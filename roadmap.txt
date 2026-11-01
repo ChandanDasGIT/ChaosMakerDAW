@@ -1,0 +1,77 @@
+# ChaosMaker: Suggested File Writing Order
+
+Follow the phases in `.claude/ROADMAP.md` from top to bottom. Complete each phase's “Done when” checkpoint before starting the next. The files below are ordered from foundations to app features; the roadmap has the detailed implementation steps and later-phase file lists.
+
+## Phase 0 — Buildable skeleton and application shell
+
+1. `README.md` — build, run, and dependency instructions.
+2. `CMakeLists.txt` — defines how the engine, app, and tests are built.
+3. `CMakePresets.json` — defines standard and sanitizer build configurations.
+4. `backend/core/version.h` — declares the backend version interface.
+5. `backend/core/version.cpp` — implements the backend version.
+6. `main.cpp` — starts Qt and loads the QML application.
+7. `Main.qml` — defines the main application window and its top-level layout.
+8. `frontend/Theme.qml` — centralizes shared colors, sizes, and visual settings.
+9. `frontend/Icons.qml` — centralizes icons by name.
+10. `frontend/window/StatusStrip.qml` — displays status along the bottom of the window.
+11. `wrapper/engineWrap/enginecontroller.h` — declares the engine object exposed to QML.
+12. `wrapper/engineWrap/enginecontroller.cpp` — implements the QML-facing engine object.
+13. `tests/testkit.h` — provides basic test and assertion helpers.
+14. `tests/testsignals.h` — provides signal and audio-test helpers.
+15. `tests/backendtests.cpp` — discovers and runs backend tests.
+16. `tests/core/version_test.cpp` — checks the backend version.
+17. `tests/core/allheaders_test.cpp` — checks that backend headers compile together.
+
+## Phase 1 — First sound
+
+18. `backend/core/audioview.h` — describes a view over audio buffers owned elsewhere.
+19. `backend/core/audiodata.h` — stores decoded audio data.
+20. `backend/rt/rtsafe.h` — provides real-time thread helpers and constraints.
+21. `backend/rt/rtqueue.h` — provides a fixed-size single-writer/single-reader queue.
+22. `backend/rt/snapshotslot.h` — transfers snapshots safely to and from the audio thread.
+23. `backend/midi/midievent.h` — defines MIDI events and a fixed-size MIDI buffer.
+24. `backend/audiodevice/audiodevice.h` — defines the device and audio callback interfaces.
+25. `backend/processor/parameter.h` — defines a parameter that can be read safely across threads.
+26. `backend/processor/smoother.h` — smooths parameter changes to avoid clicks.
+27. `backend/engine/enginecommands.h` — defines commands and events passed across the thread boundary.
+28. `backend/engine/enginesnapshot.h` — defines the read-only song state consumed by the audio thread.
+29. `backend/engine/audioengine.h` — declares the audio engine and its callback interface.
+30. `tests/rt/rtqueue_test.cpp` — checks queue behavior.
+31. `tests/rt/snapshotslot_test.cpp` — checks snapshot handoff behavior.
+32. `tests/midi/midibuffer_test.cpp` — checks MIDI buffer behavior.
+33. `tests/core/` tests — add tests for audio types as those types are implemented.
+34. `backend/audiodevice/jackdevice.h` and `.cpp` — implement audio and MIDI I/O through JACK.
+35. `backend/engine/audioengine.cpp` — implements command handling, test tone, and audio rendering.
+36. `wrapper/engineWrap/enginecontroller.*` — connect QML controls and status to the engine.
+37. `frontend/` transport controls — add the first-sound controls following the roadmap's chosen layout.
+
+## Later phases — continue in this order
+
+38. **Phase 2: Live input and plugin interface** — implement `backend/processor/processor.h`, the processor implementation, and input monitoring; add processor tests and the latency tool; connect a gain control through the wrapper and QML.
+39. **Phase 3: Transport, BPM, and time signature** — implement `backend/transport/tempomap.h` and its implementation, metronome/click behavior, transport wrapper, UI, and tests.
+40. **Phase 4: Project model and playback** — implement `backend/session/project.h` and its implementation, compile project state into engine snapshots, add WAV loading/playback, and build track/timeline UI and tests.
+41. **Phase 5: Recording** — add audio recording and disk-writing components, recording controls and UI, and overflow/timing tests.
+42. **Phase 6: Editing, undo, and save** — add edit commands, timeline editing, persistence, save/load UI, and corresponding tests.
+43. **Phase 7: Mixer and plugin slots** — add mixer state and controls, plugin slot management, and the gain processor.
+44. **Phase 8: Compressor, EQ, and reverb** — implement each DSP effect, its controls, and effect tests.
+45. **Phase 9: GuitarSuite electric-guitar pedalboard** — chain host in `backend/plugins/guitarsuite/`, each pedal in its own `backend/plugins/<pedal>/` folder, shared DSP in `backend/dsp/`, shared wrapper in `wrapper/pluginWrap/`, and UI in `frontend/plugins/guitarsuite/`. Phase 1 (live monitoring) now includes smoothed tanh overdrive with filtered 2x oversampling, circular delay, Freeverb-style reverb, snapshot-based chain swaps, whole-chain `.gspreset` save/load, and a render-order test. Phase 2 adds Noise Gate, Compressor, manual Wah, Chorus, Tremolo, and an analysis-only dry-input YIN Tuner with Standard open-string targets, selectable strings, and a flat/sharp cents meter; all use the shared registry and presets. Tremolo additionally supports BPM sync from the bottom-bar tempo field with straight, dotted, and triplet beat divisions. Input calibration adds preset-backed ±24 dB trim and raw/pre-FX/stereo-output peak meters with clip indicators. The next amp/cab stage is now implemented: generic 4x oversampled Amp and worker-loaded Cabinet IR with partitioned convolution and external WAV references in presets. The separate 10-band EQ has seven factory curves and custom .eqpreset save/load. The user confirmed amp/cab live listening works. Octaver and ±12-semitone Pitch Shifter are now implemented, with shared spectral voices, mix/level controls and preset support. BPM editing has a tested numeric editor with ± controls; EngineController owns tempo, and the nonmodal board allows transport edits while open. Crunch (lighter asymmetric drive) and Distortion (high-gain clipping, Tight, and sweepable mid EQ) are also implemented for live rock/metal monitoring, with preset/bypass support. Movable three-band Parametric EQ, Fuzz and BPM-syncable Phaser are also implemented, with shared presets and stable dial updates. GuitarSuite now includes exactly two whole-chain factory presets, Djent and Jazz, preserving calibrated input trim and any loaded cabinet IR. Live listening to the newest modules/presets remains pending; real dry recording/playback is the next broader DAW milestone. See `.claude/ROADMAP.md` Phase 9.
+46. **Phase 10: MIDI and piano roll** — add MIDI editing and recording, quantization, piano-roll UI, and tests.
+47. **Phase 11: Sampler and instruments** — implement SFZ and sample playback plus piano, drums, strings, and acoustic guitar content and controls.
+48. **Phase 12: Auto chord player** — implement chord input and rhythm-pattern playback, with wrapper, UI, and tests.
+49. **Phase 13: Export and finish** — implement offline rendering, export controls, and final verification.
+
+## How to treat the rest of the tree
+
+- `build/` contains generated build output; do not write project source there.
+- `.gitkeep` files mark folders reserved for later phases; they are not implementation tasks by themselves.
+- `templates/` contains copyable examples; copy them to the real source locations and rename/update them before use.
+- `EducationPurpose/architecture.txt` describes the project layers: `frontend/` QML talks to `wrapper/` Qt C++, which talks to `backend/` plain C++.
+- `.claude/ROADMAP.md` is the detailed source of truth for phase-specific steps, dependencies, and completion checks. Update `EducationPurpose/architecture.txt` when adding or removing project files, as its instructions specify.
+
+2026-11-01 continuation: the first real dry-input recording/playback workflow is now implemented.
+Transport uses the audio sample clock; a bounded ring feeds a background float32 WAV writer;
+finished takes become model-owned clips, and playback applies track volume/mute/solo. Optional
+Settings → Restore session on startup persists tracks/media references/tempo/EQ/GuitarSuite and
+reopens stopped/disarmed. Tremolo has opt-in Sustain only with attack delay, fade-in and threshold.
+Next: live interface validation, recording latency compensation, and per-track insert/EQ playback
+routing (clips currently play dry). General WAV import and portable project save/open remain later.

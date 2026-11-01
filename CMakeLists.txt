@@ -1,0 +1,147 @@
+cmake_minimum_required(VERSION 3.21)
+
+project(ChaosMaker VERSION 0.1 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo)     # DSP in a debug build is too slow to judge
+endif()
+
+# The sanitizer builds turn this off, so they need only the engine and the tests.
+option(DAW_BUILD_APP "Build the Qt app as well as the engine and tests" ON)
+
+find_package(Threads REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(JACK REQUIRED IMPORTED_TARGET jack)
+find_package(nlohmann_json 3 REQUIRED)
+
+# ---------------------------------------------------------------- the engine (no Qt)
+# Everything under backend/ is plain C++20. It is built as its own library and does not link to Qt,
+# so a Qt include in there fails to compile.
+file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/backend/*.cpp")
+
+add_library(dawengine STATIC ${ENGINE_SOURCES})
+target_include_directories(dawengine PUBLIC "${CMAKE_CURRENT_LIST_DIR}/backend")
+target_compile_definitions(dawengine PUBLIC DAW_VERSION="${PROJECT_VERSION}")
+# PUBLIC: the wrapper and tests must compile the backend's inline headers the same way.
+target_compile_options(dawengine PUBLIC -march=x86-64-v3 -fno-math-errno)
+target_compile_options(dawengine PRIVATE -Wall -Wextra)
+target_link_libraries(dawengine PUBLIC Threads::Threads PkgConfig::JACK)
+# PRIVATE: only backend .cpp files can see it. Keep its include inside backend/persistence/.
+target_link_libraries(dawengine PRIVATE nlohmann_json::nlohmann_json)
+
+# ---------------------------------------------------------------- the app
+if(DAW_BUILD_APP)
+    find_package(Qt6 REQUIRED COMPONENTS Quick Concurrent)
+    qt_standard_project_setup(REQUIRES 6.10)
+
+    # wrapper/  : QObject classes that connect the engine to QML (any subfolders)
+    # frontend/ : the QML files (any subfolders). File names must start with a capital letter and be
+    #             unique across all subfolders.
+    file(GLOB_RECURSE WRAPPER_SOURCES CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_LIST_DIR}"
+        "${CMAKE_CURRENT_LIST_DIR}/wrapper/*.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/wrapper/*.h")
+
+    file(GLOB_RECURSE FRONTEND_QML CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_LIST_DIR}"
+        "${CMAKE_CURRENT_LIST_DIR}/frontend/*.qml")
+
+    set_source_files_properties(frontend/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+    set_source_files_properties(frontend/Icons.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
+    qt_add_executable(appChaosMaker
+        main.cpp
+    )
+
+    qt_add_qml_module(appChaosMaker
+        URI ChaosMaker
+        QML_FILES
+            Main.qml
+            ${FRONTEND_QML}
+        SOURCES
+            ${WRAPPER_SOURCES}
+    )
+
+    target_include_directories(appChaosMaker PRIVATE "${CMAKE_CURRENT_LIST_DIR}")
+
+    # Qt's generated registration code includes the wrapper headers by bare file name,
+    # so every folder under wrapper/ has to be on the include path.
+    set(WRAPPER_DIRS "")
+    foreach(f ${WRAPPER_SOURCES})
+        get_filename_component(d "${CMAKE_CURRENT_LIST_DIR}/${f}" DIRECTORY)
+        list(APPEND WRAPPER_DIRS "${d}")
+    endforeach()
+    list(REMOVE_DUPLICATES WRAPPER_DIRS)
+    target_include_directories(appChaosMaker PRIVATE ${WRAPPER_DIRS})
+
+    target_link_libraries(appChaosMaker PRIVATE Qt6::Quick Qt6::Concurrent dawengine)
+endif()
+
+# ---------------------------------------------------------------- the tests (no Qt)
+# tests/abc/abc_test.cpp is found by itself, and ctest gets one entry named abc.
+enable_testing()
+
+file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/tests/*_test.cpp")
+
+add_executable(backendtests tests/backendtests.cpp ${TEST_SOURCES})
+target_include_directories(backendtests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/tests")
+target_compile_options(backendtests PRIVATE -Wall -Wextra)
+target_link_libraries(backendtests PRIVATE dawengine)
+
+foreach(file ${TEST_SOURCES})
+    get_filename_component(stem "${file}" NAME_WE)
+    string(REGEX REPLACE "_test$" "" suite "${stem}")
+    add_test(NAME ${suite} COMMAND backendtests ${suite})
+endforeach()
+
+# Qt model integration tests are separate from the Qt-free realtime test binary.
+if(DAW_BUILD_APP)
+    add_executable(wrappertests
+        tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp
+        wrapper/engineWrap/enginecontroller.cpp wrapper/engineWrap/enginecontroller.h
+        wrapper/session/tracklistmodel.cpp wrapper/session/tracklistmodel.h
+        wrapper/pluginWrap/guitarsuitemodel.cpp wrapper/pluginWrap/guitarsuitemodel.h
+        wrapper/pluginWrap/pedalregistry.cpp wrapper/pluginWrap/pedalregistry.h)
+    target_include_directories(wrappertests PRIVATE "${CMAKE_CURRENT_LIST_DIR}" "${CMAKE_CURRENT_LIST_DIR}/tests" ${WRAPPER_DIRS})
+    target_compile_options(wrappertests PRIVATE -Wall -Wextra)
+    target_link_libraries(wrappertests PRIVATE Qt6::Qml Qt6::Concurrent dawengine)
+    add_test(NAME qtpresets COMMAND wrappertests qtpresets)
+    add_test(NAME qtrecording COMMAND wrappertests qtrecording)
+endif()
+
+# Exercise actual mouse/keyboard tempo editing when Qt Test is available.
+if(DAW_BUILD_APP)
+    find_package(Qt6 QUIET COMPONENTS Test)
+    if(TARGET Qt6::Test)
+        qt_add_executable(transporttests tests/ui/transport_qtcheck.cpp)
+        qt_add_qml_module(transporttests URI TransportTests
+            QML_FILES frontend/Theme.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
+                      frontend/transportbar/TempoEditor.qml
+                      frontend/plugins/guitarsuite/GuitarSuitePanel.qml
+                      frontend/plugins/guitarsuite/LevelMeter.qml
+                      tests/ui/TransportHarness.qml
+            SOURCES ${WRAPPER_SOURCES})
+        target_include_directories(transporttests PRIVATE "${CMAKE_CURRENT_LIST_DIR}" ${WRAPPER_DIRS})
+        target_link_libraries(transporttests PRIVATE Qt6::Quick Qt6::Test Qt6::Concurrent dawengine)
+        add_test(NAME transport_ui COMMAND transporttests)
+        set_tests_properties(transport_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;PIPEWIRE_REMOTE=codex-test-no-server;PULSE_SERVER=unix:/tmp/chaosmaker-test-no-server")
+    endif()
+endif()
+
+# The two factory chains are embedded in every executable that uses GuitarSuiteModel.
+if(DAW_BUILD_APP)
+    foreach(preset_target appChaosMaker wrappertests transporttests)
+        if(TARGET ${preset_target})
+            qt_add_resources(${preset_target} guitarsuite_factory_presets
+                PREFIX "/GuitarSuitePresets"
+                BASE "${CMAKE_CURRENT_LIST_DIR}/resources/presets/guitarsuite"
+                FILES resources/presets/guitarsuite/Djent.gspreset
+                      resources/presets/guitarsuite/Jazz.gspreset)
+        endif()
+    endforeach()
+endif()

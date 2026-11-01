@@ -1,0 +1,163 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+Rectangle {
+    id: root
+    property int timeSignature: 4
+    property int timeSignatureDenominator: 4
+    property real bpm: 120
+    property bool playing: false
+    property bool recording: false
+    property bool repeating: false
+    signal numeratorEdited(int value)
+    signal denominatorEdited(int value)
+    signal bpmEdited(real value)
+    signal transportAction(string action)
+    height: 72
+    color: "#242424"
+    border.color: Theme.divider
+    RowLayout {
+        anchors.fill: parent
+        anchors.leftMargin: 16
+        anchors.rightMargin: 16
+        spacing: 8
+        Repeater {
+            model: [
+                {glyph: "|◀", hintText: "Go to start", command: "rewind"},
+                {glyph: "▶|", hintText: "Skip forward one bar", command: "forward"},
+                {glyph: "●", hintText: "Start recording", command: "record"},
+                {glyph: "▶", hintText: "Play", command: "play"},
+                {glyph: "Ⅱ", hintText: "Pause", command: "pause"},
+                {glyph: "■", hintText: "Stop", command: "stop"},
+                {glyph: "⟳", hintText: "Toggle repeat", command: "repeat"}
+            ]
+            delegate: ToolButton {
+                id: transportButton
+                objectName: "transport_" + command
+                required property int index
+                required property string glyph
+                required property string hintText
+                required property string command
+                readonly property bool active: command === "record" ? root.recording
+                                                   : command === "play" ? root.playing && !root.recording
+                                                   : command === "repeat" ? root.repeating : false
+                text: glyph
+                Layout.preferredWidth: index < 2 ? 42 : 36
+                Layout.preferredHeight: 36
+                contentItem: Text {
+                    text: transportButton.glyph
+                    color: index === 2 ? Theme.record : (transportButton.active ? Theme.accent : (transportButton.hovered ? Theme.text : Theme.textMuted))
+                    font.pixelSize: index === 2 ? 18 : 12
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    radius: 6
+                    color: index === 2 && transportButton.active ? "#633238"
+                         : transportButton.down ? "#454851"
+                         : transportButton.active ? "#203a45"
+                         : transportButton.hovered ? "#363941" : "#2b2d32"
+                    border.color: index === 2 && transportButton.active ? Theme.record
+                                : transportButton.active ? Theme.accent
+                                : transportButton.hovered ? "#5a5e68" : "#41444c"
+                }
+                onClicked: root.transportAction(command)
+                ToolTip.visible: hovered
+                ToolTip.text: hintText
+                ToolTip.delay: 450
+            }
+        }
+        Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 34; color: Theme.divider; Layout.leftMargin: 8; Layout.rightMargin: 8 }
+        Text {
+            text: {
+                const ms = Math.floor(EngineController.positionSeconds * 1000)
+                const hours = Math.floor(ms / 3600000)
+                const minutes = Math.floor(ms / 60000) % 60
+                const seconds = Math.floor(ms / 1000) % 60
+                return String(hours).padStart(2, "0") + ":" + String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0") + "." + String(ms % 1000).padStart(3, "0")
+            }
+            color: Theme.text; font.pixelSize: 15; font.family: "monospace" }
+        Item { Layout.fillWidth: true }
+        ColumnLayout {
+            spacing: 3
+            Text { text: "TIME SIGNATURE"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
+            Rectangle {
+                Layout.preferredWidth: 87
+                Layout.preferredHeight: 29
+                radius: 6
+                color: "#191a1e"
+                border.color: "#3a3d45"
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 3
+                    TextField {
+                        id: numeratorField
+                        width: 32; height: 23
+                        text: String(root.timeSignature)
+                        color: Theme.text
+                        font.pixelSize: 12; font.bold: true
+                        horizontalAlignment: TextInput.AlignHCenter
+                        verticalAlignment: TextInput.AlignVCenter
+                        selectByMouse: true
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        validator: IntValidator { bottom: 1; top: 2147483647 }
+                        background: Rectangle {
+                            radius: 5
+                            color: numeratorField.activeFocus ? "#282b32" : "transparent"
+                            border.color: numeratorField.activeFocus ? Theme.accent : "transparent"
+                        }
+                        onEditingFinished: {
+                            if (acceptableInput && Number(text) > 0)
+                                root.numeratorEdited(Number(text))
+                            else
+                                text = String(root.timeSignature)
+                        }
+                    }
+                    Text { text: "/"; anchors.verticalCenter: parent.verticalCenter; color: "#7e838d"; font.pixelSize: 13 }
+                    TextField {
+                        id: denominatorField
+                        width: 32; height: 23
+                        text: String(root.timeSignatureDenominator)
+                        color: Theme.text
+                        font.pixelSize: 12; font.bold: true
+                        horizontalAlignment: TextInput.AlignHCenter
+                        verticalAlignment: TextInput.AlignVCenter
+                        selectByMouse: true
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        validator: IntValidator { bottom: 1; top: 2147483647 }
+                        background: Rectangle {
+                            radius: 5
+                            color: denominatorField.activeFocus ? "#282b32" : "transparent"
+                            border.color: denominatorField.activeFocus ? Theme.accent : "transparent"
+                        }
+                        onEditingFinished: {
+                            if (acceptableInput && Number(text) > 0)
+                                root.denominatorEdited(Number(text))
+                            else
+                                text = String(root.timeSignatureDenominator)
+                        }
+                    }
+                }
+            }
+        }
+        ColumnLayout {
+            spacing: 3
+            Layout.leftMargin: 8
+            Text { text: "BPM"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
+            TempoEditor {
+                Layout.preferredWidth: 124
+                Layout.preferredHeight: 29
+                value: root.bpm
+                onValueEdited: value => root.bpmEdited(value)
+            }
+        }
+    }
+
+    Connections {
+        target: root
+        function onTimeSignatureChanged() { numeratorField.text = String(root.timeSignature) }
+        function onTimeSignatureDenominatorChanged() { denominatorField.text = String(root.timeSignatureDenominator) }
+    }
+}

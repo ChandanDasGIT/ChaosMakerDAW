@@ -1,0 +1,42 @@
+# Build output
+build*/
+AppDir/
+dist/
+
+# Release archives & packaged binaries
+*.tar.xz
+*.tar.gz
+*.AppImage
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CMakeUserPresets.json
+compile_commands.json
+
+# Qt Creator & language server
+*.user
+*.user.*
+.qtc_clangd/
+.cache/
+
+# Editor and system files
+.vscode/
+.idea/
+*.swp
+*~
+*.log
+
+# Sample libraries and audio live outside the repo
+*.flac
+
+# Private notes
+.claude/
+.agents/
+.codex/
+.aws/
+
+# Local commit preparation and shell scratch file
+/initial-commit.txt
+/grep
