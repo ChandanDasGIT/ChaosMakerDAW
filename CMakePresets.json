@@ -1,0 +1,53 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "default",
+            "displayName": "App and tests",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build"
+        },
+        {
+            "name": "sanitizer-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "clang++",
+                "DAW_BUILD_APP": "OFF"
+            }
+        },
+        {
+            "name": "rt",
+            "displayName": "RealtimeSanitizer: audio thread rules",
+            "inherits": "sanitizer-base",
+            "binaryDir": "${sourceDir}/build-rt",
+            "cacheVariables": { "CMAKE_CXX_FLAGS": "-fsanitize=realtime -g" }
+        },
+        {
+            "name": "tsan",
+            "displayName": "ThreadSanitizer: data races",
+            "inherits": "sanitizer-base",
+            "binaryDir": "${sourceDir}/build-tsan",
+            "cacheVariables": { "CMAKE_CXX_FLAGS": "-fsanitize=thread -g" }
+        },
+        {
+            "name": "asan",
+            "displayName": "AddressSanitizer: bad memory access",
+            "inherits": "sanitizer-base",
+            "binaryDir": "${sourceDir}/build-asan",
+            "cacheVariables": { "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -g" }
+        }
+    ],
+    "buildPresets": [
+        { "name": "default", "configurePreset": "default" },
+        { "name": "rt", "configurePreset": "rt" },
+        { "name": "tsan", "configurePreset": "tsan" },
+        { "name": "asan", "configurePreset": "asan" }
+    ],
+    "testPresets": [
+        { "name": "default", "configurePreset": "default", "output": { "outputOnFailure": true } },
+        { "name": "rt", "configurePreset": "rt", "output": { "outputOnFailure": true } },
+        { "name": "tsan", "configurePreset": "tsan", "output": { "outputOnFailure": true } },
+        { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true } }
+    ]
+}

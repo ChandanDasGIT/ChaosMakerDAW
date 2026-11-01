@@ -1,0 +1,66 @@
+{
+  "format": "GuitarSuitePreset",
+  "version": 1,
+  "name": "Djent",
+  "inputTrimDb": 0,
+  "pedals": [
+    {
+      "type": "pedal.noisegate",
+      "bypassed": false,
+      "parameters": {
+        "threshold": -40,
+        "attack": 0.15,
+        "release": 20
+      }
+    },
+    {
+      "type": "pedal.distortion",
+      "bypassed": false,
+      "parameters": {
+        "drive": 24,
+        "tight": 0.75,
+        "bass": 0,
+        "mid": 1.5,
+        "midfreq": 1100,
+        "treble": -1,
+        "level": -11
+      }
+    },
+    {
+      "type": "pedal.amp",
+      "bypassed": false,
+      "parameters": {
+        "drive": 4,
+        "bass": 1,
+        "mid": 1,
+        "treble": -2,
+        "presence": 0.15,
+        "master": -8
+      }
+    },
+    {
+      "type": "pedal.cabinet",
+      "bypassed": false,
+      "parameters": {
+        "mix": 1,
+        "level": 0
+      }
+    },
+    {
+      "type": "pedal.parametriceq",
+      "bypassed": false,
+      "parameters": {
+        "lowfreq": 95,
+        "lowgain": -1.5,
+        "lowq": 0.7,
+        "midfreq": 320,
+        "midgain": -2.5,
+        "midq": 1.2,
+        "highfreq": 6000,
+        "highgain": -4,
+        "highq": 0.7,
+        "level": -1
+      }
+    }
+  ]
+}
