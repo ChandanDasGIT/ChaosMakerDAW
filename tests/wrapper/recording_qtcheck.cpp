@@ -27,13 +27,24 @@ public:
     std::vector<std::string> inputNames() const override { return {"test:input","test:mic","test:pickup"}; }
     std::vector<std::string> outputNames() const override { return {"test:left","test:right"}; }
     std::string connectedInput;
+    bool multipleInputs=false, missingInput=false;
+    std::string failingSource;
     bool connectInput(const std::string& source) override { connectedInput=source; return true; }
+    int inputChannelCapacity() const override { return multipleInputs ? 3 : 1; }
+    int connectInputChannel(const std::string& source) override {
+        if(source==failingSource)return -1;
+        if(!multipleInputs)return connectInput(source)?0:-1;
+        const auto names=inputNames();
+        const auto it=std::find(names.begin(),names.end(),source);
+        return it==names.end() ? -1 : int(it-names.begin());
+    }
     bool connectOutput(const std::string&,const std::string&) override { return true; }
     std::string lastError() const override { return {}; }
     float input[128]{}, output[128]{}, right[128]{};
+    float mic[128]{}, pickup[128]{};
     void process() {
-        float* in[]{input}; float* out[]{output,right};
-        if(callback) callback->process({{in,1,128},{out,2,128},nullptr,128});
+        float* in[]{input,mic,pickup}; float* out[]{output,right};
+        if(callback) callback->process({{in,missingInput?0:(multipleInputs?3:1),128},{out,2,128},nullptr,128});
     }
 };
 void application() {
@@ -206,7 +217,7 @@ TEST(qtrecording, vocal_and_acoustic_share_live_input_fx_recording_and_session_p
         }
     }
 }
-TEST(qtrecording, switching_live_instruments_routes_their_input_gain_and_eq_and_rejects_multiple_arms) {
+TEST(qtrecording, switching_live_instruments_keeps_legacy_single_track_queries_unambiguous) {
     Storage storage; TrackListModel tracks;
     const int vocal=tracks.addVocalTrack(), acoustic=tracks.addInstrumentTrackOfType("Acoustic Guitar");
     const int drums=tracks.addInstrumentTrackOfType("Drums");
@@ -446,5 +457,89 @@ TEST(qttrackmeters, controller_polls_track_levels_and_removes_stale_project_mete
     CHECK(tracks.setMuted(a,true)); io->process();
     CHECK(tracks.removeTrack(b)); tick(70); CHECK(!controller.trackLevels().contains(QString::number(b)));
     CHECK(controller.newProject()); CHECK(controller.trackLevels().isEmpty());
+    controller.shutdownSession();
+}
+
+TEST(qtmultirecording, independent_inputs_monitor_fx_and_aligned_wet_dry_takes_survive_reopen) {
+    Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get(); io->multipleInputs=true;
+    EngineController controller(std::move(device),false); TrackListModel tracks; controller.attachProject(&tracks);
+    const int a=tracks.addInstrumentTrackOfType("Electric Guitar"), b=tracks.addVocalTrack();
+    CHECK(tracks.setTrackInputPort(a,"test:input")); CHECK(tracks.setTrackInputPort(b,"test:mic"));
+    auto* fxA=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(a));
+    auto* fxB=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(b));
+    fxA->setInputTrimDb(-6.020599913); fxB->setInputTrimDb(-12.041199827);
+    CHECK(tracks.setRecordDry(b,true));
+    std::fill_n(io->input,128,0.1f); std::fill_n(io->mic,128,0.4f);
+    CHECK(tracks.setRecordArmed(a,true)); CHECK(tracks.setRecordArmed(b,true));
+    for(int i=0;i<200;++i)io->process();
+    CHECK(controller.monitoredTracks().size()==2);
+    CHECK_NEAR(io->output[64],0.15,1e-5);
+    CHECK(tracks.setMuted(b,true)); CHECK(tracks.setVolume(a,0.5)); io->process();
+    CHECK_NEAR(io->output[64],0.025,1e-5);
+    controller.seekBeat(2); controller.transportAction("record"); io->process(); io->process();
+    CHECK(controller.recording()); CHECK(controller.recordingTracks().size()==2);
+    for(int id:{a,b}) {
+        CHECK(!tracks.removeTrack(id)); CHECK(!tracks.setTrackInputPort(id,"test:pickup")); CHECK(!tracks.setRecordDry(id,true));
+    }
+    controller.transportAction("pause"); io->process();
+    for(int i=0;i<100 && controller.takeBusy();++i)tick(10);
+    CHECK(!controller.takeBusy()); CHECK(!controller.playing()); CHECK(controller.positionSeconds()>0);
+    auto snapshot=tracks.playbackSnapshot(); CHECK(snapshot->keepAudio.size()==2);
+    const auto& clipA=tracks.project().findTrack(a)->audioClips[0]; const auto& clipB=tracks.project().findTrack(b)->audioClips[0];
+    CHECK(clipA.start==48000 && clipB.start==clipA.start); CHECK(clipA.length==256 && clipB.length==256);
+    CHECK(clipA.effectsPrinted); CHECK(!clipB.effectsPrinted);
+    CHECK(snapshot->keepAudio[0]->channels.size()==2); CHECK(snapshot->keepAudio[1]->channels.size()==1);
+    CHECK_NEAR(snapshot->keepAudio[0]->channels[0][64],0.05,1e-5); // independent of the fader
+    CHECK_NEAR(snapshot->keepAudio[1]->channels[0][64],0.4,1e-6); // untouched source
+    CHECK(tracks.setRecordArmed(a,false)); CHECK(tracks.setRecordArmed(b,false)); CHECK(tracks.setMuted(b,false));
+    controller.seekBeat(2); controller.transportAction("play"); io->process();
+    CHECK_NEAR(io->output[64],0.125,1e-5);
+    const auto file=QUrl::fromLocalFile(storage.dir.path()+"/multi.chaos"); CHECK(controller.saveProject(file));
+    CHECK(controller.newProject()); CHECK(controller.openProject(file)); io->process();
+    CHECK(tracks.count()==2); CHECK(!tracks.cleanMonitorArmed());
+    controller.seekBeat(2); controller.transportAction("play"); io->process();
+    CHECK_NEAR(io->output[64],0.125,1e-5); controller.shutdownSession();
+}
+
+TEST(qtmultirecording, disarming_one_track_finishes_only_its_take_and_shutdown_finalizes_the_rest) {
+    Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get(); io->multipleInputs=true;
+    EngineController controller(std::move(device),false); TrackListModel tracks; controller.attachProject(&tracks);
+    const int a=tracks.addAudioTrack(), b=tracks.addVocalTrack();
+    CHECK(tracks.setTrackInputPort(b,"test:mic"));
+    CHECK(tracks.setRecordArmed(a,true)); CHECK(tracks.setRecordArmed(b,true));
+    std::fill_n(io->input,128,0.1f); std::fill_n(io->mic,128,0.2f);
+    controller.transportAction("record"); io->process(); io->process();
+    int monitorUpdates=0;
+    QObject::connect(&controller,&EngineController::monitoredTrackChanged,&controller,[&]{++monitorUpdates;});
+    CHECK(tracks.setRecordArmed(a,false)); io->process();
+    CHECK(monitorUpdates>0); CHECK(controller.monitoredTracks().size()==1);
+    for(int i=0;i<100 && tracks.project().findTrack(a)->audioClips.empty();++i)tick(10);
+    CHECK(controller.recording()); CHECK(controller.recordingTracks().size()==1);
+    CHECK(tracks.project().findTrack(a)->audioClips.size()==1);
+    io->process(); controller.shutdownSession();
+    CHECK(!controller.takeBusy());
+    auto snapshot=tracks.playbackSnapshot(); CHECK(snapshot->keepAudio.size()==2);
+    CHECK(snapshot->keepAudio[0]->frames==256); CHECK(snapshot->keepAudio[1]->frames==512);
+    CHECK_NEAR(snapshot->keepAudio[0]->channels[0][0],0.1,1e-6);
+    CHECK_NEAR(snapshot->keepAudio[1]->channels[0][0],0.2,1e-6);
+}
+
+TEST(qtmultirecording, shared_input_can_feed_two_independent_chains_and_invalid_routes_do_not_start_takes) {
+    Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get(); io->multipleInputs=true;
+    EngineController controller(std::move(device),false); TrackListModel tracks; controller.attachProject(&tracks);
+    const int a=tracks.addAudioTrack(), b=tracks.addAudioTrack();
+    CHECK(tracks.setRecordArmed(a,true)); CHECK(tracks.setRecordArmed(b,true));
+    CHECK(tracks.setVolume(a,0.5)); std::fill_n(io->input,128,0.2f); io->process();
+    CHECK_NEAR(io->output[64],0.3,1e-6);
+    CHECK(tracks.setSolo(b,true)); io->process(); CHECK_NEAR(io->output[64],0.2,1e-6);
+    CHECK(tracks.setTrackInputPort(b,"missing:port")); controller.transportAction("record");
+    CHECK(!controller.takeBusy()); CHECK(!controller.transportMessage().isEmpty());
+    io->failingSource="test:mic";
+    CHECK(tracks.setTrackInputPort(b,"test:mic")); controller.transportAction("record");
+    CHECK(!controller.takeBusy()); CHECK(controller.transportMessage().contains("connect track input"));
+    io->failingSource.clear(); controller.transportAction("record"); io->process();
+    CHECK(controller.recording()); io->missingInput=true; io->process();
+    for(int i=0;i<100 && controller.takeBusy();++i)tick(10);
+    CHECK(!controller.recording()); CHECK(!controller.takeBusy()); CHECK(tracks.clips().size()==2);
     controller.shutdownSession();
 }

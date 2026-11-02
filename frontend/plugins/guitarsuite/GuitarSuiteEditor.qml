@@ -8,6 +8,8 @@ Item {
     property var effectsModel
     property string trackName: ""
     property bool monitoring: true
+    property var levels: EngineController.monitorLevels
+    signal clearClipsRequested()
     ColumnLayout {
         enabled: root.effectsModel && !root.effectsModel.busy
         anchors.fill: parent
@@ -88,15 +90,15 @@ Item {
                     required property var modelData
                     Layout.fillWidth: true
                     label: modelData.label
-                    levelDb: root.monitoring ? (EngineController.monitorLevels[modelData.db] ?? -120) : -120
-                    clipped: root.monitoring && (EngineController.monitorLevels[modelData.clip] ?? false)
+                    levelDb: root.monitoring ? (root.levels[modelData.db] ?? -120) : -120
+                    clipped: root.monitoring && (root.levels[modelData.clip] ?? false)
                     showTarget: modelData.db === "preFxDb"
                 }
             }
             ToolButton {
                 text: "Clear clips"
                 enabled: root.monitoring
-                onClicked: EngineController.clearMonitorClips()
+                onClicked: { EngineController.clearMonitorClips(); root.clearClipsRequested() }
                 ToolTip.visible: hovered
                 ToolTip.text: "Reset the latched red clip indicators"
             }

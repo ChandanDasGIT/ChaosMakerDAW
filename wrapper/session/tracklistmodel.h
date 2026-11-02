@@ -65,9 +65,10 @@ public:
     int recordingTrackId() const;
     const Project& project() const { return m_project; }
     void setSampleRate(double rate);
-    void lockRecordingTrack(int id) { m_recordingTrack = id; emit historyChanged(); }
-    bool canUndo() const { return m_recordingTrack < 0 && m_project.canUndo(); }
-    bool canRedo() const { return m_recordingTrack < 0 && m_project.canRedo(); }
+    void lockRecordingTrack(int id) { lockRecordingTracks(id<0 ? QSet<int>{} : QSet<int>{id}); }
+    void lockRecordingTracks(const QSet<int>& ids) { m_recordingTracks=ids; emit historyChanged(); }
+    bool canUndo() const { return m_recordingTracks.isEmpty() && m_project.canUndo(); }
+    bool canRedo() const { return m_recordingTracks.isEmpty() && m_project.canRedo(); }
     Q_INVOKABLE bool undo();
     Q_INVOKABLE bool redo();
     Q_INVOKABLE int addAudioTrack();
@@ -129,7 +130,7 @@ private:
     Project m_project;
     QHash<QString, std::shared_ptr<const AudioData>> m_audio;
     QSet<QString> m_mediaPaths;
-    int m_recordingTrack = -1;
+    QSet<int> m_recordingTracks;
     int m_nextAudioNumber = 1;
     int m_nextVocalNumber = 1;
     int m_nextInstrumentNumber = 1;

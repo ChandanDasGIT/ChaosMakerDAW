@@ -13,6 +13,7 @@
 #include <atomic>
 #include <array>
 #include "recording/takerecorder.h"
+#include "recording/recordinggroup.h"
 
 class AudioEngine final : public AudioCallback {
 public:
@@ -51,6 +52,8 @@ public:
     std::vector<std::string> inputNames() const;
     std::vector<std::string> outputNames() const;
     bool connectInput(const std::string& source);
+    int connectInputChannel(const std::string& source);
+    int inputChannelCapacity() const { return m_device ? m_device->inputChannelCapacity() : 0; }
     bool connectOutput(const std::string& left, const std::string& right);
     void setMonitorEqBand(int band, float gainDb) noexcept { m_monitorEq.setBandGain(band, gainDb); }
 
@@ -67,6 +70,8 @@ private:
     SnapshotSlot<EngineSnapshot> m_snapshot;
     SnapshotSlot<EngineSnapshot> m_playback;
     void finishRecording() noexcept;
+    void renderTracks(const AudioIO& io, const EngineSnapshot& snapshot, int frames) noexcept;
+    RecordingGroup* m_recordingGroup = nullptr;
     void mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames, TrackMeters* liveMeters) noexcept;
     TakeRecorder* m_recorder = nullptr;
     std::atomic<TakeRecorder*> m_releasedRecorder{nullptr};

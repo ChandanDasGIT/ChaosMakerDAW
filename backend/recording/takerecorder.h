@@ -19,6 +19,8 @@ public:
     bool capture(const AudioView& audio) noexcept;
     Source source() const noexcept { return m_source; }
     void finish() noexcept { inputFinished.store(true, std::memory_order_release); }
+    void releaseFromAudio() noexcept { finish(); releasedByAudio.store(true,std::memory_order_release); }
+    bool released() const noexcept { return releasedByAudio.load(std::memory_order_acquire); }
     bool done() const noexcept { return completed.load(std::memory_order_acquire); }
     void wait(); // only after the audio thread has released this object
     std::shared_ptr<const AudioData> audio() const { return result; } // only after done()/wait()
@@ -30,6 +32,7 @@ private:
     void run();
     RtAudioRing<1 << 18> ring; // ~5.5 seconds mono / 2.7 seconds stereo at 48 kHz
     std::atomic<bool> inputFinished{false}, completed{false}, overflow{false};
+    std::atomic<bool> releasedByAudio{false};
     std::ofstream file;
     std::thread worker;
     std::shared_ptr<AudioData> result;

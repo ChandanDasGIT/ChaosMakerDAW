@@ -3,6 +3,7 @@ import QtQuick.Controls
 
 Item {
     id: root
+    property var transport: EngineController
     property int timeSignature: 4
     property int timeSignatureDenominator: 4
     property real bpm: 120
@@ -10,10 +11,10 @@ Item {
     // stretching recorded audio. Keep zoom separate from the BPM binding.
     property real pixelsPerSecond: 96
     readonly property real beatWidth: pixelsPerSecond * 60 / bpm
-    readonly property real playhead: EngineController.positionBeats * beatWidth
-    readonly property bool playing: EngineController.playing
-    readonly property bool recording: EngineController.recording
-    readonly property bool repeating: EngineController.repeating
+    readonly property real playhead: root.transport.positionBeats * beatWidth
+    readonly property bool playing: root.transport.playing
+    readonly property bool recording: root.transport.recording
+    readonly property bool repeating: root.transport.repeating
     readonly property real recordingTailX: playing ? playhead + width * 0.2 : 0
     property int selectedClipId: -1
     property int selectedTrackId: -1
@@ -40,7 +41,7 @@ Item {
     readonly property int visibleBeatCount: Math.ceil(width / (beatUnitWidth * beatGridStride)) + 3
 
     function setPlayhead(position) {
-        EngineController.seekBeat(Math.max(0, position / beatWidth))
+        root.transport.seekBeat(Math.max(0, position / beatWidth))
     }
 
     function hasClipOverlap(trackId, startBeat, lengthBeats) {
@@ -85,7 +86,7 @@ Item {
     Shortcut {
         sequence: "S"
         enabled: root.activeFocus && root.selectedClipId >= 0 && !root.recording
-        onActivated: root.trackModel.splitClipAtBeat(root.selectedTrackId, root.selectedClipId, EngineController.positionBeats)
+        onActivated: root.trackModel.splitClipAtBeat(root.selectedTrackId, root.selectedClipId, root.transport.positionBeats)
     }
     Menu {
         id: clipContextMenu
@@ -107,13 +108,13 @@ Item {
         MenuItem {
             id: splitClipAction
             text: "Split at playhead"
-            enabled: !root.recording && EngineController.positionBeats > clipContextMenu.targetStart
-                     && EngineController.positionBeats < clipContextMenu.targetStart + clipContextMenu.targetLength
+            enabled: !root.recording && root.transport.positionBeats > clipContextMenu.targetStart
+                     && root.transport.positionBeats < clipContextMenu.targetStart + clipContextMenu.targetLength
             implicitHeight: 32
             leftPadding: Theme.margin
             contentItem: Text { text: splitClipAction.text; color: !splitClipAction.enabled ? Theme.textMuted : splitClipAction.highlighted ? Theme.accent : Theme.text; font.pixelSize: Theme.bodySize; verticalAlignment: Text.AlignVCenter }
             background: Rectangle { color: splitClipAction.highlighted ? Theme.tooltipBg : "transparent"; radius: 4 }
-            onTriggered: root.trackModel.splitClipAtBeat(clipContextMenu.targetTrackId, clipContextMenu.targetClipId, EngineController.positionBeats)
+            onTriggered: root.trackModel.splitClipAtBeat(clipContextMenu.targetTrackId, clipContextMenu.targetClipId, root.transport.positionBeats)
         }
         MenuItem {
             id: deleteClipAction
@@ -139,7 +140,7 @@ Item {
     }
 
     Connections {
-        target: EngineController
+        target: root.transport
         function onTransportChanged() {
             if (root.playing && root.playhead > scroll.contentX + scroll.width * 0.82)
                 scroll.contentX = Math.max(0, Math.min(root.playhead - scroll.width * 0.82,
@@ -433,14 +434,19 @@ Item {
             z: 2
         }
 
-        Rectangle {
-            visible: root.recording && root.trackModel
-            x: EngineController.recordingStartBeats * root.beatWidth
-            y: root.rulerHeight + (root.trackModel ? root.trackModel.indexOfTrack(EngineController.recordingTrackId) : 0) * root.laneHeight + 8
+        Repeater {
+          model: root.recording ? root.transport.recordingTracks : []
+          delegate: Rectangle {
+            required property int modelData
+            objectName: "recordingPreview" + modelData
+            visible: !!root.trackModel
+            x: root.transport.recordingStartBeats * root.beatWidth
+            y: root.rulerHeight + (root.trackModel ? root.trackModel.indexOfTrack(modelData) : 0) * root.laneHeight + 8
             width: Math.max(2, root.playhead - x)
             height: root.laneHeight - 18
             color: "#663238"; border.color: Theme.record; radius: 4; z: 3
             Text { anchors.left: parent.left; anchors.leftMargin: 8; anchors.top: parent.top; anchors.topMargin: 8; text: "Recording…"; color: Theme.text }
+          }
         }
         Rectangle { x: root.playhead; y: 0; width: 2; height: scroll.contentHeight; color: Theme.record; z: 4 }
 

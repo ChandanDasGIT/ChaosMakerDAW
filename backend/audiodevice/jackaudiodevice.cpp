@@ -27,10 +27,13 @@ bool JackAudioDevice::open(AudioCallback* callback, int wantedBufferFrames)
     m_bufferFrames.store(static_cast<int>(jack_get_buffer_size(m_client)), std::memory_order_relaxed);
     m_requestedBufferFrames = wantedBufferFrames;
     m_bufferRequestAccepted = wantedBufferFrames <= 0 || m_bufferFrames.load(std::memory_order_relaxed) == wantedBufferFrames;
-    m_input = jack_port_register(m_client, "guitar_in", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+    for(int i=0;i<inputChannels;++i) {
+        const std::string name=i==0 ? "guitar_in" : "track_in_"+std::to_string(i);
+        m_inputs[i]=jack_port_register(m_client,name.c_str(),JACK_DEFAULT_AUDIO_TYPE,JackPortIsInput,0);
+    }
     m_outputs[0] = jack_port_register(m_client, "monitor_l", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
     m_outputs[1] = jack_port_register(m_client, "monitor_r", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-    if (!m_input || !m_outputs[0] || !m_outputs[1]
+    if (std::any_of(m_inputs.begin(),m_inputs.end(),[](auto* port){return !port;}) || !m_outputs[0] || !m_outputs[1]
         || jack_set_process_callback(m_client, &JackAudioDevice::process, this) != 0
         || jack_set_buffer_size_callback(m_client, &JackAudioDevice::bufferSizeChanged, this) != 0
         || jack_set_xrun_callback(m_client, &JackAudioDevice::xrun, this) != 0) {
@@ -65,7 +68,7 @@ void JackAudioDevice::close()
         jack_client_close(m_client);
     }
     m_client = nullptr;
-    m_input = nullptr;
+    m_inputs = {}; m_sources = {};
     m_outputs = {};
     m_callback = nullptr;
     m_sampleRateHz = 0.0;
@@ -112,7 +115,7 @@ std::vector<std::string> JackAudioDevice::outputNames() const
 
 bool JackAudioDevice::connectInput(const std::string& source)
 {
-    if (!m_client || !m_input || source.empty()) {
+    if (!m_client || !m_inputs[0] || source.empty()) {
         m_error = "Select an available JACK audio input.";
         return false;
     }
@@ -120,13 +123,28 @@ bool JackAudioDevice::connectInput(const std::string& source)
         m_error = "The selected JACK input is no longer available.";
         return false;
     }
-    disconnectAll(m_input, false);
-    if (jack_connect(m_client, source.c_str(), jack_port_name(m_input)) != 0) {
+    disconnectAll(m_inputs[0], false);
+    if (jack_connect(m_client, source.c_str(), jack_port_name(m_inputs[0])) != 0) {
         m_error = "JACK could not connect the selected input port.";
         return false;
     }
     m_error.clear();
     return true;
+}
+
+int JackAudioDevice::connectInputChannel(const std::string& source)
+{
+    if(!m_client || std::find(m_inputNames.begin(),m_inputNames.end(),source)==m_inputNames.end()) {
+        m_error="The selected JACK input is unavailable."; return -1;
+    }
+    // Channel zero remains the legacy/default route. Track routes never reconnect it.
+    for(int i=1;i<inputChannels;++i) if(m_sources[i]==source) return i;
+    for(int i=1;i<inputChannels;++i) if(m_sources[i].empty()) {
+        const int result=jack_connect(m_client,source.c_str(),jack_port_name(m_inputs[i]));
+        if(result!=0 && result!=EEXIST) { m_error="JACK could not connect a track input."; return -1; }
+        m_sources[i]=source; m_error.clear(); return i;
+    }
+    m_error="All 31 independent JACK input routes are in use."; return -1;
 }
 
 bool JackAudioDevice::connectOutput(const std::string& left, const std::string& right)
@@ -185,12 +203,13 @@ int JackAudioDevice::processBlock(jack_nframes_t frames) noexcept
     if (!m_client || !m_callback)
         return 0;
 
-    m_inputBuffers[0] = static_cast<float*>(jack_port_get_buffer(m_input, frames));
+    for(int i=0;i<inputChannels;++i)
+        m_inputBuffers[i]=static_cast<float*>(jack_port_get_buffer(m_inputs[i],frames));
     for (std::size_t i = 0; i < m_outputs.size(); ++i)
         m_outputBuffers[i] = static_cast<float*>(jack_port_get_buffer(m_outputs[i], frames));
 
     AudioIO io;
-    io.input = {m_inputBuffers.data(), 1, static_cast<int>(frames)};
+    io.input = {m_inputBuffers.data(), inputChannels, static_cast<int>(frames)};
     io.output = {m_outputBuffers.data(), static_cast<int>(m_outputs.size()), static_cast<int>(frames)};
     io.frames = static_cast<int>(frames);
     m_callback->process(io);

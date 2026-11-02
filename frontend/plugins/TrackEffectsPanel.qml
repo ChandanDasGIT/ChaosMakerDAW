@@ -133,7 +133,9 @@ Popup {
                     sourceComponent: GuitarSuiteEditor {
                         trackName: root.trackName
                         effectsModel: root.effectsModel
-                        monitoring: EngineController.monitoredTrackId === root.trackId
+                        monitoring: EngineController.monitoredTracks.indexOf(root.trackId) >= 0
+                        levels: EngineController.trackLevels[String(root.trackId)] ?? ({})
+                        onClearClipsRequested: EngineController.clearTrackClips(root.trackId)
                     }
                 }
             }

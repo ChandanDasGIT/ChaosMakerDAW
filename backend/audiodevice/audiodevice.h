@@ -38,6 +38,9 @@ public:
     virtual std::vector<std::string> inputNames() const = 0;
     virtual std::vector<std::string> outputNames() const = 0;
     virtual bool connectInput(const std::string& source) = 0;
+    // Return a stable callback channel for this source, or -1 on failure.
+    virtual int connectInputChannel(const std::string& source) { return connectInput(source) ? 0 : -1; }
+    virtual int inputChannelCapacity() const { return 1; }
     virtual bool connectOutput(const std::string& left, const std::string& right) = 0;
     virtual std::string lastError() const = 0;
 };
