@@ -33,6 +33,7 @@ compile_commands.json
 
 # Private notes
 /docs/
+/1. planning/
 .aws/
 
 # Local commit preparation and shell scratch file

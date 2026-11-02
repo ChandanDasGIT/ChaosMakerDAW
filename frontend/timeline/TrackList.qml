@@ -53,10 +53,31 @@ Rectangle {
             Layout.fillHeight: true
             clip: true
             contentWidth: width
-            contentHeight: root.trackModel ? root.trackModel.count * root.laneHeight : 0
+            contentHeight: Math.max(height, root.trackModel ? root.trackModel.count * root.laneHeight : 0)
             contentY: Math.max(0, Math.min(contentHeight - height, root.scrollOffset))
             interactive: false
             boundsBehavior: Flickable.StopAtBounds
+
+            MouseArea {
+                objectName: "emptyTrackArea"
+                x: 0
+                y: root.trackModel ? root.trackModel.count * root.laneHeight : 0
+                width: trackScroll.width
+                height: Math.max(0, trackScroll.contentHeight - y)
+                enabled: !!root.trackModel
+                acceptedButtons: Qt.LeftButton
+                onDoubleClicked: root.trackModel.addVocalTrack()
+                Text {
+                    anchors.centerIn: parent
+                    width: Math.max(0, parent.width - 24)
+                    visible: !!root.trackModel && root.trackModel.count === 0
+                    text: "Double-click here to add a Vocal track"
+                    color: Theme.textMuted
+                    font.pixelSize: 11
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                }
+            }
 
             Repeater {
                 model: root.trackModel
@@ -67,6 +88,7 @@ Rectangle {
                     required property string name
                     required property string kind
                     required property string trackType
+                    required property color trackColour
                     required property bool isSolo
                     required property bool isMuted
                     required property bool isRecordArmed
@@ -76,12 +98,33 @@ Rectangle {
                     required property bool recordDry
                     required property bool recordsWithFx
                     required property var eqBands
+                    property bool renaming: false
+
+                    function beginRename() {
+                        nameEditor.text = trackCard.name
+                        renaming = true
+                        nameEditor.forceActiveFocus()
+                        nameEditor.selectAll()
+                    }
+                    function finishRename(commit) {
+                        if (!renaming) return
+                        const candidate = nameEditor.text
+                        renaming = false
+                        if (commit) root.trackModel.renameTrack(trackId, candidate)
+                        if (nameEditor.activeFocus) trackCard.forceActiveFocus()
+                    }
 
                     y: index * root.laneHeight
                     width: trackScroll.width
                     height: root.laneHeight
                     color: index % 2 ? "#222222" : "#252525"
                     border.color: Theme.divider
+                    Rectangle {
+                        objectName: "trackColourAccent" + trackCard.trackId
+                        anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                        width: 3
+                        color: trackCard.trackColour
+                    }
 
                     ColumnLayout {
                         anchors.fill: parent
@@ -93,7 +136,60 @@ Rectangle {
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 1
-                            Text { text: trackCard.name; color: Theme.text; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
+                            Item {
+                                Layout.fillWidth: true
+                                implicitHeight: 22
+                                ToolButton {
+                                    objectName: "trackColourButton" + trackCard.trackId
+                                    anchors.left: parent.left
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 14; height: 14
+                                    onClicked: colourPopup.open()
+                                    background: Rectangle { color: trackCard.trackColour; border.color: parent.hovered ? Theme.text : "#777777"; radius: 3 }
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Choose track colour"
+                                }
+                                Text {
+                                    objectName: "trackNameLabel" + trackCard.trackId
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 20
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: trackCard.name
+                                    color: Theme.text
+                                    font.pixelSize: 12
+                                    elide: Text.ElideRight
+                                    visible: !trackCard.renaming
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 20
+                                    visible: !trackCard.renaming
+                                    hoverEnabled: true
+                                    cursorShape: Qt.IBeamCursor
+                                    onDoubleClicked: trackCard.beginRename()
+                                    ToolTip.visible: containsMouse
+                                    ToolTip.text: "Double-click to rename track"
+                                    ToolTip.delay: 450
+                                }
+                                TextField {
+                                    id: nameEditor
+                                    objectName: "trackNameEditor" + trackCard.trackId
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 20
+                                    visible: trackCard.renaming
+                                    maximumLength: 256
+                                    selectByMouse: true
+                                    color: Theme.text
+                                    font.pixelSize: 12
+                                    padding: 2
+                                    background: Rectangle { color: "#292e36"; border.color: Theme.accent; radius: 3 }
+                                    onEditingFinished: trackCard.finishRename(true)
+                                    Keys.onEscapePressed: event => {
+                                        trackCard.finishRename(false)
+                                        event.accepted = true
+                                    }
+                                }
+                            }
                             Text { text: trackCard.trackType.toUpperCase(); color: Theme.textMuted; font.pixelSize: 8; font.letterSpacing: 0.7 }
                         }
 
@@ -124,6 +220,7 @@ Rectangle {
                             }
                             ToolButton {
                                 id: inputButton
+                                objectName: "trackInputButton" + trackCard.trackId
                                 text: "IN"
                                 implicitWidth: 26; implicitHeight: 24
                                 onClicked: inputPopup.open()
@@ -135,6 +232,7 @@ Rectangle {
                             }
                             ToolButton {
                                 id: recordButton
+                                objectName: "trackRecordButton" + trackCard.trackId
                                 property bool active: trackCard.isRecordArmed
                                 implicitWidth: 54; implicitHeight: 24
                                 text: active ? "REC ON" : "REC OFF"
@@ -195,12 +293,67 @@ Rectangle {
                         function onVolumeChanged() { volumeSlider.value = trackCard.volume }
                     }
 
+                    Popup {
+                        id: colourPopup
+                        objectName: "trackColourPopup" + trackCard.trackId
+                        parent: Overlay.overlay
+                        width: 232
+                        padding: 12
+                        x: Math.max(8, Math.min(parent.width - width - 8, trackCard.mapToItem(parent, 0, 0).x))
+                        y: Math.max(8, Math.min(parent.height - height - 8, trackCard.mapToItem(parent, 0, 28).y))
+                        background: Rectangle { color: "#25272c"; border.color: "#4a4d56"; radius: 6 }
+                        contentItem: Column {
+                            spacing: 10
+                            Text { text: "Track colour"; color: Theme.text; font.pixelSize: 12 }
+                            Grid {
+                                columns: 6
+                                spacing: 7
+                                Repeater {
+                                    model: ["#58b7b1", "#6fa8dc", "#b18bd9", "#de849c", "#e2a565", "#d8c16b",
+                                            "#86bd83", "#9babb7", "#d97c73", "#72b9ce", "#8c9bdd", "#b49a87"]
+                                    delegate: Rectangle {
+                                        required property int index
+                                        required property string modelData
+                                        objectName: "trackColourChoice" + trackCard.trackId + "_" + index
+                                        width: 28; height: 28; radius: 4
+                                        color: modelData
+                                        border.width: trackCard.trackColour.toString() === modelData ? 2 : 1
+                                        border.color: trackCard.trackColour.toString() === modelData ? Theme.text : "#45484e"
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            onClicked: {
+                                                root.trackModel.setTrackColour(trackCard.trackId, modelData)
+                                                colourPopup.close()
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Button {
+                                objectName: "customTrackColour" + trackCard.trackId
+                                text: "Custom colour…"
+                                onClicked: {
+                                    colourPopup.close()
+                                    colourDialog.selectedColor = trackCard.trackColour
+                                    colourDialog.open()
+                                }
+                            }
+                        }
+                    }
+                    ColorDialog {
+                        id: colourDialog
+                        objectName: "trackColourDialog" + trackCard.trackId
+                        title: "Choose track colour"
+                        onAccepted: root.trackModel.setTrackColour(trackCard.trackId, selectedColor.toString())
+                    }
+
                     TrackEffectsPanel {
                         id: fxPopup
                         objectName: "trackEffectsPanel" + trackCard.trackId
                         trackModel: root.trackModel
                         trackId: trackCard.trackId
                         trackName: trackCard.name
+                        trackType: trackCard.trackType
                         eqBands: trackCard.eqBands
                         hasLiveInput: trackCard.hasLiveInput
                         recordDry: trackCard.recordDry

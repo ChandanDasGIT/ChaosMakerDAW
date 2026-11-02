@@ -8,6 +8,8 @@ Track& Project::addTrack(TrackKind kind, const std::string& name, const std::str
 {
     auto track = std::make_unique<Track>();
     track->id = m_nextId++;
+    static constexpr const char* colours[]{"#58b7b1", "#6fa8dc", "#b18bd9", "#de849c", "#e2a565", "#d8c16b", "#86bd83", "#9babb7"};
+    track->colour = colours[(track->id - 1) % std::size(colours)];
     track->kind = kind;
     track->name = name;
     track->type = type.empty() ? (kind == TrackKind::Instrument ? "Instrument" : "Audio") : type;
@@ -52,6 +54,26 @@ const Track* Project::findTrack(int id) const
         return track->id == id;
     });
     return it == m_tracks.end() ? nullptr : it->get();
+}
+
+bool Project::setTrackName(int id, const std::string& name)
+{
+    auto* track = findTrack(id);
+    if (!track || name.empty() || track->name == name) return false;
+    track->name = name;
+    return true;
+}
+
+bool Project::setTrackColour(int id, const std::string& colour)
+{
+    auto* track = findTrack(id);
+    if (!track || colour.size() != 7 || colour.front() != '#'
+        || !std::all_of(colour.begin() + 1, colour.end(), [](char c) {
+            return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+        })) return false;
+    track->colour = colour;
+    for (char& c : track->colour) if (c >= 'A' && c <= 'F') c += 'a' - 'A';
+    return true;
 }
 
 bool Project::setTrackSolo(int id, bool enabled)

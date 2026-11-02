@@ -41,7 +41,8 @@ public:
         EqBandsRole,
         LiveInputRole,
         RecordDryRole,
-        RecordsWithFxRole
+        RecordsWithFxRole,
+        ColourRole
     };
     Q_ENUM(Role)
 
@@ -76,6 +77,8 @@ public:
     Q_INVOKABLE int addInstrumentTrack();
     Q_INVOKABLE int addInstrumentTrackOfType(const QString& instrumentType);
     Q_INVOKABLE bool removeTrack(int trackId);
+    Q_INVOKABLE bool renameTrack(int trackId, const QString& name);
+    Q_INVOKABLE bool setTrackColour(int trackId, const QString& colour);
     Q_INVOKABLE int indexOfTrack(int trackId) const { return rowForTrackId(trackId); }
     Q_INVOKABLE int trackIdAt(int row) const;
     Q_INVOKABLE bool setSolo(int trackId, bool enabled);

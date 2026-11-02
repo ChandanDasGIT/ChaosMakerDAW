@@ -543,3 +543,119 @@ TEST(qtmultirecording, shared_input_can_feed_two_independent_chains_and_invalid_
     CHECK(!controller.recording()); CHECK(!controller.takeBusy()); CHECK(tracks.clips().size()==2);
     controller.shutdownSession();
 }
+
+TEST(qttracknames, rename_validates_names_notifies_views_and_preserves_track_identity_and_history) {
+    Storage storage; TrackListModel tracks;
+    const int a=tracks.addVocalTrack(), b=tracks.addInstrumentTrackOfType("Electric Guitar");
+    const int clip=tracks.addClipAtBeat(a,1,4); CHECK(clip>0);
+    CHECK(tracks.setRecordArmed(a,true)); CHECK(tracks.setVolume(a,0.6));
+    int changes=0; QList<int> roles;
+    QObject::connect(&tracks,&QAbstractItemModel::dataChanged,&tracks,[&](const QModelIndex& first,const QModelIndex&,const QList<int>& changed){
+        CHECK(first.row()==0); ++changes; roles=changed;
+    });
+    const QString name=QString::fromUtf8("  Lead voix — रात 🎤  ");
+    CHECK(tracks.renameTrack(a,name)); CHECK(changes==1);
+    CHECK(roles.contains(TrackListModel::NameRole)); CHECK(roles.contains(Qt::DisplayRole)); CHECK(roles.contains(Qt::EditRole));
+    const auto row=tracks.index(0);
+    CHECK(tracks.data(row,TrackListModel::NameRole).toString()==name.trimmed());
+    CHECK(tracks.data(row,Qt::EditRole).toString()==name.trimmed());
+    CHECK(tracks.project().findTrack(a)->type=="Vocal"); CHECK(tracks.project().findTrack(a)->recordArmed);
+    CHECK_NEAR(tracks.project().findTrack(a)->volume,0.6,1e-6);
+    CHECK(tracks.project().findTrack(a)->audioClips[0].id==clip);
+    CHECK(tracks.project().findTrack(b)->name=="Electric Guitar 1");
+    CHECK(tracks.renameTrack(a,name)); CHECK(changes==1); // no dirty notification for an unchanged name
+    for(const auto& invalid:QStringList{"", "   ", "two\nlines", "two\tparts",QString(257,'x'),QString(QChar(0))})
+        CHECK(!tracks.renameTrack(a,invalid));
+    CHECK(!tracks.renameTrack(-1,"Missing")); CHECK(changes==1);
+    CHECK(tracks.setData(row,"Harmony",TrackListModel::NameRole)); CHECK(changes==2);
+    CHECK(tracks.setData(row,"Final vocal",Qt::EditRole)); CHECK(changes==3);
+    CHECK(tracks.undo()); CHECK(tracks.project().findTrack(a)->audioClips.empty());
+    CHECK(tracks.project().findTrack(a)->name=="Final vocal"); // existing clip history remains usable
+    CHECK(tracks.redo()); CHECK(tracks.project().findTrack(a)->audioClips[0].id==clip);
+}
+
+TEST(qttracknames, renaming_dirties_project_persists_on_reopen_and_is_safe_during_recording) {
+    Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
+    EngineController controller(std::move(device),false); TrackListModel tracks; controller.attachProject(&tracks);
+    const int track=tracks.addAudioTrack(); const auto file=QUrl::fromLocalFile(storage.dir.path()+"/names.chaos");
+    CHECK(controller.saveProject(file)); CHECK(!controller.projectDirty());
+    CHECK(tracks.renameTrack(track,"Audio 1")); CHECK(!controller.projectDirty());
+    CHECK(!tracks.renameTrack(track,"   ")); CHECK(!controller.projectDirty());
+    CHECK(tracks.renameTrack(track,QString::fromUtf8("Rhythm — गिटार"))); CHECK(controller.projectDirty());
+    CHECK(tracks.setRecordArmed(track,true)); std::fill_n(io->input,128,0.25f);
+    controller.transportAction("record"); io->process(); CHECK(controller.recording());
+    CHECK(tracks.renameTrack(track,QString::fromUtf8("Main — गिटार"))); io->process();
+    CHECK(controller.recording()); CHECK(tracks.recordingTrackId()==track);
+    controller.transportAction("stop"); io->process();
+    for(int i=0;i<100 && controller.takeBusy();++i)tick(10);
+    CHECK(!controller.takeBusy()); CHECK(tracks.clips().size()==1);
+    auto recorded=tracks.playbackSnapshot()->keepAudio[0]; CHECK(recorded->frames==256);
+    for(float sample:recorded->channels[0])CHECK(sample==0.25f);
+    CHECK(controller.saveProject()); CHECK(!controller.projectDirty());
+    CHECK(controller.newProject()); CHECK(controller.openProject(file)); io->process();
+    CHECK(tracks.count()==1); CHECK(tracks.data(tracks.index(0),TrackListModel::NameRole).toString()==QString::fromUtf8("Main — गिटार"));
+    CHECK(tracks.project().findTrack(tracks.trackIdAt(0))->type=="Audio");
+    CHECK(tracks.playbackSnapshot()->keepAudio[0]->channels==recorded->channels);
+    CHECK(!controller.projectDirty()); controller.shutdownSession();
+}
+
+TEST(qttrackcolours, colours_validate_notify_clips_and_preserve_other_tracks_and_history) {
+    Storage storage; TrackListModel tracks;
+    const int a=tracks.addVocalTrack(),b=tracks.addAudioTrack();
+    const int clip=tracks.addClipAtBeat(a,0,4); CHECK(clip>0);
+    const auto other=tracks.project().findTrack(b)->colour;
+    int changes=0,clipsChanged=0;
+    QObject::connect(&tracks,&QAbstractItemModel::dataChanged,&tracks,[&](const QModelIndex& first,const QModelIndex&,const QList<int>& roles){
+        CHECK(first.row()==0); CHECK(roles.contains(TrackListModel::ColourRole)); ++changes;
+    });
+    QObject::connect(&tracks,&TrackListModel::clipsChanged,&tracks,[&]{++clipsChanged;});
+    CHECK(tracks.setTrackColour(a,"  #A1B2C3  ")); CHECK(changes==1 && clipsChanged==1);
+    CHECK(tracks.data(tracks.index(0),TrackListModel::ColourRole).toString()=="#a1b2c3");
+    CHECK(tracks.clips()[0].toMap()["trackColour"].toString()=="#a1b2c3");
+    CHECK(tracks.project().findTrack(b)->colour==other);
+    CHECK(tracks.project().findTrack(a)->type=="Vocal");
+    CHECK(tracks.setTrackColour(a,"#a1b2c3")); CHECK(changes==1 && clipsChanged==1);
+    for(const auto& invalid:QStringList{"", "red", "#abc", "#12345g", "#ff123456", "#1234567"})CHECK(!tracks.setTrackColour(a,invalid));
+    CHECK(!tracks.setTrackColour(-1,"#123456")); CHECK(changes==1);
+    CHECK(tracks.setData(tracks.index(0),"#765432",TrackListModel::ColourRole)); CHECK(changes==2);
+    CHECK(tracks.project().findTrack(a)->audioClips[0].id==clip); CHECK(tracks.canUndo());
+    // Clip history is unaffected by appearance changes.
+    QObject::disconnect(&tracks,&QAbstractItemModel::dataChanged,&tracks,nullptr);
+    CHECK(tracks.undo()); CHECK(tracks.project().findTrack(a)->audioClips.empty());
+    CHECK(tracks.project().findTrack(a)->colour=="#765432");
+    CHECK(tracks.redo()); CHECK(tracks.clips()[0].toMap()["trackColour"].toString()=="#765432");
+}
+
+TEST(qttrackcolours, project_and_session_roundtrip_support_legacy_files_and_reject_invalid_colours) {
+    Storage storage; auto device=std::make_unique<OfflineDevice>();
+    EngineController controller(std::move(device),false); TrackListModel tracks; controller.attachProject(&tracks);
+    const int a=tracks.addAudioTrack(),b=tracks.addVocalTrack(); CHECK(tracks.addClipAtBeat(a,1,4)>0);
+    const auto file=QUrl::fromLocalFile(storage.dir.path()+"/colours.chaos");
+    CHECK(controller.saveProject(file)); CHECK(!controller.projectDirty());
+    CHECK(!tracks.setTrackColour(a,"broken")); CHECK(!controller.projectDirty());
+    CHECK(tracks.setTrackColour(a,QString::fromStdString(tracks.project().findTrack(a)->colour))); CHECK(!controller.projectDirty());
+    CHECK(tracks.setTrackColour(a,"#123456")); CHECK(tracks.setTrackColour(b,"#fedcba")); CHECK(controller.projectDirty());
+    CHECK(controller.saveProject()); CHECK(!controller.projectDirty());
+    TrackListModel session; QString error; CHECK(session.restoreSessionState(tracks.sessionState(),error));
+    CHECK(session.project().findTrack(session.trackIdAt(0))->colour=="#123456");
+    CHECK(session.project().findTrack(session.trackIdAt(1))->colour=="#fedcba");
+    CHECK(controller.newProject()); CHECK(controller.openProject(file));
+    CHECK(tracks.project().findTrack(tracks.trackIdAt(0))->colour=="#123456");
+    CHECK(tracks.project().findTrack(tracks.trackIdAt(1))->colour=="#fedcba");
+    CHECK(tracks.clips()[0].toMap()["trackColour"].toString()=="#123456");
+    QJsonObject document; { QFile input(file.toLocalFile()); CHECK(input.open(QIODevice::ReadOnly)); document=QJsonDocument::fromJson(input.readAll()).object(); }
+    const auto invalid=QUrl::fromLocalFile(storage.dir.path()+"/invalid.chaos");
+    auto project=document["project"].toObject(); auto rows=project["tracks"].toArray();
+    auto first=rows[0].toObject(); first["colour"]="#invalid"; rows[0]=first; project["tracks"]=rows; document["project"]=project;
+    { QFile output(invalid.toLocalFile()); CHECK(output.open(QIODevice::WriteOnly)); output.write(QJsonDocument(document).toJson()); }
+    CHECK(!controller.openProject(invalid)); CHECK(controller.projectFile()==file);
+    CHECK(tracks.project().findTrack(tracks.trackIdAt(0))->colour=="#123456");
+    for(int i=0;i<rows.size();++i) { auto row=rows[i].toObject(); row.remove("colour"); rows[i]=row; }
+    project["tracks"]=rows; document["project"]=project;
+    const auto legacy=QUrl::fromLocalFile(storage.dir.path()+"/legacy.chaos");
+    { QFile output(legacy.toLocalFile()); CHECK(output.open(QIODevice::WriteOnly)); output.write(QJsonDocument(document).toJson()); }
+    CHECK(controller.openProject(legacy)); CHECK(tracks.count()==2 && tracks.clips().size()==1);
+    CHECK(tracks.project().findTrack(tracks.trackIdAt(0))->colour=="#58b7b1");
+    CHECK(tracks.project().findTrack(tracks.trackIdAt(1))->colour=="#6fa8dc");
+    CHECK(!controller.projectDirty()); controller.shutdownSession();
+}

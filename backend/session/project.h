@@ -27,6 +27,7 @@ struct Track {
     TrackKind kind = TrackKind::Audio;
     std::string name;
     std::string type;
+    std::string colour = "#388b95";
     bool solo = false;
     bool muted = false;
     bool recordArmed = false;
@@ -47,6 +48,8 @@ public:
     void moveTrack(int from, int to);
     Track* findTrack(int id);
     const Track* findTrack(int id) const;
+    bool setTrackName(int id, const std::string& name);
+    bool setTrackColour(int id, const std::string& colour);
     bool setTrackSolo(int id, bool enabled);
     bool setTrackMuted(int id, bool enabled);
     bool setTrackRecordArmed(int id, bool enabled);

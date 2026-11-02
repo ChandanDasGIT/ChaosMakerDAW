@@ -202,6 +202,19 @@ Item {
 
         // Draw beat dividers over the lane backgrounds so every track shows the grid.
         Repeater {
+            model: root.trackModel
+            delegate: Rectangle {
+                required property int index
+                required property int trackId
+                required property color trackColour
+                objectName: "timelineLaneColour" + trackId
+                x: 0; y: root.rulerHeight + index * root.laneHeight
+                width: 3; height: root.laneHeight
+                color: trackColour
+                z: 2
+            }
+        }
+        Repeater {
             model: root.visibleBeatCount
             delegate: Rectangle {
                 property real beatNumber: root.firstVisibleBeat + index * root.beatGridStride
@@ -226,6 +239,7 @@ Item {
                 required property real lengthBeats
                 required property string label
                 required property bool effectsPrinted
+                required property color trackColour
                 objectName: "clipBlock" + clipId
                 property real previewStartBeat: startBeat
                 property real previewLengthBeats: lengthBeats
@@ -238,8 +252,8 @@ Item {
                 width: Math.max(4, previewLengthBeats * root.beatWidth - 8)
                 height: root.laneHeight - 18
                 radius: 4
-                color: ["#245b62", "#665238", "#4e466e"][clipId % 3]
-                border.color: root.selectedClipId === clipId ? Theme.accent : ["#388b95", "#9a794a", "#7770a3"][clipId % 3]
+                color: Qt.darker(trackColour, 2.4)
+                border.color: root.selectedClipId === clipId ? Theme.accent : trackColour
                 border.width: root.selectedClipId === clipId ? 2 : 1
                 z: 3
                 Text {

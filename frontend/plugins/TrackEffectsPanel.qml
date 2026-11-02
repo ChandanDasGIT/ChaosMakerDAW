@@ -7,16 +7,24 @@ Popup {
     property var trackModel
     property int trackId: -1
     property string trackName: ""
+    property string trackType: ""
     property var eqBands: []
     property bool hasLiveInput: true
     property bool recordDry: false
     property var effectsModel: null
     property string selectedEffect: "eq"
+    readonly property bool supportsGuitarSuite: hasLiveInput && trackType !== "Vocal"
+    onSupportsGuitarSuiteChanged: {
+        if (!supportsGuitarSuite && selectedEffect === "pedals") selectedEffect = "eq"
+    }
+    onSelectedEffectChanged: {
+        if (!supportsGuitarSuite && selectedEffect === "pedals") selectedEffect = "eq"
+    }
     // Add future editor entries here; navigation stays in the same workspace.
     readonly property var effectEntries: [
         { key: "eq", title: "Equalizer", subtitle: "10-band tone shaping", available: true },
-        { key: "pedals", title: "GuitarSuite", subtitle: "Pedals and signal chain", available: hasLiveInput }
-    ]
+        { key: "pedals", title: "GuitarSuite", subtitle: "Pedals and signal chain", available: supportsGuitarSuite }
+    ].filter(entry => entry.available)
     parent: Overlay.overlay
     x: (parent.width - width) / 2
     y: (parent.height - height) / 2
@@ -26,7 +34,7 @@ Popup {
     focus: true
     closePolicy: Popup.CloseOnEscape
     padding: 0
-    onAboutToShow: effectsModel = EngineController.trackEffects(trackId)
+    onAboutToShow: effectsModel = supportsGuitarSuite ? EngineController.trackEffects(trackId) : null
     background: Rectangle { color: "#22252b"; radius: 10; border.color: "#4a4d56" }
     contentItem: ColumnLayout {
         spacing: 0
@@ -121,7 +129,7 @@ Popup {
             StackLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                currentIndex: root.selectedEffect === "pedals" ? 1 : 0
+                currentIndex: root.supportsGuitarSuite && root.selectedEffect === "pedals" ? 1 : 0
                 TrackEqualizer {
                     trackModel: root.trackModel
                     trackId: root.trackId
@@ -129,8 +137,9 @@ Popup {
                     eqBands: root.eqBands
                 }
                 Loader {
-                    active: root.effectsModel !== null
+                    active: root.supportsGuitarSuite && root.effectsModel !== null
                     sourceComponent: GuitarSuiteEditor {
+                        objectName: "trackGuitarSuiteEditor" + root.trackId
                         trackName: root.trackName
                         effectsModel: root.effectsModel
                         monitoring: EngineController.monitoredTracks.indexOf(root.trackId) >= 0

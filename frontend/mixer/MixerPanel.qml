@@ -40,6 +40,7 @@ Rectangle {
                     required property int index
                     required property int trackId
                     required property string name
+                    required property color trackColour
                     required property bool isMuted
                     required property bool isSolo
                     required property real volume
@@ -50,6 +51,12 @@ Rectangle {
                     height: stripRow.height
                     color: index % 2 ? "#202020" : "#222222"
                     border.color: Theme.divider
+                    Rectangle {
+                        objectName: "mixerColour" + strip.trackId
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                        height: 3
+                        color: strip.trackColour
+                    }
 
                     ColumnLayout {
                         anchors.fill: parent
