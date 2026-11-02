@@ -6,12 +6,17 @@ Item {
     property int timeSignature: 4
     property int timeSignatureDenominator: 4
     property real bpm: 120
-    property real beatWidth: 48
+    // Zoom is measured in time so tempo changes redraw the musical grid without
+    // stretching recorded audio. Keep zoom separate from the BPM binding.
+    property real pixelsPerSecond: 96
+    readonly property real beatWidth: pixelsPerSecond * 60 / bpm
     readonly property real playhead: EngineController.positionBeats * beatWidth
     readonly property bool playing: EngineController.playing
     readonly property bool recording: EngineController.recording
     readonly property bool repeating: EngineController.repeating
     readonly property real recordingTailX: playing ? playhead + width * 0.2 : 0
+    property int selectedClipId: -1
+    property int selectedTrackId: -1
     property bool selecting: false
     property bool hasSelection: false
     property real selectionStartX: 0
@@ -71,10 +76,66 @@ Item {
 
     function zoomAtCursor(factor, cursorX) {
         const anchor = scroll.contentX + cursorX
-        const nextBeatWidth = Math.max(0.000001, beatWidth * factor)
-        const scale = nextBeatWidth / beatWidth
-        beatWidth = nextBeatWidth
+        const nextPixelsPerSecond = Math.max(0.000001, pixelsPerSecond * factor)
+        const scale = nextPixelsPerSecond / pixelsPerSecond
+        pixelsPerSecond = nextPixelsPerSecond
         scroll.contentX = Math.max(0, Math.min(scroll.contentWidth - scroll.width, anchor * scale - cursorX))
+    }
+
+    Shortcut {
+        sequence: "S"
+        enabled: root.activeFocus && root.selectedClipId >= 0 && !root.recording
+        onActivated: root.trackModel.splitClipAtBeat(root.selectedTrackId, root.selectedClipId, EngineController.positionBeats)
+    }
+    Menu {
+        id: clipContextMenu
+        parent: root
+        popupType: Popup.Item
+        width: 160
+        padding: 5
+        property int targetTrackId: -1
+        property int targetClipId: -1
+        property real targetStart: 0
+        property real targetLength: 0
+
+        background: Rectangle {
+            color: Theme.panelBg
+            border.color: Theme.divider
+            radius: 6
+        }
+
+        MenuItem {
+            id: splitClipAction
+            text: "Split at playhead"
+            enabled: !root.recording && EngineController.positionBeats > clipContextMenu.targetStart
+                     && EngineController.positionBeats < clipContextMenu.targetStart + clipContextMenu.targetLength
+            implicitHeight: 32
+            leftPadding: Theme.margin
+            contentItem: Text { text: splitClipAction.text; color: !splitClipAction.enabled ? Theme.textMuted : splitClipAction.highlighted ? Theme.accent : Theme.text; font.pixelSize: Theme.bodySize; verticalAlignment: Text.AlignVCenter }
+            background: Rectangle { color: splitClipAction.highlighted ? Theme.tooltipBg : "transparent"; radius: 4 }
+            onTriggered: root.trackModel.splitClipAtBeat(clipContextMenu.targetTrackId, clipContextMenu.targetClipId, EngineController.positionBeats)
+        }
+        MenuItem {
+            id: deleteClipAction
+            text: "Delete"
+            implicitHeight: 32
+            leftPadding: Theme.margin
+            rightPadding: Theme.margin
+            contentItem: Text {
+                text: deleteClipAction.text
+                color: deleteClipAction.highlighted ? Theme.accent : Theme.text
+                font.pixelSize: Theme.bodySize
+                verticalAlignment: Text.AlignVCenter
+            }
+            background: Rectangle {
+                color: deleteClipAction.highlighted ? Theme.tooltipBg : "transparent"
+                radius: 4
+            }
+            onTriggered: {
+                if (root.trackModel)
+                    root.trackModel.removeAudioClip(clipContextMenu.targetTrackId, clipContextMenu.targetClipId)
+            }
+        }
     }
 
     Connections {
@@ -163,24 +224,123 @@ Item {
                 required property real startBeat
                 required property real lengthBeats
                 required property string label
+                required property bool effectsPrinted
+                objectName: "clipBlock" + clipId
+                property real previewStartBeat: startBeat
                 property real previewLengthBeats: lengthBeats
+                onStartBeatChanged: previewStartBeat = startBeat
 
                 onLengthBeatsChanged: previewLengthBeats = lengthBeats
 
-                x: startBeat * root.beatWidth + 4
+                x: previewStartBeat * root.beatWidth + 4
                 y: root.rulerHeight + laneIndex * root.laneHeight + 8
                 width: Math.max(4, previewLengthBeats * root.beatWidth - 8)
                 height: root.laneHeight - 18
                 radius: 4
                 color: ["#245b62", "#665238", "#4e466e"][clipId % 3]
-                border.color: ["#388b95", "#9a794a", "#7770a3"][clipId % 3]
+                border.color: root.selectedClipId === clipId ? Theme.accent : ["#388b95", "#9a794a", "#7770a3"][clipId % 3]
+                border.width: root.selectedClipId === clipId ? 2 : 1
                 z: 3
                 Text {
                     anchors.left: parent.left; anchors.leftMargin: 10
                     anchors.top: parent.top; anchors.topMargin: 8
-                    text: label; color: "#f0f0f0"; font.pixelSize: 11
+                    text: label + (clipItem.effectsPrinted ? "" : " · Dry"); color: "#f0f0f0"; font.pixelSize: 11
                     elide: Text.ElideRight
                     width: Math.max(0, parent.width - 20)
+                }
+                Canvas {
+                    id: waveform
+                    objectName: "clipWaveform" + clipItem.clipId
+                    x: Math.max(0, scroll.contentX - clipItem.x)
+                    y: 30
+                    width: Math.max(0, Math.min(clipItem.width - x, scroll.width))
+                    height: Math.max(0, clipItem.height - 38)
+                    property var peaks: width > 0 && root.trackModel
+                        ? root.trackModel.clipWaveform(clipItem.trackId, clipItem.clipId, Math.ceil(width),
+                            x / clipItem.width, Math.min(1, (x + width) / clipItem.width)) : []
+                    onPeaksChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        ctx.clearRect(0, 0, width, height)
+                        ctx.strokeStyle = "#d6edf0"
+                        ctx.lineWidth = 1
+                        ctx.beginPath()
+                        for (let i = 0; i < peaks.length; ++i) {
+                            const px = (i + 0.5) * width / peaks.length
+                            ctx.moveTo(px, height * (0.5 - Math.min(1, peaks[i][1]) * 0.48))
+                            ctx.lineTo(px, height * (0.5 - Math.max(-1, peaks[i][0]) * 0.48) + 1)
+                        }
+                        ctx.stroke()
+                    }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    cursorShape: pressedButtons & Qt.LeftButton ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                    property real pointerStartX: 0
+                    property real originalBeat: 0
+                    onPressed: mouse => {
+                        root.selectedTrackId = clipItem.trackId
+                        root.selectedClipId = clipItem.clipId
+                        root.forceActiveFocus()
+                        pointerStartX = mapToItem(scroll.contentItem, mouse.x, mouse.y).x
+                        originalBeat = clipItem.startBeat
+                    }
+                    onPositionChanged: mouse => {
+                        if (!(pressedButtons & Qt.LeftButton) || root.recording) return
+                        const delta = mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStartX
+                        const step = 4.0 / root.timeSignatureDenominator
+                        clipItem.previewStartBeat = Math.max(0, Math.round((originalBeat + delta / root.beatWidth) / step) * step)
+                    }
+                    onReleased: mouse => {
+                        if (mouse.button === Qt.LeftButton && clipItem.previewStartBeat !== clipItem.startBeat) {
+                            if (!root.trackModel.moveClipAtBeat(clipItem.trackId, clipItem.clipId, clipItem.previewStartBeat))
+                                clipItem.previewStartBeat = clipItem.startBeat
+                        }
+                    }
+                    onCanceled: clipItem.previewStartBeat = clipItem.startBeat
+                    onClicked: mouse => {
+                        if (mouse.button !== Qt.RightButton) return
+                        clipContextMenu.targetTrackId = clipItem.trackId
+                        clipContextMenu.targetClipId = clipItem.clipId
+                        clipContextMenu.targetStart = clipItem.startBeat
+                        clipContextMenu.targetLength = clipItem.lengthBeats
+                        const position = mapToItem(root, mouse.x, mouse.y)
+                        clipContextMenu.popup(position.x, position.y)
+                    }
+                }
+                Rectangle {
+                    anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                    width: 8; radius: 3; color: leftTrim.containsMouse ? Theme.accent : "#ffffff24"
+                    MouseArea {
+                        id: leftTrim
+                        objectName: "clipLeftTrim" + clipItem.clipId
+                        anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.LeftButton
+                        cursorShape: Qt.SizeHorCursor
+                        property real pointerStart: 0
+                        property real originalStart: 0
+                        property real originalEnd: 0
+                        onPressed: mouse => {
+                            root.selectedTrackId = clipItem.trackId; root.selectedClipId = clipItem.clipId
+                            pointerStart = mapToItem(scroll.contentItem, mouse.x, mouse.y).x
+                            originalStart = clipItem.startBeat; originalEnd = clipItem.startBeat + clipItem.lengthBeats
+                        }
+                        onPositionChanged: mouse => {
+                            if (!pressed || root.recording) return
+                            const step = 4.0 / root.timeSignatureDenominator
+                            const delta = (mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStart) / root.beatWidth
+                            const start = Math.max(0, Math.min(originalEnd - step, Math.round((originalStart + delta) / step) * step))
+                            clipItem.previewStartBeat = start; clipItem.previewLengthBeats = originalEnd - start
+                        }
+                        onReleased: {
+                            if (!root.trackModel.trimClipStartAtBeat(clipItem.trackId, clipItem.clipId, clipItem.previewStartBeat)) {
+                                clipItem.previewStartBeat = clipItem.startBeat; clipItem.previewLengthBeats = clipItem.lengthBeats
+                            }
+                        }
+                        onCanceled: { clipItem.previewStartBeat = clipItem.startBeat; clipItem.previewLengthBeats = clipItem.lengthBeats }
+                        ToolTip.visible: containsMouse; ToolTip.text: "Drag to trim the start"
+                    }
                 }
                 Rectangle {
                     id: resizeGrip
@@ -192,6 +352,7 @@ Item {
                     radius: 3
                     MouseArea {
                         id: resizeArea
+                        objectName: "clipRightTrim" + clipItem.clipId
                         anchors.fill: parent
                         hoverEnabled: true
                         acceptedButtons: Qt.LeftButton
@@ -246,6 +407,8 @@ Item {
             x: 0; y: root.rulerHeight; width: root.contentWidth; height: scroll.contentHeight - root.rulerHeight; z: 1
             acceptedButtons: Qt.LeftButton
             onPressed: mouse => {
+                root.selectedClipId = -1
+                root.selectedTrackId = -1
                 root.selecting = true
                 root.hasSelection = true
                 root.selectionStartX = mouse.x

@@ -102,7 +102,7 @@ endforeach()
 # Qt model integration tests are separate from the Qt-free realtime test binary.
 if(DAW_BUILD_APP)
     add_executable(wrappertests
-        tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp
+        tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp tests/wrapper/clipediting_qtcheck.cpp
         wrapper/engineWrap/enginecontroller.cpp wrapper/engineWrap/enginecontroller.h
         wrapper/session/tracklistmodel.cpp wrapper/session/tracklistmodel.h
         wrapper/pluginWrap/guitarsuitemodel.cpp wrapper/pluginWrap/guitarsuitemodel.h
@@ -112,6 +112,8 @@ if(DAW_BUILD_APP)
     target_link_libraries(wrappertests PRIVATE Qt6::Qml Qt6::Concurrent dawengine)
     add_test(NAME qtpresets COMMAND wrappertests qtpresets)
     add_test(NAME qtrecording COMMAND wrappertests qtrecording)
+    add_test(NAME qtclipediting COMMAND wrappertests qtclipediting)
+    add_test(NAME qtprojectfiles COMMAND wrappertests qtprojectfiles)
 endif()
 
 # Exercise actual mouse/keyboard tempo editing when Qt Test is available.
@@ -123,6 +125,11 @@ if(DAW_BUILD_APP)
             QML_FILES frontend/Theme.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
                       frontend/transportbar/TempoEditor.qml
                       frontend/plugins/guitarsuite/GuitarSuitePanel.qml
+                      frontend/plugins/guitarsuite/GuitarSuiteEditor.qml
+                      frontend/plugins/TrackEffectsPanel.qml frontend/plugins/TrackEqualizer.qml
+                      frontend/timeline/TrackList.qml frontend/timeline/Timeline.qml
+                      frontend/mixer/MixerPanel.qml
+                      frontend/mixer/StereoLevelMeter.qml
                       frontend/plugins/guitarsuite/LevelMeter.qml
                       tests/ui/TransportHarness.qml
             SOURCES ${WRAPPER_SOURCES})

@@ -12,6 +12,19 @@ class RtAudioRing {
     static_assert((Capacity & (Capacity - 1)) == 0, "Capacity must be a power of two");
 
 public:
+    // Publish all channels together so a consumer never sees a partial frame.
+    bool pushPlanar(float* const* channels, std::size_t channelCount, std::size_t frames) noexcept
+    {
+        const auto write = m_write.load(std::memory_order_relaxed);
+        const auto read = m_read.load(std::memory_order_acquire);
+        if (!channelCount || frames > (Capacity - (write - read)) / channelCount) return false;
+        for (std::size_t i = 0; i < frames; ++i)
+            for (std::size_t c = 0; c < channelCount; ++c)
+                m_samples[(write + i * channelCount + c) & (Capacity - 1)] = channels[c][i];
+        m_write.store(write + frames * channelCount, std::memory_order_release);
+        return true;
+    }
+
     // Audio thread: writes samples, returning false if the ring has insufficient space.
     bool push(std::span<const float> samples) noexcept
     {

@@ -1,5 +1,6 @@
 #include "testkit.h"
 #include "engine/audioengine.h"
+#include "processor/trackinput.h"
 #include "testsignals.h"
 #include <limits>
 
@@ -61,4 +62,25 @@ TEST(monitorlevels, trim_changes_are_smooth_and_invalid_controls_are_rejected) {
     for(int i=1;i<128;++i) CHECK(std::abs(output[i]-output[i-1])<0.002);
     for(double db : {-25.0,25.0,std::numeric_limits<double>::quiet_NaN()}) CHECK(!engine.setInputTrimDb(db));
     CHECK(engine.setInputTrimDb(0));
+}
+
+TEST(monitorlevels, track_input_stages_isolate_trim_eq_history_and_latest_routing) {
+    AudioEngine engine(nullptr); engine.deviceChanged(48000,128); arm(engine,true);
+    auto a=std::make_shared<TrackInput>(), b=std::make_shared<TrackInput>();
+    a->prepare(48000,128); a->setEqBand(5,12);
+    b->setTrimDb(-6.020599913); b->prepare(48000,128);
+    auto publish=[&](const auto& input) {
+        auto snapshot=std::make_unique<EngineSnapshot>(); snapshot->inputStage=input.get();
+        snapshot->keepProcessors.push_back(input); engine.publishMonitor(std::move(snapshot));
+    };
+    float input[128]{}, output[128]{}; float* in[]{input}; float* out[]{output};
+    AudioIO io{{in,1,128},{out,1,128},nullptr,128};
+    CHECK(engine.setInputTrimDb(-24)); // legacy global trim must not affect a track-owned stage
+    publish(a); publish(b); std::fill_n(input,128,0.25f); process(engine,io);
+    for(float sample:output) CHECK_NEAR(sample,0.125,1e-6);
+    std::fill_n(input,128,0); input[127]=0.25f; publish(a); process(engine,io);
+    input[127]=0; publish(b); process(engine,io);
+    for(float sample:output) CHECK(sample==0); // no filter history from A in B
+    publish(a); process(engine,io);
+    CHECK(std::any_of(output,output+128,[](float v){return std::abs(v)>1e-6f;}));
 }

@@ -11,6 +11,7 @@ public:
     void prepare(double sampleRate,int maxFrames) override;
     void reset() noexcept override;
     void process(ProcessContext& context) noexcept override;
+    const CabinetImpulse& impulseData() const noexcept { return impulse; }
     bool loaded() const noexcept { return !impulse.channels[0].empty(); }
 private:
     CabinetImpulse impulse;

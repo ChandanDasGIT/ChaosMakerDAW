@@ -36,6 +36,7 @@ public:
     QString presetFilePath() const { return m_presetFilePath; }
     QString lastError() const { return m_lastError; }
     void setPublisher(std::function<void(std::shared_ptr<GuitarSuite>)> publisher);
+    void setPlaybackPublisher(std::function<void(std::shared_ptr<GuitarSuite>)> publisher);
     void configure(double sampleRate, int maxFrames);
 
     QStringList factoryPresetNames() const { return {QStringLiteral("Djent"), QStringLiteral("Jazz")}; }
@@ -74,7 +75,9 @@ private:
     void setError(const QString& message);
 
     std::vector<std::shared_ptr<PedalSlot>> m_slots;
-    std::function<void(std::shared_ptr<GuitarSuite>)> m_publisher;
+    std::function<void(std::shared_ptr<GuitarSuite>)> m_publisher, m_playbackPublisher;
+    struct PlaybackSlot { std::shared_ptr<PedalSlot> source, mirror; };
+    std::vector<PlaybackSlot> m_playbackSlots;
     QString m_presetFilePath;
     QString m_lastError;
     int m_nextPedalId = 1;

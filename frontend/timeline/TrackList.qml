@@ -72,6 +72,9 @@ Rectangle {
                     required property bool isRecordArmed
                     required property string inputPort
                     required property real volume
+                    required property bool hasLiveInput
+                    required property bool recordDry
+                    required property bool recordsWithFx
                     required property var eqBands
 
                     y: index * root.laneHeight
@@ -140,12 +143,13 @@ Rectangle {
                                 background: Rectangle { radius: 4; color: parent.active ? "#a9363c" : "#303030"; border.color: parent.active ? Theme.record : "#424242" }
                                 ToolTip.visible: hovered
                                 ToolTip.text: active
-                                    ? (trackCard.trackType === "Electric Guitar" ? "Clean input monitoring enabled" : "Recording armed")
-                                    : (trackCard.trackType === "Electric Guitar" ? "Arm for clean input monitoring" : "Arm track for recording")
+                                    ? (trackCard.hasLiveInput ? "Recording armed · live monitoring enabled" : "Recording armed")
+                                    : (trackCard.hasLiveInput ? "Arm for recording and live monitoring" : "Arm track for recording")
                                 ToolTip.delay: 450
                             }
                             ToolButton {
                                 id: fxButton
+                                objectName: "trackFxButton" + trackCard.trackId
                                 text: "FX"
                                 implicitWidth: 28; implicitHeight: 24
                                 onClicked: fxPopup.open()
@@ -191,196 +195,15 @@ Rectangle {
                         function onVolumeChanged() { volumeSlider.value = trackCard.volume }
                     }
 
-                    Popup {
+                    TrackEffectsPanel {
                         id: fxPopup
-                        parent: Overlay.overlay
-                        x: (parent.width - width) / 2
-                        y: (parent.height - height) / 2
-                        width: 340
-                        height: trackCard.trackType === "Electric Guitar" ? 242 : 176
-                        modal: true
-                        focus: true
-                        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-                        padding: 0
-                        background: Rectangle { radius: 8; color: "#25272c"; border.color: "#4a4d56" }
-                        contentItem: ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 12
-                            spacing: 8
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Text { text: trackCard.name + " · FX"; color: Theme.text; font.pixelSize: 13; font.bold: true; Layout.fillWidth: true }
-                                ToolButton {
-                                    text: "×"
-                                    onClicked: fxPopup.close()
-                                    contentItem: Text { text: "×"; color: parent.hovered ? Theme.text : Theme.textMuted; font.pixelSize: 18; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                }
-                            }
-                            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.divider }
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 58
-                                radius: 5
-                                color: equalizerArea.containsMouse ? "#363941" : "#2b2d33"
-                                border.color: equalizerArea.containsMouse ? Theme.accent : "#42454d"
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 10
-                                    anchors.rightMargin: 10
-                                    spacing: 10
-                                    ColumnLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 3
-                                        Text { text: "Equalizer"; color: Theme.text; font.pixelSize: 12; font.bold: true }
-                                        Text { text: "10-band graphic EQ"; color: Theme.textMuted; font.pixelSize: 10 }
-                                    }
-                                    Text { text: "›"; color: Theme.textMuted; font.pixelSize: 20 }
-                                }
-                                MouseArea {
-                                    id: equalizerArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    onClicked: {
-                                        fxPopup.close()
-                                        eqPopup.open()
-                                    }
-                                }
-                            }
-                            Rectangle {
-                                visible: trackCard.trackType === "Electric Guitar"
-                                Layout.fillWidth: true
-                                height: 58
-                                radius: 5
-                                color: guitarSuiteArea.containsMouse ? "#363941" : "#2b2d33"
-                                border.color: guitarSuiteArea.containsMouse ? Theme.accent : "#42454d"
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 10
-                                    anchors.rightMargin: 10
-                                    spacing: 10
-                                    ColumnLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 3
-                                        Text { text: "GuitarSuite pedalboard"; color: Theme.text; font.pixelSize: 12; font.bold: true }
-                                        Text { text: "Guitar pedalboard / signal chain"; color: Theme.textMuted; font.pixelSize: 10 }
-                                    }
-                                    Text { text: "›"; color: Theme.textMuted; font.pixelSize: 20 }
-                                }
-                                MouseArea {
-                                    id: guitarSuiteArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    onClicked: {
-                                        fxPopup.close()
-                                        guitarSuitePopup.open()
-                                    }
-                                }
-                            }
-                            Item { Layout.fillHeight: true }
-                        }
-                    }
-
-                    GuitarSuitePanel {
-                        id: guitarSuitePopup
+                        objectName: "trackEffectsPanel" + trackCard.trackId
+                        trackModel: root.trackModel
+                        trackId: trackCard.trackId
                         trackName: trackCard.name
-                    }
-
-                    Popup {
-                        id: eqPopup
-                        parent: Overlay.overlay
-                        x: (parent.width - width) / 2
-                        y: (parent.height - height) / 2
-                        width: Math.min(760, parent.width - 32)
-                        height: Math.min(460, parent.height - 32)
-                        modal: true
-                        focus: true
-                        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-                        padding: 0
-                        background: Rectangle { radius: 9; color: "#25272c"; border.color: "#4a4d56" }
-                        contentItem: ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 16
-                            spacing: 10
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Text { text: trackCard.name + " · EQUALIZER"; color: Theme.text; font.pixelSize: 14; font.bold: true; Layout.fillWidth: true }
-                                Text { text: "10 bands  ·  ±12 dB"; color: Theme.textMuted; font.pixelSize: 10 }
-                                ToolButton {
-                                    text: "Reset"
-                                    onClicked: root.trackModel.resetTrackEq(trackCard.trackId)
-                                    contentItem: Text { text: "Reset"; color: parent.hovered ? Theme.text : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                    background: Rectangle { radius: 4; color: parent.hovered ? "#383838" : "#303030"; border.color: "#424242" }
-                                }
-                                ToolButton {
-                                    text: "×"
-                                    onClicked: eqPopup.close()
-                                    contentItem: Text { text: "×"; color: parent.hovered ? Theme.text : Theme.textMuted; font.pixelSize: 18; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                }
-                            }
-                            RowLayout {
-                                Layout.fillWidth: true
-                                ComboBox { id: eqFactory; Layout.fillWidth: true; model: root.trackModel.eqPresetNames }
-                                Button { text: "Apply preset"; onClicked: root.trackModel.applyEqPreset(trackCard.trackId, eqFactory.currentIndex) }
-                                Button { text: "Save custom…"; onClicked: eqSaveDialog.open() }
-                                Button { text: "Load custom…"; onClicked: eqLoadDialog.open() }
-                            }
-                            Text {
-                                visible: text.length > 0
-                                text: root.trackModel.eqPresetError
-                                color: Theme.record; font.pixelSize: 10
-                                Layout.fillWidth: true; wrapMode: Text.WordWrap
-                            }
-                            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.divider }
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                spacing: 8
-                                Repeater {
-                                    model: ["31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"]
-                                    delegate: ColumnLayout {
-                                        required property string modelData
-                                        required property int index
-                                        Layout.fillWidth: true
-                                        Layout.fillHeight: true
-                                        spacing: 5
-                                        Text {
-                                            text: Number(trackCard.eqBands[index] || 0).toFixed(1) + " dB"
-                                            color: Math.abs(Number(trackCard.eqBands[index] || 0)) > 0.01 ? Theme.accent : Theme.textMuted
-                                            font.pixelSize: 9
-                                            horizontalAlignment: Text.AlignHCenter
-                                            Layout.fillWidth: true
-                                        }
-                                        Slider {
-                                            Layout.fillHeight: true
-                                            Layout.alignment: Qt.AlignHCenter
-                                            implicitWidth: 28
-                                            from: -12; to: 12; stepSize: 0.5
-                                            orientation: Qt.Vertical
-                                            value: Number(trackCard.eqBands[index] || 0)
-                                            onMoved: root.trackModel.setEqBand(trackCard.trackId, index, value)
-                                        }
-                                        Text { text: modelData; color: Theme.textMuted; font.pixelSize: 9; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
-                                    }
-                                }
-                            }
-                            Text { text: "Frequency (Hz)"; color: Theme.textMuted; font.pixelSize: 9; Layout.alignment: Qt.AlignHCenter }
-                        }
-                    }
-
-                    FileDialog {
-                        id: eqSaveDialog
-                        title: "Save equalizer preset"
-                        fileMode: FileDialog.SaveFile
-                        nameFilters: ["Equalizer presets (*.eqpreset)"]
-                        defaultSuffix: "eqpreset"
-                        onAccepted: root.trackModel.saveEqPreset(trackCard.trackId, selectedFile)
-                    }
-                    FileDialog {
-                        id: eqLoadDialog
-                        title: "Load equalizer preset"
-                        fileMode: FileDialog.OpenFile
-                        nameFilters: ["Equalizer presets (*.eqpreset)"]
-                        onAccepted: root.trackModel.loadEqPreset(trackCard.trackId, selectedFile)
+                        eqBands: trackCard.eqBands
+                        hasLiveInput: trackCard.hasLiveInput
+                        recordDry: trackCard.recordDry
                     }
 
                     Popup {

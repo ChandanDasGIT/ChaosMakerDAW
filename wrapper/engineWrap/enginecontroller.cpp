@@ -7,6 +7,7 @@
 #include "engine/enginesnapshot.h"
 #include "guitarsuitemodel.h"
 #include "plugins/guitarsuite/guitarsuite.h"
+#include "processor/trackinput.h"
 
 #include <QCoreApplication>
 #include <QJsonArray>
@@ -63,7 +64,7 @@ EngineController::EngineController(std::unique_ptr<AudioDevice> device, bool dis
 
     m_guitarSuite = new GuitarSuiteModel(this);
     connect(m_guitarSuite, &GuitarSuiteModel::inputTrimDbChanged, this, [this] {
-        m_engine->setInputTrimDb(m_guitarSuite->inputTrimDb());
+        if (!m_project) m_engine->setInputTrimDb(m_guitarSuite->inputTrimDb());
     });
     connect(&m_meterTimer, &QTimer::timeout, this, [this] {
         const auto levels = m_engine->takeMonitorLevels();
@@ -80,6 +81,22 @@ EngineController::EngineController(std::unique_ptr<AudioDevice> device, bool dis
         m_monitorLevels[QStringLiteral("leftClip")] = levels.leftClip;
         m_monitorLevels[QStringLiteral("rightClip")] = levels.rightClip;
         emit monitorLevelsChanged();
+        QVariantMap trackLevels;
+        for (const auto& [id,fx] : m_trackEffects) {
+            const QString key=QString::number(id);
+            const auto previous=m_trackLevels.value(key).toMap();
+            QVariantMap levels;
+            for(int c=0;c<2;++c) for(int output=0;output<2;++output) {
+                auto& meter=output ? fx.meters->output[c] : fx.meters->input[c];
+                const QString channel=(output ? QStringLiteral("output") : QStringLiteral("input"))+(c==0 ? "Left" : "Right");
+                const double db=20*std::log10(std::max(double(meter.takePeak()),1e-6));
+                levels[channel+"Db"]=std::max(db,previous.value(channel+"Db",-120.0).toDouble()-1.2);
+                levels[channel+"Clip"]=meter.clipped();
+            }
+            trackLevels[key]=levels;
+        }
+        m_trackLevels=trackLevels;
+        emit trackLevelsChanged();
     });
     m_meterTimer.start(50);
     const double rate = m_engine->sampleRate() > 1000.0 ? m_engine->sampleRate() : 48000.0;
@@ -91,30 +108,13 @@ EngineController::EngineController(std::unique_ptr<AudioDevice> device, bool dis
     connect(&m_snapshotTimer, &QTimer::timeout, this, [this] {
         if (!m_engine) return;
         m_engine->collectGarbage();
-        if (m_pendingGuitarSnapshot)
-            m_engine->tryPublish(m_pendingGuitarSnapshot);
         pollTransport();
     });
     m_snapshotTimer.start(20);
     m_sessionTimer.setSingleShot(true);
     m_sessionTimer.setInterval(1500);
     connect(&m_sessionTimer, &QTimer::timeout, this, &EngineController::saveSession);
-    connect(m_guitarSuite, &QAbstractItemModel::dataChanged, this, [this] { if (!m_restoring) m_sessionTimer.start(); });
-    connect(m_guitarSuite, &GuitarSuiteModel::countChanged, this, [this] { if (!m_restoring) m_sessionTimer.start(); });
-    connect(m_guitarSuite, &GuitarSuiteModel::inputTrimDbChanged, this, [this] { if (!m_restoring) m_sessionTimer.start(); });
-    connect(m_guitarSuite, &GuitarSuiteModel::lastErrorChanged, this, [this] {
-        if (!m_guitarSuite->lastError().isEmpty()) setTransportMessage(m_guitarSuite->lastError());
-    });
-    connect(m_guitarSuite, &GuitarSuiteModel::busyChanged, this, [this] {
-        if (!m_restoringPreset || m_guitarSuite->busy()) return;
-        // The loader emits busyChanged before committing or reporting its error.
-        QTimer::singleShot(0, this, [this] {
-            m_restoringPreset = false;
-            m_sessionSaveBlocked = !m_guitarSuite->lastError().isEmpty();
-            if (m_sessionSaveBlocked)
-                setTransportMessage(m_guitarSuite->lastError() + " · saved session kept unchanged.");
-        });
-    });
+    watchEffects(m_guitarSuite);
     connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, &EngineController::shutdownSession);
 }
 
@@ -137,11 +137,132 @@ QObject* EngineController::guitarSuite() const
 
 void EngineController::queueGuitarSuite(std::shared_ptr<GuitarSuite> chain)
 {
+    if (m_project) return;
     auto snapshot = std::make_unique<EngineSnapshot>();
     snapshot->masterChain.push_back(chain.get());
     snapshot->keepProcessors.push_back(std::move(chain));
-    m_pendingGuitarSnapshot = std::move(snapshot);
-    if (m_project && !m_restoring) m_sessionTimer.start();
+    m_engine->publishMonitor(std::move(snapshot));
+}
+
+void EngineController::watchEffects(GuitarSuiteModel* model)
+{
+    const auto changed = [this] { if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); } };
+    connect(model, &QAbstractItemModel::dataChanged, this, changed);
+    connect(model, &GuitarSuiteModel::countChanged, this, changed);
+    connect(model, &GuitarSuiteModel::inputTrimDbChanged, this, changed);
+    connect(model, &GuitarSuiteModel::lastErrorChanged, this, [this, model] {
+        if (!model->lastError().isEmpty()) setTransportMessage(model->lastError());
+    });
+    connect(model, &GuitarSuiteModel::busyChanged, this, [this, model] {
+        // Async preset loaders commit after emitting busyChanged.
+        QTimer::singleShot(0, model, [this] {
+            if (!m_restoringPreset || effectsBusy()) return;
+            m_restoringPreset = false;
+            bool failed = !m_guitarSuite->lastError().isEmpty();
+            for (const auto& [id, fx] : m_trackEffects) failed |= !fx.model->lastError().isEmpty();
+            m_sessionSaveBlocked = failed;
+            if (!failed) m_sessionTimer.start();
+        });
+    });
+}
+
+bool EngineController::effectsBusy() const
+{
+    if (m_guitarSuite->busy()) return true;
+    for (const auto& [id, fx] : m_trackEffects) if (fx.model->busy()) return true;
+    return false;
+}
+
+QObject* EngineController::trackEffects(int trackId)
+{
+    if (!m_project || !m_project->project().findTrack(trackId)) return nullptr;
+    const auto existing=m_trackEffects.find(trackId);
+    if(existing!=m_trackEffects.end())return existing->second.model;
+    bindTrackEffects(trackId,new GuitarSuiteModel(this));
+    return m_trackEffects.at(trackId).model;
+}
+
+void EngineController::bindTrackEffects(int trackId, GuitarSuiteModel* model)
+{
+    auto& fx=m_trackEffects[trackId];
+    fx.model=model;
+    fx.input = std::make_shared<TrackInput>();
+    fx.playbackInput = std::make_shared<TrackInput>();
+    const double rate = m_engine->sampleRate() > 1000 ? m_engine->sampleRate() : 48000;
+    const int frames = std::max(128, m_engine->latency().captureFrames);
+    fx.input->setTrimDb(fx.model->inputTrimDb());
+    fx.input->prepare(rate, frames);
+    fx.playbackInput->setTrimDb(fx.model->inputTrimDb()); fx.playbackInput->prepare(rate,frames);
+    fx.model->configure(rate, frames);
+    connect(fx.model, &GuitarSuiteModel::inputTrimDbChanged, this, [this, trackId] {
+        auto& fx = m_trackEffects.at(trackId);
+        fx.input->setTrimDb(fx.model->inputTrimDb());
+        fx.playbackInput->setTrimDb(fx.model->inputTrimDb());
+    });
+    watchEffects(fx.model);
+    fx.model->setPublisher([this, trackId](std::shared_ptr<GuitarSuite> chain) {
+        m_trackEffects.at(trackId).chain = std::move(chain);
+        if (m_monitoredTrack == trackId) syncTrackEffects();
+        if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
+    });
+    fx.model->setPlaybackPublisher([this,trackId](std::shared_ptr<GuitarSuite> chain) {
+        m_trackEffects.at(trackId).playbackChain=std::move(chain);
+        if(!m_restoring)publishPlayback();
+    });
+    QQmlEngine::setObjectOwnership(fx.model, QQmlEngine::CppOwnership);
+}
+
+void EngineController::clearTrackEffects()
+{
+    m_monitoredTrack = -1;
+    emit monitoredTrackChanged();
+    for (auto& [id, fx] : m_trackEffects) delete fx.model;
+    m_trackEffects.clear();
+    m_trackLevels.clear(); emit trackLevelsChanged();
+    m_engine->publishMonitor(std::make_unique<EngineSnapshot>());
+}
+
+void EngineController::syncTrackEffects()
+{
+    if (!m_project) return;
+    for (const auto& track : m_project->project().tracks()) {
+        trackEffects(track->id);
+        auto& fx = m_trackEffects.at(track->id);
+        for (int band = 0; band < 10; ++band) {
+            fx.input->setEqBand(band, track->eqGainDb[band]);
+            fx.playbackInput->setEqBand(band,track->eqGainDb[band]);
+        }
+    }
+    for (auto it = m_trackEffects.begin(); it != m_trackEffects.end();) {
+        if (!m_project->project().findTrack(it->first)) {
+            delete it->second.model;
+            it = m_trackEffects.erase(it);
+        } else ++it;
+    }
+    const int previousTrack = monitoredTrackId();
+    // Keep the recording's chain pinned until its final block has been released.
+    m_monitoredTrack = m_take ? m_recordTrack : m_project->recordingTrackId();
+    const auto* track = m_project->project().findTrack(m_monitoredTrack);
+    auto snapshot = std::make_unique<EngineSnapshot>();
+    if (track) {
+        const auto& fx = m_trackEffects.at(track->id);
+        snapshot->monitorMeters=fx.meters;
+        snapshot->inputStage = fx.input.get();
+        snapshot->keepProcessors.push_back(fx.input);
+        if (fx.chain) {
+            snapshot->masterChain.push_back(fx.chain.get());
+            snapshot->keepProcessors.push_back(fx.chain);
+        }
+        if (!m_take && (m_monitorInputOverride != QString::fromStdString(track->inputPort) || !m_inputConnected))
+            setCleanMonitorInput(QString::fromStdString(track->inputPort));
+        const bool anySolo = std::any_of(m_project->project().tracks().begin(), m_project->project().tracks().end(),
+            [](const auto& other) { return other->solo; });
+        setCleanMonitorGain(track->muted || (anySolo && !track->solo) ? 0 : track->volume);
+    }
+    m_engine->publishMonitor(std::move(snapshot));
+    const bool monitor = track && track->recordArmed;
+    if (monitor != m_monitorEnabled) setCleanMonitorEnabled(monitor);
+    if (previousTrack != monitoredTrackId()) emit monitoredTrackChanged();
 }
 
 EngineController* EngineController::create(QQmlEngine*, QJSEngine*)
@@ -170,6 +291,7 @@ void EngineController::setCleanMonitorEnabled(bool enabled)
     command.a = enabled ? 1 : 0;
     if (m_engine->post(command)) {
         m_monitorEnabled = enabled;
+        emit monitoredTrackChanged();
         updateAudioStatus();
     }
 }
@@ -242,8 +364,18 @@ bool EngineController::setBufferSize(int frames)
         return false;
     }
     m_connectionError.clear();
-    if (m_guitarSuite)
-        m_guitarSuite->configure(m_engine->sampleRate(), frames);
+    if (m_guitarSuite) m_guitarSuite->configure(m_engine->sampleRate(), frames);
+    for (auto& [id, fx] : m_trackEffects) {
+        // Replace input state rather than preparing a processor the audio thread may own.
+        auto input = std::make_shared<TrackInput>();
+        input->setTrimDb(fx.model->inputTrimDb());
+        input->prepare(m_engine->sampleRate(), frames);
+        fx.input = std::move(input);
+        fx.playbackInput=std::make_shared<TrackInput>();
+        fx.playbackInput->setTrimDb(fx.model->inputTrimDb()); fx.playbackInput->prepare(m_engine->sampleRate(),frames);
+        fx.model->configure(m_engine->sampleRate(), frames);
+    }
+    syncTrackEffects();
     emit bufferSizeChanged();
     updateAudioStatus();
     return true;
@@ -488,6 +620,12 @@ void EngineController::clearMonitorClips()
     if (m_engine) m_engine->clearMonitorClips();
 }
 
+void EngineController::clearTrackClips(int trackId)
+{
+    const auto it=m_trackEffects.find(trackId);
+    if(it!=m_trackEffects.end())it->second.meters->clearClips();
+}
+
 namespace {
 QString sessionPath() {
     return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/last-session.json");
@@ -516,6 +654,9 @@ void EngineController::setTransportMessage(const QString& message) {
 void EngineController::attachProject(TrackListModel* model) {
     if (!model || m_project == model) return;
     if (m_project) disconnect(m_project, nullptr, this, nullptr);
+    clearTrackEffects();
+    m_restoringPreset = false;
+    m_sessionSaveBlocked = false;
     m_project = model;
     model->setSampleRate(m_engine->sampleRate() > 1000 ? m_engine->sampleRate() : 48000);
     m_restoring = true;
@@ -529,7 +670,10 @@ void EngineController::attachProject(TrackListModel* model) {
                 const auto doc = QJsonDocument::fromJson(file.readAll(), &parse);
                 QString error;
                 if (parse.error != QJsonParseError::NoError || doc["format"].toString() != "ChaosMakerSession"
-                    || doc["version"].toInt() != 1 || !doc["guitarSuite"].isObject()
+                    || (doc["version"].toInt() != 1 && doc["version"].toInt() != 2)
+                    || (doc["version"].toInt() == 1 && !doc["guitarSuite"].isObject())
+                    || (doc["version"].toInt() == 2 && (!doc["trackEffects"].isArray()
+                        || doc["trackEffects"].toArray().size() != doc["project"]["tracks"].toArray().size()))
                     || !model->restoreSessionState(doc["project"].toObject(), error)) {
                     m_sessionSaveBlocked = true;
                     setTransportMessage(error.isEmpty() ? "Invalid saved session; original file kept." : error);
@@ -538,11 +682,21 @@ void EngineController::attachProject(TrackListModel* model) {
                     setBpm(model->project().tempo().bpm()); emit meterChanged();
                     setTransportMessage(error);
                     m_sessionSaveBlocked = false;
-                    if (!m_guitarSuite->restoreSessionData(QJsonDocument(doc["guitarSuite"].toObject()).toJson())) {
+                    const auto effects = doc["trackEffects"].toArray();
+                    int row = 0;
+                    for (const auto& track : model->project().tracks()) {
+                        auto* fx = qobject_cast<GuitarSuiteModel*>(trackEffects(track->id));
+                        const auto state = doc["version"].toInt() == 1 ? doc["guitarSuite"].toObject()
+                            : effects[row].toObject();
+                        if (!fx->restoreSessionData(QJsonDocument(state).toJson())) {
+                            m_sessionSaveBlocked = true;
+                            setTransportMessage(fx->lastError() + " · saved session kept unchanged.");
+                        }
+                        ++row;
+                    }
+                    if (effectsBusy()) {
+                        m_restoringPreset = !m_sessionSaveBlocked;
                         m_sessionSaveBlocked = true;
-                        setTransportMessage(m_guitarSuite->lastError() + " · saved session kept unchanged.");
-                    } else if (m_guitarSuite->busy()) {
-                        m_restoringPreset = true; m_sessionSaveBlocked = true;
                     }
                 }
             }
@@ -551,12 +705,31 @@ void EngineController::attachProject(TrackListModel* model) {
     m_restoring = false;
     connect(model, &TrackListModel::projectChanged, this, &EngineController::refreshProject);
     refreshProject();
+    setProjectDirty(model->count()>0);
 }
 void EngineController::refreshProject() {
     if (!m_project) return;
-    m_engine->publishPlayback(m_project->playbackSnapshot());
-    if (!m_restoring) m_sessionTimer.start();
+    if (m_take && m_project->recordingTrackId() != m_recordTrack)
+        postTransport(int(EngineCommand::Type::StopRecording));
+    syncTrackEffects();
+    publishPlayback();
+    if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
 }
+void EngineController::publishPlayback() {
+    if(!m_project)return;
+    auto snapshot=m_project->playbackSnapshot();
+    for(auto& track:snapshot->tracks) {
+        const auto effects=m_trackEffects.find(track.trackId);
+        if(effects!=m_trackEffects.end())track.meters=effects->second.meters;
+        if(!std::any_of(track.clips.begin(),track.clips.end(),[](const auto& clip){return !clip.effectsPrinted;}))continue;
+        const auto it=m_trackEffects.find(track.trackId); if(it==m_trackEffects.end())continue;
+        const auto& fx=it->second;
+        track.chain.push_back(fx.playbackInput.get()); snapshot->keepProcessors.push_back(fx.playbackInput);
+        if(fx.playbackChain) { track.chain.push_back(fx.playbackChain.get()); snapshot->keepProcessors.push_back(fx.playbackChain); }
+    }
+    m_engine->publishPlayback(std::move(snapshot));
+}
+
 void EngineController::setMeter(int numerator, int denominator) {
     if (numerator <= 0 || denominator <= 0) return;
     m_numerator = numerator; m_denominator = denominator;
@@ -598,7 +771,7 @@ void EngineController::transportAction(const QString& action) {
         setTransportMessage("Recording needs a connected audio input and output."); return;
     }
     const int track = m_project->recordingTrackId();
-    if (track < 0) { setTransportMessage("Arm exactly one Audio, Vocal or Electric Guitar track to record."); return; }
+    if (track < 0) { setTransportMessage("Arm exactly one Audio, Vocal, Acoustic Guitar or Electric Guitar track to record."); return; }
     if (m_repeating) {
         if (!postTransport(int(Type::ClearLoop))) return;
         m_repeating = false;
@@ -607,12 +780,17 @@ void EngineController::transportAction(const QString& action) {
     if (!QDir().mkpath(folder)) { setTransportMessage("Cannot create recordings folder."); return; }
     try {
         const QString path = folder + "/Take-" + QUuid::createUuid().toString(QUuid::WithoutBraces) + ".wav";
-        m_take = std::make_unique<TakeRecorder>(path.toStdString(), m_engine->sampleRate());
+        const auto* recordingTrack = m_project->project().findTrack(track);
+        const bool withFx = recordingTrack->recordsWithFx();
+        m_take = std::make_unique<TakeRecorder>(path.toStdString(), m_engine->sampleRate(),
+            withFx ? TakeRecorder::Source::PostFx : TakeRecorder::Source::DryInput);
         m_engine->clearReleasedRecorder();
         EngineCommand command; command.type = Type::StartRecording; command.recorder = m_take.get();
         if (!m_engine->post(command)) { m_take.reset(); setTransportMessage("Could not start recording; audio queue is full."); return; }
         m_recordTrack = track; m_recordStartBeat = positionBeats(); m_project->lockRecordingTrack(track);
-        setTransportMessage("Recording dry input…"); emit transportChanged();
+        setTransportMessage(withFx
+            ? QStringLiteral("Recording %1 with FX…").arg(QString::fromStdString(recordingTrack->name))
+            : QStringLiteral("Recording dry input · playback FX stay editable…")); emit transportChanged();
     } catch (const std::exception& e) { setTransportMessage(QString::fromUtf8(e.what())); }
 }
 void EngineController::pollTransport() {
@@ -630,23 +808,112 @@ void EngineController::completeTake() {
     const QString error = QString::fromStdString(m_take->error());
     if (m_project) {
         m_project->lockRecordingTrack(-1);
-        if (audio && audio->frames > 0) m_project->attachTake(m_recordTrack, m_take->startSample, audio);
+        if (audio && audio->frames > 0) m_project->attachTake(m_recordTrack, m_take->startSample, audio, m_take->source()==TakeRecorder::Source::PostFx);
     }
     setTransportMessage(!error.isEmpty() ? error : audio && audio->frames > 0
         ? QStringLiteral("Recorded %1 seconds · %2").arg(audio->frames / audio->sampleRate, 0, 'f', 2).arg(QString::fromStdString(audio->path))
         : QStringLiteral("Take ended before any audio was captured."));
     m_take.reset(); m_recordTrack = -1;
-    if (m_project) setCleanMonitorInput(m_project->cleanMonitorInput());
+    syncTrackEffects();
     emit transportChanged();
     saveSession();
 }
+void EngineController::setProjectDirty(bool dirty) {
+    if(m_projectDirty==dirty)return;
+    m_projectDirty=dirty; emit projectDirtyChanged();
+}
+QJsonObject EngineController::projectDocument() {
+    QJsonArray effects;
+    for(const auto& track:m_project->project().tracks()) {
+        auto* fx=qobject_cast<GuitarSuiteModel*>(trackEffects(track->id));
+        effects.append(QJsonDocument::fromJson(fx->sessionData()).object());
+    }
+    return {{"format","ChaosMakerProject"},{"version",2},{"project",m_project->sessionState()},{"trackEffects",effects}};
+}
+bool EngineController::saveProject(const QUrl& file) {
+    const QUrl target=file.isEmpty()?m_projectFile:file;
+    if(!m_project || m_take || projectLoading() || effectsBusy()) { setTransportMessage("Finish recording or loading effects before saving a project."); return false; }
+    if(!target.isLocalFile()) { setTransportMessage("Choose a local project file."); return false; }
+    QSaveFile output(target.toLocalFile()); const auto bytes=QJsonDocument(projectDocument()).toJson();
+    if(!output.open(QIODevice::WriteOnly) || output.write(bytes)!=bytes.size() || !output.commit()) {
+        setTransportMessage("Could not save project: "+output.errorString()); return false;
+    }
+    m_projectFile=QUrl::fromLocalFile(QFileInfo(target.toLocalFile()).absoluteFilePath());
+    emit projectFileChanged(); setProjectDirty(false); setTransportMessage("Project saved."); return true;
+}
+void EngineController::cancelProjectLoad() {
+    for(auto* model:m_loadingEffects)delete model;
+    m_loadingEffects.clear(); m_loadingProject.reset(); emit projectLoadingChanged();
+}
+bool EngineController::openProject(const QUrl& file) {
+    if(!m_project || m_take || projectLoading() || effectsBusy()) { setTransportMessage("Finish recording or loading effects before opening a project."); return false; }
+    if(!file.isLocalFile()) { setTransportMessage("Choose a local project file."); return false; }
+    QFile input(file.toLocalFile());
+    if(!input.open(QIODevice::ReadOnly) || input.size()>16*1024*1024) { setTransportMessage("Cannot read project file."); return false; }
+    QJsonParseError error; const auto doc=QJsonDocument::fromJson(input.readAll(),&error).object();
+    const int version=doc["version"].toInt();
+    if(error.error!=QJsonParseError::NoError || (doc["format"]!="ChaosMakerProject" && doc["format"]!="ChaosMakerSession")
+        || (version!=1 && version!=2) || (version==1 && !doc["guitarSuite"].isObject())
+        || (version==2 && (!doc["trackEffects"].isArray() || doc["trackEffects"].toArray().size()!=doc["project"].toObject()["tracks"].toArray().size()))) {
+        setTransportMessage("Invalid project file; current project kept."); return false;
+    }
+    auto candidate=std::make_unique<TrackListModel>();
+    candidate->setSampleRate(m_engine->sampleRate()>1000?m_engine->sampleRate():48000);
+    if(!candidate->restoreSessionState(doc["project"].toObject(),m_loadingWarning)) { setTransportMessage(m_loadingWarning); return false; }
+    m_loadingProject=std::move(candidate); m_loadingFile=file; emit projectLoadingChanged();
+    for(int row=0;row<m_loadingProject->count();++row) {
+        auto* fx=new GuitarSuiteModel(this); m_loadingEffects.push_back(fx);
+        fx->configure(m_engine->sampleRate()>1000?m_engine->sampleRate():48000,std::max(128,m_engine->latency().captureFrames));
+        connect(fx,&GuitarSuiteModel::busyChanged,this,[this] { QTimer::singleShot(0,this,[this]{finishProjectLoad();}); });
+        const auto state=version==1 ? doc["guitarSuite"].toObject() : doc["trackEffects"].toArray()[row].toObject();
+        if(!fx->restoreSessionData(QJsonDocument(state).toJson())) {
+            const auto message=fx->lastError(); cancelProjectLoad(); setTransportMessage(message+" · current project kept."); return false;
+        }
+    }
+    finishProjectLoad(); return true;
+}
+void EngineController::finishProjectLoad() {
+    if(!m_loadingProject)return;
+    for(auto* model:m_loadingEffects)if(model->busy())return;
+    for(auto* model:m_loadingEffects)if(!model->lastError().isEmpty()) {
+        const auto message=model->lastError(); cancelProjectLoad(); setTransportMessage(message+" · current project kept."); return;
+    }
+    if(!m_project || !m_engine->post({EngineCommand::Type::Stop})) { cancelProjectLoad(); setTransportMessage("Could not switch projects; try again."); return; }
+    m_restoring=true; clearTrackEffects();
+    for(int row=0;row<m_loadingProject->count();++row) {
+        auto* fx=m_loadingEffects[row]; disconnect(fx,nullptr,this,nullptr);
+        bindTrackEffects(m_loadingProject->trackIdAt(row),fx);
+    }
+    m_loadingEffects.clear();
+    m_project->adoptDocument(*m_loadingProject);
+    m_numerator=m_project->project().tempo().numerator(); m_denominator=m_project->project().tempo().denominator();
+    setBpm(m_project->project().tempo().bpm()); emit meterChanged();
+    m_repeating=false; m_engine->post({EngineCommand::Type::ClearLoop});
+    m_projectFile=m_loadingFile; m_loadingProject.reset(); m_sessionSaveBlocked=false;
+    m_restoringPreset=false; m_restoring=false; refreshProject(); setProjectDirty(false);
+    emit projectFileChanged(); emit projectLoadingChanged();
+    setTransportMessage(m_loadingWarning.isEmpty()?"Project opened.":m_loadingWarning);
+    emit transportChanged();
+}
+bool EngineController::newProject() {
+    if(!m_project || m_take || projectLoading() || effectsBusy()) { setTransportMessage("Finish recording or loading effects before creating a project."); return false; }
+    m_loadingProject=std::make_unique<TrackListModel>();
+    m_loadingProject->setSampleRate(m_engine->sampleRate()>1000?m_engine->sampleRate():48000);
+    m_loadingFile=QUrl(); m_loadingWarning.clear(); finishProjectLoad(); return !projectLoading();
+}
+
 bool EngineController::saveSession() {
-    if (!restoreSessionOnStartup() || !m_project || m_restoring || m_sessionSaveBlocked || m_guitarSuite->busy()) return false;
+    if (!restoreSessionOnStartup() || !m_project || m_restoring || m_sessionSaveBlocked || projectLoading() || effectsBusy()) return false;
     const QString path = sessionPath();
     if (!QDir().mkpath(QFileInfo(path).absolutePath())) { setTransportMessage("Could not create session folder."); return false; }
     QSaveFile file(path);
-    const auto data = QJsonDocument(QJsonObject{{"format", "ChaosMakerSession"}, {"version", 1},
-        {"project", m_project->sessionState()}, {"guitarSuite", QJsonDocument::fromJson(m_guitarSuite->sessionData()).object()}}).toJson();
+    QJsonArray effects;
+    for (const auto& track : m_project->project().tracks()) {
+        auto* fx = qobject_cast<GuitarSuiteModel*>(trackEffects(track->id));
+        effects.append(QJsonDocument::fromJson(fx->sessionData()).object());
+    }
+    const auto data = QJsonDocument(QJsonObject{{"format", "ChaosMakerSession"}, {"version", 2},
+        {"project", m_project->sessionState()}, {"trackEffects", effects}}).toJson();
     if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit()) {
         setTransportMessage("Could not save startup session."); return false;
     }
