@@ -37,10 +37,13 @@ QVariant TrackListModel::data(const QModelIndex& index, int role) const
     const auto& track = *m_project.tracks()[static_cast<std::size_t>(index.row())];
     switch (role) {
     case Qt::DisplayRole:
+    case Qt::EditRole:
     case NameRole:
         return QString::fromStdString(track.name);
     case TrackIdRole:
         return track.id;
+    case ColourRole:
+        return QString::fromStdString(track.colour);
     case KindRole:
         return track.kind == TrackKind::Instrument ? QStringLiteral("instrument") : QStringLiteral("audio");
     case LiveInputRole:
@@ -94,6 +97,7 @@ QHash<int, QByteArray> TrackListModel::roleNames() const
 {
     return {
         {TrackIdRole, "trackId"},
+        {ColourRole, "trackColour"},
         {NameRole, "name"},
         {KindRole, "kind"},
         {TypeRole, "trackType"},
@@ -123,6 +127,7 @@ QVariantList TrackListModel::clips() const
                 {QStringLiteral("clipId"), clip.id},
                 {QStringLiteral("effectsPrinted"), clip.effectsPrinted},
                 {QStringLiteral("trackId"), track.id},
+                {QStringLiteral("trackColour"), QString::fromStdString(track.colour)},
                 {QStringLiteral("laneIndex"), static_cast<int>(row)},
                 {QStringLiteral("startBeat"), startBeat},
                 {QStringLiteral("lengthBeats"), endBeat - startBeat},
@@ -159,6 +164,12 @@ bool TrackListModel::setData(const QModelIndex& index, const QVariant& value, in
     if (m_recordingTracks.contains(trackId) && role == InputPortRole) return false;
     bool changed = false;
     switch (role) {
+    case ColourRole:
+        return setTrackColour(trackId, value.toString());
+    case Qt::DisplayRole:
+    case Qt::EditRole:
+    case NameRole:
+        return renameTrack(trackId, value.toString());
     case SoloRole:
         changed = m_project.setTrackSolo(trackId, value.toBool());
         break;
@@ -244,6 +255,34 @@ int TrackListModel::rowForTrackId(int trackId) const
             return static_cast<int>(row);
     }
     return -1;
+}
+
+bool TrackListModel::renameTrack(int trackId, const QString& name)
+{
+    const QString cleaned = name.trimmed();
+    if (cleaned.isEmpty() || cleaned.size() > 256
+        || std::any_of(cleaned.cbegin(), cleaned.cend(), [](QChar ch) { return ch.category() == QChar::Other_Control; }))
+        return false;
+    const auto* track = m_project.findTrack(trackId);
+    if (!track) return false;
+    if (QString::fromStdString(track->name) == cleaned) return true;
+    if (!m_project.setTrackName(trackId, cleaned.toStdString())) return false;
+    const auto changed = index(rowForTrackId(trackId));
+    emit dataChanged(changed, changed, {NameRole, Qt::DisplayRole, Qt::EditRole});
+    return true;
+}
+
+bool TrackListModel::setTrackColour(int trackId, const QString& colour)
+{
+    const auto* track = m_project.findTrack(trackId);
+    if (!track) return false;
+    const QString cleaned = colour.trimmed().toLower();
+    if (QString::fromStdString(track->colour) == cleaned) return true;
+    if (!m_project.setTrackColour(trackId, cleaned.toStdString())) return false;
+    const auto changed = index(rowForTrackId(trackId));
+    emit dataChanged(changed, changed, {ColourRole});
+    emit clipsChanged();
+    return true;
 }
 
 bool TrackListModel::removeTrack(int trackId)
@@ -690,6 +729,7 @@ QJsonObject TrackListModel::sessionState() const
                 {"offset", QString::number(clip.sourceOffset)}, {"gainDb", clip.gainDb}, {"effectsPrinted", clip.effectsPrinted}});
         }
         tracks.append(QJsonObject{{"name", QString::fromStdString(track->name)},
+            {"colour", QString::fromStdString(track->colour)},
             {"type", QString::fromStdString(track->type)}, {"instrument", track->kind == TrackKind::Instrument},
             {"solo", track->solo}, {"muted", track->muted}, {"volume", track->volume},
             {"input", QString::fromStdString(track->inputPort)}, {"recordDry", track->recordDry}, {"eq", eq}, {"clips", clips}});
@@ -722,6 +762,10 @@ bool TrackListModel::restoreSessionState(const QJsonObject& state, QString& erro
         auto& track = candidate.addTrack(item["instrument"].toBool() ? TrackKind::Instrument : TrackKind::Audio,
             item["name"].toString().toStdString(), item["type"].toString().toStdString());
         track.recordDry = item["recordDry"].toBool(track.type=="Audio");
+        if (item.contains("colour") && (!item["colour"].isString()
+            || !candidate.setTrackColour(track.id, item["colour"].toString().toStdString()))) {
+            error = "Invalid track colour."; return false;
+        }
         track.solo = item["solo"].toBool(); track.muted = item["muted"].toBool();
         track.volume = float(item["volume"].toDouble(-1));
         track.inputPort = item["input"].toString().toStdString();

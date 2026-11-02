@@ -32,6 +32,7 @@ compile_commands.json
 *.flac
 
 # Private notes
+/1. planning/
 .claude/
 .agents/
 .codex/

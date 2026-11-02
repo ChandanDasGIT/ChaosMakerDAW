@@ -72,11 +72,52 @@ checkpoint; its dry-only/shared-chain and placeholder-project descriptions are h
    reopen. Existing recording, project-file, clip-lock and meter checks pass.
    Focused UI checks cover both recording lanes, one-lane disarm and affected FX/
    mixer/editing interactions. Production app ran offscreen for three seconds with
-   an isolated two-track recovery session and no QML diagnostics; live interface
-   routing/listening has not been measured. Routes remain cached until app close;
+   an isolated two-track recovery session and no QML diagnostics. The user has now
+   completed the live interface check and reports it works perfectly. Routes remain cached until app close;
    device hotplug and recording latency compensation remain separate work.
-   Waiting for go-ahead before task 6 (remove GuitarSuite from Vocal tracks).
-6. Remove the GuitarSuite option from Vocal tracks.
+6. **Done: remove the GuitarSuite option from Vocal tracks.** Track type now
+   determines editor availability independently of live-input support. Vocal FX
+   shows Equalizer without creating a GuitarSuite editor; unsupported pedal-page
+   navigation falls back to EQ. Input selection, record-arm, Print FX/Dry mode,
+   EQ editing and EQ presets remain available. Existing stored effect state is
+   preserved. Verified the Vocal editor through actual arm/EQ/mode/close/reopen
+   interactions, the existing guitar FX navigation case and the focused Vocal/
+   Acoustic recording/playback/session integration case. App/UI builds and diff
+   checks passed. Screenshot: /tmp/chaosmaker-vocal-eq.png.
+7. **Done: rename tracks directly in the interface.** Double-click the name in a
+   track card to edit inline; Enter or focus loss commits, Escape cancels. Names
+   are trimmed, limited to 256 UTF-16 code units and reject empty/control-character
+   values. Unicode and duplicate names are supported. Updates notify the shared
+   model, mixer and FX/input titles and mark the project modified only when the
+   name changes. Existing project/session serialization persists the name. Track
+   IDs/types, media references and clip edit history remain intact; renaming is
+   allowed during recording. Two focused model/controller cases passed for
+   validation, role notifications, Unicode, unchanged-name handling, clip history,
+   modified state, save/reopen and unchanged recorded samples. The inline rename
+   interaction case and affected Vocal FX interaction case passed; app and Qt
+   test builds passed. The user's private planning folder was not accessed.
+8. **Done: double-click empty track-list space to add a Vocal track.** The empty
+   area below the track cards accepts a left double-click and calls the existing
+   Vocal-track creation path; empty sessions show a short hint. Each gesture adds
+   one unarmed Vocal track, also appearing in the mixer. Single/right clicks do
+   not create tracks. Existing-card double-clicks still rename, and the + chooser
+   remains available. The focused addition/row-removal/rename interaction case,
+   inline rename case and Vocal FX case all passed; app/UI builds and diff checks
+   passed. The private planning folder was not accessed.
+9. **Done: choose track colours, reflected in timeline and mixer.** Each track
+   name has a colour-square button offering twelve swatches and a custom colour
+   dialog. The chosen opaque RGB colour appears on the card accent, empty-lane
+   marker, all of that track's clips (darker fill for readable labels/waveforms)
+   and mixer-strip accent. Colours live in the document and persist in project/
+   recovery JSON. Old documents without a colour get deterministic defaults;
+   invalid saved colours reject the candidate without replacing the current
+   project. No-op choices do not mark a saved project dirty; clip edit history,
+   track identity and other tracks remain intact. Two focused model/controller
+   cases and the palette/custom/cancel UI case passed. Affected rename, add-track,
+   clip-editing and mixer UI cases and project/clip integration cases passed.
+   App/test builds and diff checks passed; visually checked
+   /tmp/chaosmaker-track-colours.png. The private planning folder was not accessed.
+   Wait for the user's go-ahead before the next task.
 
 The user will manually check clip editing and project files. Do not treat those
 checks as passed until results are reported.

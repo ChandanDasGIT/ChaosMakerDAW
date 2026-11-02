@@ -115,6 +115,8 @@ if(DAW_BUILD_APP)
     add_test(NAME qtmultirecording COMMAND wrappertests qtmultirecording)
     add_test(NAME qtclipediting COMMAND wrappertests qtclipediting)
     add_test(NAME qtprojectfiles COMMAND wrappertests qtprojectfiles)
+    add_test(NAME qttracknames COMMAND wrappertests qttracknames)
+    add_test(NAME qttrackcolours COMMAND wrappertests qttrackcolours)
 endif()
 
 # Exercise actual mouse/keyboard tempo editing when Qt Test is available.

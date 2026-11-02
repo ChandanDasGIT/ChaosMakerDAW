@@ -76,8 +76,17 @@ routes are retained until the app closes. The timeline and time display follow t
 mute and solo affect playback; repeat loops from the start through the current clip extent (at
 least one bar). Recording disables repeat and prevents seeking until the take is finalized.
 
+Double-click the empty area below the track cards in the left track list to add a Vocal track.
+The + button opens the existing track-type chooser.
+
 The bottom mixer shows your session tracks and updates when tracks are added, removed or
 reopened. Its volume faders (0–200%), mute and solo controls share the track cards' settings.
+Double-click a track name in the left track list to rename it. Press Enter or click another
+control to save, or Escape to cancel. Blank names keep the previous name. Names update in
+the mixer and effects window and are saved with the project/session.
+Click the colour square beside a track name to choose a swatch or a custom colour.
+The colour appears on the track card, timeline lane marker, clips and mixer strip.
+Colours are saved with projects and startup recovery; older projects receive default colours.
 Drag a strip's right edge to resize it; scroll horizontally when the strips exceed the window.
 Each strip has a vertical volume fader and two vertical meters, IN and OUT. Each meter has
 left/right halves separated by a thin line. IN measures source audio before inserts and gain;
@@ -96,6 +105,8 @@ Each track owns its GuitarSuite chain, pedal order, bypass settings, input trim 
 Arming another track adds its sound to the monitor mix; opening or editing a track's FX keeps
 each track's input and processing independent. FX opens one non-modal window with a searchable sidebar: switch between Equalizer
 and GuitarSuite without closing the editor. Track settings and pedal controls stay in place.
+Vocal tracks expose the Equalizer in their FX window, with recording mode controls still
+available. GuitarSuite is offered on the supported non-Vocal tracks.
 Effects are printed into new wet takes; editing a chain later does not reprocess existing clips.
 WAV import and recording-latency compensation are not yet implemented. WAV takes live in Qt's
 application-data folder, normally `~/.local/share/ChaosMaker/ChaosMaker/Recordings/`.
