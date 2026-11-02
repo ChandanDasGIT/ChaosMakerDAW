@@ -61,11 +61,18 @@ Noise Gate → Distortion → Amp → Cabinet IR → Parametric EQ (bypassed) �
 It uses a fast gate, a 1.1 kHz distortion mid lift, added Crunch and room Reverb.
 Load a cabinet IR to finish the tone; adjust the gate threshold for your guitar's output/noise.
 
-Real recording and playback: arm exactly one **Audio**, **Vocal**, **Acoustic Guitar**, or **Electric Guitar** track,
-select its input and an output, then press **Record** in the bottom bar. Press **Stop** to finish
-and return to the start, then **Play** to hear the take. **Pause** finishes the take and keeps the
-position; pressing Record again ends recording while playback continues. Disarming also ends
-the take. The timeline and time display now follow the audio engine's sample clock. Track volume,
+Real recording and playback: arm one or more **Audio**, **Vocal**, **Acoustic Guitar**, or **Electric Guitar** tracks,
+select each track's input with **IN**, choose an output, then press **Record** in the bottom bar.
+All armed tracks start on the same sample and create separate WAVs/clips with their own
+recording modes and effects. Tracks may share an input or use different inputs. Arming several
+tracks enables simultaneous live monitoring through their individual effects chains.
+Press **Stop** to finish all takes and return to the start, then **Play** to hear them.
+**Pause** finishes all takes and keeps the position; pressing Record again ends capture while
+playback continues. Disarming one track finishes only its take; the others keep recording.
+Tracks armed after recording starts can monitor immediately and join capture on the next take.
+Input/mode changes and removal of participating tracks stay locked until the group finishes.
+The JACK adapter provides 31 dedicated source routes, shared by tracks using the same source;
+routes are retained until the app closes. The timeline and time display follow the sample clock. Track volume,
 mute and solo affect playback; repeat loops from the start through the current clip extent (at
 least one bar). Recording disables repeat and prevents seeking until the take is finalized.
 
@@ -75,7 +82,7 @@ Drag a strip's right edge to resize it; scroll horizontally when the strips exce
 Each strip has a vertical volume fader and two vertical meters, IN and OUT. Each meter has
 left/right halves separated by a thin line. IN measures source audio before inserts and gain;
 OUT measures the track after effects, volume, mute and solo, before the master output clamp.
-Meters work for playback and the currently monitored track. Mono live input fills both halves.
+Meters work for playback and every monitored track. Mono live input fills both halves.
 Hover for channel levels in dBFS; click a meter to clear that track's latched clip indicators.
 
 **Electric Guitar, Acoustic Guitar and Vocal takes record stereo audio with FX**, after input
@@ -86,13 +93,14 @@ Monitoring can be off or muted without silencing the recording. Stop ends captur
 leave recording running until delay/reverb tails have faded if you want them in the take.
 Audio takes still contain raw mono input. Arming any supported input track enables live monitoring.
 Each track owns its GuitarSuite chain, pedal order, bypass settings, input trim and EQ state.
-Arming another track selects its sound; opening or editing another track's FX does not switch
-monitoring. FX opens one non-modal window with a searchable sidebar: switch between Equalizer
+Arming another track adds its sound to the monitor mix; opening or editing a track's FX keeps
+each track's input and processing independent. FX opens one non-modal window with a searchable sidebar: switch between Equalizer
 and GuitarSuite without closing the editor. Track settings and pedal controls stay in place.
 Effects are printed into new wet takes; editing a chain later does not reprocess existing clips.
 WAV import and recording-latency compensation are not yet implemented. WAV takes live in Qt's
 application-data folder, normally `~/.local/share/ChaosMaker/ChaosMaker/Recordings/`.
-A full disk buffer ends the take and reports an error instead of skipping samples. Each take is
+A failed capture or missing callback input stops the recording group and keeps completed samples;
+writer errors are reported instead of silently skipping samples. Each take is
 limited to one hour or 1 GB, whichever comes first, since playback audio is held in RAM.
 
 Enable **Settings → Restore session on startup** to automatically save and reopen your tracks,

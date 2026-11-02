@@ -48,8 +48,34 @@ checkpoint; its dry-only/shared-chain and placeholder-project descriptions are h
    existing monitor cases, ten affected recording/playback cases, controller meter
    polling/removal/project reset, dry/printed controller integration and three mixer
    UI cases. Visually checked /tmp/chaosmaker-mixer-meters.png. App rebuilt.
-   Waiting for go-ahead before task 5 (multiple-track recording/live monitoring).
-5. Support simultaneous recording and live monitoring on multiple tracks.
+5. **Done: simultaneous recording and live monitoring on multiple tracks.**
+   JACK now has 31 stable dedicated mono source routes plus the legacy default
+   port. Tracks can share a source or select separate sources; each armed track
+   monitors through its own trim/EQ/GuitarSuite and fader/mute/solo. Callback routing
+   and scratch storage are prepared outside audio. One group command starts all
+   take writers at the same sample; per-track dry/wet modes remain independent.
+   Disarm finishes that track's writer and attaches its clip when ready, while
+   others continue; Stop/Pause/Record toggle finish the group. Tracks armed later
+   monitor immediately but enter capture on the next take. Participating source/
+   mode/removal edits remain locked until all writers are released and finalized.
+   Input loss or capture failure stops the group, preserves completed samples and
+   reports the failure. Closing finalizes every take. No allocation, I/O, waiting
+   or destruction of shared snapshots occurs in audio. Timeline previews and the
+   GuitarSuite meters now follow all active tracks, using per-track level data.
+   Fixed reentrant FX publication during project replacement discovered by the new
+   reopen test; binding suppresses publication until the track models are ready.
+   Verification: four new backend cases (different inputs, stereo wet/dry alignment,
+   variable blocks, meters, disarm, Stop/Pause, missing input, failed writer and
+   queued-start shutdown) pass normally, realtime sanitizer and ASan/UBSan
+   (leak detection off under tracing). Three new controller cases cover routing,
+   shared sources, FX isolation, locks, partial disarm, shutdown, errors and project
+   reopen. Existing recording, project-file, clip-lock and meter checks pass.
+   Focused UI checks cover both recording lanes, one-lane disarm and affected FX/
+   mixer/editing interactions. Production app ran offscreen for three seconds with
+   an isolated two-track recovery session and no QML diagnostics; live interface
+   routing/listening has not been measured. Routes remain cached until app close;
+   device hotplug and recording latency compensation remain separate work.
+   Waiting for go-ahead before task 6 (remove GuitarSuite from Vocal tracks).
 6. Remove the GuitarSuite option from Vocal tracks.
 
 The user will manually check clip editing and project files. Do not treat those

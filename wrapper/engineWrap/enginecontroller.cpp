@@ -25,6 +25,7 @@
 #include <QFile>
 #include <QSaveFile>
 #include <QUuid>
+#include <QScopedValueRollback>
 
 EngineController::EngineController(QObject* parent)
     : EngineController(std::make_unique<JackAudioDevice>(), true, parent) {}
@@ -93,6 +94,14 @@ EngineController::EngineController(std::unique_ptr<AudioDevice> device, bool dis
                 levels[channel+"Db"]=std::max(db,previous.value(channel+"Db",-120.0).toDouble()-1.2);
                 levels[channel+"Clip"]=meter.clipped();
             }
+            for(const auto& tap : {std::pair<const char*,PeakMeter*>{"raw",&fx.meters->raw}, {"preFx",&fx.meters->preFx}}) {
+                const QString name=QString::fromLatin1(tap.first);
+                const double db=20*std::log10(std::max(double(tap.second->takePeak()),1e-6));
+                levels[name+"Db"]=std::max(db,previous.value(name+"Db",-120.0).toDouble()-1.2);
+                levels[name+"Clip"]=tap.second->clipped();
+            }
+            levels["leftDb"]=levels["outputLeftDb"]; levels["rightDb"]=levels["outputRightDb"];
+            levels["leftClip"]=levels["outputLeftClip"]; levels["rightClip"]=levels["outputRightClip"];
             trackLevels[key]=levels;
         }
         m_trackLevels=trackLevels;
@@ -121,7 +130,7 @@ EngineController::EngineController(std::unique_ptr<AudioDevice> device, bool dis
 EngineController::~EngineController()
 {
     m_engine->stop();
-    if (m_take) { m_take->finish(); m_take->wait(); }
+    for(auto& [id,take]:m_takes) { take->finish(); take->wait(); }
 }
 
 EngineController* EngineController::instance()
@@ -184,6 +193,7 @@ QObject* EngineController::trackEffects(int trackId)
 
 void EngineController::bindTrackEffects(int trackId, GuitarSuiteModel* model)
 {
+    QScopedValueRollback<bool> binding(m_bindingEffects,true);
     auto& fx=m_trackEffects[trackId];
     fx.model=model;
     fx.input = std::make_shared<TrackInput>();
@@ -202,12 +212,12 @@ void EngineController::bindTrackEffects(int trackId, GuitarSuiteModel* model)
     watchEffects(fx.model);
     fx.model->setPublisher([this, trackId](std::shared_ptr<GuitarSuite> chain) {
         m_trackEffects.at(trackId).chain = std::move(chain);
-        if (m_monitoredTrack == trackId) syncTrackEffects();
+        if(m_project && !m_restoring && !m_bindingEffects) { syncTrackEffects(); publishPlayback(); }
         if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
     });
     fx.model->setPlaybackPublisher([this,trackId](std::shared_ptr<GuitarSuite> chain) {
         m_trackEffects.at(trackId).playbackChain=std::move(chain);
-        if(!m_restoring)publishPlayback();
+        if(!m_restoring && !m_bindingEffects)publishPlayback();
     });
     QQmlEngine::setObjectOwnership(fx.model, QQmlEngine::CppOwnership);
 }
@@ -239,30 +249,40 @@ void EngineController::syncTrackEffects()
             it = m_trackEffects.erase(it);
         } else ++it;
     }
-    const int previousTrack = monitoredTrackId();
-    // Keep the recording's chain pinned until its final block has been released.
-    m_monitoredTrack = m_take ? m_recordTrack : m_project->recordingTrackId();
-    const auto* track = m_project->project().findTrack(m_monitoredTrack);
-    auto snapshot = std::make_unique<EngineSnapshot>();
-    if (track) {
-        const auto& fx = m_trackEffects.at(track->id);
-        snapshot->monitorMeters=fx.meters;
-        snapshot->inputStage = fx.input.get();
-        snapshot->keepProcessors.push_back(fx.input);
-        if (fx.chain) {
-            snapshot->masterChain.push_back(fx.chain.get());
-            snapshot->keepProcessors.push_back(fx.chain);
+    m_trackRoutingError.clear();
+    QSet<QString> sources;
+    for(const auto& track:m_project->project().tracks())if(track->hasLiveInput() && track->recordArmed)
+        sources.insert(track->inputPort.empty() ? m_selectedInput : QString::fromStdString(track->inputPort));
+    const bool capacity=sources.size()<=m_engine->inputChannelCapacity();
+    if(!capacity)m_trackRoutingError="The audio device cannot route all selected track inputs independently.";
+    m_monitoredTrack=-1;
+    for(const auto& track:m_project->project().tracks()) {
+        auto& fx=m_trackEffects.at(track->id);
+        if(!track->hasLiveInput() || !track->recordArmed)continue;
+        const QString source=track->inputPort.empty() ? m_selectedInput : QString::fromStdString(track->inputPort);
+        if(!capacity || !m_inputPorts.contains(source)) {
+            fx.inputChannel=-1;
+            if(capacity)m_trackRoutingError="Track input is unavailable: "+source;
+            continue;
         }
-        if (!m_take && (m_monitorInputOverride != QString::fromStdString(track->inputPort) || !m_inputConnected))
-            setCleanMonitorInput(QString::fromStdString(track->inputPort));
-        const bool anySolo = std::any_of(m_project->project().tracks().begin(), m_project->project().tracks().end(),
-            [](const auto& other) { return other->solo; });
-        setCleanMonitorGain(track->muted || (anySolo && !track->solo) ? 0 : track->volume);
+        if(fx.source!=source || fx.inputChannel<0 || m_engine->inputChannelCapacity()==1) {
+            fx.inputChannel=m_engine->connectInputChannel(source.toStdString());
+            fx.source=fx.inputChannel<0 ? QString() : source;
+        }
+        if(fx.inputChannel<0) {
+            m_trackRoutingError=QString::fromStdString(m_engine->lastError());
+            if(m_trackRoutingError.isEmpty())m_trackRoutingError="Could not connect track input: "+source;
+            continue;
+        }
+        if(m_monitoredTrack<0)m_monitoredTrack=track->id;
     }
-    m_engine->publishMonitor(std::move(snapshot));
-    const bool monitor = track && track->recordArmed;
-    if (monitor != m_monitorEnabled) setCleanMonitorEnabled(monitor);
-    if (previousTrack != monitoredTrackId()) emit monitoredTrackChanged();
+    const bool monitor=m_monitoredTrack>=0;
+    if(monitor!=m_monitorEnabled)setCleanMonitorEnabled(monitor);
+    // Arm/input changes have already reached the model; notify even when the
+    // first monitored track stays the same so every editor updates membership.
+    emit monitoredTrackChanged();
+    if(!m_trackRoutingError.isEmpty())setStatus(m_trackRoutingError);
+
 }
 
 EngineController* EngineController::create(QQmlEngine*, QJSEngine*)
@@ -298,13 +318,17 @@ void EngineController::setCleanMonitorEnabled(bool enabled)
 
 bool EngineController::selectInput(int index)
 {
-    if (m_take) return false;
+    if (takeBusy()) return false;
     if (!m_engine || !m_audioReady || index < 0 || index >= m_inputPorts.size())
         return false;
     const QString source = m_inputPorts[index];
     m_selectedInput = source;
     m_selectedInputIndex = index;
     emit audioRoutingChanged();
+    if(m_project) {
+        syncTrackEffects(); publishPlayback();
+        if(!monitoredTracks().empty()) { m_connectionError.clear(); updateAudioStatus(); return true; }
+    }
     if (m_monitorInputOverride.isEmpty()) {
         m_inputConnected = m_engine->connectInput(source.toStdString());
         if (!m_inputConnected) {
@@ -541,7 +565,7 @@ void EngineController::connectOutputDevicePorts(const QString& description)
 
 bool EngineController::setCleanMonitorInput(const QString& port)
 {
-    if (m_take) return false;
+    if (takeBusy()) return false;
     if (!m_engine || !m_audioReady)
         return false;
     m_monitorInputOverride = port;
@@ -709,8 +733,6 @@ void EngineController::attachProject(TrackListModel* model) {
 }
 void EngineController::refreshProject() {
     if (!m_project) return;
-    if (m_take && m_project->recordingTrackId() != m_recordTrack)
-        postTransport(int(EngineCommand::Type::StopRecording));
     syncTrackEffects();
     publishPlayback();
     if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
@@ -718,9 +740,19 @@ void EngineController::refreshProject() {
 void EngineController::publishPlayback() {
     if(!m_project)return;
     auto snapshot=m_project->playbackSnapshot();
+    snapshot->multiMonitor=true;
     for(auto& track:snapshot->tracks) {
         const auto effects=m_trackEffects.find(track.trackId);
-        if(effects!=m_trackEffects.end())track.meters=effects->second.meters;
+        if(effects!=m_trackEffects.end()) {
+            const auto& fx=effects->second;
+            const auto* document=m_project->project().findTrack(track.trackId);
+            track.meters=fx.meters;
+            track.inputChannel=fx.inputChannel;
+            track.armed=document->hasLiveInput() && document->recordArmed;
+            track.monitoring=track.armed && fx.inputChannel>=0;
+            track.monitorChain.push_back(fx.input.get()); snapshot->keepProcessors.push_back(fx.input);
+            if(fx.chain) { track.monitorChain.push_back(fx.chain.get()); snapshot->keepProcessors.push_back(fx.chain); }
+        }
         if(!std::any_of(track.clips.begin(),track.clips.end(),[](const auto& clip){return !clip.effectsPrinted;}))continue;
         const auto it=m_trackEffects.find(track.trackId); if(it==m_trackEffects.end())continue;
         const auto& fx=it->second;
@@ -744,7 +776,7 @@ bool EngineController::postTransport(int type, qint64 a, qint64 b) {
     return true;
 }
 void EngineController::seekBeat(double beat) {
-    if (m_take || !std::isfinite(beat) || beat < 0 || !m_project) return;
+    if (takeBusy() || !std::isfinite(beat) || beat < 0 || !m_project) return;
     const double samples = beat * 60 * m_project->project().tempo().sampleRate() / m_bpm;
     if (samples > double(INT64_MAX / 4)) return;
     postTransport(int(EngineCommand::Type::Seek), std::llround(samples));
@@ -757,7 +789,7 @@ void EngineController::transportAction(const QString& action) {
     if (action == "rewind") { seekBeat(0); return; }
     if (action == "forward") { seekBeat(positionBeats() + m_numerator * 4.0 / m_denominator); return; }
     if (action == "repeat") {
-        if (m_take) { setTransportMessage("Finish the take before changing repeat."); return; }
+        if (takeBusy()) { setTransportMessage("Finish the take before changing repeat."); return; }
         const double end = m_project ? std::max(m_project->contentEndBeats(), m_numerator * 4.0 / m_denominator) : 4;
         const double rate = m_engine->sampleRate() > 1000 ? m_engine->sampleRate() : 48000;
         if (postTransport(int(m_repeating ? Type::ClearLoop : Type::SetLoop), 0, std::max<qint64>(1, std::llround(std::min(double(INT64_MAX / 4), end * 60 * rate / m_bpm))))) {
@@ -766,58 +798,96 @@ void EngineController::transportAction(const QString& action) {
         return;
     }
     if (action != "record") return;
-    if (m_take) { postTransport(int(Type::StopRecording)); return; }
+    if (takeBusy()) { postTransport(int(Type::StopRecording)); return; }
     if (!m_audioReady || !m_inputConnected || !m_outputConnected || !m_project) {
         setTransportMessage("Recording needs a connected audio input and output."); return;
     }
-    const int track = m_project->recordingTrackId();
-    if (track < 0) { setTransportMessage("Arm exactly one Audio, Vocal, Acoustic Guitar or Electric Guitar track to record."); return; }
-    if (m_repeating) {
-        if (!postTransport(int(Type::ClearLoop))) return;
-        m_repeating = false;
+    syncTrackEffects(); publishPlayback();
+    if(!m_trackRoutingError.isEmpty()) { setTransportMessage(m_trackRoutingError); return; }
+    std::vector<int> tracks;
+    for(const auto& track:m_project->project().tracks()) {
+        if(!track->recordArmed)continue;
+        if(!track->hasLiveInput()) { setTransportMessage("Disarm tracks without audio inputs before recording."); return; }
+        tracks.push_back(track->id);
     }
-    const QString folder = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/Recordings";
-    if (!QDir().mkpath(folder)) { setTransportMessage("Cannot create recordings folder."); return; }
+    if(tracks.empty()) { setTransportMessage("Arm at least one Audio, Vocal, Acoustic Guitar or Electric Guitar track to record."); return; }
+    if(m_repeating) {
+        if(!postTransport(int(Type::ClearLoop)))return;
+        m_repeating=false;
+    }
+    const QString folder=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+"/Recordings";
+    if(!QDir().mkpath(folder)) { setTransportMessage("Cannot create recordings folder."); return; }
     try {
-        const QString path = folder + "/Take-" + QUuid::createUuid().toString(QUuid::WithoutBraces) + ".wav";
-        const auto* recordingTrack = m_project->project().findTrack(track);
-        const bool withFx = recordingTrack->recordsWithFx();
-        m_take = std::make_unique<TakeRecorder>(path.toStdString(), m_engine->sampleRate(),
-            withFx ? TakeRecorder::Source::PostFx : TakeRecorder::Source::DryInput);
-        m_engine->clearReleasedRecorder();
-        EngineCommand command; command.type = Type::StartRecording; command.recorder = m_take.get();
-        if (!m_engine->post(command)) { m_take.reset(); setTransportMessage("Could not start recording; audio queue is full."); return; }
-        m_recordTrack = track; m_recordStartBeat = positionBeats(); m_project->lockRecordingTrack(track);
-        setTransportMessage(withFx
-            ? QStringLiteral("Recording %1 with FX…").arg(QString::fromStdString(recordingTrack->name))
-            : QStringLiteral("Recording dry input · playback FX stay editable…")); emit transportChanged();
-    } catch (const std::exception& e) { setTransportMessage(QString::fromUtf8(e.what())); }
+        auto group=std::make_unique<RecordingGroup>();
+        std::map<int,std::unique_ptr<TakeRecorder>> takes;
+        QSet<int> locked;
+        for(int id:tracks) {
+            const auto* track=m_project->project().findTrack(id);
+            const auto path=folder+"/Take-"+QUuid::createUuid().toString(QUuid::WithoutBraces)+".wav";
+            auto take=std::make_unique<TakeRecorder>(path.toStdString(),m_engine->sampleRate(),
+                track->recordsWithFx()?TakeRecorder::Source::PostFx:TakeRecorder::Source::DryInput);
+            group->entries.push_back({id,m_trackEffects.at(id).inputChannel,take.get()});
+            takes.emplace(id,std::move(take)); locked.insert(id);
+        }
+        EngineCommand command; command.type=Type::StartRecordingGroup; command.group=group.get();
+        if(!m_engine->post(command)) { setTransportMessage("Could not start recording; audio queue is full."); return; }
+        m_takes=std::move(takes); m_group=std::move(group);
+        m_recordTrack=tracks.front(); m_recordStartBeat=positionBeats(); m_project->lockRecordingTracks(locked);
+        setTransportMessage(tracks.size()==1
+            ? (m_project->project().findTrack(m_recordTrack)->recordsWithFx()
+                ? QStringLiteral("Recording %1 with FX…").arg(QString::fromStdString(m_project->project().findTrack(m_recordTrack)->name))
+                : QStringLiteral("Recording dry input · playback FX stay editable…"))
+            : QStringLiteral("Recording %1 tracks with independent inputs and FX…").arg(tracks.size()));
+        emit transportChanged();
+    } catch(const std::exception& error) { setTransportMessage(QString::fromUtf8(error.what())); }
+}
+QVariantList EngineController::monitoredTracks() const {
+    QVariantList result;
+    if(m_monitorEnabled && m_project)for(const auto& track:m_project->project().tracks()) {
+        const auto it=m_trackEffects.find(track->id);
+        if(track->hasLiveInput() && track->recordArmed && it!=m_trackEffects.end() && it->second.inputChannel>=0)result.push_back(track->id);
+    }
+    return result;
+}
+QVariantList EngineController::recordingTracks() const {
+    QVariantList result;
+    for(const auto& [id,take]:m_takes)if(!take->released())result.push_back(id);
+    return result;
 }
 void EngineController::pollTransport() {
-    if (recording() && m_project)
-        m_recordStartBeat = m_project->project().tempo().beatAt(m_engine->recordingStart());
-    if (m_take && m_engine->releasedRecorder() == m_take.get() && m_take->done()) completeTake();
-    // Disarming ends the take on the next audio block.
-    if (m_take && m_project && m_project->recordingTrackId() != m_recordTrack && recording())
-        postTransport(int(EngineCommand::Type::StopRecording));
+    if(recording() && m_project)m_recordStartBeat=m_project->project().tempo().beatAt(m_engine->recordingStart());
+    for(const auto& [id,take]:m_takes)if(take->released() && take->done() && !m_attachedTakes.contains(id)) {
+        const auto audio=take->audio();
+        if(m_project && audio && audio->frames>0)m_project->attachTake(id,take->startSample,audio,take->source()==TakeRecorder::Source::PostFx);
+        m_attachedTakes.insert(id);
+    }
+    if(m_group && m_group->released.load(std::memory_order_acquire)
+        && std::all_of(m_takes.begin(),m_takes.end(),[](const auto& pair){return pair.second->done();}))completeTake();
     emit transportChanged();
 }
 void EngineController::completeTake() {
-    if (!m_take) return;
-    const auto audio = m_take->audio();
-    const QString error = QString::fromStdString(m_take->error());
-    if (m_project) {
-        m_project->lockRecordingTrack(-1);
-        if (audio && audio->frames > 0) m_project->attachTake(m_recordTrack, m_take->startSample, audio, m_take->source()==TakeRecorder::Source::PostFx);
+    if(!takeBusy())return;
+    QStringList errors; int completed=0;
+    if(m_group && m_group->inputLost.load(std::memory_order_relaxed))
+        errors.push_back("Recording stopped: an audio input became unavailable; completed samples were kept.");
+    if(m_project)m_project->lockRecordingTrack(-1);
+    // The group has been released by audio and every worker has finished.
+    for(const auto& [id,take]:m_takes) {
+        const auto audio=take->audio();
+        if(!take->error().empty())errors.push_back(QString::fromStdString(take->error()));
+        if(m_project && audio && audio->frames>0) {
+            if(!m_attachedTakes.contains(id))m_project->attachTake(id,take->startSample,audio,take->source()==TakeRecorder::Source::PostFx);
+            ++completed;
+        }
     }
-    setTransportMessage(!error.isEmpty() ? error : audio && audio->frames > 0
-        ? QStringLiteral("Recorded %1 seconds · %2").arg(audio->frames / audio->sampleRate, 0, 'f', 2).arg(QString::fromStdString(audio->path))
-        : QStringLiteral("Take ended before any audio was captured."));
-    m_take.reset(); m_recordTrack = -1;
-    syncTrackEffects();
-    emit transportChanged();
-    saveSession();
+    if(errors.empty() && m_group && m_group->captureFailed.load(std::memory_order_relaxed))
+        errors.push_back("Recording stopped because audio capture could not continue; completed samples were kept.");
+    m_group.reset(); m_takes.clear(); m_attachedTakes.clear(); m_recordTrack=-1;
+    setTransportMessage(!errors.empty() ? errors.join(" · ") : completed>0
+        ? QStringLiteral("Recorded %1 track(s).").arg(completed) : "Take ended before any audio was captured.");
+    syncTrackEffects(); publishPlayback(); emit transportChanged(); saveSession();
 }
+
 void EngineController::setProjectDirty(bool dirty) {
     if(m_projectDirty==dirty)return;
     m_projectDirty=dirty; emit projectDirtyChanged();
@@ -832,7 +902,7 @@ QJsonObject EngineController::projectDocument() {
 }
 bool EngineController::saveProject(const QUrl& file) {
     const QUrl target=file.isEmpty()?m_projectFile:file;
-    if(!m_project || m_take || projectLoading() || effectsBusy()) { setTransportMessage("Finish recording or loading effects before saving a project."); return false; }
+    if(!m_project || takeBusy() || projectLoading() || effectsBusy()) { setTransportMessage("Finish recording or loading effects before saving a project."); return false; }
     if(!target.isLocalFile()) { setTransportMessage("Choose a local project file."); return false; }
     QSaveFile output(target.toLocalFile()); const auto bytes=QJsonDocument(projectDocument()).toJson();
     if(!output.open(QIODevice::WriteOnly) || output.write(bytes)!=bytes.size() || !output.commit()) {
@@ -846,7 +916,7 @@ void EngineController::cancelProjectLoad() {
     m_loadingEffects.clear(); m_loadingProject.reset(); emit projectLoadingChanged();
 }
 bool EngineController::openProject(const QUrl& file) {
-    if(!m_project || m_take || projectLoading() || effectsBusy()) { setTransportMessage("Finish recording or loading effects before opening a project."); return false; }
+    if(!m_project || takeBusy() || projectLoading() || effectsBusy()) { setTransportMessage("Finish recording or loading effects before opening a project."); return false; }
     if(!file.isLocalFile()) { setTransportMessage("Choose a local project file."); return false; }
     QFile input(file.toLocalFile());
     if(!input.open(QIODevice::ReadOnly) || input.size()>16*1024*1024) { setTransportMessage("Cannot read project file."); return false; }
@@ -896,7 +966,7 @@ void EngineController::finishProjectLoad() {
     emit transportChanged();
 }
 bool EngineController::newProject() {
-    if(!m_project || m_take || projectLoading() || effectsBusy()) { setTransportMessage("Finish recording or loading effects before creating a project."); return false; }
+    if(!m_project || takeBusy() || projectLoading() || effectsBusy()) { setTransportMessage("Finish recording or loading effects before creating a project."); return false; }
     m_loadingProject=std::make_unique<TrackListModel>();
     m_loadingProject->setSampleRate(m_engine->sampleRate()>1000?m_engine->sampleRate():48000);
     m_loadingFile=QUrl(); m_loadingWarning.clear(); finishProjectLoad(); return !projectLoading();
@@ -921,8 +991,8 @@ bool EngineController::saveSession() {
 }
 void EngineController::shutdownSession() {
     if (m_shutdown) return;
-    m_shutdown = true; m_snapshotTimer.stop(); m_sessionTimer.stop();
+    m_shutdown = true; m_snapshotTimer.stop(); m_sessionTimer.stop(); m_meterTimer.stop();
     m_engine->stop(); // Quiesce JACK before releasing the recorder or its ring.
-    if (m_take) { m_take->finish(); m_take->wait(); completeTake(); }
+    if(takeBusy()) { for(auto& [id,take]:m_takes) { take->finish(); take->wait(); } completeTake(); }
     saveSession();
 }

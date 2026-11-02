@@ -42,11 +42,13 @@ struct TrackRender {
     int inputChannel = -1;                                // -1: none
     bool armed = false;
     bool monitoring = false;
+    std::vector<Processor*> monitorChain;
 };
 
 // Flat, finished, read-only once it has been published. The keepAlive lists are why the audio thread
 // never destroys anything: the last owner of an old clip or plugin is an old snapshot, freed on the UI thread.
 struct EngineSnapshot {
+    bool multiMonitor = false;
     std::shared_ptr<TrackMeters> monitorMeters;
     Processor* inputStage = nullptr;                    // optional per-track trim and EQ
     std::vector<TrackRender> tracks;

@@ -22,6 +22,8 @@ public:
     std::vector<std::string> inputNames() const override;
     std::vector<std::string> outputNames() const override;
     bool connectInput(const std::string& source) override;
+    int connectInputChannel(const std::string& source) override;
+    int inputChannelCapacity() const override { return inputChannels-1; }
     bool connectOutput(const std::string& left, const std::string& right) override;
     std::string lastError() const override { return m_error; }
 
@@ -35,9 +37,11 @@ private:
     bool disconnectAll(jack_port_t* port, bool portIsSource);
 
     jack_client_t* m_client = nullptr;
-    jack_port_t* m_input = nullptr;
+    static constexpr int inputChannels = 32;
+    std::array<jack_port_t*, inputChannels> m_inputs{};
+    std::array<std::string, inputChannels> m_sources{};
     std::array<jack_port_t*, 2> m_outputs{};
-    std::array<float*, 1> m_inputBuffers{};
+    std::array<float*, inputChannels> m_inputBuffers{};
     std::array<float*, 2> m_outputBuffers{};
     AudioCallback* m_callback = nullptr;
     std::atomic<int> m_bufferFrames{0};

@@ -56,6 +56,10 @@ void AudioEngine::stop()
     finishRecording();
     EngineCommand pending;
     while (m_commands.pop(pending)) {
+        if(pending.type==EngineCommand::Type::StartRecordingGroup && pending.group) {
+            for(auto& entry:pending.group->entries)entry.recorder->releaseFromAudio();
+            pending.group->released.store(true,std::memory_order_release);
+        }
         if (pending.type == EngineCommand::Type::StartRecording && pending.recorder) {
             pending.recorder->finish();
             m_releasedRecorder.store(pending.recorder, std::memory_order_release);
@@ -139,6 +143,11 @@ bool AudioEngine::connectInput(const std::string& source)
     return m_device && m_device->connectInput(source);
 }
 
+int AudioEngine::connectInputChannel(const std::string& source)
+{
+    return m_device ? m_device->connectInputChannel(source) : -1;
+}
+
 bool AudioEngine::connectOutput(const std::string& left, const std::string& right)
 {
     return m_device && m_device->connectOutput(left, right);
@@ -163,7 +172,7 @@ void AudioEngine::process(const AudioIO& io) noexcept
         case EngineCommand::Type::Pause: finishRecording(); m_resetPlayback = true; m_playing = false; break;
         case EngineCommand::Type::Stop: finishRecording(); m_resetPlayback = true; m_playing = false; m_position = 0; break;
         case EngineCommand::Type::Seek:
-            if (!m_recorder) { m_position = std::clamp<std::int64_t>(command.a, 0, INT64_MAX / 2); m_resetPlayback = true; }
+            if (!m_recorder && !m_recordingGroup) { m_position = std::clamp<std::int64_t>(command.a, 0, INT64_MAX / 2); m_resetPlayback = true; }
             break;
         case EngineCommand::Type::SetLoop:
             m_loopStart = std::max<std::int64_t>(0, command.a); m_loopEnd = command.b;
@@ -173,6 +182,14 @@ void AudioEngine::process(const AudioIO& io) noexcept
             if (command.recorder && !m_recorder) {
                 m_recorder = command.recorder; m_recorder->begin(m_position);
                 m_recordingStart.store(m_position, std::memory_order_relaxed); m_playing = true;
+            }
+            break;
+        case EngineCommand::Type::StartRecordingGroup:
+            if(command.group && !m_recordingGroup && !m_recorder) {
+                m_recordingGroup=command.group;
+                for(auto& entry:m_recordingGroup->entries)entry.recorder->begin(m_position);
+                m_recordingStart.store(m_position,std::memory_order_relaxed);
+                m_playing=true;
             }
             break;
         case EngineCommand::Type::StopRecording: finishRecording(); break;
@@ -185,6 +202,13 @@ void AudioEngine::process(const AudioIO& io) noexcept
     const double bpm = m_tempoBpm.load(std::memory_order_relaxed);
 
     io.output.clear();
+    if(playback && playback->multiMonitor) {
+        renderTracks(io,*playback,std::max(0,std::min(io.frames,io.output.frames)));
+        m_reportedPosition.store(m_position,std::memory_order_relaxed);
+        m_reportedPlaying.store(m_playing,std::memory_order_relaxed);
+        m_reportedRecording.store(m_recordingGroup!=nullptr,std::memory_order_relaxed);
+        return;
+    }
     if (io.input.channelCount > 0 && io.input.frames > 0 && io.frames > 0) {
         AudioView raw = io.input;
         raw.channelCount = 1; // The live monitor currently consumes mono input 0.
@@ -279,6 +303,13 @@ void AudioEngine::xrunOccurred() noexcept
 
 void AudioEngine::finishRecording() noexcept
 {
+    if(m_recordingGroup) {
+        auto* group=m_recordingGroup; m_recordingGroup=nullptr;
+        for(auto& entry:group->entries) {
+            if(entry.active) { entry.recorder->releaseFromAudio(); entry.active=false; }
+        }
+        group->released.store(true,std::memory_order_release);
+    }
     if (!m_recorder) return;
     TakeRecorder* finished = m_recorder;
     m_recorder = nullptr;
@@ -362,5 +393,123 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
     }
     for(int c=0;c<io.output.channelCount;++c)for(int i=0;i<frames;++i) {
         float& sample=io.output.channel(c)[i]; sample=std::isfinite(sample)?std::clamp(sample,-1.0f,1.0f):0.0f;
+    }
+}
+
+void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot, int frames) noexcept
+{
+    bool anySolo=false;
+    for(const auto& track:snapshot.tracks) {
+        anySolo|=track.soloed;
+        if(m_resetPlayback)for(auto* processor:track.chain)if(processor)processor->reset();
+    }
+    m_resetPlayback=false;
+    if(m_recordingGroup) {
+        bool active=false, missingInput=false;
+        for(auto& entry:m_recordingGroup->entries) {
+            if(!entry.active)continue;
+            const auto track=std::find_if(snapshot.tracks.begin(),snapshot.tracks.end(),[&](const auto& t){return t.trackId==entry.trackId;});
+            if(track==snapshot.tracks.end() || !track->armed) {
+                entry.recorder->releaseFromAudio(); entry.active=false;
+            } else {
+                active=true;
+                missingInput|=entry.inputChannel<0 || entry.inputChannel>=io.input.channelCount || io.input.frames<frames;
+            }
+        }
+        if(!active || missingInput) {
+            if(missingInput)m_recordingGroup->inputLost.store(true,std::memory_order_relaxed);
+            finishRecording(); if(missingInput)m_playing=false;
+        }
+    }
+    for(int offset=0;offset<frames;) {
+        if(m_playing && m_looping && !m_recordingGroup && m_position>=m_loopEnd)m_position=m_loopStart;
+        int count=std::min(m_fxBlockFrames,frames-offset);
+        if(m_playing && m_looping && !m_recordingGroup)count=int(std::min<std::int64_t>(count,m_loopEnd-m_position));
+        bool failed=false;
+        for(const auto& track:snapshot.tracks) {
+            RecordingGroup::Entry* recording=nullptr;
+            if(m_recordingGroup)for(auto& entry:m_recordingGroup->entries)
+                if(entry.active && entry.trackId==track.trackId) { recording=&entry; break; }
+            const int inputChannel=recording ? recording->inputChannel : track.inputChannel;
+            const bool live=(track.monitoring || recording) && inputChannel>=0
+                && inputChannel<io.input.channelCount && io.input.frames>=offset+count;
+            const bool audible=!track.muted && (!anySolo || track.soloed);
+            float* liveAudio[]{m_fxAudio[0].data(),m_fxAudio[1].data()};
+            float* dry[]{m_playbackAudio[0].data(),m_playbackAudio[1].data()};
+            for(int c=0;c<2;++c) {
+                std::fill_n(liveAudio[c],count,0); std::fill_n(dry[c],count,0);
+                std::fill_n(m_printedAudio[c].data(),count,0);
+            }
+            if(live) {
+                float* raw[]{io.input.channel(inputChannel)+offset};
+                for(int c=0;c<2;++c)std::copy_n(raw[0],count,liveAudio[c]);
+                ProcessContext context; context.audio={liveAudio,2,count}; context.sampleRate=m_sampleRate;
+                context.samplePosition=m_position; context.bpm=m_tempoBpm.load(std::memory_order_relaxed); context.playing=m_playing;
+                ProcessContext analysis=context; analysis.audio={raw,1,count};
+                for(auto* processor:track.monitorChain)if(processor)processor->analyseInput(analysis);
+                if(track.meters)track.meters->raw.capture({raw,1,count});
+                for(std::size_t i=0;i<track.monitorChain.size();++i) {
+                    if(track.monitorChain[i])track.monitorChain[i]->process(context);
+                    if(i==0 && track.meters)track.meters->preFx.capture(context.audio);
+                }
+                if(recording) {
+                    const bool captured=recording->recorder->source()==TakeRecorder::Source::DryInput
+                        ? recording->recorder->capture(raw[0],count) : recording->recorder->capture(context.audio);
+                    failed|=!captured;
+                }
+            }
+            if(m_playing)for(const auto& clip:track.clips) {
+                if(!clip.audio || clip.audio->channels.empty())continue;
+                for(int i=0;i<count;++i) {
+                    const auto at=m_position+i;
+                    if(at<clip.start || at-clip.start>=clip.length)continue;
+                    const double source=clip.sourceOffset+double(at-clip.start)*clip.audio->sampleRate/m_sampleRate;
+                    if(source<0 || source>=clip.audio->frames)continue;
+                    const auto sample=static_cast<std::size_t>(source);
+                    for(int c=0;c<2;++c) {
+                        const auto& data=clip.audio->channels[std::min<std::size_t>(c,clip.audio->channels.size()-1)];
+                        if(sample>=data.size())continue;
+                        const float next=sample+1<data.size()?data[sample+1]:data[sample];
+                        const float value=(data[sample]+float(source-sample)*(next-data[sample]))*clip.gain;
+                        if(!clip.effectsPrinted && !track.chain.empty())dry[c][i]+=value;
+                        else m_printedAudio[c][i]+=value;
+                    }
+                }
+            }
+            if(track.meters)for(int c=0;c<2;++c) {
+                float peak=0;
+                for(int i=0;i<count;++i) {
+                    const float value=dry[c][i]+m_printedAudio[c][i]+(live ? io.input.channel(inputChannel)[offset+i] : 0);
+                    if(std::isfinite(value))peak=std::max(peak,std::abs(value));
+                }
+                track.meters->input[c].capturePeak(peak);
+            }
+            if(m_playing && !track.chain.empty()) {
+                ProcessContext context; context.audio={dry,2,count}; context.sampleRate=m_sampleRate;
+                context.samplePosition=m_position; context.bpm=m_tempoBpm.load(std::memory_order_relaxed); context.playing=true;
+                for(auto* processor:track.chain)if(processor)processor->process(context);
+            }
+            for(int c=0;c<2;++c) {
+                float peak=0;
+                for(int i=0;i<count;++i) {
+                    float value=0;
+                    if(audible)value=(dry[c][i]+m_printedAudio[c][i]+(live && m_cleanMonitorEnabled ? liveAudio[c][i] : 0))*track.gain;
+                    liveAudio[c][i]=value;
+                    if(std::isfinite(value))peak=std::max(peak,std::abs(value));
+                }
+                if(track.meters)track.meters->output[c].capturePeak(peak);
+            }
+            for(int c=0;c<io.output.channelCount;++c)for(int i=0;i<count;++i)
+                io.output.channel(c)[offset+i]+=liveAudio[c==1?1:0][i];
+        }
+        if(m_playing)m_position=std::min<std::int64_t>(INT64_MAX/2,m_position+count);
+        offset+=count;
+        if(failed) {
+            if(m_recordingGroup)m_recordingGroup->captureFailed.store(true,std::memory_order_relaxed);
+            finishRecording(); m_playing=false; break;
+        }
+    }
+    for(int c=0;c<io.output.channelCount;++c)for(int i=0;i<frames;++i) {
+        float& value=io.output.channel(c)[i]; value=std::isfinite(value)?std::clamp(value,-1.0f,1.0f):0;
     }
 }

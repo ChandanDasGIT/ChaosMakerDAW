@@ -11,6 +11,7 @@
 #include <QPointer>
 #include "wrapper/session/tracklistmodel.h"
 class TakeRecorder;
+struct RecordingGroup;
 
 class GuitarSuiteModel;
 class GuitarSuite;
@@ -35,6 +36,7 @@ class EngineController : public QObject {
     Q_PROPERTY(double positionSeconds READ positionSeconds NOTIFY transportChanged)
     Q_PROPERTY(double recordingStartBeats READ recordingStartBeats NOTIFY transportChanged)
     Q_PROPERTY(int recordingTrackId READ recordingTrackId NOTIFY transportChanged)
+    Q_PROPERTY(QVariantList recordingTracks READ recordingTracks NOTIFY transportChanged)
     Q_PROPERTY(int numerator READ numerator NOTIFY meterChanged)
     Q_PROPERTY(int denominator READ denominator NOTIFY meterChanged)
     Q_PROPERTY(bool repeating READ repeating NOTIFY transportChanged)
@@ -54,6 +56,7 @@ class EngineController : public QObject {
     Q_PROPERTY(int selectedOutputIndex READ selectedOutputIndex NOTIFY outputDeviceChanged)
     Q_PROPERTY(QObject* guitarSuite READ guitarSuite CONSTANT)
     Q_PROPERTY(int monitoredTrackId READ monitoredTrackId NOTIFY monitoredTrackChanged)
+    Q_PROPERTY(QVariantList monitoredTracks READ monitoredTracks NOTIFY monitoredTrackChanged)
     Q_PROPERTY(QUrl projectFile READ projectFile NOTIFY projectFileChanged)
     Q_PROPERTY(bool projectDirty READ projectDirty NOTIFY projectDirtyChanged)
     Q_PROPERTY(bool projectLoading READ projectLoading NOTIFY projectLoadingChanged)
@@ -67,7 +70,9 @@ public:
 
     bool playing() const;
     bool recording() const;
-    bool takeBusy() const { return bool(m_take); }
+    bool takeBusy() const { return !m_takes.empty(); }
+    QVariantList recordingTracks() const;
+    QVariantList monitoredTracks() const;
     double positionBeats() const;
     double positionSeconds() const;
     double recordingStartBeats() const { return m_recordStartBeat; }
@@ -164,9 +169,13 @@ private:
         GuitarSuiteModel* model = nullptr;
         std::shared_ptr<TrackInput> input, playbackInput;
         std::shared_ptr<GuitarSuite> chain, playbackChain;
+        int inputChannel = -1;
+        QString source;
     };
     std::map<int, TrackEffects> m_trackEffects;
     int m_monitoredTrack = -1;
+    QString m_trackRoutingError;
+    bool m_bindingEffects = false;
 
     void refreshProject();
     void publishPlayback();
@@ -175,7 +184,9 @@ private:
     void setTransportMessage(const QString& message);
     bool postTransport(int type, qint64 a = 0, qint64 b = 0);
     QPointer<TrackListModel> m_project;
-    std::unique_ptr<TakeRecorder> m_take;
+    std::map<int,std::unique_ptr<TakeRecorder>> m_takes;
+    std::unique_ptr<RecordingGroup> m_group;
+    QSet<int> m_attachedTakes;
     QTimer m_sessionTimer;
     bool m_repeating = false, m_shutdown = false, m_restoring = false, m_sessionSaveBlocked = false, m_restoringPreset = false;
     int m_recordTrack = -1, m_numerator = 4, m_denominator = 4;

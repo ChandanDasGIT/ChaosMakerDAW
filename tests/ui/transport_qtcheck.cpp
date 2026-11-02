@@ -9,6 +9,28 @@
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QStandardPaths>
+#include "audiodevice/audiodevice.h"
+
+class MultiInputUiDevice final : public AudioDevice {
+public:
+    AudioCallback* callback=nullptr;
+    bool open(AudioCallback* c,int frames) override { callback=c; c->deviceChanged(48000,frames); return true; }
+    void close() override { callback=nullptr; }
+    double sampleRate() const override { return 48000; }
+    DeviceLatency latency() const override { return {128,128,128}; }
+    bool setBufferSize(int) override { return true; }
+    std::vector<std::string> inputNames() const override { return {"test:input","test:mic"}; }
+    std::vector<std::string> outputNames() const override { return {"test:left","test:right"}; }
+    bool connectInput(const std::string&) override { return true; }
+    int inputChannelCapacity() const override { return 2; }
+    int connectInputChannel(const std::string& source) override { return source=="test:input" ? 0 : source=="test:mic" ? 1 : -1; }
+    bool connectOutput(const std::string&,const std::string&) override { return true; }
+    std::string lastError() const override { return {}; }
+    void process() {
+        float a[128]{},b[128]{},left[128]{},right[128]{}; float* in[]{a,b}; float* out[]{left,right};
+        if(callback)callback->process({{in,2,128},{out,2,128},nullptr,128});
+    }
+};
 
 class TransportUiTest : public QObject {
     Q_OBJECT
@@ -405,6 +427,30 @@ private slots:
         QVERIFY(fader->x()<input->x()); QVERIFY(input->x()<output->x());
         QVERIFY(window->grabWindow().save("/tmp/chaosmaker-mixer-meters.png"));
         mixer->setProperty("levels",QVariantMap()); mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
+    }
+    void timeline_shows_each_recording_lane_and_disarming_one_keeps_the_other_active() {
+        auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        TrackListModel tracks; controller.attachProject(&tracks);
+        const int a=tracks.addAudioTrack(),b=tracks.addVocalTrack();
+        QVERIFY(tracks.setTrackInputPort(b,"test:mic"));
+        QVERIFY(tracks.setRecordArmed(a,true)); QVERIFY(tracks.setRecordArmed(b,true));
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        timeline->setProperty("transport",QVariant::fromValue(&controller));
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        controller.transportAction("record"); io->process();
+        QTRY_VERIFY(visualItem(timeline,"recordingPreview"+QString::number(a)));
+        auto* first=visualItem(timeline,"recordingPreview"+QString::number(a));
+        auto* second=visualItem(timeline,"recordingPreview"+QString::number(b)); QVERIFY(second);
+        QCOMPARE(second->y()-first->y(),timeline->property("laneHeight").toDouble());
+        QVERIFY(tracks.setRecordArmed(a,false)); io->process();
+        QTRY_VERIFY(!visualItem(timeline,"recordingPreview"+QString::number(a)));
+        QVERIFY(visualItem(timeline,"recordingPreview"+QString::number(b))); QVERIFY(controller.recording());
+        controller.transportAction("stop"); io->process(); QTRY_VERIFY(!controller.takeBusy());
+        QCOMPARE(tracks.clips().size(),2);
+        timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+        timeline->setProperty("transport",QVariant::fromValue(EngineController::instance()));
+        controller.shutdownSession();
     }
     void new_project_prompts_before_discarding_unsaved_clips() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);

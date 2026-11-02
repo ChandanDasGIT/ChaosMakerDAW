@@ -156,7 +156,7 @@ bool TrackListModel::setData(const QModelIndex& index, const QVariant& value, in
         return false;
 
     const int trackId = m_project.tracks()[static_cast<std::size_t>(index.row())]->id;
-    if (trackId == m_recordingTrack && role == InputPortRole) return false;
+    if (m_recordingTracks.contains(trackId) && role == InputPortRole) return false;
     bool changed = false;
     switch (role) {
     case SoloRole:
@@ -248,7 +248,7 @@ int TrackListModel::rowForTrackId(int trackId) const
 
 bool TrackListModel::removeTrack(int trackId)
 {
-    if (trackId == m_recordingTrack) return false;
+    if (m_recordingTracks.contains(trackId)) return false;
     const int row = rowForTrackId(trackId);
     if (row < 0)
         return false;
@@ -297,7 +297,7 @@ bool TrackListModel::setMuted(int trackId, bool enabled)
 
 bool TrackListModel::setRecordDry(int trackId, bool dry) {
     auto* track=m_project.findTrack(trackId);
-    if(!track || !track->hasLiveInput() || m_recordingTrack==trackId)return false;
+    if(!track || !track->hasLiveInput() || m_recordingTracks.contains(trackId))return false;
     if(track->recordDry==dry)return true;
     track->recordDry=dry; const auto changed=index(rowForTrackId(trackId));
     emit dataChanged(changed,changed,{RecordDryRole,RecordsWithFxRole}); return true;
@@ -379,7 +379,7 @@ bool TrackListModel::resetTrackEq(int trackId)
 
 bool TrackListModel::setTrackInputPort(int trackId, const QString& port)
 {
-    if (trackId == m_recordingTrack) return false;
+    if (m_recordingTracks.contains(trackId)) return false;
     const int row = rowForTrackId(trackId);
     Track* track = m_project.findTrack(trackId);
     if (row < 0 || !track)
@@ -458,7 +458,7 @@ int TrackListModel::addClipAtBeat(int trackId, double startBeat, double lengthBe
 
 bool TrackListModel::trimClipStartAtBeat(int trackId, int clipId, double startBeat) {
     const double sample = startBeat * 60 * m_project.tempo().sampleRate() / m_project.tempo().bpm();
-    if (m_recordingTrack >= 0 || !std::isfinite(sample) || sample < 0 || sample >= double(INT64_MAX/4)) return false;
+    if (!m_recordingTracks.isEmpty() || !std::isfinite(sample) || sample < 0 || sample >= double(INT64_MAX/4)) return false;
     const auto* track = m_project.findTrack(trackId); if (!track) return false;
     for (const auto& c : track->audioClips) if (c.id==clipId) {
         const auto audio=m_audio.value(QString::fromStdString(c.poolId));
@@ -473,7 +473,7 @@ bool TrackListModel::trimClipStartAtBeat(int trackId, int clipId, double startBe
 }
 int TrackListModel::splitClipAtBeat(int trackId, int clipId, double beat) {
     const double sample=beat*60*m_project.tempo().sampleRate()/m_project.tempo().bpm();
-    if (m_recordingTrack>=0 || !std::isfinite(sample) || sample<0 || sample>=double(INT64_MAX/4)) return -1;
+    if (!m_recordingTracks.isEmpty() || !std::isfinite(sample) || sample<0 || sample>=double(INT64_MAX/4)) return -1;
     const auto* track=m_project.findTrack(trackId); if (!track) return -1;
     for (const auto& c : track->audioClips) if(c.id==clipId) {
         const auto audio=m_audio.value(QString::fromStdString(c.poolId));
@@ -490,14 +490,14 @@ int TrackListModel::splitClipAtBeat(int trackId, int clipId, double beat) {
 
 bool TrackListModel::moveClipAtBeat(int trackId, int clipId, double startBeat) {
     const double samples = startBeat * 60.0 * m_project.tempo().sampleRate() / m_project.tempo().bpm();
-    if (m_recordingTrack >= 0 || !std::isfinite(samples) || samples < 0 || samples >= double(INT64_MAX / 4)) return false;
+    if (!m_recordingTracks.isEmpty() || !std::isfinite(samples) || samples < 0 || samples >= double(INT64_MAX / 4)) return false;
     if (!m_project.moveAudioClip(trackId, clipId, std::llround(samples))) return false;
     notifyClipEdit(trackId); return true;
 }
 
 bool TrackListModel::resizeClipAtBeat(int trackId, int clipId, double lengthBeats)
 {
-    if (m_recordingTrack >= 0 || !std::isfinite(lengthBeats) || lengthBeats <= 0.0)
+    if (!m_recordingTracks.isEmpty() || !std::isfinite(lengthBeats) || lengthBeats <= 0.0)
         return false;
     const Track* track = m_project.findTrack(trackId);
     if (!track)
@@ -643,7 +643,7 @@ int TrackListModel::recordingTrackId() const
     for (const auto& track : m_project.tracks()) {
         if (!track->recordArmed) continue;
         if (!track->hasLiveInput()) return -1;
-        if (selected != -1) return -1; // The current JACK device exposes one mono capture port.
+        if (selected != -1) return -1; // Compatibility query: use the full armed-track list for recording.
         selected = track->id;
     }
     return selected;
@@ -776,7 +776,7 @@ void TrackListModel::adoptDocument(TrackListModel& candidate) {
     m_project=std::move(candidate.m_project); m_audio=std::move(candidate.m_audio); m_mediaPaths=std::move(candidate.m_mediaPaths);
     m_nextAudioNumber=candidate.m_nextAudioNumber; m_nextVocalNumber=candidate.m_nextVocalNumber;
     m_nextInstrumentNumber=candidate.m_nextInstrumentNumber; m_nextClipNumber=candidate.m_nextClipNumber;
-    m_instrumentNumbers=std::move(candidate.m_instrumentNumbers); m_recordingTrack=-1;
+    m_instrumentNumbers=std::move(candidate.m_instrumentNumbers); m_recordingTracks.clear();
     m_project.clearHistory(); endResetModel();
     emit countChanged(); emit clipsChanged(); emit contentEndBeatsChanged();
     emit cleanMonitorChanged(false); emit cleanMonitorInputChanged(); emit cleanMonitorGainChanged(cleanMonitorGain()); emit cleanMonitorEqChanged();
