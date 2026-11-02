@@ -9,46 +9,33 @@ Window {
     minimumWidth: 980
     minimumHeight: 640
     visible: true
-    title: "ChaosMaker"
+    title: (EngineController.projectDirty ? "* " : "") + (EngineController.projectFile.toString().split("/").pop() || "Untitled") + " · ChaosMaker"
+    property bool closeApproved: false
     color: Theme.windowBg
     palette.toolTipBase: Theme.tooltipBg
     palette.toolTipText: Theme.tooltipText
 
     TrackListModel { id: trackModel }
 
-    Connections {
-        target: trackModel
-        function onCleanMonitorChanged(enabled) {
-            EngineController.setCleanMonitorEnabled(enabled)
-        }
-        function onCleanMonitorInputChanged() {
-            EngineController.setCleanMonitorInput(trackModel.cleanMonitorInput)
-        }
-        function onCleanMonitorGainChanged(gain) {
-            EngineController.setCleanMonitorGain(gain)
-        }
-        function onCleanMonitorEqChanged() {
-            EngineController.setCleanMonitorEqBands(trackModel.cleanMonitorEqBands)
-        }
+    onClosing: event => {
+        if (!closeApproved && EngineController.projectDirty) {
+            event.accepted = false
+            topBar.requestProjectAction("Close")
+        } else EngineController.shutdownSession()
     }
-
-    onClosing: EngineController.shutdownSession()
 
     Component.onCompleted: {
         EngineController.attachProject(trackModel)
-        EngineController.setCleanMonitorEnabled(trackModel.cleanMonitorArmed)
-        EngineController.setCleanMonitorInput(trackModel.cleanMonitorInput)
-        EngineController.setCleanMonitorGain(trackModel.cleanMonitorGain)
-        EngineController.setCleanMonitorEqBands(trackModel.cleanMonitorEqBands)
     }
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
 
-        TopBar { Layout.fillWidth: true }
+        TopBar { id: topBar; trackModel: trackModel; Layout.fillWidth: true; onCloseRequested: { window.closeApproved = true; window.close() } }
 
         RowLayout {
+            enabled: !EngineController.projectLoading
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: 0
@@ -86,7 +73,7 @@ Window {
             onBpmEdited: value => EngineController.bpm = value
             onTransportAction: action => EngineController.transportAction(action)
         }
-        MixerPanel { Layout.fillWidth: true; Layout.preferredHeight: 166 }
+        MixerPanel { trackModel: trackModel; Layout.fillWidth: true; Layout.preferredHeight: 166 }
         StatusStrip { Layout.fillWidth: true; Layout.preferredHeight: Theme.stripHeight }
     }
 }

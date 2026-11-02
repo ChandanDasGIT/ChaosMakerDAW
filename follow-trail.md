@@ -1,6 +1,84 @@
 # ChaosMaker development follow trail
 
-Updated: 2026-11-01
+Updated: 2026-11-02
+
+## Active task queue — 2026-11-02
+
+This queue takes priority over the older roadmap below. Work on one task at a time,
+verify only the affected behavior, report the result, and wait for the user's explicit
+"go ahead" before starting the next task. Current code has advanced beyond the older
+checkpoint; its dry-only/shared-chain and placeholder-project descriptions are historical.
+
+1. **Done: update the factory Djent preset from `best_djent.gspreset`.** Copy exact
+   parameter values, pedal order and bypass states, including Crunch, Reverb and
+   bypassed Parametric EQ. Retain factory cabinet reuse instead of embedding the
+   source preset's machine-local cabinet path. Verified exact source JSON settings
+   (excluding local IR references and retaining the factory name), successful app/test
+   builds, both `qtpresets.factory_` cases and the focused factory-picker UI case.
+2. **Done: fix BPM changes not being reflected in the timeline.** The timeline's
+   fixed beat width ignored its BPM property. It now keeps zoom in pixels per second
+   and derives beat/bar spacing from BPM, so increasing BPM brings beat lines closer
+   together without moving or stretching recorded audio in time. Zoom does not break
+   the tempo binding. The UI harness now binds tempo/meter like the production app.
+   A new interaction test reproduced the original failure before the fix; nine focused
+   UI cases passed afterward, covering BPM entry/buttons, decimal/extreme tempos,
+   meter, tempo after zoom, unchanged recorded timing, beat-snapped moves/undo,
+   trimming and waveforms. App and UI test builds passed.
+3. **Done: replace the bottom mixer placeholder tracks with session tracks.**
+   Main.qml passes the shared TrackListModel to MixerPanel. Strips follow track
+   creation/removal and project replacement, display actual names, and use model
+   volume/mute/solo controls. Volume supports the same 0–200% range as track cards
+   and shows dB. Removed the disconnected MASTER strip and Stereo/Mono selector.
+   Empty sessions show an add-track hint; horizontal scrolling and per-strip width
+   resizing remain available. Two focused UI cases passed for add/remove/reset,
+   names, width retention after removal, overflow, actual mute/solo clicks, keyboard
+   fader movement and external model updates after interaction. App and UI builds
+   passed.
+4. **Done: bottom-bar input/output meters and vertical volume fader.** The user
+   clarified two meters per track (IN/OUT), each split into L/R halves by a thin
+   line. Added compact vertical meters alongside the fader with GuitarSuite's
+   green/amber/red level colors, dBFS tooltips and click-to-clear clip indicators.
+   Per-track atomic peak meters cover playback and the currently monitored track;
+   source input is measured before inserts/gain and output after FX, fader and
+   mute/solo, before the master clamp. Printed takes bypass inserts as before.
+   Simultaneous live/playback contributions on the same track are summed for
+   metering, without including other tracks. Mono live input fills both halves.
+   UI polling provides decay; snapshot ownership protects removed-track meters.
+   Verified two backend meter cases normally and with realtime sanitizer, four
+   existing monitor cases, ten affected recording/playback cases, controller meter
+   polling/removal/project reset, dry/printed controller integration and three mixer
+   UI cases. Visually checked /tmp/chaosmaker-mixer-meters.png. App rebuilt.
+   Waiting for go-ahead before task 5 (multiple-track recording/live monitoring).
+5. Support simultaneous recording and live monitoring on multiple tracks.
+6. Remove the GuitarSuite option from Vocal tracks.
+
+The user will manually check clip editing and project files. Do not treat those
+checks as passed until results are reported.
+
+### Planned audio import — implementation deferred
+
+Target a first release with mono/stereo WAV, MP3 and FLAC import through a file
+picker, editable clips and reliable project save/reopen. Proposed batches:
+
+1. **Decoder foundation:** use one shared decoder (proposed: libsndfile with WAV,
+   FLAC and MP3 support verified in the installed build). Cover common WAV variants,
+   mono/stereo, damaged files, decoded-memory limits and sample-rate handling with
+   focused fixtures. The existing take WAV reader only accepts the app's own layout.
+2. **Session import:** add Import Audio with multiple selection; proposed default
+   is one new Audio track per file, named from the file, starting at the playhead.
+   Decode and build waveforms in the background, provide progress/cancellation,
+   and attach each file only when ready. Imported tracks start with neutral FX.
+3. **Editing/project integration:** make import undoable and mark the project
+   modified; use the shared decoder on reopen. Verify trims, splits, stereo,
+   sample-rate differences and missing-file handling.
+4. **Portability/convenience:** project-local media copies with relative references,
+   covering recordings and cabinet dependencies too, followed by drag-and-drop.
+
+Retain referenced media for the initial release; portable bundling is a later batch.
+Automatic tempo matching, time stretching and multichannel routing are deferred.
+Each implementation batch needs its own go-ahead after the preceding batch is verified.
+Decoder references: https://libsndfile.github.io/libsndfile/formats.html and
+https://github.com/libsndfile/libsndfile (MP3 support depends on build configuration).
 
 ## Current checkpoint — read this first
 

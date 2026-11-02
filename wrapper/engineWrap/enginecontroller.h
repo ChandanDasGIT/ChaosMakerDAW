@@ -7,12 +7,14 @@
 #include <QTimer>
 #include <QtQml/qqmlregistration.h>
 #include <memory>
+#include <map>
 #include <QPointer>
 #include "wrapper/session/tracklistmodel.h"
 class TakeRecorder;
 
 class GuitarSuiteModel;
 class GuitarSuite;
+class TrackInput;
 struct EngineSnapshot;
 
 class QQmlEngine;
@@ -39,6 +41,7 @@ class EngineController : public QObject {
     Q_PROPERTY(QString transportMessage READ transportMessage NOTIFY transportMessageChanged)
     Q_PROPERTY(bool restoreSessionOnStartup READ restoreSessionOnStartup WRITE setRestoreSessionOnStartup NOTIFY restoreSessionOnStartupChanged)
     Q_PROPERTY(QVariantMap monitorLevels READ monitorLevels NOTIFY monitorLevelsChanged)
+    Q_PROPERTY(QVariantMap trackLevels READ trackLevels NOTIFY trackLevelsChanged)
     Q_PROPERTY(double bpm READ bpm WRITE setBpm NOTIFY bpmChanged)
     Q_PROPERTY(QString version READ version CONSTANT)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
@@ -50,6 +53,10 @@ class EngineController : public QObject {
     Q_PROPERTY(int selectedInputIndex READ selectedInputIndex NOTIFY audioRoutingChanged)
     Q_PROPERTY(int selectedOutputIndex READ selectedOutputIndex NOTIFY outputDeviceChanged)
     Q_PROPERTY(QObject* guitarSuite READ guitarSuite CONSTANT)
+    Q_PROPERTY(int monitoredTrackId READ monitoredTrackId NOTIFY monitoredTrackChanged)
+    Q_PROPERTY(QUrl projectFile READ projectFile NOTIFY projectFileChanged)
+    Q_PROPERTY(bool projectDirty READ projectDirty NOTIFY projectDirtyChanged)
+    Q_PROPERTY(bool projectLoading READ projectLoading NOTIFY projectLoadingChanged)
 
 public:
     // Inject a device for offline integration checks; system discovery is only for JACK.
@@ -76,8 +83,16 @@ public:
     Q_INVOKABLE void seekBeat(double beat);
     Q_INVOKABLE void setMeter(int numerator, int denominator);
     Q_INVOKABLE bool saveSession();
+    QUrl projectFile() const { return m_projectFile; }
+    bool projectDirty() const { return m_projectDirty; }
+    bool projectLoading() const { return bool(m_loadingProject); }
+    Q_INVOKABLE bool saveProject(const QUrl& file = QUrl());
+    Q_INVOKABLE bool openProject(const QUrl& file);
+    Q_INVOKABLE bool newProject();
     Q_INVOKABLE void shutdownSession();
     QVariantMap monitorLevels() const { return m_monitorLevels; }
+    QVariantMap trackLevels() const { return m_trackLevels; }
+    Q_INVOKABLE void clearTrackClips(int trackId);
     Q_INVOKABLE void clearMonitorClips();
     double bpm() const { return m_bpm; }
     void setBpm(double bpm);
@@ -92,6 +107,8 @@ public:
     int selectedInputIndex() const { return m_selectedInputIndex; }
     int selectedOutputIndex() const { return m_selectedOutputIndex; }
     QObject* guitarSuite() const;
+    int monitoredTrackId() const { return m_monitorEnabled ? m_monitoredTrack : -1; }
+    Q_INVOKABLE QObject* trackEffects(int trackId);
     Q_INVOKABLE void setCleanMonitorEnabled(bool enabled);
     Q_INVOKABLE void setCleanMonitorGain(double gain);
     Q_INVOKABLE void setCleanMonitorEqBands(const QVariantList& bands);
@@ -102,11 +119,16 @@ public:
     Q_INVOKABLE bool setCleanMonitorInput(const QString& port);
 
 signals:
+    void projectFileChanged();
+    void projectDirtyChanged();
+    void projectLoadingChanged();
     void transportChanged();
     void transportMessageChanged();
     void restoreSessionOnStartupChanged();
     void meterChanged();
     void monitorLevelsChanged();
+    void trackLevelsChanged();
+    void monitoredTrackChanged();
     void bpmChanged();
     void statusChanged();
     void audioRoutingChanged();
@@ -116,6 +138,16 @@ signals:
     void bufferSizeChanged();
 
 private:
+    void setProjectDirty(bool dirty);
+    QJsonObject projectDocument();
+    void finishProjectLoad();
+    void cancelProjectLoad();
+    void bindTrackEffects(int trackId, GuitarSuiteModel* model);
+    QUrl m_projectFile, m_loadingFile;
+    bool m_projectDirty = false;
+    std::unique_ptr<TrackListModel> m_loadingProject;
+    std::vector<GuitarSuiteModel*> m_loadingEffects;
+    QString m_loadingWarning;
     explicit EngineController(QObject* parent);
     void setStatus(const QString& status);
     void updateAudioStatus();
@@ -123,8 +155,21 @@ private:
     void discoverInputDevices();
     void connectOutputDevicePorts(const QString& description);
     void queueGuitarSuite(std::shared_ptr<GuitarSuite> chain);
+    void syncTrackEffects();
+    void clearTrackEffects();
+    void watchEffects(GuitarSuiteModel* model);
+    bool effectsBusy() const;
+    struct TrackEffects {
+        std::shared_ptr<TrackMeters> meters = std::make_shared<TrackMeters>();
+        GuitarSuiteModel* model = nullptr;
+        std::shared_ptr<TrackInput> input, playbackInput;
+        std::shared_ptr<GuitarSuite> chain, playbackChain;
+    };
+    std::map<int, TrackEffects> m_trackEffects;
+    int m_monitoredTrack = -1;
 
     void refreshProject();
+    void publishPlayback();
     void pollTransport();
     void completeTake();
     void setTransportMessage(const QString& message);
@@ -139,10 +184,10 @@ private:
     QString m_status = QStringLiteral("not started");
     std::unique_ptr<AudioEngine> m_engine;
     GuitarSuiteModel* m_guitarSuite = nullptr;
-    std::unique_ptr<EngineSnapshot> m_pendingGuitarSnapshot;
     QTimer m_snapshotTimer;
     QTimer m_meterTimer;
     QVariantMap m_monitorLevels;
+    QVariantMap m_trackLevels;
     double m_bpm = 120.0;
     bool m_audioReady = false;
     bool m_monitorEnabled = false;

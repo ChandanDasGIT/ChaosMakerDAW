@@ -4,100 +4,170 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
-    property var channelWidths: [108, 108, 108, 108, 108, 108]
-    property int resizingIndex: -1
-    property real resizeStartX: 0
-    property real resizeStartWidth: 0
-
-    function totalChannelWidth() {
-        var total = 0
-        for (var i = 0; i < channelWidths.length; ++i)
-            total += channelWidths[i]
-        return total
-    }
-
-    function setChannelWidth(index, width) {
-        var updatedWidths = channelWidths.slice()
-        updatedWidths[index] = Math.max(82, Math.min(220, width))
-        channelWidths = updatedWidths
-    }
+    property var trackModel: null
+    property var levels: EngineController.trackLevels
+    readonly property int stripCount: trackStrips.count
 
     color: "#1d1d1d"
     border.color: Theme.divider
+    Text {
+        anchors.centerIn: parent
+        visible: root.stripCount === 0
+        text: "Add a track to show its mixer controls"
+        color: Theme.textMuted
+        font.pixelSize: 12
+    }
     Flickable {
         id: mixerScroll
+        objectName: "mixerScroll"
         anchors.fill: parent
         anchors.margins: 1
         clip: true
-        contentWidth: root.totalChannelWidth()
+        contentWidth: stripRow.width
         contentHeight: height
         boundsBehavior: Flickable.StopAtBounds
         flickableDirection: Flickable.HorizontalFlick
 
         Row {
             id: stripRow
-            width: root.totalChannelWidth()
             height: mixerScroll.height
             spacing: 0
             Repeater {
-                model: ["MASTER", "DRUMS", "BASS", "KEYS", "AUDIO 1", "AUDIO 2"]
+                id: trackStrips
+                model: root.trackModel
                 delegate: Rectangle {
-                width: root.channelWidths[index]
-                height: stripRow.height
-                color: index === 0 ? "#252525" : (index % 2 ? "#202020" : "#222222")
-                border.color: Theme.divider
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 10
-                    spacing: 6
-                    Text { text: modelData; color: index === 0 ? Theme.accent : Theme.text; font.pixelSize: 10; font.bold: true; font.letterSpacing: 1 }
-                    Text { text: "−∞    0 dB"; color: Theme.textMuted; font.pixelSize: 10; Layout.alignment: Qt.AlignHCenter }
-                    Slider { Layout.fillHeight: true; Layout.alignment: Qt.AlignHCenter; orientation: Qt.Vertical; from: 0; to: 1; value: index === 0 ? 0.78 : 0.68 }
-                    RowLayout {
-                        Layout.alignment: Qt.AlignHCenter
-                        spacing: 4
-                        ToolButton {
-                            text: "M"; implicitWidth: 30; implicitHeight: 24
-                            contentItem: Text { text: parent.text; color: Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                            background: Rectangle { color: "#303030"; radius: 3 }
-                        }
-                        ToolButton {
-                            text: "S"; implicitWidth: 30; implicitHeight: 24
-                            contentItem: Text { text: parent.text; color: Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                            background: Rectangle { color: "#303030"; radius: 3 }
-                        }
-                    }
-                    ComboBox { Layout.fillWidth: true; model: ["Stereo", "Mono"]; currentIndex: 0; implicitHeight: 25; font.pixelSize: 10 }
-                }
+                    id: strip
+                    required property int index
+                    required property int trackId
+                    required property string name
+                    required property bool isMuted
+                    required property bool isSolo
+                    required property real volume
+                    readonly property var levels: root.levels[String(trackId)] ?? ({})
+                    property real channelWidth: 108
+                    objectName: "mixerStrip" + trackId
+                    width: channelWidth
+                    height: stripRow.height
+                    color: index % 2 ? "#202020" : "#222222"
+                    border.color: Theme.divider
 
-                Rectangle {
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    anchors.right: parent.right
-                    width: 7
-                    color: resizeHandle.containsMouse || root.resizingIndex === index ? "#676767" : "transparent"
-                    z: 2
-                    MouseArea {
-                        id: resizeHandle
+                    ColumnLayout {
                         anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.SizeHorCursor
-                        onPressed: mouse => {
-                            root.resizingIndex = index
-                            root.resizeStartX = mapToItem(root, mouse.x, mouse.y).x
-                            root.resizeStartWidth = root.channelWidths[index]
+                        anchors.margins: 10
+                        spacing: 6
+                        Text {
+                            objectName: "mixerName" + strip.trackId
+                            text: strip.name
+                            color: Theme.text
+                            font.pixelSize: 10
+                            font.bold: true
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
                         }
-                        onPositionChanged: mouse => {
-                            if (pressed && root.resizingIndex === index) {
-                                var pointerX = mapToItem(root, mouse.x, mouse.y).x
-                                root.setChannelWidth(index, root.resizeStartWidth + pointerX - root.resizeStartX)
+                        Text {
+                            text: strip.volume > 0 ? (20 * Math.log(strip.volume) / Math.LN10).toFixed(1) + " dB" : "−∞ dB"
+                            color: Theme.textMuted
+                            font.pixelSize: 10
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+                        RowLayout {
+                            Layout.fillHeight: true
+                            Layout.fillWidth: true
+                            spacing: 4
+                            Slider {
+                                id: volumeSlider
+                                objectName: "mixerVolume" + strip.trackId
+                                Layout.fillHeight: true
+                                Layout.preferredWidth: 24
+                                Layout.alignment: Qt.AlignHCenter
+                                orientation: Qt.Vertical
+                                from: 0; to: 2; stepSize: 0.01
+                                value: strip.volume
+                                onMoved: root.trackModel.setVolume(strip.trackId, value)
+                                ToolTip.visible: hovered
+                                ToolTip.text: "Track volume " + Math.round(value * 100) + "%"
+                            }
+                            StereoLevelMeter {
+                                objectName: "mixerInput" + strip.trackId
+                                label: "IN"
+                                Layout.fillHeight: true
+                                Layout.fillWidth: true
+                                leftDb: strip.levels.inputLeftDb ?? -120
+                                rightDb: strip.levels.inputRightDb ?? -120
+                                leftClipped: strip.levels.inputLeftClip ?? false
+                                rightClipped: strip.levels.inputRightClip ?? false
+                                onClearClipsRequested: EngineController.clearTrackClips(strip.trackId)
+                            }
+                            StereoLevelMeter {
+                                objectName: "mixerOutput" + strip.trackId
+                                label: "OUT"
+                                Layout.fillHeight: true
+                                Layout.fillWidth: true
+                                leftDb: strip.levels.outputLeftDb ?? -120
+                                rightDb: strip.levels.outputRightDb ?? -120
+                                leftClipped: strip.levels.outputLeftClip ?? false
+                                rightClipped: strip.levels.outputRightClip ?? false
+                                onClearClipsRequested: EngineController.clearTrackClips(strip.trackId)
                             }
                         }
-                        onReleased: root.resizingIndex = -1
+                        RowLayout {
+                            Layout.alignment: Qt.AlignHCenter
+                            spacing: 4
+                            ToolButton {
+                                objectName: "mixerMute" + strip.trackId
+                                property bool active: strip.isMuted
+                                text: "M"; implicitWidth: 30; implicitHeight: 24
+                                onClicked: root.trackModel.setMuted(strip.trackId, !active)
+                                contentItem: Text { text: parent.text; color: parent.active ? "#ffb0a8" : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                background: Rectangle { color: parent.active ? "#663238" : "#303030"; radius: 3 }
+                                ToolTip.visible: hovered
+                                ToolTip.text: active ? "Mute enabled" : "Mute disabled"
+                            }
+                            ToolButton {
+                                objectName: "mixerSolo" + strip.trackId
+                                property bool active: strip.isSolo
+                                text: "S"; implicitWidth: 30; implicitHeight: 24
+                                onClicked: root.trackModel.setSolo(strip.trackId, !active)
+                                contentItem: Text { text: parent.text; color: parent.active ? "#ffe08a" : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                background: Rectangle { color: parent.active ? "#665322" : "#303030"; radius: 3 }
+                                ToolTip.visible: hovered
+                                ToolTip.text: active ? "Solo enabled" : "Solo disabled"
+                            }
+                        }
+                    }
+                    Connections {
+                        target: strip
+                        function onVolumeChanged() { volumeSlider.value = strip.volume }
+                    }
+                    Rectangle {
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.right: parent.right
+                        width: 7
+                        color: resizeHandle.containsMouse || resizeHandle.pressed ? "#676767" : "transparent"
+                        z: 2
+                        MouseArea {
+                            id: resizeHandle
+                            objectName: "mixerResize" + strip.trackId
+                            property real startX: 0
+                            property real startWidth: 0
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.SizeHorCursor
+                            onPressed: mouse => {
+                                startX = mapToItem(root, mouse.x, mouse.y).x
+                                startWidth = strip.channelWidth
+                            }
+                            onPositionChanged: mouse => {
+                                if (pressed) {
+                                    const pointerX = mapToItem(root, mouse.x, mouse.y).x
+                                    strip.channelWidth = Math.max(82, Math.min(220, startWidth + pointerX - startX))
+                                }
+                            }
+                        }
                     }
                 }
             }
-        }
         }
         ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
     }

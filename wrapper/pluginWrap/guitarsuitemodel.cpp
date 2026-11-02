@@ -84,6 +84,10 @@ void GuitarSuiteModel::setPublisher(std::function<void(std::shared_ptr<GuitarSui
     publishChain();
 }
 
+void GuitarSuiteModel::setPlaybackPublisher(std::function<void(std::shared_ptr<GuitarSuite>)> publisher) {
+    m_playbackPublisher=std::move(publisher); publishChain();
+}
+
 void GuitarSuiteModel::configure(double sampleRate, int maxFrames)
 {
     if (sampleRate > 1000.0 && std::isfinite(sampleRate))
@@ -165,6 +169,7 @@ bool GuitarSuiteModel::setBypassed(int pedalId, bool bypassed)
     const auto slot = findSlot(pedalId);
     if (!slot) return false;
     slot->bypassed.store(bypassed, std::memory_order_relaxed);
+    for(const auto& copy:m_playbackSlots)if(copy.source==slot)copy.mirror->bypassed.store(bypassed,std::memory_order_relaxed);
     const auto it = std::find(m_slots.begin(), m_slots.end(), slot);
     const int row = static_cast<int>(std::distance(m_slots.begin(), it));
     const QModelIndex changed = index(row, 0);
@@ -180,6 +185,8 @@ bool GuitarSuiteModel::setParameter(int pedalId, const QString& parameterId, dou
     for (const auto& parameter : slot->processor->parameters()) {
         if (QString::fromStdString(parameter->id) == parameterId) {
             parameter->set(static_cast<float>(value));
+            for(const auto& copy:m_playbackSlots)if(copy.source==slot)
+                for(const auto& mirror:copy.mirror->processor->parameters())if(mirror->id==parameter->id)mirror->set(parameter->get());
             const auto it = std::find(m_slots.begin(), m_slots.end(), slot);
             const int row = static_cast<int>(std::distance(m_slots.begin(), it));
             const QModelIndex changed = index(row, 0);
@@ -192,10 +199,33 @@ bool GuitarSuiteModel::setParameter(int pedalId, const QString& parameterId, dou
 
 void GuitarSuiteModel::publishChain()
 {
-    if (!m_publisher) return;
-    auto chain = std::make_shared<GuitarSuite>(m_slots);
-    chain->prepare(m_sampleRate, m_maxFrames);
-    m_publisher(std::move(chain));
+    if (m_publisher) {
+        auto chain = std::make_shared<GuitarSuite>(m_slots);
+        chain->prepare(m_sampleRate, m_maxFrames);
+        m_publisher(std::move(chain));
+    }
+    if (!m_playbackPublisher) return;
+    std::vector<PlaybackSlot> next;
+    std::vector<std::shared_ptr<PedalSlot>> playbackSlots;
+    for(const auto& source:m_slots) {
+        const auto existing=std::find_if(m_playbackSlots.begin(),m_playbackSlots.end(),[&](const auto& p){return p.source==source;});
+        std::shared_ptr<PedalSlot> mirror;
+        if(existing!=m_playbackSlots.end())mirror=existing->mirror;
+        else {
+            mirror=std::make_shared<PedalSlot>(); mirror->id=source->id; mirror->type=source->type;
+            mirror->resourcePath=source->resourcePath;
+            if(auto cabinet=std::dynamic_pointer_cast<Cabinet>(source->processor))
+                mirror->processor=std::make_shared<Cabinet>(cabinet->impulseData());
+            else mirror->processor=PedalRegistry::create(QString::fromStdString(source->type));
+            for(const auto& parameter:source->processor->parameters())
+                for(const auto& p:mirror->processor->parameters())if(p->id==parameter->id)p->set(parameter->get());
+            mirror->bypassed.store(source->bypassed.load());
+        }
+        next.push_back({source,mirror}); playbackSlots.push_back(mirror);
+    }
+    m_playbackSlots=std::move(next);
+    auto chain=std::make_shared<GuitarSuite>(std::move(playbackSlots)); chain->prepare(m_sampleRate,m_maxFrames);
+    m_playbackPublisher(std::move(chain));
 }
 
 bool GuitarSuiteModel::savePreset()

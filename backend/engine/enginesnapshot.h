@@ -3,6 +3,7 @@
 #include "midi/midievent.h"
 #include "processor/processor.h"
 #include "transport/tempomap.h"
+#include "dsp/trackmeters.h"
 
 #include <cstdint>
 #include <memory>
@@ -16,6 +17,7 @@ struct ClipRender {
     std::int64_t fadeIn = 0;
     std::int64_t fadeOut = 0;
     float gain = 1.0f;
+    bool effectsPrinted = true;
 };
 
 struct NoteRender {
@@ -26,6 +28,7 @@ struct NoteRender {
 };
 
 struct TrackRender {
+    std::shared_ptr<TrackMeters> meters;
     int trackId = 0;
     float gain = 1.0f;
     bool muted = false, soloed = false;
@@ -44,6 +47,8 @@ struct TrackRender {
 // Flat, finished, read-only once it has been published. The keepAlive lists are why the audio thread
 // never destroys anything: the last owner of an old clip or plugin is an old snapshot, freed on the UI thread.
 struct EngineSnapshot {
+    std::shared_ptr<TrackMeters> monitorMeters;
+    Processor* inputStage = nullptr;                    // optional per-track trim and EQ
     std::vector<TrackRender> tracks;
     std::vector<Processor*> masterChain;
     TempoMap tempo;

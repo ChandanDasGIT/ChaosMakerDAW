@@ -119,7 +119,7 @@ private slots:
         auto* apply=visualItem(window->contentItem(),"applyGuitarFactoryPreset");QVERIFY(picker);QVERIFY(apply);
         QCOMPARE(picker->property("count").toInt(),2);
         picker->setProperty("currentIndex",0);click(apply);
-        QCOMPARE(model->count(),5);
+        QCOMPARE(model->count(),7);
         QCOMPARE(model->data(model->index(1),GuitarSuiteModel::PedalTypeRole).toString(),QString("pedal.distortion"));
         picker->setProperty("currentIndex",1);click(apply);
         QCOMPARE(model->count(),5);
@@ -163,6 +163,258 @@ private slots:
         QCOMPARE(second.data(second.index(0),TrackListModel::VolumeRole).toFloat(),0.42f);
         controller->setRestoreSessionOnStartup(false);
     }
+    void track_effects_switch_in_place_and_keep_edits_on_the_selected_track() {
+        auto* controller=EngineController::instance();
+        controller->setRestoreSessionOnStartup(false);
+        TrackListModel tracks; controller->attachProject(&tracks);
+        const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar"), vocal=tracks.addVocalTrack();
+        auto* guitarFx=qobject_cast<GuitarSuiteModel*>(controller->trackEffects(guitar));
+        auto* vocalFx=qobject_cast<GuitarSuiteModel*>(controller->trackEffects(vocal));
+        QVERIFY(guitarFx && vocalFx && guitarFx!=vocalFx);
+        QVERIFY(guitarFx->addPedal("Parametric EQ"));
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QCoreApplication::processEvents();
+        auto* fxButton=visualItem(window->contentItem(),"trackFxButton"+QString::number(guitar)); QVERIFY(fxButton);
+        click(fxButton);
+        auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(guitar)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        auto* pedals=visualItem(window->contentItem(),"selectEffect_pedals"); QVERIFY(pedals); click(pedals);
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("pedals"));
+        QPointer<QQuickItem> dial=visualItem(window->contentItem(),"pedal.parametriceq.lowfreq"); QVERIFY(dial);
+        const int id=guitarFx->data(guitarFx->index(0),GuitarSuiteModel::PedalIdRole).toInt();
+        QVERIFY(guitarFx->setParameter(id,"lowfreq",300)); QTRY_COMPARE(dial->property("value").toDouble(),300.0);
+        auto* eq=visualItem(window->contentItem(),"selectEffect_eq"); QVERIFY(eq); click(eq);
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("eq"));
+        QVERIFY(panel->property("visible").toBool()); QVERIFY(tracks.setEqBand(guitar,5,4));
+        auto* band=visualItem(window->contentItem(),"trackEqBand5"); QVERIFY(band);
+        QTRY_COMPARE(band->property("value").toDouble(),4.0);
+        click(pedals); QVERIFY(dial); QTRY_COMPARE(dial->property("value").toDouble(),300.0);
+        QCOMPARE(vocalFx->count(),0); QCOMPARE(tracks.project().findTrack(vocal)->eqGainDb[5],0.0f);
+        auto* search=visualItem(window->contentItem(),"effectSearch"); QVERIFY(search);
+        search->setProperty("text","guitar"); QTRY_VERIFY(!eq->isVisible()); QVERIFY(pedals->isVisible());
+        search->setProperty("text",""); QTRY_VERIFY(eq->isVisible());
+        // The FX workspace stays open while editing the transport.
+        click(field); QTest::keyClick(window,Qt::Key_9); QTest::keyClick(window,Qt::Key_1); QTest::keyClick(window,Qt::Key_Return);
+        QCOMPARE(controller->bpm(),91.0); QVERIFY(panel->property("visible").toBool());
+        window->grabWindow().save("/tmp/projectdaw-track-effects.png");
+        QPointer<QObject> guardedPanel=panel;
+        QVERIFY(tracks.removeTrack(guitar));
+        QTRY_VERIFY(guardedPanel.isNull());
+        list->setVisible(false); list->setProperty("trackModel",QVariant());
+    }
+    void undo_redo_buttons_restore_deleted_clips() {
+        TrackListModel tracks;
+        auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
+        top->setProperty("trackModel",QVariant::fromValue(&tracks));
+        const int track=tracks.addAudioTrack(); const int clip=tracks.addClipAtBeat(track,0,4);
+        QVERIFY(tracks.removeAudioClip(track,clip));
+        auto* undo=visualItem(window->contentItem(),"undoClipEdit");
+        auto* redo=visualItem(window->contentItem(),"redoClipEdit"); QVERIFY(undo); QVERIFY(redo);
+        QVERIFY(undo->isEnabled()); click(undo); QCOMPARE(tracks.clips().size(),1);
+        QVERIFY(redo->isEnabled()); click(redo); QCOMPARE(tracks.clips().size(),0);
+        top->setProperty("trackModel",QVariant());
+    }
+    void timeline_bpm_edit_updates_grid_and_preserves_recorded_audio_timing() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListModel tracks; controller->attachProject(&tracks); controller->setMeter(4,4);
+        const int track=tracks.addAudioTrack();
+        auto audio=std::make_shared<AudioData>(); audio->path="tempo-wave.wav"; audio->frames=96000;
+        audio->channels={std::vector<float>(96000,0.25f)}; audio->buildWaveform();
+        QVERIFY(tracks.attachTake(track,48000,audio));
+        const auto original=tracks.project().findTrack(track)->audioClips[0];
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        QCoreApplication::processEvents();
+        const QString blockName="clipBlock"+QString::number(original.id);
+        auto* block=visualItem(window->contentItem(),blockName); QVERIFY(block);
+        const double originalX=block->x(), originalWidth=block->width();
+        QCOMPARE(timeline->property("barWidth").toDouble(),192.0);
+        click(field); QTest::keyClick(window,Qt::Key_6); QTest::keyClick(window,Qt::Key_0); QTest::keyClick(window,Qt::Key_Return);
+        QCOMPARE(controller->bpm(),60.0);
+        QCOMPARE(timeline->property("barWidth").toDouble(),384.0);
+        QCoreApplication::processEvents();
+        block=visualItem(window->contentItem(),blockName); QVERIFY(block);
+        QCOMPARE(block->x(),originalX); QCOMPARE(block->width(),originalWidth);
+        QCOMPARE(tracks.clips()[0].toMap()["startBeat"].toDouble(),1.0);
+        QCOMPARE(tracks.clips()[0].toMap()["lengthBeats"].toDouble(),2.0);
+        const auto& unchanged=tracks.project().findTrack(track)->audioClips[0];
+        QCOMPARE(unchanged.start,original.start); QCOMPARE(unchanged.length,original.length);
+        QCOMPARE(unchanged.sourceOffset,original.sourceOffset);
+        QCOMPARE(tracks.playbackSnapshot()->keepAudio[0].get(),audio.get());
+        // At 60 BPM a 105-pixel drag snaps to one second, not the old half-second beat.
+        const QPoint start=block->mapToScene(QPointF(30,30)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
+        QTest::mouseMove(window,start+QPoint(105,0));
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,start+QPoint(105,0));
+        QCOMPARE(tracks.project().findTrack(track)->audioClips[0].start,qint64(96000));
+        QVERIFY(tracks.undo()); QCOMPARE(tracks.project().findTrack(track)->audioClips[0].start,original.start);
+        timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+    }
+    void timeline_tempo_grid_updates_after_zoom_with_decimal_bpm_and_meter() {
+        auto* controller=EngineController::instance(); controller->setMeter(4,4);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        // Exercise the same zoom handler as the mouse wheel before changing tempo.
+        QVERIFY(QMetaObject::invokeMethod(timeline,"zoomAtCursor",Q_ARG(QVariant,2.0),Q_ARG(QVariant,0.0)));
+        QCOMPARE(timeline->property("beatWidth").toDouble(),96.0);
+        controller->setBpm(137.5);
+        QVERIFY(std::abs(timeline->property("beatWidth").toDouble()-192.0*60/137.5)<1e-8);
+        auto* plus=window->findChild<QQuickItem*>("bpmIncrease"); QVERIFY(plus); click(plus);
+        QCOMPARE(controller->bpm(),138.5);
+        QVERIFY(std::abs(timeline->property("barWidth").toDouble()-4*192.0*60/138.5)<1e-8);
+        controller->setMeter(7,8);
+        QVERIFY(std::abs(timeline->property("barWidth").toDouble()-3.5*192.0*60/138.5)<1e-8);
+        for(double bpm : {0.01,10000.0}) {
+            controller->setBpm(bpm);
+            QVERIFY(std::isfinite(timeline->property("barWidth").toDouble()));
+            QVERIFY(timeline->property("barWidth").toDouble()>0);
+            QVERIFY(timeline->property("visibleBeatCount").toInt()<150);
+        }
+        QVERIFY(QMetaObject::invokeMethod(timeline,"zoomAtCursor",Q_ARG(QVariant,0.5),Q_ARG(QVariant,0.0)));
+        controller->setMeter(4,4); controller->setBpm(120);
+        QCOMPARE(timeline->property("beatWidth").toDouble(),48.0);
+    }
+    void timeline_drag_selects_snaps_and_undoes_as_one_edit() {
+        TrackListModel tracks; const int track=tracks.addAudioTrack(); const int clip=tracks.addClipAtBeat(track,1,4);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        QCoreApplication::processEvents();
+        auto* block=visualItem(window->contentItem(),"clipBlock"+QString::number(clip)); QVERIFY(block);
+        const QPoint start=block->mapToScene(QPointF(30,30)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
+        QTest::mouseMove(window,start+QPoint(105,0));
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,start+QPoint(105,0));
+        QCOMPARE(timeline->property("selectedClipId").toInt(),clip);
+        QCOMPARE(tracks.project().findTrack(track)->audioClips[0].start,qint64(72000));
+        QVERIFY(tracks.undo()); QCOMPARE(tracks.project().findTrack(track)->audioClips[0].start,qint64(24000));
+        timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+    }
+    void recorded_block_displays_waveform_peaks() {
+        TrackListModel tracks; const int track=tracks.addAudioTrack();
+        auto audio=std::make_shared<AudioData>(); audio->path="ui-wave.wav"; audio->frames=48000;
+        audio->channels={std::vector<float>(48000)};
+        for(int i=0;i<48000;++i)audio->channels[0][i]=float(std::sin(i*0.07)*0.7);
+        audio->buildWaveform(); QVERIFY(tracks.attachTake(track,0,audio));
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        QCoreApplication::processEvents();
+        const int clip=tracks.project().findTrack(track)->audioClips[0].id;
+        auto* waveform=visualItem(window->contentItem(),"clipWaveform"+QString::number(clip)); QVERIFY(waveform);
+        QVERIFY(waveform->width()>0); QVERIFY(waveform->height()>0);
+        QVERIFY(QMetaObject::invokeMethod(waveform,"requestPaint")); QTest::qWait(30);
+        QVERIFY(window->grabWindow().save("/tmp/projectdaw-waveform.png"));
+        timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+    }
+    void timeline_left_and_right_handles_trim_without_moving_source() {
+        TrackListModel tracks; const int track=tracks.addAudioTrack(); const int clip=tracks.addClipAtBeat(track,1,4);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true); QCoreApplication::processEvents();
+        auto drag=[&](const QString& name,int delta) {
+            auto* handle=visualItem(window->contentItem(),name+QString::number(clip)); QVERIFY(handle);
+            const QPoint start=handle->mapToScene(QPointF(4,40)).toPoint();
+            QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start); QTest::mouseMove(window,start+QPoint(delta,0));
+            QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,start+QPoint(delta,0)); QCoreApplication::processEvents();
+        };
+        drag("clipLeftTrim",48); auto c=tracks.project().findTrack(track)->audioClips[0];
+        QCOMPARE(c.start,qint64(48000)); QCOMPARE(c.length,qint64(72000)); QCOMPARE(c.sourceOffset,qint64(24000));
+        drag("clipRightTrim",-48); QCOMPARE(tracks.project().findTrack(track)->audioClips[0].length,qint64(48000));
+        QVERIFY(tracks.undo()); QVERIFY(tracks.undo()); QCOMPARE(tracks.project().findTrack(track)->audioClips[0].start,qint64(24000));
+        timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+    }
+    void mixer_tracks_follow_add_remove_and_project_replacement() {
+        TrackListModel tracks;
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
+        mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
+        QCOMPARE(mixer->property("stripCount").toInt(),0);
+        const int first=tracks.addAudioTrack(), second=tracks.addVocalTrack();
+        QTRY_COMPARE(mixer->property("stripCount").toInt(),2);
+        auto* label=visualItem(mixer,"mixerName"+QString::number(second)); QVERIFY(label);
+        QCOMPARE(label->property("text").toString(),QString("Vocal 1"));
+        auto* handle=visualItem(mixer,"mixerResize"+QString::number(second)); QVERIFY(handle);
+        const QPoint start=handle->mapToScene(QPointF(3,30)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
+        QTest::mouseMove(window,start+QPoint(40,0));
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,start+QPoint(40,0));
+        auto* remaining=visualItem(mixer,"mixerStrip"+QString::number(second)); QVERIFY(remaining);
+        QCOMPARE(remaining->width(),148.0);
+        QVERIFY(tracks.removeTrack(first)); QTRY_COMPARE(mixer->property("stripCount").toInt(),1);
+        QVERIFY(!visualItem(mixer,"mixerStrip"+QString::number(first)));
+        QCOMPARE(visualItem(mixer,"mixerStrip"+QString::number(second)),remaining);
+        QCOMPARE(remaining->width(),148.0);
+        auto* mute=visualItem(mixer,"mixerMute"+QString::number(second)); QVERIFY(mute); click(mute);
+        QVERIFY(tracks.project().findTrack(second)->muted);
+        for(int i=0;i<12;++i)tracks.addAudioTrack();
+        QTRY_COMPARE(mixer->property("stripCount").toInt(),13);
+        auto* scroll=mixer->findChild<QQuickItem*>("mixerScroll"); QVERIFY(scroll);
+        QTRY_VERIFY(scroll->property("contentWidth").toDouble()>mixer->width());
+        // New/Open replace the contents of the same model object.
+        TrackListModel replacement; const int guitar=replacement.addInstrumentTrackOfType("Electric Guitar");
+        replacement.setVolume(guitar,0.5); replacement.setSolo(guitar,true);
+        tracks.adoptDocument(replacement); QTRY_COMPARE(mixer->property("stripCount").toInt(),1);
+        auto* slider=visualItem(mixer,"mixerVolume"+QString::number(guitar)); QVERIFY(slider);
+        QCOMPARE(slider->property("value").toDouble(),0.5);
+        auto* solo=visualItem(mixer,"mixerSolo"+QString::number(guitar)); QVERIFY(solo);
+        QVERIFY(solo->property("active").toBool());
+        QTRY_COMPARE(scroll->property("contentWidth").toDouble(),108.0);
+        TrackListModel empty; tracks.adoptDocument(empty); QTRY_COMPARE(mixer->property("stripCount").toInt(),0);
+        QTRY_COMPARE(scroll->property("contentWidth").toDouble(),0.0);
+        mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
+    }
+    void mixer_controls_update_shared_track_state_and_follow_external_changes() {
+        TrackListModel tracks; const int first=tracks.addAudioTrack(), second=tracks.addVocalTrack();
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
+        mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
+        QCoreApplication::processEvents();
+        auto* mute=visualItem(mixer,"mixerMute"+QString::number(first));
+        auto* solo=visualItem(mixer,"mixerSolo"+QString::number(first));
+        auto* slider=visualItem(mixer,"mixerVolume"+QString::number(first));
+        QVERIFY(mute); QVERIFY(solo); QVERIFY(slider);
+        QTest::qWait(30); // Allow the newly visible ColumnLayout to place its controls.
+        click(mute); click(solo);
+        QVERIFY(tracks.project().findTrack(first)->muted); QVERIFY(tracks.project().findTrack(first)->solo);
+        QVERIFY(!tracks.project().findTrack(second)->muted); QVERIFY(!tracks.project().findTrack(second)->solo);
+        tracks.setMuted(first,false); tracks.setSolo(first,false); tracks.setVolume(first,0.75);
+        QVERIFY(!mute->property("active").toBool()); QVERIFY(!solo->property("active").toBool());
+        QCOMPARE(slider->property("value").toDouble(),0.75);
+        slider->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Up);
+        QVERIFY(std::abs(tracks.project().findTrack(first)->volume-0.76f)<1e-6);
+        QCOMPARE(tracks.project().findTrack(second)->volume,1.0f);
+        // A user movement must not detach later model-to-slider updates.
+        tracks.setVolume(first,0.5); QCOMPARE(slider->property("value").toDouble(),0.5);
+        tracks.setVolume(first,2); QCOMPARE(slider->property("value").toDouble(),2.0);
+        tracks.setVolume(first,0); QCOMPARE(slider->property("value").toDouble(),0.0);
+        mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
+    }
+    void mixer_split_meters_show_independent_channels_beside_the_vertical_fader() {
+        TrackListModel tracks; const int a=tracks.addAudioTrack(), b=tracks.addVocalTrack();
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
+        mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
+        QVariantMap levels{{QString::number(a),QVariantMap{{"inputLeftDb",-6.0},{"inputRightDb",-18.0},
+            {"outputLeftDb",1.0},{"outputRightDb",-12.0},{"outputLeftClip",true}}}};
+        mixer->setProperty("levels",levels); QTest::qWait(30);
+        auto* input=visualItem(mixer,"mixerInput"+QString::number(a));
+        auto* output=visualItem(mixer,"mixerOutput"+QString::number(a));
+        auto* fader=visualItem(mixer,"mixerVolume"+QString::number(a));
+        auto* silent=visualItem(mixer,"mixerInput"+QString::number(b));
+        QVERIFY(input); QVERIFY(output); QVERIFY(fader); QVERIFY(silent);
+        QCOMPARE(input->property("leftDb").toDouble(),-6.0); QCOMPARE(input->property("rightDb").toDouble(),-18.0);
+        QVERIFY(output->property("leftClipped").toBool()); QVERIFY(!output->property("rightClipped").toBool());
+        QCOMPARE(silent->property("leftDb").toDouble(),-120.0);
+        QVERIFY(input->height()>input->width()); QVERIFY(output->height()>output->width());
+        QCOMPARE(fader->property("orientation").toInt(),int(Qt::Vertical));
+        QVERIFY(fader->x()<input->x()); QVERIFY(input->x()<output->x());
+        QVERIFY(window->grabWindow().save("/tmp/chaosmaker-mixer-meters.png"));
+        mixer->setProperty("levels",QVariantMap()); mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
+    }
+    void new_project_prompts_before_discarding_unsaved_clips() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListModel tracks; controller->attachProject(&tracks); const int track=tracks.addAudioTrack(); tracks.addClipAtBeat(track,0,4);
+        auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top); top->setProperty("trackModel",QVariant::fromValue(&tracks));
+        auto* button=visualItem(window->contentItem(),"projectNew"); QVERIFY(button); click(button);
+        auto* dialog=window->findChild<QObject*>("unsavedProjectChanges"); QVERIFY(dialog); QTRY_VERIFY(dialog->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog,"reject")); QCOMPARE(tracks.clips().size(),1);
+        QVERIFY(controller->projectDirty()); top->setProperty("trackModel",QVariant());
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());
@@ -170,6 +422,12 @@ private slots:
     }
 private:
     QTemporaryDir storage{QStringLiteral("/tmp/chaosmaker-ui-XXXXXX")};
+    static QObject* visualObject(QQuickItem* root,const QString& name) {
+        if(root->objectName()==name)return root;
+        if(auto* object=root->findChild<QObject*>(name))return object;
+        for(auto* child:root->childItems())if(auto* result=visualObject(child,name))return result;
+        return nullptr;
+    }
     static QQuickItem* visualItem(QQuickItem* root,const QString& name) {
         if(root->objectName()==name)return root;
         for(auto* child:root->childItems())if(auto* result=visualItem(child,name))return result;

@@ -159,7 +159,7 @@ TEST(qtpresets, factory_djent_and_jazz_apply_exactly_their_declared_chains) {
         for(int row=0;row<expected.size();++row) {
             const auto pedal=expected[row].toObject();
             CHECK(model.data(model.index(row),GuitarSuiteModel::PedalTypeRole).toString()==pedal["type"].toString());
-            CHECK(!model.data(model.index(row),GuitarSuiteModel::BypassedRole).toBool());
+            CHECK(model.data(model.index(row),GuitarSuiteModel::BypassedRole).toBool()==pedal["bypassed"].toBool());
             const auto settings=pedal["parameters"].toObject();
             for(auto it=settings.begin();it!=settings.end();++it) {
                 const auto actual=model.data(model.index(row),GuitarSuiteModel::ParametersRole).toList();

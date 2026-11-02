@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <atomic>
+#include <array>
 #include "recording/takerecorder.h"
 
 class AudioEngine final : public AudioCallback {
@@ -35,6 +36,7 @@ public:
     bool tryPublish(std::unique_ptr<EngineSnapshot>& snapshot);
     void collectGarbage();
     void publishPlayback(std::unique_ptr<EngineSnapshot> snapshot);
+    void publishMonitor(std::unique_ptr<EngineSnapshot> snapshot);
     bool tryPublishPlayback(std::unique_ptr<EngineSnapshot>& snapshot);
     std::int64_t position() const { return m_reportedPosition.load(std::memory_order_relaxed); }
     std::int64_t recordingStart() const { return m_recordingStart.load(std::memory_order_relaxed); }
@@ -65,7 +67,7 @@ private:
     SnapshotSlot<EngineSnapshot> m_snapshot;
     SnapshotSlot<EngineSnapshot> m_playback;
     void finishRecording() noexcept;
-    void mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames) noexcept;
+    void mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames, TrackMeters* liveMeters) noexcept;
     TakeRecorder* m_recorder = nullptr;
     std::atomic<TakeRecorder*> m_releasedRecorder{nullptr};
     std::atomic<std::int64_t> m_reportedPosition{0}, m_recordingStart{0};
@@ -75,6 +77,12 @@ private:
     RtQueue<EngineCommand, 512> m_commands;
     RtQueue<EngineEvent, 512> m_events;
     TenBandEq m_monitorEq;
+    // Fixed scratch space keeps FX independent of speaker routing and recording allocation-free.
+    std::array<std::array<float, 1024>, 2> m_fxAudio{};
+    int m_fxBlockFrames = 1024;
+    std::array<std::array<float,1024>,2> m_playbackAudio{};
+    std::array<std::array<float,1024>,2> m_printedAudio{}, m_liveAudio{};
+    bool m_resetPlayback = false;
     std::atomic<float> m_inputTrimGain{1.0f};
     Smoother m_inputTrim;
     PeakMeter m_rawMeter, m_preFxMeter, m_leftMeter, m_rightMeter;

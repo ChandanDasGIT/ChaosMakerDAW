@@ -30,6 +30,9 @@ The separate track Equalizer offers factory curves and custom `.eqpreset` save/l
 presets store all ten band gains and can be applied to another track.
 
 Edit tempo with the bottom-right BPM number (Enter or click elsewhere to apply), or its −/+ buttons.
+Timeline beat/bar spacing follows BPM, including after mouse-wheel zoom: faster tempos show
+closer beat lines. Recorded clips keep their position and duration in seconds; changing BPM
+does not time-stretch audio.
 The pedalboard stays open while you adjust the transport. Tempo drives both the visual timeline
 and BPM-synced Tremolo. Octaver and Pitch Shifter are available in GuitarSuite; start with clear
 single notes before Overdrive/Amp. Their spectral wet voices have about 1024 samples of delay
@@ -53,11 +56,12 @@ use **Save preset** to keep a custom version. Factory presets do not change BPM 
 track EQ. Targeted checks: `build/wrappertests qtpresets.factory_` and
 `build/transporttests factory_preset_picker_applies_djent_and_jazz` (offscreen Qt environment).
 
-Djent uses a fast gate, restrained distortion gain, a 1.1 kHz mid lift and a broad 6 kHz cut
-for defined rhythm playing. Its low-end filtering leaves more body for low-tuned palm mutes.
+Djent copies the pedal order, bypass states and exact parameter values from `best_djent.gspreset`:
+Noise Gate → Distortion → Amp → Cabinet IR → Parametric EQ (bypassed) → Crunch → Reverb.
+It uses a fast gate, a 1.1 kHz distortion mid lift, added Crunch and room Reverb.
 Load a cabinet IR to finish the tone; adjust the gate threshold for your guitar's output/noise.
 
-Real recording and playback: arm exactly one **Audio**, **Vocal**, or **Electric Guitar** track,
+Real recording and playback: arm exactly one **Audio**, **Vocal**, **Acoustic Guitar**, or **Electric Guitar** track,
 select its input and an output, then press **Record** in the bottom bar. Press **Stop** to finish
 and return to the start, then **Play** to hear the take. **Pause** finishes the take and keeps the
 position; pressing Record again ends recording while playback continues. Disarming also ends
@@ -65,15 +69,35 @@ the take. The timeline and time display now follow the audio engine's sample clo
 mute and solo affect playback; repeat loops from the start through the current clip extent (at
 least one bar). Recording disables repeat and prevents seeking until the take is finalized.
 
-Takes contain the raw mono input, before trim, EQ, volume and GuitarSuite. Live monitoring still
-uses the shared GuitarSuite chain; **recorded clips currently play back dry**. Independent track
-inserts, WAV import and recording-latency compensation are not yet implemented. WAV takes live in
-Qt's application-data folder, normally `~/.local/share/ChaosMaker/ChaosMaker/Recordings/`.
+The bottom mixer shows your session tracks and updates when tracks are added, removed or
+reopened. Its volume faders (0–200%), mute and solo controls share the track cards' settings.
+Drag a strip's right edge to resize it; scroll horizontally when the strips exceed the window.
+Each strip has a vertical volume fader and two vertical meters, IN and OUT. Each meter has
+left/right halves separated by a thin line. IN measures source audio before inserts and gain;
+OUT measures the track after effects, volume, mute and solo, before the master output clamp.
+Meters work for playback and the currently monitored track. Mono live input fills both halves.
+Hover for channel levels in dBFS; click a meter to clear that track's latched clip indicators.
+
+**Electric Guitar, Acoustic Guitar and Vocal takes record stereo audio with FX**, after input
+trim, track EQ and GuitarSuite, before monitor volume/mute and before mixing backing tracks.
+Choose the track input and set its tone through FX → Equalizer / GuitarSuite, arm the track, and
+press Record; playback preserves the recorded effects even if you later change the pedals.
+Monitoring can be off or muted without silencing the recording. Stop ends capture immediately;
+leave recording running until delay/reverb tails have faded if you want them in the take.
+Audio takes still contain raw mono input. Arming any supported input track enables live monitoring.
+Each track owns its GuitarSuite chain, pedal order, bypass settings, input trim and EQ state.
+Arming another track selects its sound; opening or editing another track's FX does not switch
+monitoring. FX opens one non-modal window with a searchable sidebar: switch between Equalizer
+and GuitarSuite without closing the editor. Track settings and pedal controls stay in place.
+Effects are printed into new wet takes; editing a chain later does not reprocess existing clips.
+WAV import and recording-latency compensation are not yet implemented. WAV takes live in Qt's
+application-data folder, normally `~/.local/share/ChaosMaker/ChaosMaker/Recordings/`.
 A full disk buffer ends the take and reports an error instead of skipping samples. Each take is
 limited to one hour or 1 GB, whichever comes first, since playback audio is held in RAM.
 
 Enable **Settings → Restore session on startup** to automatically save and reopen your tracks,
-clips, tempo/meter, track EQ and GuitarSuite chain, including input trim and cabinet IR references.
+clips, tempo/meter, and every track's EQ and GuitarSuite chain, including input trim and cabinet
+IR references. Older shared-chain sessions reopen with a separate copy on each track.
 It defaults to off. Changes are saved after a short idle interval and on normal exit; closing
 while recording finishes the take first. Startup restores stopped, with tracks disarmed. The
 session file is `last-session.json` beside the Recordings folder. Keep recorded WAVs and external

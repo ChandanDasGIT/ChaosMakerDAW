@@ -13,6 +13,9 @@ public:
         for (int c = 0; c < audio.channelCount; ++c)
             for (int i = 0; i < audio.frames; ++i)
                 peak = std::max(peak, std::abs(audio.channel(c)[i]));
+        capturePeak(peak);
+    }
+    void capturePeak(float peak) noexcept {
         float previous = m_peak.load(std::memory_order_relaxed);
         while (previous < peak && !m_peak.compare_exchange_weak(previous, peak, std::memory_order_relaxed)) {}
         // Include the largest signed PCM capture samples just below 1.0.

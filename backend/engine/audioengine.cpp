@@ -85,6 +85,12 @@ void AudioEngine::publishPlayback(std::unique_ptr<EngineSnapshot> snapshot)
     delete m_playback.replacePending(snapshot.release());
 }
 
+void AudioEngine::publishMonitor(std::unique_ptr<EngineSnapshot> snapshot)
+{
+    collectGarbage();
+    delete m_snapshot.replacePending(snapshot.release());
+}
+
 bool AudioEngine::tryPublishPlayback(std::unique_ptr<EngineSnapshot>& snapshot)
 {
     if (!snapshot || !m_playback.pendingEmpty()) return false;
@@ -153,11 +159,11 @@ void AudioEngine::process(const AudioIO& io) noexcept
         else if (command.type == EngineCommand::Type::SetCleanMonitorGain)
             m_cleanMonitorGain = command.value;
         else switch (command.type) {
-        case EngineCommand::Type::Play: finishRecording(); m_playing = true; break;
-        case EngineCommand::Type::Pause: finishRecording(); m_playing = false; break;
-        case EngineCommand::Type::Stop: finishRecording(); m_playing = false; m_position = 0; break;
+        case EngineCommand::Type::Play: finishRecording(); m_resetPlayback = true; m_playing = true; break;
+        case EngineCommand::Type::Pause: finishRecording(); m_resetPlayback = true; m_playing = false; break;
+        case EngineCommand::Type::Stop: finishRecording(); m_resetPlayback = true; m_playing = false; m_position = 0; break;
         case EngineCommand::Type::Seek:
-            if (!m_recorder) m_position = std::clamp<std::int64_t>(command.a, 0, INT64_MAX / 2);
+            if (!m_recorder) { m_position = std::clamp<std::int64_t>(command.a, 0, INT64_MAX / 2); m_resetPlayback = true; }
             break;
         case EngineCommand::Type::SetLoop:
             m_loopStart = std::max<std::int64_t>(0, command.a); m_loopEnd = command.b;
@@ -188,12 +194,16 @@ void AudioEngine::process(const AudioIO& io) noexcept
     const int renderedFrames = std::max(0, std::min(io.frames, io.output.frames));
     if (m_recorder && renderedFrames > 0) {
         if (io.input.channelCount <= 0 || io.input.frames < renderedFrames
-            || !m_recorder->capture(io.input.channel(0), renderedFrames)) {
+            || (m_recorder->source() == TakeRecorder::Source::DryInput
+                && !m_recorder->capture(io.input.channel(0), renderedFrames))) {
             finishRecording(); m_playing = false;
         }
     }
-    if (m_cleanMonitorEnabled && io.input.channelCount > 0 && io.output.channelCount > 0
-        && io.input.frames > 0 && io.output.frames > 0) {
+    const bool recordFx = m_recorder && m_recorder->source() == TakeRecorder::Source::PostFx;
+    TrackMeters* liveMeters = snapshot ? snapshot->monitorMeters.get() : nullptr;
+    const bool liveActive = (m_cleanMonitorEnabled || recordFx) && io.input.channelCount > 0
+        && io.input.frames > 0 && renderedFrames > 0;
+    if (liveActive) {
 
         // Analysis receives the unmodified input, independent of pedal order and EQ.
         ProcessContext analysis;
@@ -206,37 +216,48 @@ void AudioEngine::process(const AudioIO& io) noexcept
                 if (processor) processor->analyseInput(analysis);
 
         const float* input = io.input.channel(0);
-        const int frames = std::min(io.frames, std::min(io.input.frames, io.output.frames));
-        const int channelsCount = std::min(io.output.channelCount, 2);
-        float* channels[2]{};
-        for (int channel = 0; channel < channelsCount; ++channel)
-            channels[channel] = io.output.channel(channel);
+        const int frames = std::min(renderedFrames, io.input.frames);
+        float* channels[]{m_fxAudio[0].data(), m_fxAudio[1].data()};
         const float targetTrim = m_inputTrimGain.load(std::memory_order_relaxed);
-        for (int frame = 0; frame < frames; ++frame) {
-            const float sample = input[frame] * m_inputTrim.next(targetTrim);
-            for (int channel = 0; channel < channelsCount; ++channel)
-                channels[channel][frame] = sample;
-        }
-        ProcessContext context;
-        context.audio = AudioView{channels, channelsCount, frames};
-        context.sampleRate = m_sampleRate;
-        context.bpm = bpm;
-        m_monitorEq.process(context);
-        m_preFxMeter.capture(context.audio);
-        if (snapshot) {
-            for (Processor* processor : snapshot->masterChain) {
-                if (processor)
-                    processor->process(context);
+        for (int offset = 0; offset < frames; offset += m_fxBlockFrames) {
+            const int count = std::min(m_fxBlockFrames, frames - offset);
+            for (int i = 0; i < count; ++i) {
+                const float sample = input[offset + i]
+                    * (snapshot && snapshot->inputStage ? 1.0f : m_inputTrim.next(targetTrim));
+                channels[0][i] = channels[1][i] = sample;
             }
+            ProcessContext context;
+            context.audio = AudioView{channels, 2, count};
+            context.sampleRate = m_sampleRate;
+            context.bpm = bpm;
+            if (snapshot && snapshot->inputStage) snapshot->inputStage->process(context);
+            else m_monitorEq.process(context);
+            m_preFxMeter.capture(context.audio);
+            if (snapshot) {
+                for (Processor* processor : snapshot->masterChain)
+                    if (processor) processor->process(context);
+            }
+            // Print only the instrument FX, before monitor gain and playback mixing.
+            if (recordFx && m_recorder && !m_recorder->capture(context.audio)) {
+                finishRecording(); m_playing = false;
+            }
+            const float monitorGain = m_cleanMonitorEnabled ? m_cleanMonitorGain : 0.0f;
+            for (int c = 0; c < 2; ++c)
+                for (int i = 0; i < count; ++i) channels[c][i] *= monitorGain;
+            if (liveMeters && !m_playing) {
+                float* raw[]{io.input.channel(0) + offset};
+                for (int c = 0; c < 2; ++c) {
+                    liveMeters->input[c].capture({raw,1,count});
+                    liveMeters->output[c].capture({channels+c,1,count});
+                }
+            }
+            m_leftMeter.capture(AudioView{channels, 1, count});
+            m_rightMeter.capture(AudioView{channels + 1, 1, count});
+            for (int c = 0; c < io.output.channelCount; ++c)
+                std::copy_n(channels[c == 1 ? 1 : 0], count, io.output.channel(c) + offset);
         }
-        for (int c = 0; c < channelsCount; ++c)
-            for (int i = 0; i < frames; ++i) channels[c][i] *= m_cleanMonitorGain;
-        m_leftMeter.capture(AudioView{channels, 1, frames});
-        if (channelsCount > 1) m_rightMeter.capture(AudioView{channels + 1, 1, frames});
-        for (int channel = channelsCount; channel < io.output.channelCount; ++channel)
-            std::copy_n(channels[0], frames, io.output.channel(channel));
     }
-    mixPlayback(io, playback, renderedFrames);
+    mixPlayback(io, playback, renderedFrames, liveActive ? liveMeters : nullptr);
     m_reportedPosition.store(m_position, std::memory_order_relaxed);
     m_reportedPlaying.store(m_playing, std::memory_order_relaxed);
     m_reportedRecording.store(m_recorder != nullptr, std::memory_order_relaxed);
@@ -245,6 +266,7 @@ void AudioEngine::process(const AudioIO& io) noexcept
 void AudioEngine::deviceChanged(double sampleRate, int maxFrames)
 {
     m_sampleRate = sampleRate;
+    m_fxBlockFrames = std::clamp(maxFrames, 1, int(m_fxAudio[0].size()));
     m_monitorEq.prepare(sampleRate, maxFrames);
     m_inputTrim.prepare(sampleRate, 20.0f);
     m_inputTrim.reset(m_inputTrimGain.load(std::memory_order_relaxed));
@@ -264,35 +286,81 @@ void AudioEngine::finishRecording() noexcept
     m_releasedRecorder.store(finished, std::memory_order_release);
 }
 
-void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames) noexcept
+void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames, TrackMeters* liveMeters) noexcept
 {
     bool anySolo = false;
-    if (snapshot) for (const auto& track : snapshot->tracks) anySolo |= track.soloed;
-    for (int i = 0; i < frames; ++i) {
-        if (m_playing) {
-            // Recording is linear; repeat resumes only after the take has finished.
-            if (m_looping && !m_recorder && m_position >= m_loopEnd) m_position = m_loopStart;
-            if (snapshot) for (const auto& track : snapshot->tracks) {
-                if (track.muted || (anySolo && !track.soloed)) continue;
-                for (const auto& clip : track.clips) {
-                    if (!clip.audio || m_position < clip.start || m_position - clip.start >= clip.length) continue;
-                    const double source = clip.sourceOffset + double(m_position - clip.start) * clip.audio->sampleRate / m_sampleRate;
-                    if (source < 0 || source >= clip.audio->frames) continue;
-                    const auto at = static_cast<std::size_t>(source);
-                    for (int c = 0; c < io.output.channelCount; ++c) {
-                        if (clip.audio->channels.empty()) continue;
-                        const auto& data = clip.audio->channels[std::min<std::size_t>(c, clip.audio->channels.size()-1)];
-                        if (at >= data.size()) continue;
-                        const float next = at + 1 < data.size() ? data[at+1] : data[at];
-                        io.output.channel(c)[i] += (data[at] + float(source - at) * (next-data[at])) * clip.gain * track.gain;
+    if (snapshot) for (const auto& track : snapshot->tracks) {
+        anySolo |= track.soloed;
+        if (m_resetPlayback) for (auto* processor : track.chain) if (processor) processor->reset();
+    }
+    m_resetPlayback = false;
+    for (int offset = 0; offset < frames && m_playing;) {
+        if (m_looping && !m_recorder && m_position >= m_loopEnd) m_position = m_loopStart;
+        int count = std::min(m_fxBlockFrames, frames-offset);
+        if (m_looping && !m_recorder) count = int(std::min<std::int64_t>(count,m_loopEnd-m_position));
+        for (int c=0;c<2;++c) {
+            if (io.output.channelCount>0) std::copy_n(io.output.channel(std::min(c,io.output.channelCount-1))+offset,count,m_liveAudio[c].data());
+            else std::fill_n(m_liveAudio[c].data(),count,0);
+        }
+        if (snapshot) for (const auto& track : snapshot->tracks) {
+            const bool live = liveMeters && track.meters.get()==liveMeters;
+            const bool audible = !track.muted && (!anySolo || track.soloed);
+            float* channels[]{m_playbackAudio[0].data(),m_playbackAudio[1].data()};
+            std::fill_n(channels[0],count,0); std::fill_n(channels[1],count,0);
+            for (auto& channel : m_printedAudio) std::fill_n(channel.data(),count,0);
+            for (const auto& clip : track.clips) {
+                if (!clip.audio || clip.audio->channels.empty()) continue;
+                const bool dry = !clip.effectsPrinted && !track.chain.empty();
+                for (int i=0;i<count;++i) {
+                    const auto position=m_position+i;
+                    if(position<clip.start || position-clip.start>=clip.length)continue;
+                    const double source=clip.sourceOffset+double(position-clip.start)*clip.audio->sampleRate/m_sampleRate;
+                    if(source<0 || source>=clip.audio->frames)continue;
+                    const auto at=static_cast<std::size_t>(source);
+                    const int channelCount=2;
+                    for(int c=0;c<channelCount;++c) {
+                        const auto& data=clip.audio->channels[std::min<std::size_t>(c,clip.audio->channels.size()-1)];
+                        if(at>=data.size())continue;
+                        const float next=at+1<data.size()?data[at+1]:data[at];
+                        const float sample=(data[at]+float(source-at)*(next-data[at]))*clip.gain;
+                        if(dry)channels[c][i]+=sample;
+                        else m_printedAudio[c][i]+=sample;
                     }
                 }
             }
-            if (m_position < INT64_MAX / 2) ++m_position;
+            if (track.meters) for(int c=0;c<2;++c) {
+                float peak=0;
+                // The stereo track input includes all source clips and any live input.
+                for(int i=0;i<count;++i) {
+                    float sample=channels[c][i]+m_printedAudio[c][i];
+                    if(live && offset+i<io.input.frames) sample+=io.input.channel(0)[offset+i];
+                    if(std::isfinite(sample)) peak=std::max(peak,std::abs(sample));
+                }
+                track.meters->input[c].capturePeak(peak);
+            }
+            if (!track.chain.empty()) {
+                ProcessContext context; context.audio={channels,2,count}; context.sampleRate=m_sampleRate;
+                context.samplePosition=m_position; context.bpm=m_tempoBpm.load(std::memory_order_relaxed); context.playing=true;
+                for(auto* processor:track.chain)if(processor)processor->process(context);
+            }
+            for(int c=0;c<2;++c) {
+              float peak=0;
+              for(int i=0;i<count;++i) {
+                const float sample=audible ? (channels[c][i]+m_printedAudio[c][i])*track.gain : 0.0f;
+                if(track.meters) {
+                    float measured=sample+(live ? m_liveAudio[c][i] : 0.0f);
+                    if(std::isfinite(measured)) peak=std::max(peak,std::abs(measured));
+                }
+                if(c<io.output.channelCount) io.output.channel(c)[offset+i]+=sample;
+              }
+              if(track.meters)track.meters->output[c].capturePeak(peak);
+            }
+            for(int c=2;c<io.output.channelCount;++c) for(int i=0;i<count;++i)
+                if(audible)io.output.channel(c)[offset+i]+=(channels[0][i]+m_printedAudio[0][i])*track.gain;
         }
-        for (int c = 0; c < io.output.channelCount; ++c) {
-            float& sample = io.output.channel(c)[i];
-            sample = std::isfinite(sample) ? std::clamp(sample, -1.0f, 1.0f) : 0.0f;
-        }
+        m_position=std::min<std::int64_t>(INT64_MAX/2,m_position+count); offset+=count;
+    }
+    for(int c=0;c<io.output.channelCount;++c)for(int i=0;i<frames;++i) {
+        float& sample=io.output.channel(c)[i]; sample=std::isfinite(sample)?std::clamp(sample,-1.0f,1.0f):0.0f;
     }
 }

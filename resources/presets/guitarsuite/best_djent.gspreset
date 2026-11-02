@@ -1,0 +1,91 @@
+{
+    "format": "GuitarSuitePreset",
+    "inputTrimDb": 0,
+    "pedals": [
+        {
+            "bypassed": false,
+            "irPath": "",
+            "parameters": {
+                "attack": 0.15000000596046448,
+                "release": 20,
+                "threshold": -40
+            },
+            "type": "pedal.noisegate"
+        },
+        {
+            "bypassed": false,
+            "irPath": "",
+            "parameters": {
+                "bass": 0,
+                "drive": 24,
+                "level": -11,
+                "mid": 1.5,
+                "midfreq": 1100,
+                "tight": 0.75,
+                "treble": -1
+            },
+            "type": "pedal.distortion"
+        },
+        {
+            "bypassed": false,
+            "irPath": "",
+            "parameters": {
+                "bass": 1,
+                "drive": 4,
+                "master": -8,
+                "mid": 1,
+                "presence": 0.15000000596046448,
+                "treble": -2
+            },
+            "type": "pedal.amp"
+        },
+        {
+            "bypassed": false,
+            "irPath": "../Origin Effects IR Cab Library V4/48kHz Origin Effects IR Cab Library/Modern Boutique 4x12/Modern Boutique 4x12 - Medium - Mix.wav",
+            "parameters": {
+                "level": 0,
+                "mix": 1
+            },
+            "type": "pedal.cabinet"
+        },
+        {
+            "bypassed": true,
+            "irPath": "",
+            "parameters": {
+                "highfreq": 6000,
+                "highgain": -4,
+                "highq": 0.699999988079071,
+                "level": -1,
+                "lowfreq": 95,
+                "lowgain": -1.5,
+                "lowq": 0.699999988079071,
+                "midfreq": 320,
+                "midgain": -2.5,
+                "midq": 1.2000000476837158
+            },
+            "type": "pedal.parametriceq"
+        },
+        {
+            "bypassed": false,
+            "irPath": "",
+            "parameters": {
+                "body": 1,
+                "drive": 12.386744499206543,
+                "level": -6,
+                "tone": 1
+            },
+            "type": "pedal.crunch"
+        },
+        {
+            "bypassed": false,
+            "irPath": "",
+            "parameters": {
+                "damping": 0.2800000011920929,
+                "mix": 0.2199999988079071,
+                "room": 0.7200000286102295
+            },
+            "type": "pedal.reverb"
+        }
+    ],
+    "version": 1
+}
