@@ -52,6 +52,12 @@ Item {
     }
     property string editOperation: ""
     property real editDelta: 0
+    property int editLaneDelta: 0
+    function updateGroupLane(delta) {
+        for (const clip of trackModel.clips.filter(c => selectedClipIds.indexOf(c.clipId) >= 0))
+            delta = Math.max(-clip.laneIndex, Math.min(trackModel.count - 1 - clip.laneIndex, delta))
+        editLaneDelta = delta
+    }
     function updateGroupEdit(delta) {
         const clips = trackModel.clips.filter(c => selectedClipIds.indexOf(c.clipId) >= 0)
         for (const clip of clips) {
@@ -62,9 +68,9 @@ Item {
         editDelta = delta
     }
     function commitGroupEdit() {
-        const operation = editOperation, delta = editDelta
-        editOperation = ""; editDelta = 0
-        if (operation && trackModel) trackModel.editClips(selectedClipIds, operation, delta)
+        const operation = editOperation, delta = editDelta, lanes = editLaneDelta
+        editOperation = ""; editDelta = 0; editLaneDelta = 0
+        if (operation && trackModel) trackModel.editClips(selectedClipIds, operation, delta, operation === "move" ? lanes : 0)
     }
     Shortcut {
         sequence: "Delete"
@@ -97,10 +103,9 @@ Item {
         onActivated: root.deselectClips()
     }
     readonly property bool canMergeSelection: {
-        if (!trackModel || selectedClipIds.length !== 2) return false
-        const clips = trackModel.clips
-        const first = clips.find(c => c.clipId === selectedClipIds[0])
-        return !!first && trackModel.canMergeClips(first.trackId, selectedClipIds[0], selectedClipIds[1])
+        if (!trackModel || selectedClipIds.length < 2) return false
+        const clips = trackModel.clips // Re-evaluate compatibility after moving or trimming clips.
+        return clips.length >= selectedClipIds.length && trackModel.canMergeSelectedClips(selectedClipIds)
     }
     function selectClip(trackId, clipId, toggle, preserve) {
         const ids = selectedClipIds.slice()
@@ -123,9 +128,10 @@ Item {
         function onClipsChanged() {
             const clips = root.trackModel.clips
             root.selectedClipIds = root.selectedClipIds.filter(id => clips.some(c => c.clipId === id))
-            if (root.selectedClipIds.indexOf(root.selectedClipId) < 0) {
-                root.selectedClipId = -1; root.selectedTrackId = -1
-            }
+            const primary = clips.find(c => c.clipId === root.selectedClipId)
+                || clips.find(c => root.selectedClipIds.indexOf(c.clipId) >= 0)
+            root.selectedClipId = primary ? primary.clipId : -1
+            root.selectedTrackId = primary ? primary.trackId : -1
         }
     }
     property int selectedClipId: -1
@@ -274,10 +280,7 @@ Item {
             objectName: "mergeSelectedClips"
             text: "Merge selected clips"
             enabled: root.canMergeSelection && !root.recording
-            onTriggered: {
-                const first = root.trackModel.clips.find(c => c.clipId === root.selectedClipIds[0])
-                if (first) root.trackModel.mergeClips(first.trackId, root.selectedClipIds[0], root.selectedClipIds[1])
-            }
+            onTriggered: root.trackModel.mergeSelectedClips(root.selectedClipIds)
         }
         MenuItem {
             id: deleteClipAction
@@ -428,7 +431,7 @@ Item {
                 readonly property bool groupEditing: root.editOperation !== "" && root.selectedClipIds.indexOf(clipId) >= 0
                 x: (groupEditing && (root.editOperation === "move" || root.editOperation === "trimStart")
                     ? startBeat + root.editDelta : previewStartBeat) * root.beatWidth + 4
-                y: root.rulerHeight + laneIndex * root.laneHeight + 8
+                y: root.rulerHeight + (laneIndex + (groupEditing && root.editOperation === "move" ? root.editLaneDelta : 0)) * root.laneHeight + 8
                 width: Math.max(4, (groupEditing && root.editOperation === "resize" ? lengthBeats + root.editDelta
                     : groupEditing && root.editOperation === "trimStart" ? lengthBeats - root.editDelta
                     : previewLengthBeats) * root.beatWidth - 8)
@@ -477,6 +480,7 @@ Item {
                     cursorShape: pressedButtons & Qt.LeftButton ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                     property real pointerStartX: 0
                     property real originalBeat: 0
+                    property int originalLane: 0
                     onPressed: mouse => {
                         if (mouse.button === Qt.LeftButton && (mouse.modifiers & Qt.ShiftModifier)) {
                             const point = mapToItem(scroll.contentItem, mouse.x, mouse.y)
@@ -488,9 +492,9 @@ Item {
                             true)
                         root.forceActiveFocus()
                         pointerStartX = mapToItem(scroll.contentItem, mouse.x, mouse.y).x
-                        originalBeat = clipItem.startBeat
+                        originalBeat = clipItem.startBeat; originalLane = clipItem.laneIndex
                         if (mouse.button === Qt.LeftButton && !(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier))) {
-                            root.editOperation = "move"; root.editDelta = 0
+                            root.editOperation = "move"; root.editDelta = 0; root.editLaneDelta = 0
                         }
                     }
                     onPositionChanged: mouse => {
@@ -501,7 +505,10 @@ Item {
                         }
                         if (!(pressedButtons & Qt.LeftButton) || root.recording || (mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier))) return
                         const delta = mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStartX
-                        root.updateGroupEdit(root.snapBeat(originalBeat + delta / root.beatWidth) - originalBeat)
+                        const pointerY = mapToItem(scroll.contentItem, mouse.x, mouse.y).y
+                        root.updateGroupLane(Math.floor((pointerY-root.rulerHeight)/root.laneHeight)-originalLane)
+                        const verticalOnly = root.editLaneDelta !== 0 && Math.abs(delta) < Qt.styleHints.startDragDistance
+                        root.updateGroupEdit(verticalOnly ? 0 : root.snapBeat(originalBeat + delta / root.beatWidth) - originalBeat)
                     }
                     onReleased: mouse => {
                         if (mouse.button === Qt.LeftButton) {
@@ -509,7 +516,7 @@ Item {
                             else root.commitGroupEdit()
                         }
                     }
-                    onCanceled: { root.editOperation = ""; root.editDelta = 0; root.selecting = false }
+                    onCanceled: { root.editOperation = ""; root.editDelta = 0; root.editLaneDelta = 0; root.selecting = false }
                     onClicked: mouse => {
                         if (mouse.button !== Qt.RightButton) return
                         clipContextMenu.targetTrackId = clipItem.trackId

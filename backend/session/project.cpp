@@ -247,13 +247,22 @@ bool Project::editClipGroup(const std::vector<ClipChange>& changes) {
             || std::none_of(track->audioClips.begin(),track->audioClips.end(),[&](const auto& c){return c.id==clip.id;})
             || clip.start<0 || clip.length<=0 || clip.sourceOffset<0 || clip.start>INT64_MAX-clip.length) return false;
         ids.push_back(clip.id);
-        auto state=std::find_if(edit.tracks.begin(),edit.tracks.end(),[&](const auto& t){return t.trackId==change.trackId;});
-        if (state==edit.tracks.end()) {
-            edit.tracks.push_back({change.trackId,track->audioClips,track->audioClips});
-            state=std::prev(edit.tracks.end());
+        const int destinationId=change.remove || change.destinationTrackId<0 ? change.trackId : change.destinationTrackId;
+        if (!findTrack(destinationId)) return false;
+        for (int id:{change.trackId,destinationId}) {
+            if (std::none_of(edit.tracks.begin(),edit.tracks.end(),[&](const auto& t){return t.trackId==id;})) {
+                const auto& clips=findTrack(id)->audioClips;
+                edit.tracks.push_back({id,clips,clips});
+            }
         }
-        auto at=std::find_if(state->after.begin(),state->after.end(),[&](const auto& c){return c.id==clip.id;});
-        if (change.remove) state->after.erase(at); else *at=clip;
+        auto source=std::find_if(edit.tracks.begin(),edit.tracks.end(),[&](const auto& t){return t.trackId==change.trackId;});
+        auto at=std::find_if(source->after.begin(),source->after.end(),[&](const auto& c){return c.id==clip.id;});
+        if (change.remove || destinationId!=change.trackId) source->after.erase(at);
+        else *at=clip;
+        if (!change.remove && destinationId!=change.trackId) {
+            auto destination=std::find_if(edit.tracks.begin(),edit.tracks.end(),[&](const auto& t){return t.trackId==destinationId;});
+            destination->after.push_back(clip);
+        }
     }
     m_history.erase(m_history.begin()+m_historyPosition,m_history.end());
     m_history.push_back(std::move(edit));

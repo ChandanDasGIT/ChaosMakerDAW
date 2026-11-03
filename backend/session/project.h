@@ -65,7 +65,7 @@ public:
     bool canMergeAudioClips(int trackId, int first, int second, double sourceRate) const;
     bool mergeAudioClips(int trackId, int first, int second, double sourceRate);
     bool moveAudioClip(int trackId, int clipId, std::int64_t start);
-    struct ClipChange { int trackId; AudioClip clip; bool remove = false; };
+    struct ClipChange { int trackId; AudioClip clip; bool remove = false; int destinationTrackId = -1; };
     bool editClipGroup(const std::vector<ClipChange>& changes);
     bool canUndo() const { return m_historyPosition > 0; }
     bool canRedo() const { return m_historyPosition < m_history.size(); }
