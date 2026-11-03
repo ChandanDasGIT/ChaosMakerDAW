@@ -197,6 +197,34 @@ int Project::splitAudioClip(int trackId, int clipId, std::int64_t position, std:
     rememberClipEdit(trackId,std::move(before)); return right.id;
 }
 
+bool Project::canMergeAudioClips(int trackId, int first, int second, double sourceRate) const {
+    const auto* track=findTrack(trackId);
+    if (!track || first==second || !std::isfinite(sourceRate) || sourceRate<=0) return false;
+    const AudioClip *a=nullptr,*b=nullptr;
+    for (const auto& clip:track->audioClips) {
+        if (clip.id==first) a=&clip;
+        if (clip.id==second) b=&clip;
+    }
+    if (!a || !b) return false;
+    if (a->start>b->start) std::swap(a,b);
+    return a->start+a->length==b->start && a->poolId==b->poolId
+        && a->sourceOffset+std::llround(a->length*sourceRate/m_tempo.sampleRate())==b->sourceOffset
+        && a->effectsPrinted==b->effectsPrinted && a->gainDb==b->gainDb
+        && a->fadeOut==0 && b->fadeIn==0;
+}
+
+bool Project::mergeAudioClips(int trackId, int first, int second, double sourceRate) {
+    if (!canMergeAudioClips(trackId,first,second,sourceRate)) return false;
+    auto* track=findTrack(trackId);
+    auto a=std::find_if(track->audioClips.begin(),track->audioClips.end(),[&](const auto& c){return c.id==first;});
+    auto b=std::find_if(track->audioClips.begin(),track->audioClips.end(),[&](const auto& c){return c.id==second;});
+    if (a->start>b->start) std::swap(a,b);
+    auto before=track->audioClips;
+    a->length+=b->length; a->fadeOut=b->fadeOut;
+    track->audioClips.erase(b);
+    rememberClipEdit(trackId,std::move(before)); return true;
+}
+
 bool Project::moveAudioClip(int trackId, int clipId, std::int64_t start) {
     auto* track = findTrack(trackId);
     if (!track || start < 0) return false;
@@ -208,10 +236,37 @@ bool Project::moveAudioClip(int trackId, int clipId, std::int64_t start) {
     rememberClipEdit(trackId, std::move(before)); return true;
 }
 
+bool Project::editClipGroup(const std::vector<ClipChange>& changes) {
+    if (changes.empty()) return false;
+    ClipEdit edit;
+    std::vector<int> ids;
+    for (const auto& change:changes) {
+        const auto* track=findTrack(change.trackId);
+        const auto& clip=change.clip;
+        if (!track || std::find(ids.begin(),ids.end(),clip.id)!=ids.end()
+            || std::none_of(track->audioClips.begin(),track->audioClips.end(),[&](const auto& c){return c.id==clip.id;})
+            || clip.start<0 || clip.length<=0 || clip.sourceOffset<0 || clip.start>INT64_MAX-clip.length) return false;
+        ids.push_back(clip.id);
+        auto state=std::find_if(edit.tracks.begin(),edit.tracks.end(),[&](const auto& t){return t.trackId==change.trackId;});
+        if (state==edit.tracks.end()) {
+            edit.tracks.push_back({change.trackId,track->audioClips,track->audioClips});
+            state=std::prev(edit.tracks.end());
+        }
+        auto at=std::find_if(state->after.begin(),state->after.end(),[&](const auto& c){return c.id==clip.id;});
+        if (change.remove) state->after.erase(at); else *at=clip;
+    }
+    m_history.erase(m_history.begin()+m_historyPosition,m_history.end());
+    m_history.push_back(std::move(edit));
+    if (m_history.size()>100) m_history.erase(m_history.begin());
+    m_historyPosition=m_history.size();
+    for (const auto& state:m_history.back().tracks) findTrack(state.trackId)->audioClips=state.after;
+    return true;
+}
+
 void Project::rememberClipEdit(int trackId, std::vector<AudioClip> before)
 {
     m_history.erase(m_history.begin() + m_historyPosition, m_history.end());
-    m_history.push_back({trackId, std::move(before), findTrack(trackId)->audioClips});
+    m_history.push_back({{{trackId, std::move(before), findTrack(trackId)->audioClips}}});
     if (m_history.size() > 100) m_history.erase(m_history.begin());
     m_historyPosition = m_history.size();
 }
@@ -220,16 +275,16 @@ int Project::undo()
 {
     if (!canUndo()) return -1;
     const auto& edit = m_history[--m_historyPosition];
-    findTrack(edit.trackId)->audioClips = edit.before;
-    return edit.trackId;
+    for (const auto& track:edit.tracks) findTrack(track.trackId)->audioClips = track.before;
+    return edit.tracks.front().trackId;
 }
 
 int Project::redo()
 {
     if (!canRedo()) return -1;
     const auto& edit = m_history[m_historyPosition++];
-    findTrack(edit.trackId)->audioClips = edit.after;
-    return edit.trackId;
+    for (const auto& track:edit.tracks) findTrack(track.trackId)->audioClips = track.after;
+    return edit.tracks.front().trackId;
 }
 
 double Project::contentEndBeats() const noexcept

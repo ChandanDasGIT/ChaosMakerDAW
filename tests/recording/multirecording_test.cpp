@@ -30,7 +30,7 @@ struct Fixture {
         publish(true);
     }
     void publish(bool armedA) {
-        auto snapshot=std::make_unique<EngineSnapshot>(); snapshot->multiMonitor=true;
+        auto snapshot=std::make_unique<EngineSnapshot>(); snapshot->multiMonitor=true; snapshot->playbackEnd=0;
         TrackRender a,b; a.trackId=1; a.inputChannel=0; a.armed=armedA; a.monitoring=armedA; a.muted=true;
         a.monitorChain.push_back(gain.get()); a.meters=meterA;
         b.trackId=2; b.inputChannel=1; b.armed=true; b.monitoring=true; b.gain=0.5f; b.meters=meterB;

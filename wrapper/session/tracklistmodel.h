@@ -35,6 +35,7 @@ public:
         SoloRole,
         MutedRole,
         RecordArmedRole,
+        MonitorEnabledRole,
         InputPortRole,
         VolumeRole,
         ClipsRole,
@@ -77,6 +78,7 @@ public:
     Q_INVOKABLE int addInstrumentTrack();
     Q_INVOKABLE int addInstrumentTrackOfType(const QString& instrumentType);
     Q_INVOKABLE bool removeTrack(int trackId);
+    Q_INVOKABLE bool moveTrack(int trackId, int destinationRow);
     Q_INVOKABLE bool renameTrack(int trackId, const QString& name);
     Q_INVOKABLE bool setTrackColour(int trackId, const QString& colour);
     Q_INVOKABLE int indexOfTrack(int trackId) const { return rowForTrackId(trackId); }
@@ -85,6 +87,7 @@ public:
     Q_INVOKABLE bool setMuted(int trackId, bool enabled);
     Q_INVOKABLE bool setRecordDry(int trackId, bool dry);
     Q_INVOKABLE bool setRecordArmed(int trackId, bool enabled);
+    Q_INVOKABLE bool setMonitorEnabled(int trackId, bool enabled);
     bool cleanMonitorArmed() const;
     QString cleanMonitorInput() const;
     double cleanMonitorGain() const;
@@ -104,6 +107,9 @@ public:
     Q_INVOKABLE int addClipAtBeat(int trackId, double startBeat, double lengthBeats);
     Q_INVOKABLE bool trimClipStartAtBeat(int trackId, int clipId, double startBeat);
     Q_INVOKABLE int splitClipAtBeat(int trackId, int clipId, double beat);
+    Q_INVOKABLE bool editClips(const QVariantList& ids, const QString& operation, double deltaBeats = 0);
+    Q_INVOKABLE bool canMergeClips(int trackId, int first, int second) const;
+    Q_INVOKABLE bool mergeClips(int trackId, int first, int second);
     Q_INVOKABLE bool moveClipAtBeat(int trackId, int clipId, double startBeat);
     Q_INVOKABLE bool resizeClipAtBeat(int trackId, int clipId, double lengthBeats);
     Q_INVOKABLE bool removeAudioClip(int trackId, int clipId);

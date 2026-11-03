@@ -64,12 +64,16 @@ Load a cabinet IR to finish the tone; adjust the gate threshold for your guitar'
 Real recording and playback: arm one or more **Audio**, **Vocal**, **Acoustic Guitar**, or **Electric Guitar** tracks,
 select each track's input with **IN**, choose an output, then press **Record** in the bottom bar.
 All armed tracks start on the same sample and create separate WAVs/clips with their own
-recording modes and effects. Tracks may share an input or use different inputs. Arming several
-tracks enables simultaneous live monitoring through their individual effects chains.
+recording modes and effects. Tracks may share an input or use different inputs. Use each track's **MON** button for live monitoring through its effects, independently of **REC**.
+Arming a track does not enable monitoring; turning monitoring off does not stop capture.
 Press **Stop** to finish all takes and return to the start, then **Play** to hear them.
-**Pause** finishes all takes and keeps the position; pressing Record again ends capture while
-playback continues. Disarming one track finishes only its take; the others keep recording.
-Tracks armed after recording starts can monitor immediately and join capture on the next take.
+**Pause** finishes all takes and keeps the position; pressing Record again ends capture and
+pauses transport, leaving the red playhead at the take's end. Disarming one track finishes
+only its take; the others keep recording.
+Playback pauses automatically at the final clip's end and leaves the red playhead there; Repeat and active recording continue.
+Transport shortcuts: **Space** plays/pauses, and **R** starts/stops recording.
+Shortcuts do not trigger while typing in text fields, and holding a key does not repeat them.
+Tracks armed after recording starts join capture on the next take; MON can change at any time.
 Input/mode changes and removal of participating tracks stay locked until the group finishes.
 The JACK adapter provides 31 dedicated source routes, shared by tracks using the same source;
 routes are retained until the app closes. The timeline and time display follow the sample clock. Track volume,
@@ -81,6 +85,16 @@ The + button opens the existing track-type chooser.
 
 The bottom mixer shows your session tracks and updates when tracks are added, removed or
 reopened. Its volume faders (0–200%), mute and solo controls share the track cards' settings.
+Double-click a volume fader in the mixer or a track card to restore unity gain (100%, 0 dB).
+Drag a track's name header up or down to reorder it; timeline lanes and mixer strips follow the same order.
+Ctrl-click clips to toggle multiple selections, or Shift-drag a rectangle to select intersecting clips on multiple tracks.
+Normal dragging in empty timeline space selects a time range snapped to the beat grid; enable Repeat to loop that range.
+Drag a new range to update an active loop, or click empty timeline space to clear the range and repeat the full project.
+Drag any selected clip to move the group while preserving track assignments and spacing.
+Drag a selected clip's trim edge to trim the group, or press Delete/right-click Delete selected clips to remove it.
+Each group edit is one undo/redo step; edits that exceed audio or timeline boundaries are rejected together.
+Select two adjacent split pieces and right-click **Merge selected clips** to join them in one undoable edit.
+Merge requires the same track, source audio, contiguous source samples and matching gain/effects mode.
 Double-click a track name in the left track list to rename it. Press Enter or click another
 control to save, or Escape to cancel. Blank names keep the previous name. Names update in
 the mixer and effects window and are saved with the project/session.
@@ -100,9 +114,9 @@ Choose the track input and set its tone through FX → Equalizer / GuitarSuite, 
 press Record; playback preserves the recorded effects even if you later change the pedals.
 Monitoring can be off or muted without silencing the recording. Stop ends capture immediately;
 leave recording running until delay/reverb tails have faded if you want them in the take.
-Audio takes still contain raw mono input. Arming any supported input track enables live monitoring.
+Audio takes still contain raw mono input. Enable MON on any supported input track for live monitoring.
 Each track owns its GuitarSuite chain, pedal order, bypass settings, input trim and EQ state.
-Arming another track adds its sound to the monitor mix; opening or editing a track's FX keeps
+Enabling MON on another track adds its sound to the monitor mix; opening or editing a track's FX keeps
 each track's input and processing independent. FX opens one non-modal window with a searchable sidebar: switch between Equalizer
 and GuitarSuite without closing the editor. Track settings and pedal controls stay in place.
 Vocal tracks expose the Equalizer in their FX window, with recording mode controls still
@@ -118,7 +132,7 @@ Enable **Settings → Restore session on startup** to automatically save and reo
 clips, tempo/meter, and every track's EQ and GuitarSuite chain, including input trim and cabinet
 IR references. Older shared-chain sessions reopen with a separate copy on each track.
 It defaults to off. Changes are saved after a short idle interval and on normal exit; closing
-while recording finishes the take first. Startup restores stopped, with tracks disarmed. The
+while recording finishes the take first. Startup restores stopped, with record-arm and live monitoring off. The
 session file is `last-session.json` beside the Recordings folder. Keep recorded WAVs and external
 cabinet IRs in place. Missing takes stay visible as offline clips, and damaged sessions or failed
 pedal restoration are reported without overwriting the saved session. This is startup recovery,

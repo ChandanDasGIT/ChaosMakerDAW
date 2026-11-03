@@ -86,6 +86,7 @@ public:
     Q_INVOKABLE void attachProject(TrackListModel* model);
     Q_INVOKABLE void transportAction(const QString& action);
     Q_INVOKABLE void seekBeat(double beat);
+    Q_INVOKABLE bool setRepeatRange(double startBeat, double endBeat);
     Q_INVOKABLE void setMeter(int numerator, int denominator);
     Q_INVOKABLE bool saveSession();
     QUrl projectFile() const { return m_projectFile; }
@@ -182,6 +183,7 @@ private:
     void pollTransport();
     void completeTake();
     void setTransportMessage(const QString& message);
+    bool postRepeatLoop();
     bool postTransport(int type, qint64 a = 0, qint64 b = 0);
     QPointer<TrackListModel> m_project;
     std::map<int,std::unique_ptr<TakeRecorder>> m_takes;
@@ -191,6 +193,7 @@ private:
     bool m_repeating = false, m_shutdown = false, m_restoring = false, m_sessionSaveBlocked = false, m_restoringPreset = false;
     int m_recordTrack = -1, m_numerator = 4, m_denominator = 4;
     double m_recordStartBeat = 0;
+    double m_repeatStartBeat = 0, m_repeatEndBeat = 0;
     QString m_transportMessage;
     QString m_status = QStringLiteral("not started");
     std::unique_ptr<AudioEngine> m_engine;

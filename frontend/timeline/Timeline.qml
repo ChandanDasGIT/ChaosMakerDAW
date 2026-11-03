@@ -16,12 +16,101 @@ Item {
     readonly property bool recording: root.transport.recording
     readonly property bool repeating: root.transport.repeating
     readonly property real recordingTailX: playing ? playhead + width * 0.2 : 0
+    property var selectedClipIds: []
+    property string editOperation: ""
+    property real editDelta: 0
+    function updateGroupEdit(delta) {
+        const clips = trackModel.clips.filter(c => selectedClipIds.indexOf(c.clipId) >= 0)
+        for (const clip of clips) {
+            if (editOperation === "move" || editOperation === "trimStart") delta = Math.max(delta, -clip.startBeat)
+            if (editOperation === "resize") delta = Math.max(delta, 4 / timeSignatureDenominator - clip.lengthBeats)
+            if (editOperation === "trimStart") delta = Math.min(delta, clip.lengthBeats - 4 / timeSignatureDenominator)
+        }
+        editDelta = delta
+    }
+    function commitGroupEdit() {
+        const operation = editOperation, delta = editDelta
+        editOperation = ""; editDelta = 0
+        if (operation && trackModel) trackModel.editClips(selectedClipIds, operation, delta)
+    }
+    Shortcut {
+        sequence: "Delete"
+        enabled: root.activeFocus && root.selectedClipIds.length > 0 && !root.recording
+        autoRepeat: false
+        onActivated: root.trackModel.editClips(root.selectedClipIds, "delete", 0)
+    }
+    readonly property bool canMergeSelection: {
+        if (!trackModel || selectedClipIds.length !== 2) return false
+        const clips = trackModel.clips
+        const first = clips.find(c => c.clipId === selectedClipIds[0])
+        return !!first && trackModel.canMergeClips(first.trackId, selectedClipIds[0], selectedClipIds[1])
+    }
+    function selectClip(trackId, clipId, toggle, preserve) {
+        const ids = selectedClipIds.slice()
+        const at = ids.indexOf(clipId)
+        if (toggle) {
+            if (at >= 0) ids.splice(at, 1)
+            else ids.push(clipId)
+            selectedClipIds = ids
+        } else if (!preserve || at < 0) selectedClipIds = [clipId]
+        selectedClipId = selectedClipIds.indexOf(clipId) >= 0 ? clipId : -1
+        selectedTrackId = selectedClipId >= 0 ? trackId : -1
+        hasSelection = false
+    }
+    onTrackModelChanged: {
+        selectedClipIds = []; selectedClipId = -1; selectedTrackId = -1
+        timeRangeStartBeat = 0; timeRangeEndBeat = 0; hasSelection = false
+    }
+    Connections {
+        target: root.trackModel || null
+        function onClipsChanged() {
+            const clips = root.trackModel.clips
+            root.selectedClipIds = root.selectedClipIds.filter(id => clips.some(c => c.clipId === id))
+            if (root.selectedClipIds.indexOf(root.selectedClipId) < 0) {
+                root.selectedClipId = -1; root.selectedTrackId = -1
+            }
+        }
+    }
     property int selectedClipId: -1
     property int selectedTrackId: -1
     property bool selecting: false
     property bool hasSelection: false
+    property bool clipSelectionDrag: false
+    property real timeRangeStartBeat: 0
+    property real timeRangeEndBeat: 0
+    readonly property real rangeStartBeat: selecting && !clipSelectionDrag
+        ? Math.floor(Math.min(selectionStartX, selectionEndX) / beatUnitWidth) * 4 / timeSignatureDenominator : timeRangeStartBeat
+    readonly property real rangeEndBeat: selecting && !clipSelectionDrag && Math.abs(selectionEndX-selectionStartX)>2
+        ? Math.ceil(Math.max(selectionStartX, selectionEndX) / beatUnitWidth) * 4 / timeSignatureDenominator : timeRangeEndBeat
+    function beginSelection(x, y, clips) {
+        selectedClipIds = []; selectedClipId = -1; selectedTrackId = -1
+        selecting = true; hasSelection = true; clipSelectionDrag = clips
+        forceActiveFocus()
+        selectionStartX = x; selectionEndX = x
+        selectionStartY = y; selectionEndY = y
+    }
+    function finishSelection() {
+        if (!clipSelectionDrag) {
+            const start = rangeStartBeat, end = Math.abs(selectionEndX-selectionStartX)>2 ? rangeEndBeat : 0
+            if (!recording && transport.setRepeatRange(end>start ? start : 0, end)) {
+                timeRangeStartBeat = end>start ? start : 0; timeRangeEndBeat = end
+            }
+            selecting = false
+            return
+        }
+        selecting = false
+        const left = Math.min(selectionStartX, selectionEndX) / beatWidth
+        const right = Math.max(selectionStartX, selectionEndX) / beatWidth
+        const top = Math.min(selectionStartY, selectionEndY)
+        const bottom = Math.max(selectionStartY, selectionEndY) + 1
+        if (trackModel && right > left)
+            selectedClipIds = trackModel.clips.filter(c => c.startBeat < right && c.startBeat+c.lengthBeats > left
+                && c.laneIndex*laneHeight+8 < bottom && (c.laneIndex+1)*laneHeight-10 > top).map(c => c.clipId)
+    }
     property real selectionStartX: 0
     property real selectionEndX: 0
+    property real selectionStartY: 0
+    property real selectionEndY: 0
     property var trackModel
     property int laneCount: 5
     property int laneHeight: 106
@@ -85,7 +174,7 @@ Item {
 
     Shortcut {
         sequence: "S"
-        enabled: root.activeFocus && root.selectedClipId >= 0 && !root.recording
+        enabled: root.activeFocus && root.selectedClipIds.length === 1 && root.selectedClipId >= 0 && !root.recording
         onActivated: root.trackModel.splitClipAtBeat(root.selectedTrackId, root.selectedClipId, root.transport.positionBeats)
     }
     Menu {
@@ -117,8 +206,18 @@ Item {
             onTriggered: root.trackModel.splitClipAtBeat(clipContextMenu.targetTrackId, clipContextMenu.targetClipId, root.transport.positionBeats)
         }
         MenuItem {
+            objectName: "mergeSelectedClips"
+            text: "Merge selected clips"
+            enabled: root.canMergeSelection && !root.recording
+            onTriggered: {
+                const first = root.trackModel.clips.find(c => c.clipId === root.selectedClipIds[0])
+                if (first) root.trackModel.mergeClips(first.trackId, root.selectedClipIds[0], root.selectedClipIds[1])
+            }
+        }
+        MenuItem {
             id: deleteClipAction
-            text: "Delete"
+            text: root.selectedClipIds.length > 1 ? "Delete selected clips" : "Delete"
+            enabled: !root.recording
             implicitHeight: 32
             leftPadding: Theme.margin
             rightPadding: Theme.margin
@@ -134,7 +233,7 @@ Item {
             }
             onTriggered: {
                 if (root.trackModel)
-                    root.trackModel.removeAudioClip(clipContextMenu.targetTrackId, clipContextMenu.targetClipId)
+                    root.trackModel.editClips(root.selectedClipIds, "delete", 0)
             }
         }
     }
@@ -247,14 +346,18 @@ Item {
 
                 onLengthBeatsChanged: previewLengthBeats = lengthBeats
 
-                x: previewStartBeat * root.beatWidth + 4
+                readonly property bool groupEditing: root.editOperation !== "" && root.selectedClipIds.indexOf(clipId) >= 0
+                x: (groupEditing && (root.editOperation === "move" || root.editOperation === "trimStart")
+                    ? startBeat + root.editDelta : previewStartBeat) * root.beatWidth + 4
                 y: root.rulerHeight + laneIndex * root.laneHeight + 8
-                width: Math.max(4, previewLengthBeats * root.beatWidth - 8)
+                width: Math.max(4, (groupEditing && root.editOperation === "resize" ? lengthBeats + root.editDelta
+                    : groupEditing && root.editOperation === "trimStart" ? lengthBeats - root.editDelta
+                    : previewLengthBeats) * root.beatWidth - 8)
                 height: root.laneHeight - 18
                 radius: 4
                 color: Qt.darker(trackColour, 2.4)
-                border.color: root.selectedClipId === clipId ? Theme.accent : trackColour
-                border.width: root.selectedClipId === clipId ? 2 : 1
+                border.color: root.selectedClipIds.indexOf(clipId) >= 0 ? Theme.accent : trackColour
+                border.width: root.selectedClipIds.indexOf(clipId) >= 0 ? 2 : 1
                 z: 3
                 Text {
                     anchors.left: parent.left; anchors.leftMargin: 10
@@ -296,25 +399,39 @@ Item {
                     property real pointerStartX: 0
                     property real originalBeat: 0
                     onPressed: mouse => {
-                        root.selectedTrackId = clipItem.trackId
-                        root.selectedClipId = clipItem.clipId
+                        if (mouse.button === Qt.LeftButton && (mouse.modifiers & Qt.ShiftModifier)) {
+                            const point = mapToItem(scroll.contentItem, mouse.x, mouse.y)
+                            root.beginSelection(point.x, point.y-root.rulerHeight, true)
+                            return
+                        }
+                        root.selectClip(clipItem.trackId, clipItem.clipId,
+                            mouse.button === Qt.LeftButton && !!(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)),
+                            true)
                         root.forceActiveFocus()
                         pointerStartX = mapToItem(scroll.contentItem, mouse.x, mouse.y).x
                         originalBeat = clipItem.startBeat
-                    }
-                    onPositionChanged: mouse => {
-                        if (!(pressedButtons & Qt.LeftButton) || root.recording) return
-                        const delta = mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStartX
-                        const step = 4.0 / root.timeSignatureDenominator
-                        clipItem.previewStartBeat = Math.max(0, Math.round((originalBeat + delta / root.beatWidth) / step) * step)
-                    }
-                    onReleased: mouse => {
-                        if (mouse.button === Qt.LeftButton && clipItem.previewStartBeat !== clipItem.startBeat) {
-                            if (!root.trackModel.moveClipAtBeat(clipItem.trackId, clipItem.clipId, clipItem.previewStartBeat))
-                                clipItem.previewStartBeat = clipItem.startBeat
+                        if (mouse.button === Qt.LeftButton && !(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier))) {
+                            root.editOperation = "move"; root.editDelta = 0
                         }
                     }
-                    onCanceled: clipItem.previewStartBeat = clipItem.startBeat
+                    onPositionChanged: mouse => {
+                        if (root.selecting && root.clipSelectionDrag) {
+                            const point = mapToItem(scroll.contentItem, mouse.x, mouse.y)
+                            root.selectionEndX = point.x; root.selectionEndY = point.y-root.rulerHeight
+                            return
+                        }
+                        if (!(pressedButtons & Qt.LeftButton) || root.recording || (mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier))) return
+                        const delta = mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStartX
+                        const step = 4.0 / root.timeSignatureDenominator
+                        root.updateGroupEdit(Math.round(delta / root.beatWidth / step) * step)
+                    }
+                    onReleased: mouse => {
+                        if (mouse.button === Qt.LeftButton) {
+                            if (root.selecting) root.finishSelection()
+                            else root.commitGroupEdit()
+                        }
+                    }
+                    onCanceled: { root.editOperation = ""; root.editDelta = 0; root.selecting = false }
                     onClicked: mouse => {
                         if (mouse.button !== Qt.RightButton) return
                         clipContextMenu.targetTrackId = clipItem.trackId
@@ -337,23 +454,19 @@ Item {
                         property real originalStart: 0
                         property real originalEnd: 0
                         onPressed: mouse => {
-                            root.selectedTrackId = clipItem.trackId; root.selectedClipId = clipItem.clipId
+                            root.selectClip(clipItem.trackId, clipItem.clipId, false, true)
                             pointerStart = mapToItem(scroll.contentItem, mouse.x, mouse.y).x
                             originalStart = clipItem.startBeat; originalEnd = clipItem.startBeat + clipItem.lengthBeats
+                            root.editOperation = "trimStart"; root.editDelta = 0
                         }
                         onPositionChanged: mouse => {
                             if (!pressed || root.recording) return
                             const step = 4.0 / root.timeSignatureDenominator
                             const delta = (mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStart) / root.beatWidth
-                            const start = Math.max(0, Math.min(originalEnd - step, Math.round((originalStart + delta) / step) * step))
-                            clipItem.previewStartBeat = start; clipItem.previewLengthBeats = originalEnd - start
+                            root.updateGroupEdit(Math.round(delta / step) * step)
                         }
-                        onReleased: {
-                            if (!root.trackModel.trimClipStartAtBeat(clipItem.trackId, clipItem.clipId, clipItem.previewStartBeat)) {
-                                clipItem.previewStartBeat = clipItem.startBeat; clipItem.previewLengthBeats = clipItem.lengthBeats
-                            }
-                        }
-                        onCanceled: { clipItem.previewStartBeat = clipItem.startBeat; clipItem.previewLengthBeats = clipItem.lengthBeats }
+                        onReleased: root.commitGroupEdit()
+                        onCanceled: { root.editOperation = ""; root.editDelta = 0 }
                         ToolTip.visible: containsMouse; ToolTip.text: "Drag to trim the start"
                     }
                 }
@@ -377,16 +490,14 @@ Item {
 
                         function updatePreview(mouseX) {
                             const pointerX = mapToItem(scroll.contentItem, mouseX, height / 2).x
-                            const desiredWidth = lengthStart * root.beatWidth - 8 + pointerX - pointerStartX
-                            const beatStep = 4.0 / root.timeSignatureDenominator
-                            const snappedLength = Math.max(beatStep,
-                                Math.round((desiredWidth + 8) / (root.beatWidth * beatStep)) * beatStep)
-                            clipItem.previewLengthBeats = snappedLength
+                            const step = 4.0 / root.timeSignatureDenominator
+                            root.updateGroupEdit(Math.round((pointerX - pointerStartX) / root.beatWidth / step) * step)
                         }
 
                         onPressed: mouse => {
+                            root.selectClip(clipItem.trackId, clipItem.clipId, false, true)
                             pointerStartX = mapToItem(scroll.contentItem, mouse.x, mouse.y).x
-                            lengthStart = clipItem.lengthBeats
+                            root.editOperation = "resize"; root.editDelta = 0
                         }
                         onPositionChanged: mouse => {
                             if (pressed)
@@ -394,12 +505,9 @@ Item {
                         }
                         onReleased: mouse => {
                             updatePreview(mouse.x)
-                            const resized = root.trackModel.resizeClipAtBeat(clipItem.trackId, clipItem.clipId,
-                                                                              clipItem.previewLengthBeats)
-                            if (!resized)
-                                clipItem.previewLengthBeats = clipItem.lengthBeats
+                            root.commitGroupEdit()
                         }
-                        onCanceled: clipItem.previewLengthBeats = clipItem.lengthBeats
+                        onCanceled: { root.editOperation = ""; root.editDelta = 0 }
                         ToolTip.visible: containsMouse
                         ToolTip.text: "Drag to trim or extend by beat"
                         ToolTip.delay: 450
@@ -421,31 +529,30 @@ Item {
         MouseArea {
             x: 0; y: root.rulerHeight; width: root.contentWidth; height: scroll.contentHeight - root.rulerHeight; z: 1
             acceptedButtons: Qt.LeftButton
-            onPressed: mouse => {
-                root.selectedClipId = -1
-                root.selectedTrackId = -1
-                root.selecting = true
-                root.hasSelection = true
-                root.selectionStartX = mouse.x
-                root.selectionEndX = mouse.x
-            }
+            onPressed: mouse => root.beginSelection(mouse.x, mouse.y, !!(mouse.modifiers & Qt.ShiftModifier))
             onPositionChanged: mouse => {
-                if (pressed) {
-                    root.selectionEndX = mouse.x
-                }
+                if (pressed) { root.selectionEndX = mouse.x; root.selectionEndY = mouse.y }
             }
-            onReleased: root.selecting = false
+            onReleased: root.finishSelection()
+            onCanceled: { root.selecting = false; root.hasSelection = false }
             onDoubleClicked: mouse => root.createClipAt(mouse.x, mouse.y)
         }
         Rectangle {
+            objectName: "timelineSelection"
             x: Math.min(root.selectionStartX, root.selectionEndX)
-            y: root.rulerHeight
-            width: Math.abs(root.selectionEndX - root.selectionStartX)
-            height: scroll.contentHeight - root.rulerHeight
-            visible: root.hasSelection && width > 2
-            color: "#3860cdff"
-            border.color: Theme.accent
-            z: 2
+            y: root.rulerHeight + Math.min(root.selectionStartY, root.selectionEndY)
+            width: Math.abs(root.selectionEndX-root.selectionStartX)
+            height: Math.max(1,Math.abs(root.selectionEndY-root.selectionStartY))
+            visible: root.clipSelectionDrag && root.hasSelection && width>2
+            color: "#3860cdff"; border.color: Theme.accent; z: 2
+        }
+        Rectangle {
+            objectName: "timelineTimeRange"
+            x: root.rangeStartBeat*root.beatWidth; y: root.rulerHeight
+            width: Math.max(0,root.rangeEndBeat-root.rangeStartBeat)*root.beatWidth
+            height: scroll.contentHeight-root.rulerHeight
+            visible: width>0
+            color: "#2858b7b1"; border.color: Theme.accent; z: 2
         }
 
         Repeater {
@@ -462,7 +569,7 @@ Item {
             Text { anchors.left: parent.left; anchors.leftMargin: 8; anchors.top: parent.top; anchors.topMargin: 8; text: "Recording…"; color: Theme.text }
           }
         }
-        Rectangle { x: root.playhead; y: 0; width: 2; height: scroll.contentHeight; color: Theme.record; z: 4 }
+        Rectangle { objectName: "timelinePlayhead"; x: root.playhead; y: 0; width: 2; height: scroll.contentHeight; color: Theme.record; z: 4 }
 
         ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AlwaysOn }
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }

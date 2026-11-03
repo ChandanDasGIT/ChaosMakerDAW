@@ -3,12 +3,15 @@ import QtQuick.Controls
 import TransportTests
 Window {
     width: 1100; height: 900; visible: true
+    property var transport: EngineController
     TransportBar {
         objectName: "transport"
         width: parent.width
         anchors.bottom: parent.bottom
         bpm: EngineController.bpm
-        onTransportAction: action => EngineController.transportAction(action)
+        playing: transport.playing
+        recording: transport.recording
+        onTransportAction: action => transport.transportAction(action)
         onBpmEdited: value => EngineController.bpm = value
     }
     TopBar { objectName: "testTopBar"; width: parent.width }
