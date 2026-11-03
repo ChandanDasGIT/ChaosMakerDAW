@@ -7,7 +7,7 @@ struct EngineCommand {
     enum class Type : std::uint8_t { Play, Pause, Stop, Seek, SetLoop, ClearLoop, StartRecording, StopRecording, SetCleanMonitor,
                                      SetMetronome, NoteFromUi, TestTone, SetCleanMonitorGain, StartRecordingGroup };
     Type type = Type::Stop;
-    std::int64_t a = 0;
+    std::int64_t a = 0; // StartRecordingGroup: count-in/pre-roll duration in samples.
     std::int64_t b = 0;
     float value = 0.0f;
     TakeRecorder* recorder = nullptr;

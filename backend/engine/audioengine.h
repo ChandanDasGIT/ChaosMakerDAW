@@ -42,6 +42,7 @@ public:
     std::int64_t position() const { return m_reportedPosition.load(std::memory_order_relaxed); }
     std::int64_t recordingStart() const { return m_recordingStart.load(std::memory_order_relaxed); }
     bool playing() const { return m_reportedPlaying.load(std::memory_order_relaxed); }
+    std::int64_t countInSamplesRemaining() const { return m_countInRemaining.load(std::memory_order_relaxed); }
     bool recording() const { return m_reportedRecording.load(std::memory_order_relaxed); }
     TakeRecorder* releasedRecorder() const { return m_releasedRecorder.load(std::memory_order_acquire); }
     void clearReleasedRecorder() { m_releasedRecorder.store(nullptr, std::memory_order_relaxed); }
@@ -76,9 +77,10 @@ private:
     void mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames, TrackMeters* liveMeters) noexcept;
     TakeRecorder* m_recorder = nullptr;
     std::atomic<TakeRecorder*> m_releasedRecorder{nullptr};
-    std::atomic<std::int64_t> m_reportedPosition{0}, m_recordingStart{0};
+    std::atomic<std::int64_t> m_reportedPosition{0}, m_recordingStart{0}, m_countInRemaining{0};
     std::atomic<bool> m_reportedPlaying{false}, m_reportedRecording{false};
     std::int64_t m_position = 0, m_loopStart = 0, m_loopEnd = 0;
+    std::int64_t m_countInTarget = -1;
     bool m_playing = false, m_looping = false;
     bool m_metronomeEnabled = false;
     float m_metronomeVolume = 0.5f;

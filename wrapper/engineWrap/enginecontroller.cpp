@@ -630,6 +630,17 @@ void EngineController::setStatus(const QString& status)
     emit statusChanged();
 }
 
+void EngineController::setCountInEnabled(bool enabled) {
+    if (takeBusy() || enabled==m_countInEnabled) return;
+    m_countInEnabled=enabled; emit countInSettingsChanged();
+}
+bool EngineController::countingIn() const { return m_engine->countInSamplesRemaining()>0; }
+int EngineController::countInBeatsRemaining() const {
+    const double rate=m_engine->sampleRate()>1000 ? m_engine->sampleRate() : 48000;
+    const double beats=m_engine->countInSamplesRemaining()*m_bpm*m_denominator/(60*rate*4);
+    return int(std::min(double(INT_MAX),std::ceil(beats)));
+}
+
 bool EngineController::postMetronome(bool enabled, double volume) {
     EngineCommand command; command.type=EngineCommand::Type::SetMetronome;
     command.a=enabled; command.value=float(volume);
@@ -646,7 +657,7 @@ void EngineController::setMetronomeVolume(double volume) {
 
 void EngineController::setBpm(double bpm)
 {
-    if (!m_engine || !m_engine->setTempoBpm(bpm) || m_bpm == bpm) return;
+    if (countingIn() || !m_engine || !m_engine->setTempoBpm(bpm) || m_bpm == bpm) return;
     m_bpm = bpm;
     if (m_repeating && !takeBusy()) postRepeatLoop();
     if (m_project) m_project->setTempo(bpm, m_numerator, m_denominator);
@@ -779,7 +790,7 @@ void EngineController::publishPlayback() {
 }
 
 void EngineController::setMeter(int numerator, int denominator) {
-    if (numerator <= 0 || denominator <= 0) return;
+    if (countingIn() || numerator <= 0 || denominator <= 0) return;
     m_numerator = numerator; m_denominator = denominator;
     if (m_project) m_project->setTempo(m_bpm, numerator, denominator);
     emit meterChanged(); m_sessionTimer.start();
@@ -867,10 +878,17 @@ void EngineController::transportAction(const QString& action) {
             takes.emplace(id,std::move(take)); locked.insert(id);
         }
         EngineCommand command; command.type=Type::StartRecordingGroup; command.group=group.get();
+        if (m_countInEnabled) {
+            const double frames=m_numerator*4.0/m_denominator*60/m_bpm*m_engine->sampleRate();
+            if (!std::isfinite(frames) || frames<1 || frames>=double(INT64_MAX/4)) {
+                setTransportMessage("Count-in duration is outside the supported range."); return;
+            }
+            command.a=std::llround(frames);
+        }
         if(!m_engine->post(command)) { setTransportMessage("Could not start recording; audio queue is full."); return; }
-        m_takes=std::move(takes); m_group=std::move(group);
+        m_takes=std::move(takes); m_group=std::move(group); m_countInMessagePending=m_countInEnabled;
         m_recordTrack=tracks.front(); m_recordStartBeat=positionBeats(); m_project->lockRecordingTracks(locked);
-        setTransportMessage(tracks.size()==1
+        setTransportMessage(m_countInEnabled ? QStringLiteral("Count-in / pre-roll · one bar before recording…") : tracks.size()==1
             ? (m_project->project().findTrack(m_recordTrack)->recordsWithFx()
                 ? QStringLiteral("Recording %1 with FX…").arg(QString::fromStdString(m_project->project().findTrack(m_recordTrack)->name))
                 : QStringLiteral("Recording dry input · playback FX stay editable…"))
@@ -892,6 +910,10 @@ QVariantList EngineController::recordingTracks() const {
     return result;
 }
 void EngineController::pollTransport() {
+    if (m_countInMessagePending && recording()) {
+        m_countInMessagePending=false;
+        setTransportMessage(QStringLiteral("Recording %1 track(s)…").arg(m_takes.size()));
+    }
     if(recording() && m_project)m_recordStartBeat=m_project->project().tempo().beatAt(m_engine->recordingStart());
     for(const auto& [id,take]:m_takes)if(take->released() && take->done() && !m_attachedTakes.contains(id)) {
         const auto audio=take->audio();
@@ -919,7 +941,7 @@ void EngineController::completeTake() {
     }
     if(errors.empty() && m_group && m_group->captureFailed.load(std::memory_order_relaxed))
         errors.push_back("Recording stopped because audio capture could not continue; completed samples were kept.");
-    m_group.reset(); m_takes.clear(); m_attachedTakes.clear(); m_recordTrack=-1;
+    m_group.reset(); m_takes.clear(); m_attachedTakes.clear(); m_recordTrack=-1; m_countInMessagePending=false;
     setTransportMessage(!errors.empty() ? errors.join(" · ") : completed>0
         ? QStringLiteral("Recorded %1 track(s).").arg(completed) : "Take ended before any audio was captured.");
     syncTrackEffects(); publishPlayback(); emit transportChanged(); saveSession();

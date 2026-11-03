@@ -31,6 +31,9 @@ class EngineController : public QObject {
 
     Q_PROPERTY(bool playing READ playing NOTIFY transportChanged)
     Q_PROPERTY(bool recording READ recording NOTIFY transportChanged)
+    Q_PROPERTY(bool countInEnabled READ countInEnabled WRITE setCountInEnabled NOTIFY countInSettingsChanged)
+    Q_PROPERTY(bool countingIn READ countingIn NOTIFY transportChanged)
+    Q_PROPERTY(int countInBeatsRemaining READ countInBeatsRemaining NOTIFY transportChanged)
     Q_PROPERTY(bool takeBusy READ takeBusy NOTIFY transportChanged)
     Q_PROPERTY(double positionBeats READ positionBeats NOTIFY transportChanged)
     Q_PROPERTY(double positionSeconds READ positionSeconds NOTIFY transportChanged)
@@ -72,6 +75,10 @@ public:
 
     bool playing() const;
     bool recording() const;
+    bool countInEnabled() const { return m_countInEnabled; }
+    void setCountInEnabled(bool enabled);
+    bool countingIn() const;
+    int countInBeatsRemaining() const;
     bool takeBusy() const { return !m_takes.empty(); }
     QVariantList recordingTracks() const;
     QVariantList monitoredTracks() const;
@@ -143,6 +150,7 @@ signals:
     void monitoredTrackChanged();
     void bpmChanged();
     void metronomeChanged();
+    void countInSettingsChanged();
     void statusChanged();
     void audioRoutingChanged();
     void outputDevicesChanged();
@@ -211,7 +219,7 @@ private:
     QVariantMap m_monitorLevels;
     QVariantMap m_trackLevels;
     double m_bpm = 120.0;
-    bool m_metronomeEnabled = false;
+    bool m_metronomeEnabled = false, m_countInEnabled = false, m_countInMessagePending = false;
     double m_metronomeVolume = 0.5;
     bool m_audioReady = false;
     bool m_monitorEnabled = false;
