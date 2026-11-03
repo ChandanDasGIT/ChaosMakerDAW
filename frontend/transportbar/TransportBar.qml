@@ -8,6 +8,7 @@ Rectangle {
     property int timeSignature: 4
     property int timeSignatureDenominator: 4
     property real bpm: 120
+    property int snapMode: 1
     property bool playing: false
     property bool recording: false
     property bool repeating: false
@@ -16,6 +17,7 @@ Rectangle {
     signal numeratorEdited(int value)
     signal denominatorEdited(int value)
     signal bpmEdited(real value)
+    signal snapModeEdited(int value)
     signal transportAction(string action)
     height: 72
     color: "#242424"
@@ -108,7 +110,7 @@ Rectangle {
             contentItem: Text { text: parent.text; color: quickSettings.visible ? Theme.accent : Theme.text; font.pixelSize: 12; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
             background: Rectangle { radius: 6; color: quickSettings.visible ? "#203a45" : parent.hovered ? "#363941" : "#2b2d32"; border.color: quickSettings.visible ? Theme.accent : "#41444c" }
             ToolTip.visible: hovered
-            ToolTip.text: "Metronome, count-in, BPM and time signature"
+            ToolTip.text: "Metronome, count-in, BPM, time signature and snap grid"
         }
     }
 
@@ -270,6 +272,20 @@ Rectangle {
                     Layout.preferredHeight: 29
                     value: root.bpm
                     onValueEdited: value => root.bpmEdited(value)
+                }
+            }
+            ColumnLayout {
+                spacing: 3
+                Layout.fillWidth: true
+                Text { text: "SNAP GRID"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
+                ComboBox {
+                    id: snapGrid
+                    objectName: "snapGridSelector"
+                    Layout.fillWidth: true
+                    model: ["Bars", "Beats", "1/2 beat", "1/4 beat", "1/8 beat", "1/16 beat", "Off"]
+                    currentIndex: root.snapMode
+                    onActivated: index => root.snapModeEdited(index)
+                    Accessible.name: "Snap grid"
                 }
             }
         }

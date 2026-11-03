@@ -638,6 +638,73 @@ private slots:
         for(auto* view:{list,mixer,timeline}) { view->setVisible(false); view->setProperty("trackModel",QVariant()); }
         list->setHeight(650); timeline->setX(0); timeline->setWidth(1000);
     }
+    void adjustable_snap_grid_applies_to_group_edits_and_ranges_data() {
+        QTest::addColumn<int>("mode"); QTest::addColumn<int>("numerator"); QTest::addColumn<int>("denominator");
+        for(int mode=0;mode<7;++mode)QTest::newRow(qPrintable(QString("4/4 mode %1").arg(mode))) << mode << 4 << 4;
+        for(int mode:{0,1,3,6})QTest::newRow(qPrintable(QString("3/8 mode %1").arg(mode))) << mode << 3 << 8;
+    }
+    void adjustable_snap_grid_applies_to_group_edits_and_ranges() {
+        QFETCH(int,mode); QFETCH(int,numerator); QFETCH(int,denominator);
+        auto* controller=EngineController::instance(); controller->setMeter(numerator,denominator);
+        TrackListModel tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
+        const int x=tracks.addClipAtBeat(a,2,4),y=tracks.addClipAtBeat(b,3.25,4);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] {
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); timeline->setProperty("snapMode",1);
+            controller->setMeter(4,4); controller->setRepeatRange(0,0);
+        });
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        openQuickSettings(); auto* picker=visualItem(window->contentItem(),"snapGridSelector"); QVERIFY(picker);
+        click(picker); QTest::keyClick(window,Qt::Key_Home);
+        for(int i=0;i<mode;++i)QTest::keyClick(window,Qt::Key_Down);
+        QTest::keyClick(window,Qt::Key_Return); QTRY_COMPARE(timeline->property("snapMode").toInt(),mode);
+        const double step=mode==6 ? 0 : mode==0 ? numerator*4.0/denominator : 4.0/denominator/std::pow(2.0,mode-1);
+        QCOMPARE(timeline->property("snapStepBeats").toDouble(),step);
+        QCOMPARE(timeline->property("gridUnitWidth").toDouble(),48*(step>0 ? step : 4.0/denominator));
+        auto* close=visualItem(window->contentItem(),"closeQuickSettings"); QVERIFY(close); click(close); QTest::qWait(20);
+        auto* first=visualItem(timeline,"clipBlock"+QString::number(x));
+        auto* second=visualItem(timeline,"clipBlock"+QString::number(y)); QVERIFY(first); QVERIFY(second);
+        click(first); QTest::mouseClick(window,Qt::LeftButton,Qt::ControlModifier,second->mapToScene(QPointF(30,30)).toPoint());
+        const auto drag=[&](QQuickItem* item,int distance) {
+            const QPoint start=item->mapToScene(QPointF(item->width()>20 ? 30 : item->width()/2,20)).toPoint();
+            QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
+            QTest::mouseMove(window,start+QPoint(distance,0));
+            QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,start+QPoint(distance,0));
+        };
+        const auto snap=[&](double beat) { return step>0 ? std::round(beat/step)*step : beat; };
+        const qint64 delta=std::llround((snap(2+37.0/48)-2)*24000);
+        drag(first,37);
+        QCOMPARE(tracks.project().findTrack(a)->audioClips[0].start,qint64(48000)+delta);
+        QCOMPARE(tracks.project().findTrack(b)->audioClips[0].start,qint64(78000)+delta);
+        QVERIFY(tracks.undo());
+        auto* left=visualItem(timeline,"clipLeftTrim"+QString::number(x)); QVERIFY(left); drag(left,37);
+        QCOMPARE(tracks.project().findTrack(a)->audioClips[0].start,qint64(48000)+delta);
+        QCOMPARE(tracks.project().findTrack(a)->audioClips[0].sourceOffset,delta);
+        QVERIFY(tracks.undo());
+        auto* right=visualItem(timeline,"clipRightTrim"+QString::number(x)); QVERIFY(right); drag(right,37);
+        const qint64 resized=std::llround((snap(6+37.0/48)-2)*24000);
+        QCOMPARE(tracks.project().findTrack(a)->audioClips[0].length,resized);
+        QCOMPARE(tracks.project().findTrack(b)->audioClips[0].length,resized);
+        QVERIFY(tracks.undo());
+        const QPoint start=timeline->mapToScene(QPointF(65,300)).toPoint(),end=timeline->mapToScene(QPointF(175,300)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
+        QTest::mouseMove(window,end); QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,end);
+        const double rangeStart=step>0 ? std::floor((65.0/48)/step)*step : 65.0/48;
+        const double rangeEnd=step>0 ? std::ceil((175.0/48)/step)*step : 175.0/48;
+        QCOMPARE(timeline->property("rangeStartBeat").toDouble(),rangeStart);
+        QCOMPARE(timeline->property("rangeEndBeat").toDouble(),rangeEnd);
+    }
+    void snap_off_allows_subbeat_clip_lengths() {
+        TrackListModel tracks; const int track=tracks.addAudioTrack(),clip=tracks.addClipAtBeat(track,2,1);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); timeline->setProperty("snapMode",1); });
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setProperty("snapMode",6); timeline->setVisible(true);
+        QTest::qWait(20); auto* grip=visualItem(timeline,"clipRightTrim"+QString::number(clip)); QVERIFY(grip);
+        const QPoint start=grip->mapToScene(QPointF(4,20)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
+        QTest::mouseMove(window,start-QPoint(37,0)); QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,start-QPoint(37,0));
+        QCOMPARE(tracks.project().findTrack(track)->audioClips[0].length,qint64(5500));
+    }
     void manual_timeline_scrolling_is_not_overridden_by_transport_updates() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);

@@ -6,6 +6,8 @@ Window {
     width: 1100; height: 900; visible: true
     property var transport: EngineController
     TransportBar {
+        snapMode: testTimeline.snapMode
+        onSnapModeEdited: value => testTimeline.snapMode = value
         transport: harness.transport
         objectName: "transport"
         width: parent.width
@@ -33,6 +35,7 @@ Window {
         visible: false
     }
     Timeline {
+        id: testTimeline
         objectName: "testTimeline"
         bpm: EngineController.bpm
         timeSignature: EngineController.numerator
