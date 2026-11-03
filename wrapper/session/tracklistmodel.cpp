@@ -549,13 +549,14 @@ int TrackListModel::splitClipAtBeat(int trackId, int clipId, double beat) {
     return -1;
 }
 
-bool TrackListModel::editClips(const QVariantList& ids, const QString& operation, double deltaBeats) {
+bool TrackListModel::editClips(const QVariantList& ids, const QString& operation, double deltaBeats, int laneDelta) {
     if (!m_recordingTracks.isEmpty() || ids.isEmpty() || !std::isfinite(deltaBeats)
         || (operation!="move" && operation!="delete" && operation!="trimStart" && operation!="resize")) return false;
     const double samples=deltaBeats*60*m_project.tempo().sampleRate()/m_project.tempo().bpm();
     if (!std::isfinite(samples) || std::abs(samples)>=double(INT64_MAX/4)) return false;
     const qint64 delta=std::llround(samples);
-    if (operation!="delete" && delta==0) return true;
+    if (laneDelta!=0 && operation!="move") return false;
+    if (operation!="delete" && delta==0 && laneDelta==0) return true;
     std::vector<Project::ClipChange> changes;
     for (const auto& value:ids) {
         bool ok=false; const int id=value.toInt(&ok); if (!ok) return false;
@@ -575,7 +576,9 @@ bool TrackListModel::editClips(const QVariantList& ids, const QString& operation
             if (clip.start<0 || clip.length<=0 || clip.start>=INT64_MAX/2 || clip.length>=INT64_MAX/2) return false;
             if (operation!="delete" && operation!="move" && audio
                 && clip.length>std::llround((audio->frames-clip.sourceOffset)/ratio)) return false;
-            changes.push_back({track->id,clip,operation=="delete"});
+            const qint64 destination=qint64(rowForTrackId(track->id))+laneDelta;
+            if (destination<0 || destination>=count()) return false;
+            changes.push_back({track->id,clip,operation=="delete",trackIdAt(int(destination))});
         }
         if (!found) return false;
     }
@@ -584,24 +587,56 @@ bool TrackListModel::editClips(const QVariantList& ids, const QString& operation
 }
 
 bool TrackListModel::canMergeClips(int trackId, int first, int second) const {
-    if (!m_recordingTracks.isEmpty()) return false;
+    if (!m_recordingTracks.isEmpty() || first==second) return false;
     const auto* track=m_project.findTrack(trackId); if (!track) return false;
-    for (const auto& clip:track->audioClips) if (clip.id==first) {
-        const auto audio=m_audio.value(QString::fromStdString(clip.poolId));
-        return m_project.canMergeAudioClips(trackId,first,second,audio ? audio->sampleRate : m_project.tempo().sampleRate());
+    const AudioClip *a=nullptr,*b=nullptr;
+    for (const auto& clip:track->audioClips) { if (clip.id==first)a=&clip; if (clip.id==second)b=&clip; }
+    if (!a || !b) return false;
+    const auto blank=[&](const AudioClip& clip) {
+        const auto name=QString::fromStdString(clip.poolId);
+        return name.startsWith("Clip ") && !m_mediaPaths.contains(name) && !m_audio.contains(name);
+    };
+    if (blank(*a) && blank(*b)) {
+        if (a->start>b->start)std::swap(a,b);
+        return a->start+a->length==b->start && a->effectsPrinted==b->effectsPrinted && a->gainDb==b->gainDb
+            && a->fadeOut==0 && b->fadeIn==0;
     }
-    return false;
+    const auto audio=m_audio.value(QString::fromStdString(a->poolId));
+    return m_project.canMergeAudioClips(trackId,first,second,audio ? audio->sampleRate : m_project.tempo().sampleRate());
+}
+
+bool TrackListModel::canMergeSelectedClips(const QVariantList& ids) const {
+    if (!m_recordingTracks.isEmpty() || ids.size()<2) return false;
+    std::vector<const AudioClip*> clips; int trackId=-1; QSet<int> seen;
+    for (const auto& value:ids) {
+        bool ok=false; const int id=value.toInt(&ok); if (!ok || seen.contains(id)) return false;
+        seen.insert(id); bool found=false;
+        for (const auto& track:m_project.tracks()) for (const auto& clip:track->audioClips) if (clip.id==id) {
+            if (trackId>=0 && trackId!=track->id) return false;
+            trackId=track->id; clips.push_back(&clip); found=true;
+        }
+        if (!found) return false;
+    }
+    std::sort(clips.begin(),clips.end(),[](const auto* a,const auto* b){return a->start<b->start;});
+    for (std::size_t i=1;i<clips.size();++i) if (!canMergeClips(trackId,clips[i-1]->id,clips[i]->id)) return false;
+    return true;
+}
+
+bool TrackListModel::mergeSelectedClips(const QVariantList& ids) {
+    if (!canMergeSelectedClips(ids)) return false;
+    std::vector<AudioClip> clips; int trackId=-1;
+    for (const auto& track:m_project.tracks()) for (const auto& clip:track->audioClips)
+        if (ids.contains(clip.id)) { clips.push_back(clip); trackId=track->id; }
+    std::sort(clips.begin(),clips.end(),[](const auto& a,const auto& b){return a.start<b.start;});
+    auto merged=clips.front(); merged.length=clips.back().start+clips.back().length-merged.start; merged.fadeOut=clips.back().fadeOut;
+    std::vector<Project::ClipChange> changes{{trackId,merged}};
+    for (std::size_t i=1;i<clips.size();++i)changes.push_back({trackId,clips[i],true});
+    if (!m_project.editClipGroup(changes)) return false;
+    notifyClipEdit(trackId); return true;
 }
 
 bool TrackListModel::mergeClips(int trackId, int first, int second) {
-    if (!canMergeClips(trackId,first,second)) return false;
-    const auto* track=m_project.findTrack(trackId);
-    for (const auto& clip:track->audioClips) if (clip.id==first) {
-        const auto audio=m_audio.value(QString::fromStdString(clip.poolId));
-        if (!m_project.mergeAudioClips(trackId,first,second,audio ? audio->sampleRate : m_project.tempo().sampleRate())) return false;
-        notifyClipEdit(trackId); return true;
-    }
-    return false;
+    return canMergeClips(trackId,first,second) && mergeSelectedClips({first,second});
 }
 
 bool TrackListModel::moveClipAtBeat(int trackId, int clipId, double startBeat) {

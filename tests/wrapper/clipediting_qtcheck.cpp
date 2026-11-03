@@ -124,3 +124,51 @@ TEST(qtclipediting, playback_endpoint_exists_only_when_the_arrangement_has_clips
     CHECK(tracks.undo()); CHECK(tracks.playbackSnapshot()->playbackEnd==357);
     CHECK(tracks.removeTrack(track)); CHECK(tracks.playbackSnapshot()->playbackEnd==-1);
 }
+
+TEST(qtclipediting, adjacent_empty_cells_merge_as_one_undoable_group) {
+    TrackListModel tracks; const int track=tracks.addAudioTrack(),other=tracks.addAudioTrack();
+    const int a=tracks.addClipAtBeat(track,0,2),b=tracks.addClipAtBeat(track,2,2),c=tracks.addClipAtBeat(track,4,2);
+    const int foreign=tracks.addClipAtBeat(other,6,2);
+    CHECK(tracks.canMergeClips(track,a,b)); CHECK(tracks.canMergeSelectedClips({c,a,b}));
+    CHECK(!tracks.canMergeSelectedClips({a,b,foreign})); CHECK(!tracks.canMergeSelectedClips({a,a}));
+    CHECK(tracks.mergeSelectedClips({c,a,b}));
+    CHECK(tracks.project().findTrack(track)->audioClips.size()==1);
+    CHECK(tracks.project().findTrack(track)->audioClips[0].id==a);
+    CHECK(tracks.project().findTrack(track)->audioClips[0].length==144000);
+    CHECK(tracks.undo()); CHECK(tracks.project().findTrack(track)->audioClips.size()==3);
+    CHECK(tracks.redo()); CHECK(tracks.project().findTrack(track)->audioClips.size()==1);
+    CHECK(tracks.undo()); CHECK(tracks.moveClipAtBeat(track,b,2.5));
+    CHECK(!tracks.canMergeSelectedClips({a,b,c})); CHECK(!tracks.mergeSelectedClips({a,b,c}));
+}
+TEST(qtclipediting, three_split_recorded_pieces_merge_without_changing_source_audio) {
+    TrackListModel tracks; const int track=tracks.addAudioTrack();
+    auto audio=std::make_shared<AudioData>(); audio->path="three.wav"; audio->sampleRate=24000; audio->frames=48000;
+    audio->channels={std::vector<float>(48000,0.2f)}; CHECK(tracks.attachTake(track,0,audio));
+    const int a=tracks.project().findTrack(track)->audioClips[0].id,b=tracks.splitClipAtBeat(track,a,2),c=tracks.splitClipAtBeat(track,b,3);
+    CHECK(tracks.mergeSelectedClips({b,c,a}));
+    CHECK(tracks.project().findTrack(track)->audioClips.size()==1);
+    CHECK(tracks.project().findTrack(track)->audioClips[0].length==96000);
+    CHECK(tracks.playbackSnapshot()->keepAudio.front().get()==audio.get());
+    CHECK(tracks.undo()); CHECK(tracks.project().findTrack(track)->audioClips.size()==3);
+}
+TEST(qtclipediting, cross_track_move_preserves_source_offsets_and_group_history) {
+    TrackListModel tracks; const int a=tracks.addAudioTrack(),gap=tracks.addAudioTrack(); CHECK(tracks.removeTrack(gap));
+    const int b=tracks.addVocalTrack(),c=tracks.addAudioTrack();
+    auto audio=std::make_shared<AudioData>(); audio->path="transfer.wav"; audio->frames=48000;
+    audio->channels={std::vector<float>(48000,0.2f)}; CHECK(tracks.attachTake(a,24000,audio,false));
+    const int x=tracks.project().findTrack(a)->audioClips[0].id;
+    CHECK(tracks.trimClipStartAtBeat(a,x,2)); const int y=tracks.addClipAtBeat(b,4,2);
+    CHECK(tracks.editClips({x},"move",2,1)); CHECK(tracks.project().findTrack(a)->audioClips.empty());
+    const auto moved=tracks.project().findTrack(b)->audioClips.back();
+    CHECK(moved.id==x && moved.start==96000 && moved.length==24000 && moved.sourceOffset==24000 && !moved.effectsPrinted);
+    CHECK(tracks.playbackSnapshot()->keepAudio.front().get()==audio.get());
+    CHECK(tracks.undo()); CHECK(tracks.project().findTrack(a)->audioClips[0].id==x);
+    CHECK(tracks.redo()); CHECK(tracks.project().findTrack(a)->audioClips.empty()); CHECK(tracks.undo());
+    CHECK(tracks.editClips({x,y},"move",1,1));
+    CHECK(tracks.project().findTrack(a)->audioClips.empty()); CHECK(tracks.project().findTrack(b)->audioClips[0].id==x);
+    CHECK(tracks.project().findTrack(c)->audioClips[0].id==y);
+    CHECK(tracks.undo()); CHECK(tracks.project().findTrack(a)->audioClips[0].id==x);
+    CHECK(tracks.project().findTrack(b)->audioClips[0].id==y); CHECK(tracks.project().findTrack(c)->audioClips.empty());
+    CHECK(!tracks.editClips({x,y},"move",0,2)); CHECK(tracks.project().findTrack(a)->audioClips[0].id==x);
+    tracks.lockRecordingTrack(b); CHECK(!tracks.editClips({x},"move",0,1));
+}

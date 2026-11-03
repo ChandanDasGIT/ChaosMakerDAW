@@ -107,8 +107,10 @@ public:
     Q_INVOKABLE int addClipAtBeat(int trackId, double startBeat, double lengthBeats);
     Q_INVOKABLE bool trimClipStartAtBeat(int trackId, int clipId, double startBeat);
     Q_INVOKABLE int splitClipAtBeat(int trackId, int clipId, double beat);
-    Q_INVOKABLE bool editClips(const QVariantList& ids, const QString& operation, double deltaBeats = 0);
+    Q_INVOKABLE bool editClips(const QVariantList& ids, const QString& operation, double deltaBeats = 0, int laneDelta = 0);
     Q_INVOKABLE bool canMergeClips(int trackId, int first, int second) const;
+    Q_INVOKABLE bool canMergeSelectedClips(const QVariantList& ids) const;
+    Q_INVOKABLE bool mergeSelectedClips(const QVariantList& ids);
     Q_INVOKABLE bool mergeClips(int trackId, int first, int second);
     Q_INVOKABLE bool moveClipAtBeat(int trackId, int clipId, double startBeat);
     Q_INVOKABLE bool resizeClipAtBeat(int trackId, int clipId, double lengthBeats);

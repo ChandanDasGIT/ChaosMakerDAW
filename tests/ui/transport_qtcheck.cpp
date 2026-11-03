@@ -638,6 +638,58 @@ private slots:
         for(auto* view:{list,mixer,timeline}) { view->setVisible(false); view->setProperty("trackModel",QVariant()); }
         list->setHeight(650); timeline->setX(0); timeline->setWidth(1000);
     }
+    void adjacent_empty_cells_merge_from_the_context_menu() {
+        TrackListModel tracks; const int track=tracks.addAudioTrack();
+        const int a=tracks.addClipAtBeat(track,0,2),b=tracks.addClipAtBeat(track,2,2),c=tracks.addClipAtBeat(track,4,2);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); });
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true); QTest::qWait(20);
+        timeline->forceActiveFocus(); QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
+        QVERIFY(timeline->property("canMergeSelection").toBool());
+        auto* last=visualItem(timeline,"clipBlock"+QString::number(c)); QVERIFY(last);
+        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,last->mapToScene(QPointF(30,30)).toPoint());
+        auto* merge=visualItem(window->contentItem(),"mergeSelectedClips"); QVERIFY(merge); QVERIFY(merge->isEnabled()); click(merge);
+        QTRY_COMPARE(tracks.clips().size(),1); QCOMPARE(tracks.project().findTrack(track)->audioClips[0].id,a);
+        QCOMPARE(tracks.project().findTrack(track)->audioClips[0].length,qint64(144000));
+        QCOMPARE(timeline->property("selectedClipId").toInt(),a);
+        QVERIFY(tracks.undo()); QCOMPARE(tracks.clips().size(),3);
+        QCOMPARE(tracks.project().findTrack(track)->audioClips[1].id,b);
+    }
+    void clip_drag_moves_between_tracks_with_preview_and_undo() {
+        TrackListModel tracks; const int a=tracks.addAudioTrack(),b=tracks.addVocalTrack(),c=tracks.addAudioTrack();
+        const int clip=tracks.addClipAtBeat(a,2,2);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); timeline->setProperty("snapMode",1); });
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true); QTest::qWait(20);
+        auto* block=visualItem(timeline,"clipBlock"+QString::number(clip)); QVERIFY(block);
+        // A vertical move must preserve timing even when the clip is off the selected grid.
+        timeline->setProperty("snapMode",0);
+        const QPoint vertical=block->mapToScene(QPointF(30,30)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,vertical);
+        QTest::mouseMove(window,vertical+QPoint(0,106));
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,vertical+QPoint(0,106));
+        QCOMPARE(tracks.project().findTrack(b)->audioClips[0].start,qint64(48000));
+        QVERIFY(tracks.undo()); timeline->setProperty("snapMode",1);
+        block=visualItem(timeline,"clipBlock"+QString::number(clip)); QVERIFY(block);
+        const QPoint start=block->mapToScene(QPointF(30,30)).toPoint(),end=start+QPoint(48,106);
+        const double originalY=block->y();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start); QTest::mouseMove(window,end);
+        QCOMPARE(block->y(),originalY+106); // Preview uses the destination lane before committing.
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,end);
+        QCOMPARE(tracks.project().findTrack(a)->audioClips.size(),std::size_t(0));
+        QCOMPARE(tracks.project().findTrack(b)->audioClips[0].id,clip);
+        QCOMPARE(tracks.project().findTrack(b)->audioClips[0].start,qint64(72000));
+        QCOMPARE(timeline->property("selectedTrackId").toInt(),b);
+        QVERIFY(tracks.undo()); QCOMPARE(tracks.project().findTrack(a)->audioClips[0].id,clip);
+        QVERIFY(tracks.redo()); QCOMPARE(tracks.project().findTrack(b)->audioClips[0].id,clip);
+        block=visualItem(timeline,"clipBlock"+QString::number(clip)); QVERIFY(block);
+        const QPoint back=block->mapToScene(QPointF(30,30)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,back); QTest::mouseMove(window,back-QPoint(0,106));
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,back-QPoint(0,106));
+        QCOMPARE(tracks.project().findTrack(a)->audioClips[0].id,clip);
+        QCOMPARE(tracks.project().findTrack(a)->audioClips[0].start,qint64(72000));
+        QCOMPARE(tracks.project().findTrack(c)->audioClips.size(),std::size_t(0));
+    }
     void clip_keyboard_operations_across_tracks_data() {
         QTest::addColumn<int>("mode"); QTest::addColumn<int>("denominator");
         for(int mode:{0,1,3,6})QTest::newRow(qPrintable(QString("4/4 mode %1").arg(mode))) << mode << 4;
