@@ -61,6 +61,8 @@ Window {
         }
 
         TransportBar {
+            snapMode: timeline.snapMode
+            onSnapModeEdited: value => timeline.snapMode = value
             Layout.fillWidth: true
             timeSignature: timeline.timeSignature
             timeSignatureDenominator: timeline.timeSignatureDenominator

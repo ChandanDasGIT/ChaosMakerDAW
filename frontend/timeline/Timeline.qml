@@ -7,6 +7,16 @@ Item {
     property int timeSignature: 4
     property int timeSignatureDenominator: 4
     property real bpm: 120
+    property int snapMode: 1 // Bars, beats, beat subdivisions, off.
+    readonly property real snapStepBeats: snapMode === 6 ? 0
+        : snapMode === 0 ? timeSignature * 4 / timeSignatureDenominator
+        : (4 / timeSignatureDenominator) / Math.pow(2, snapMode - 1)
+    function snapBeat(beat, direction) {
+        if (snapStepBeats <= 0) return Math.max(0, beat)
+        const units = beat / snapStepBeats
+        return Math.max(0, (direction === "floor" ? Math.floor(units + 1e-9)
+            : direction === "ceil" ? Math.ceil(units - 1e-9) : Math.round(units)) * snapStepBeats)
+    }
     // Zoom is measured in time so tempo changes redraw the musical grid without
     // stretching recorded audio. Keep zoom separate from the BPM binding.
     property real pixelsPerSecond: 96
@@ -26,8 +36,8 @@ Item {
         const clips = trackModel.clips.filter(c => selectedClipIds.indexOf(c.clipId) >= 0)
         for (const clip of clips) {
             if (editOperation === "move" || editOperation === "trimStart") delta = Math.max(delta, -clip.startBeat)
-            if (editOperation === "resize") delta = Math.max(delta, 4 / timeSignatureDenominator - clip.lengthBeats)
-            if (editOperation === "trimStart") delta = Math.min(delta, clip.lengthBeats - 4 / timeSignatureDenominator)
+            if (editOperation === "resize") delta = Math.max(delta, 1e-6 - clip.lengthBeats)
+            if (editOperation === "trimStart") delta = Math.min(delta, clip.lengthBeats - 1e-6)
         }
         editDelta = delta
     }
@@ -82,9 +92,9 @@ Item {
     property real timeRangeStartBeat: 0
     property real timeRangeEndBeat: 0
     readonly property real rangeStartBeat: selecting && !clipSelectionDrag
-        ? Math.floor(Math.min(selectionStartX, selectionEndX) / beatUnitWidth) * 4 / timeSignatureDenominator : timeRangeStartBeat
+        ? snapBeat(Math.min(selectionStartX, selectionEndX) / beatWidth, "floor") : timeRangeStartBeat
     readonly property real rangeEndBeat: selecting && !clipSelectionDrag && Math.abs(selectionEndX-selectionStartX)>2
-        ? Math.ceil(Math.max(selectionStartX, selectionEndX) / beatUnitWidth) * 4 / timeSignatureDenominator : timeRangeEndBeat
+        ? snapBeat(Math.max(selectionStartX, selectionEndX) / beatWidth, "ceil") : timeRangeEndBeat
     function beginSelection(x, y, clips) {
         selectedClipIds = []; selectedClipId = -1; selectedTrackId = -1
         selecting = true; hasSelection = true; clipSelectionDrag = clips
@@ -128,12 +138,14 @@ Item {
     readonly property real barLabelStride: Math.max(1, Math.ceil(48 / barWidth))
     readonly property real firstVisibleBar: Math.floor(scroll.contentX / (barWidth * barLabelStride)) * barLabelStride
     readonly property int visibleBarCount: Math.ceil(width / (barWidth * barLabelStride)) + 3
-    readonly property real beatGridStride: Math.max(1, Math.ceil(8 / beatUnitWidth))
-    readonly property real firstVisibleBeat: Math.floor(scroll.contentX / (beatUnitWidth * beatGridStride)) * beatGridStride
-    readonly property int visibleBeatCount: Math.ceil(width / (beatUnitWidth * beatGridStride)) + 3
+    readonly property real gridStepBeats: snapStepBeats > 0 ? snapStepBeats : 4 / timeSignatureDenominator
+    readonly property real gridUnitWidth: gridStepBeats * beatWidth
+    readonly property real beatGridStride: Math.max(1, Math.ceil(8 / gridUnitWidth))
+    readonly property real firstVisibleBeat: Math.floor(scroll.contentX / (gridUnitWidth * beatGridStride)) * beatGridStride
+    readonly property int visibleBeatCount: Math.ceil(width / (gridUnitWidth * beatGridStride)) + 3
 
     function setPlayhead(position) {
-        root.transport.seekBeat(Math.max(0, position / beatWidth))
+        root.transport.seekBeat(snapBeat(position / beatWidth))
     }
 
     function hasClipOverlap(trackId, startBeat, lengthBeats) {
@@ -158,7 +170,7 @@ Item {
             return
         const trackId = trackModel.trackIdAt(lane)
         const beatsPerBar = timeSignature * 4.0 / timeSignatureDenominator
-        const barStartBeat = Math.floor(x / barWidth) * beatsPerBar
+        const barStartBeat = snapBeat(x / beatWidth, "floor")
         if (trackId >= 0 && !hasClipOverlap(trackId, barStartBeat, beatsPerBar))
             trackModel.addClipAtBeat(trackId, barStartBeat, beatsPerBar)
     }
@@ -339,11 +351,12 @@ Item {
             model: root.visibleBeatCount
             delegate: Rectangle {
                 property real beatNumber: root.firstVisibleBeat + index * root.beatGridStride
-                x: beatNumber * root.beatUnitWidth
+                x: beatNumber * root.gridUnitWidth
                 y: root.rulerHeight
                 width: 1
                 height: scroll.contentHeight - root.rulerHeight
-                color: beatNumber % root.timeSignature === 0 ? "#454545" : "#303030"
+                color: Math.abs(beatNumber * root.gridStepBeats / (root.timeSignature * 4 / root.timeSignatureDenominator)
+                    - Math.round(beatNumber * root.gridStepBeats / (root.timeSignature * 4 / root.timeSignatureDenominator))) < 1e-7 ? "#454545" : "#303030"
                 z: 1
             }
         }
@@ -444,8 +457,7 @@ Item {
                         }
                         if (!(pressedButtons & Qt.LeftButton) || root.recording || (mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier))) return
                         const delta = mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStartX
-                        const step = 4.0 / root.timeSignatureDenominator
-                        root.updateGroupEdit(Math.round(delta / root.beatWidth / step) * step)
+                        root.updateGroupEdit(root.snapBeat(originalBeat + delta / root.beatWidth) - originalBeat)
                     }
                     onReleased: mouse => {
                         if (mouse.button === Qt.LeftButton) {
@@ -483,9 +495,8 @@ Item {
                         }
                         onPositionChanged: mouse => {
                             if (!pressed || root.recording) return
-                            const step = 4.0 / root.timeSignatureDenominator
                             const delta = (mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStart) / root.beatWidth
-                            root.updateGroupEdit(Math.round(delta / step) * step)
+                            root.updateGroupEdit(root.snapBeat(originalStart + delta) - originalStart)
                         }
                         onReleased: root.commitGroupEdit()
                         onCanceled: { root.editOperation = ""; root.editDelta = 0 }
@@ -512,13 +523,14 @@ Item {
 
                         function updatePreview(mouseX) {
                             const pointerX = mapToItem(scroll.contentItem, mouseX, height / 2).x
-                            const step = 4.0 / root.timeSignatureDenominator
-                            root.updateGroupEdit(Math.round((pointerX - pointerStartX) / root.beatWidth / step) * step)
+                            const delta = (pointerX - pointerStartX) / root.beatWidth
+                            root.updateGroupEdit(root.snapBeat(lengthStart + delta) - lengthStart)
                         }
 
                         onPressed: mouse => {
                             root.selectClip(clipItem.trackId, clipItem.clipId, false, true)
                             pointerStartX = mapToItem(scroll.contentItem, mouse.x, mouse.y).x
+                            lengthStart = clipItem.startBeat + clipItem.lengthBeats
                             root.editOperation = "resize"; root.editDelta = 0
                         }
                         onPositionChanged: mouse => {
@@ -531,7 +543,7 @@ Item {
                         }
                         onCanceled: { root.editOperation = ""; root.editDelta = 0 }
                         ToolTip.visible: containsMouse
-                        ToolTip.text: "Drag to trim or extend by beat"
+                        ToolTip.text: root.snapStepBeats > 0 ? "Drag to trim or extend on the snap grid" : "Drag to trim or extend freely"
                         ToolTip.delay: 450
                     }
                 }
