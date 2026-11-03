@@ -2,9 +2,11 @@ import QtQuick
 import QtQuick.Controls
 import TransportTests
 Window {
+    id: harness
     width: 1100; height: 900; visible: true
     property var transport: EngineController
     TransportBar {
+        transport: harness.transport
         objectName: "transport"
         width: parent.width
         anchors.bottom: parent.bottom

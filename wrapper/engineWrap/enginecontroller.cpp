@@ -630,6 +630,20 @@ void EngineController::setStatus(const QString& status)
     emit statusChanged();
 }
 
+bool EngineController::postMetronome(bool enabled, double volume) {
+    EngineCommand command; command.type=EngineCommand::Type::SetMetronome;
+    command.a=enabled; command.value=float(volume);
+    if (!m_engine->post(command)) { setTransportMessage("Audio command queue is full; try again."); return false; }
+    m_metronomeEnabled=enabled; m_metronomeVolume=volume; emit metronomeChanged(); return true;
+}
+void EngineController::setMetronomeEnabled(bool enabled) {
+    if (enabled!=m_metronomeEnabled) postMetronome(enabled,m_metronomeVolume);
+}
+void EngineController::setMetronomeVolume(double volume) {
+    if (std::isfinite(volume) && volume>=0 && volume<=1 && volume!=m_metronomeVolume)
+        postMetronome(m_metronomeEnabled,volume);
+}
+
 void EngineController::setBpm(double bpm)
 {
     if (!m_engine || !m_engine->setTempoBpm(bpm) || m_bpm == bpm) return;

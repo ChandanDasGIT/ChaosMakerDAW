@@ -63,6 +63,26 @@ private slots:
         QCoreApplication::processEvents();
     }
     void cleanupTestCase() { engine.reset(); }
+    void metronome_controls_toggle_click_and_adjust_volume() {
+        auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        TrackListModel tracks; controller.attachProject(&tracks);
+        QCOMPARE(tracks.count(),0);
+        const auto restore=qScopeGuard([&] { window->setProperty("transport",QVariant::fromValue(EngineController::instance())); });
+        window->setProperty("transport",QVariant::fromValue(&controller));
+        auto* toggle=visualItem(window->contentItem(),"metronomeToggle");
+        auto* volume=visualItem(window->contentItem(),"metronomeVolume"); QVERIFY(toggle); QVERIFY(volume);
+        QVERIFY(!controller.metronomeEnabled()); QCOMPARE(controller.metronomeVolume(),0.5);
+        click(toggle); QVERIFY(controller.metronomeEnabled()); QVERIFY(toggle->property("active").toBool());
+        volume->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Right);
+        QVERIFY(std::abs(controller.metronomeVolume()-0.51)<1e-6);
+        controller.setMetronomeVolume(0.25); QCOMPARE(volume->property("value").toDouble(),0.25);
+        controller.setMetronomeVolume(-1); controller.setMetronomeVolume(2); QCOMPARE(controller.metronomeVolume(),0.25);
+        controller.transportAction("play"); io->process(); QVERIFY(std::abs(io->outputSample)>0.0001f);
+        controller.transportAction("pause"); io->process(); QCOMPARE(io->outputSample,0.0f);
+        click(toggle); QVERIFY(!controller.metronomeEnabled());
+        controller.shutdownSession();
+    }
     void playback_pauses_red_line_at_the_last_block_across_tracks() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
@@ -88,11 +108,17 @@ private slots:
         const double stopped=line->x(); io->process(); QTest::qWait(30); QCOMPARE(line->x(),stopped);
         controller.shutdownSession();
     }
+    void space_shortcut_plays_and_pauses_without_rewinding_data() {
+        QTest::addColumn<bool>("emptyTrack");
+        QTest::newRow("no tracks") << false;
+        QTest::newRow("empty track") << true;
+    }
     void space_shortcut_plays_and_pauses_without_rewinding() {
+        QFETCH(bool,emptyTrack);
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
         TrackListModel tracks; controller.attachProject(&tracks);
-        tracks.addClipAtBeat(tracks.addAudioTrack(),0,4);
+        if(emptyTrack)tracks.addAudioTrack();
         const auto restore=qScopeGuard([&] { window->setProperty("transport",QVariant::fromValue(EngineController::instance())); });
         window->setProperty("transport",QVariant::fromValue(&controller));
         // Space must control transport even when a different button has focus.
@@ -107,6 +133,11 @@ private slots:
         QTRY_VERIFY(!bar->property("playing").toBool());
         QTest::keyClick(window,Qt::Key_Space); io->process();
         QVERIFY(controller.playing()); QVERIFY(controller.positionSeconds()>position);
+        for(int i=0;i<100;++i)io->process();
+        QVERIFY(controller.playing());
+        controller.transportAction("pause"); io->process();
+        auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play); io->process();
+        QVERIFY(controller.playing());
         controller.shutdownSession();
     }
     void stopping_recording_pauses_the_red_playhead_data() {
@@ -521,6 +552,106 @@ private slots:
         for(auto* view:{list,mixer,timeline}) { view->setVisible(false); view->setProperty("trackModel",QVariant()); }
         list->setHeight(650); timeline->setX(0); timeline->setWidth(1000);
     }
+    void manual_timeline_scrolling_is_not_overridden_by_transport_updates() {
+        auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        TrackListModel tracks; controller.attachProject(&tracks);
+        const int track=tracks.addAudioTrack(); tracks.addClipAtBeat(track,0,80);
+        for(int i=0;i<5;++i)tracks.addAudioTrack();
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] {
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+            timeline->setProperty("transport",QVariant::fromValue(EngineController::instance()));
+        });
+        timeline->setProperty("transport",QVariant::fromValue(&controller));
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        QTest::qWait(30);
+        auto* scroll=visualItem(timeline,"timelineScroll");
+        auto* horizontal=visualItem(timeline,"timelineHorizontalScroll");
+        auto* vertical=visualItem(timeline,"timelineVerticalScroll");
+        QVERIFY(scroll); QVERIFY(horizontal); QVERIFY(vertical);
+        const auto dragBar=[&](QQuickItem* bar,int distance,bool horizontalAxis) {
+            const double center=bar->property("position").toDouble()+bar->property("size").toDouble()/2;
+            const QPoint start=bar->mapToScene(horizontalAxis ? QPointF(bar->width()*center,bar->height()/2)
+                : QPointF(bar->width()/2,bar->height()*center)).toPoint();
+            const QPoint end=start+(horizontalAxis ? QPoint(distance,0) : QPoint(0,distance));
+            QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
+            QTest::mouseMove(window,end,20); QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,end);
+        };
+        dragBar(horizontal,250,true);
+        const double stoppedX=scroll->property("contentX").toDouble(); QVERIFY(stoppedX>100);
+        QTest::qWait(100); QCOMPARE(scroll->property("contentX").toDouble(),stoppedX);
+        dragBar(vertical,40,false);
+        QVERIFY(timeline->property("verticalScrollPosition").toDouble()>0);
+        controller.seekBeat(60); controller.transportAction("play"); io->process();
+        QTRY_VERIFY(scroll->property("contentX").toDouble()>stoppedX);
+        dragBar(horizontal,-250,true);
+        const double playingX=scroll->property("contentX").toDouble();
+        QVERIFY(!timeline->property("followPlayhead").toBool());
+        for(int i=0;i<5;++i)io->process(); QTest::qWait(100);
+        QCOMPARE(scroll->property("contentX").toDouble(),playingX);
+        controller.transportAction("pause"); io->process();
+        QTRY_VERIFY(!timeline->property("playing").toBool());
+        dragBar(horizontal,100,true);
+        const double pausedX=scroll->property("contentX").toDouble(); QVERIFY(pausedX>playingX);
+        QTest::qWait(100); QCOMPARE(scroll->property("contentX").toDouble(),pausedX);
+        controller.transportAction("stop"); io->process(); QTRY_COMPARE(scroll->property("contentX").toDouble(),0.0);
+        dragBar(horizontal,100,true); const double afterStop=scroll->property("contentX").toDouble(); QVERIFY(afterStop>0);
+        QTest::qWait(100); QCOMPARE(scroll->property("contentX").toDouble(),afterStop);
+        // Horizontal trackpad scrolling and Shift-wheel navigate without changing zoom.
+        const double zoom=timeline->property("pixelsPerSecond").toDouble();
+        const QPointF local=timeline->mapToScene(QPointF(500,250));
+        const auto wheel=[&](QPoint angle,Qt::KeyboardModifiers modifiers) {
+            QWheelEvent event(local,window->mapToGlobal(local.toPoint()),QPoint(),angle,Qt::NoButton,modifiers,Qt::NoScrollPhase,false);
+            QCoreApplication::sendEvent(window,&event); QCoreApplication::processEvents();
+        };
+        wheel(QPoint(-120,0),Qt::NoModifier);
+        const double trackpadX=scroll->property("contentX").toDouble(); QVERIFY(trackpadX>afterStop);
+        wheel(QPoint(0,-120),Qt::ShiftModifier);
+        QVERIFY(scroll->property("contentX").toDouble()>trackpadX);
+        QCOMPARE(timeline->property("pixelsPerSecond").toDouble(),zoom);
+        controller.shutdownSession();
+    }
+    void pause_preserves_timeline_view_data() {
+        QTest::addColumn<bool>("repeatBeyondClips");
+        QTest::newRow("empty arrangement") << false;
+        QTest::newRow("repeat beyond clips") << true;
+    }
+    void pause_preserves_timeline_view() {
+        QFETCH(bool,repeatBeyondClips);
+        auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        TrackListModel tracks; controller.attachProject(&tracks);
+        if(repeatBeyondClips) {
+            tracks.addClipAtBeat(tracks.addAudioTrack(),0,4);
+            QVERIFY(controller.setRepeatRange(40,60)); controller.transportAction("repeat");
+        }
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] {
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+            timeline->setProperty("transport",QVariant::fromValue(EngineController::instance()));
+        });
+        timeline->setProperty("transport",QVariant::fromValue(&controller));
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        auto* scroll=visualItem(timeline,"timelineScroll"); auto* line=visualItem(timeline,"timelinePlayhead");
+        QVERIFY(scroll); QVERIFY(line);
+        controller.seekBeat(40); controller.transportAction("play"); io->process();
+        QTRY_VERIFY(scroll->property("contentX").toDouble()>0);
+        const double viewport=scroll->property("contentX").toDouble();
+        const double width=scroll->property("contentWidth").toDouble();
+        const double screenX=line->mapToScene(QPointF()).x(),position=controller.positionSeconds();
+        controller.transportAction("pause"); io->process();
+        QTRY_VERIFY(!timeline->property("playing").toBool()); QTest::qWait(50);
+        QCOMPARE(controller.positionSeconds(),position);
+        QCOMPARE(scroll->property("contentX").toDouble(),viewport);
+        QCOMPARE(scroll->property("contentWidth").toDouble(),width);
+        QCOMPARE(line->mapToScene(QPointF()).x(),screenX);
+        controller.transportAction("play"); io->process();
+        QVERIFY(controller.positionSeconds()>position);
+        controller.transportAction("stop"); io->process();
+        QTRY_COMPARE(scroll->property("contentX").toDouble(),0.0);
+        controller.shutdownSession();
+    }
     void normal_drag_selects_grid_range_and_repeat_stays_inside_it() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
@@ -546,12 +677,27 @@ private slots:
         QCOMPARE(timeline->property("selectedClipIds").value<QJSValue>().toVariant().toList().size(),0);
         auto* repeat=visualItem(window->contentItem(),"transport_repeat"); QVERIFY(repeat); click(repeat);
         QVERIFY(controller.repeating()); controller.transportAction("play");
-        for(int i=0;i<600;++i) { io->process(); QVERIFY(controller.positionBeats()>=1 && controller.positionBeats()<4); }
+        io->process(); QCOMPARE(controller.positionSeconds(),128.0/48000); // Play the lead-in from zero.
+        bool wrapped=false; double previous=controller.positionBeats();
+        for(int i=0;i<1500;++i) {
+            io->process(); const double beat=controller.positionBeats();
+            if(beat<previous)wrapped=true;
+            QVERIFY(beat<=4); if(wrapped)QVERIFY(beat>=1);
+            previous=beat;
+        }
+        QVERIFY(wrapped);
         QVERIFY(!controller.setRepeatRange(4,1)); QVERIFY(!controller.setRepeatRange(-1,3));
         range(310,210); // Reverse drag updates an active loop.
         QCOMPARE(timeline->property("rangeStartBeat").toDouble(),4.0);
         QCOMPARE(timeline->property("rangeEndBeat").toDouble(),7.0);
-        for(int i=0;i<600;++i) { io->process(); QVERIFY(controller.positionBeats()>=4 && controller.positionBeats()<7); }
+        wrapped=false; previous=controller.positionBeats();
+        for(int i=0;i<1500;++i) {
+            io->process(); const double beat=controller.positionBeats();
+            if(beat<previous)wrapped=true;
+            QVERIFY(beat<=7); if(wrapped)QVERIFY(beat>=4);
+            previous=beat;
+        }
+        QVERIFY(wrapped);
         // A plain click clears the range; Repeat falls back to the full project.
         const QPoint clear=timeline->mapToScene(QPointF(400,300)).toPoint();
         QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,clear);
@@ -568,7 +714,10 @@ private slots:
         QTest::qWait(30);
         const QPoint from=timeline->mapToScene(QPointF(120,70)).toPoint(),to=timeline->mapToScene(QPointF(300,235)).toPoint();
         QTest::mousePress(window,Qt::LeftButton,Qt::ShiftModifier,from);
-        QTest::mouseMove(window,to); QTest::mouseRelease(window,Qt::LeftButton,Qt::ShiftModifier,to);
+        QTest::mouseMove(window,to);
+        auto* marquee=visualItem(timeline,"timelineSelection"); QVERIFY(marquee); QVERIFY(marquee->isVisible());
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::ShiftModifier,to);
+        QVERIFY(!marquee->isVisible());
         QCOMPARE(timeline->property("selectedClipIds").value<QJSValue>().toVariant().toList().size(),2);
         auto* block=visualItem(timeline,"clipBlock"+QString::number(x)); QVERIFY(block);
         const QPoint start=block->mapToScene(QPointF(30,30)).toPoint();

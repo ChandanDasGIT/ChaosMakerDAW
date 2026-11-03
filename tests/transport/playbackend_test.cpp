@@ -28,7 +28,7 @@ TEST(playbackend, pauses_exactly_at_last_sample_and_silences_remaining_frames_in
         engine.stop();
     }
 }
-TEST(playbackend, repeat_can_extend_past_content_and_empty_projects_pause_immediately) {
+TEST(playbackend, repeat_can_extend_past_content_and_empty_projects_keep_playing) {
     AudioEngine engine{nullptr}; engine.deviceChanged(48000,128);
     engine.publishPlayback(snapshot(true,257));
     CHECK(engine.post({EngineCommand::Type::SetLoop,128,512})); CHECK(engine.post({EngineCommand::Type::Play}));
@@ -36,6 +36,28 @@ TEST(playbackend, repeat_can_extend_past_content_and_empty_projects_pause_immedi
     for(int i=0;i<20;++i) { render(engine,io); CHECK(engine.playing()); CHECK(engine.position()>=128 && engine.position()<=512); }
     CHECK(engine.post({EngineCommand::Type::ClearLoop})); render(engine,io);
     CHECK(!engine.playing()); CHECK(engine.position()==257);
-    engine.publishPlayback(snapshot(true,0)); CHECK(engine.post({EngineCommand::Type::Play})); render(engine,io);
-    CHECK(!engine.playing()); CHECK(engine.position()==0); engine.stop();
+    auto empty=std::make_unique<EngineSnapshot>(); empty->multiMonitor=true;
+    engine.publishPlayback(std::move(empty)); CHECK(engine.post({EngineCommand::Type::Play})); render(engine,io);
+    CHECK(engine.playing()); CHECK(engine.position()==385);
+    render(engine,io); CHECK(engine.playing()); CHECK(engine.position()==513); engine.stop();
+}
+
+TEST(playbackend, repeat_plays_lead_in_then_wraps_from_thirty_seconds_to_twenty) {
+    for(bool multi:{false,true}) {
+        AudioEngine engine{nullptr}; engine.deviceChanged(48000,128);
+        auto state=std::make_unique<EngineSnapshot>(); state->multiMonitor=multi;
+        engine.publishPlayback(std::move(state));
+        constexpr std::int64_t start=20*48000,end=30*48000;
+        CHECK(engine.post({EngineCommand::Type::SetLoop,start,end})); CHECK(engine.post({EngineCommand::Type::Play}));
+        float left[128]{},right[128]{}; float* out[]{left,right}; AudioIO io{{nullptr,0,0},{out,2,128},nullptr,128};
+        render(engine,io); CHECK(engine.position()==128); CHECK(engine.playing());
+        CHECK(engine.post({EngineCommand::Type::Seek,start+24000})); render(engine,io);
+        CHECK(engine.position()==start+24128);
+        CHECK(engine.post({EngineCommand::Type::Seek,end-64})); render(engine,io);
+        CHECK(engine.position()==start+64);
+        CHECK(engine.post({EngineCommand::Type::Pause})); render(engine,io);
+        CHECK(engine.position()==start+64); CHECK(!engine.playing());
+        CHECK(engine.post({EngineCommand::Type::Play})); render(engine,io); CHECK(engine.position()==start+192);
+        engine.stop();
+    }
 }

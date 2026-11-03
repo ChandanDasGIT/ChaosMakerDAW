@@ -70,6 +70,7 @@ private:
     SnapshotSlot<EngineSnapshot> m_snapshot;
     SnapshotSlot<EngineSnapshot> m_playback;
     void finishRecording() noexcept;
+    void mixMetronome(const AudioIO& io, int offset, int frames, const TempoMap& tempo) noexcept;
     void renderTracks(const AudioIO& io, const EngineSnapshot& snapshot, int frames) noexcept;
     RecordingGroup* m_recordingGroup = nullptr;
     void mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames, TrackMeters* liveMeters) noexcept;
@@ -79,6 +80,8 @@ private:
     std::atomic<bool> m_reportedPlaying{false}, m_reportedRecording{false};
     std::int64_t m_position = 0, m_loopStart = 0, m_loopEnd = 0;
     bool m_playing = false, m_looping = false;
+    bool m_metronomeEnabled = false;
+    float m_metronomeVolume = 0.5f;
     RtQueue<EngineCommand, 512> m_commands;
     RtQueue<EngineEvent, 512> m_events;
     TenBandEq m_monitorEq;
