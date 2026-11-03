@@ -1,172 +1,144 @@
 This is the architecture of ChaosMaker
 
 The three layers: frontend/ (QML) talks to wrapper/ (Qt C++), and wrapper/ talks to backend/ (plain C++).
-Left out: build*/ (generated) and .claude/ (private notes, ignored by git). Empty folders hold a .gitkeep until their phase.
+Left out: build*/ (generated) and .claude/ (private notes, ignored by git).
 
 ChaosMaker/
-├── backend/                                // pure C++20 engine, no Qt: built as its own static library, dawengine
-│   ├── audiofile/                          // worker-side cabinet WAV decoding and resampling
-│   │   └── impulsewav.h/.cpp               // bounded RIFF PCM/float loader; mono/stereo, up to 200 ms
-│   ├── audiodevice/                        // the sound card
-│   │   └── audiodevice.h                   // AudioDevice and AudioCallback, which hide JACK from the engine
-│   ├── core/                               // basic types
-│   │   ├── audiodata.h                     // decoded audio that never changes
-│   │   ├── audioview.h                     // audio someone else owns
-│   │   ├── version.cpp                     // its implementation
-│   │   └── version.h                       // the engine's version
-│   ├── engine/                             // the audio callback
-│   │   ├── audioengine.h                   // AudioEngine: the top of the backend
-│   │   ├── enginecommands.h                // EngineCommand and EngineEvent, across the thread line
-│   │   └── enginesnapshot.h                // the flat read-only song the audio thread plays
-│   ├── dsp/                                // shared real-time DSP building blocks
-│   │   ├── tempodivision.h                 // shared quarter-note BPM to modulation-rate conversion
-│   │   ├── dcblocker.h                     // reusable prepared DC removal for gain pedals
-│   │   ├── delayline.h                     // preallocated fractional ring buffer
-│   │   ├── peakmeter.h                     // atomic peak accumulation and latched near-full-scale clipping
-│   │   ├── pedalcontrols.h                 // shared pedal gain, smoothing coefficients, stereo detection
-│   │   ├── oversampler4x.h                 // cascaded filtered 2x stages for amp clipping
-│   │   ├── radix2fft.h                     // reusable fixed-size FFT; tables prepared off audio thread
-│   │   ├── pitchvoice.h/.cpp                // 1024-point spectral pitch voice, 128-sample hop
-│   │   ├── partitionedconvolver.h/.cpp      // direct head + FFT tail; zero added cabinet delay
-│   │   └── oversampler2x.h                 // filtered 2x nonlinear processing
-│   ├── instruments/sampler/                // the sample engine
-│   │   └── samplezone.h                    // one sample and when it plays
-│   ├── midi/                               // MIDI
-│   │   └── midievent.h                     // MidiEvent and the fixed-size MidiBuffer
-│   ├── plugins/chordplayer/                // the auto chord player
-│   │   └── rhythmpattern.h                 // a pattern as fractions of a bar
-│   ├── plugins/octaver/                    // dry, octave-down/up blends and output level
-│   ├── plugins/pitchshift/                 // integer ±12 semitone shift, mix and level
-│   ├── plugins/amp/                        // 4x oversampled two-stage amp, tone controls and master
-│   ├── plugins/cabinet/                    // prepared stereo cabinet convolver, mix and level
-│   ├── plugins/eq/                         // ten-band EQ and shared factory preset curves
-│   │   └── eqpresets.h                     // seven validated gain arrays
-│   ├── plugins/guitarsuite/                // realtime pedal chain container
-│   ├── plugins/parametriceq/                // movable three-band frequency/gain/Q equalizer
-│   ├── plugins/fuzz/                        // 4x oversampled two-stage fuzz, sustain/tone/level
-│   ├── plugins/phaser/                      // six all-pass stages, feedback/mix, manual or BPM rate
-│   ├── plugins/crunch/                     // asymmetric soft clipping, tone/body/level, 4x oversampling
-│   ├── plugins/distortion/                 // high-gain clipping, Tight and sweepable post-gain mids
-│   ├── plugins/overdrive/                  // tanh drive pedal DSP
-│   ├── plugins/delay/                      // delay pedal DSP
-│   ├── plugins/reverb/                     // Freeverb-style reverb pedal DSP
-│   ├── plugins/noisegate/                  // hysteretic gate with smoothed opening/closing
-│   ├── plugins/compressor/                 // stereo-linked peak compressor
-│   ├── plugins/wah/                        // manual resonant wah sweep preserving broadband signal
-│   ├── plugins/chorus/                     // stereo modulated delay
-│   ├── plugins/tremolo/                    // sine amplitude modulation; manual Hz or BPM note divisions
-│   ├── plugins/tuner/                      // incremental YIN analysis, atomic Hz; dry-input tap before FX
-│   │   └── standardtuning.h                // standard open-string targets and signed cents offsets
-│   ├── processor/                          // the plugin interface
-│   │   ├── parameter.h                     // one knob, safe from any thread
-│   │   ├── processor.h                     // Processor and ProcessContext: every effect and instrument
-│   │   └── smoother.h                      // glides a value, so knobs do not click
-│   ├── rt/                                 // lock-free tools for the audio thread
-│   │   ├── rtqueue.h                       // one writer, one reader queue
-│   │   ├── rtsafe.h                        // RT_SAFE and DenormalGuard
-│   │   └── snapshotslot.h                  // hands snapshots to audio, and back to be freed
-│   ├── session/                            // the document, UI thread only
-│   │   └── project.h                       // Project, Track, AudioClip
-│   └── transport/                          // time
-│       └── tempomap.h                      // samples to beats and back
-├── wrapper/                                // Qt C++: connects the engine to QML, no audio logic
-│   ├── engineWrap/
-│       ├── enginecontroller.cpp            // its implementation
-│       └── enginecontroller.h              // EngineController in QML
-│   └── pluginWrap/                         // shared pedal registry, parameter model, and preset wrapper
-├── frontend/                               // QML only
-│   ├── plugins/guitarsuite/                // shared pedalboard, trim, input/output meters, standard tuner
-│   │   └── LevelMeter.qml                  // dBFS bar, calibration target and clip indicator
-│   ├── transportbar/                       // transport and reusable TempoEditor.qml
+├── backend/                                // pure C++20 engine, no Qt: built as static library, dawengine
+│   ├── audiodevice/                        // sound card abstraction and device configuration
+│   │   ├── audiodevice.h                   // AudioDevice and AudioCallback
+│   │   ├── jackaudiodevice.h/.cpp          // JACK backend client and port negotiation
+│   │   └── devicesettings.h/.cpp           // pure C++ device enumeration, valid buffer sizes, port routing
+│   ├── core/                               // basic types and string formatting
+│   │   ├── audiodata.h                     // decoded immutable audio buffer
+│   │   ├── audioview.h                     // non-owning channel/frame audio view
+│   │   ├── valueformat.h/.cpp              // pure C++ numeric, unit and playback-position formatting
+│   │   ├── version.h/.cpp                  // engine version constant
+│   ├── dsp/                                // shared signal processing, scaling, and metering
+│   │   ├── levelscale.h/.cpp               // finite gain/dB conversions, normalization, and peak decay
+│   │   ├── levelmeter.h/.cpp               // pure C++ meter state, peak decay and threshold classifications
+│   │   ├── stereolevelmeter.h/.cpp         // pure C++ stereo meter state and reset logic
+│   │   ├── peakmeter.h                     // realtime atomic peak capture
+│   │   └── trackmeters.h                   // per-track meter state
+│   ├── engine/                             // realtime audio callback and transport
+│   │   ├── audioengine.h/.cpp              // AudioEngine: top-level realtime processor
+│   │   ├── enginecommands.h                // EngineCommand and EngineEvent
+│   │   ├── enginesnapshot.h                // flat read-only arrangement snapshot
+│   │   ├── playbackcontrols.h/.cpp         // pure C++ transport state machine, loop ranges, position conversions
+│   │   └── snapshotbuilder.h/.cpp          // off-thread EngineSnapshot compilation and routing
+│   ├── instruments/                        // instrument catalog and definitions
+│   │   ├── instrumentcatalog.h/.cpp        // registered instrument IDs, names, and capabilities
+│   │   └── guitar/                         // guitar domain backend
+│   │       ├── guitardefinition.h/.cpp     // guitar type names and live input/effect capabilities
+│   │       ├── guitarsuiteeditor.h/.cpp    // pedal chain manager, slots, bypass, and reordering
+│   │       ├── audiofile/impulsewav.h/.cpp // cabinet IR WAV decoding and resampling
+│   │       ├── dsp/                        // pedal controls, delay lines, oversamplers, FFT, pitch
+│   │       ├── plugins/                    // GuitarSuite container and pedal processors
+│   │       │   ├── guitarsuite/pedalregistry.h/.cpp // pure C++ pedal factory catalog
+│   │       │   └── tuner/tunerstate.h/.cpp // off-thread tuner state, freshness, and guidance
+│   │       └── presets/guitarsuitepreset.h/.cpp // pure C++ preset schema, JSON IO, and validation
+│   ├── mixer/                              // mixer backend
+│   │   └── mixerpanel.h/.cpp               // pure C++ track mixer calculations, volume, pan, and mute/solo
+│   ├── persistence/                        // document serialization
+│   │   └── projectdocument.h/.cpp          // pure C++ session JSON serialization, schema validation, atomic file IO
+│   ├── plugins/                            // track-level plugin systems
+│   │   ├── eq/
+│   │   │   ├── eqpresets.h                 // factory EQ gain curves
+│   │   │   ├── eqpresetstore.h/.cpp        // pure C++ preset IO, JSON parsing, validation
+│   │   │   └── tenbandeq.h/.cpp            // 10-band EQ filters, descriptors, and gain metadata
+│   │   └── trackeffectspanel.h/.cpp        // track effect eligibility, chain models, and slot management
+│   ├── processor/                          // plugin base interfaces
+│   │   ├── parameter.h                     // thread-safe atomic parameter
+│   │   ├── processor.h                     // Processor and ProcessContext
+│   │   ├── smoother.h                      // linear parameter ramp smoothing
+│   │   └── trackinput.h                    // live track input trim and live EQ stage
+│   ├── recording/                          // capture orchestration
+│   │   ├── recordingcontroller.h/.cpp      // take lifecycle, recording groups, dry/printed routing, take finalization
+│   │   ├── recordinggroup.h                // routing handoff to realtime engine
+│   │   └── takerecorder.h/.cpp             // background capture thread, circular buffers, WAV writer
+│   ├── rt/                                 // lock-free realtime primitives
+│   │   ├── rtaudioring.h                   // bounded realtime audio FIFO
+│   │   ├── rtqueue.h                       // single-producer / single-consumer ring buffer
+│   │   ├── rtsafe.h                        // RT_SAFE annotation and denormal flush guard
+│   │   └── snapshotslot.h                  // atomic snapshot publish and retirement
+│   ├── session/                            // document & session state
+│   │   ├── project.h/.cpp                  // Project, Track, AudioClip, and atomic undo history
+│   │   ├── projectsession.h/.cpp           // session ownership, dirty tracking, autosave policy, restore candidate
+│   │   ├── projectactions.h/.cpp           // action/dialog state machine (New, Open, Save, Save As, Close)
+│   │   └── tracklist.h/.cpp                // track collection, live monitoring routing, media management
+│   ├── settings/                           // application & quick settings
+│   │   ├── appsettings.h/.cpp              // startup preferences, autosave intervals, pure C++ INI storage
+│   │   └── quicksettings.h/.cpp            // buffer size choices, snap grid modes, formatted status strings
+│   ├── tempo/
+│   │   └── tempoeditor.h/.cpp              // tempo editing rules, boundaries, and typing validation
+│   ├── timeline/                           // arrangement calculations
+│   │   ├── timeline.h/.cpp                 // clip placement, snapping, multi-selection, trimming, move history
+│   │   └── clipwaveform.h/.cpp             // clip-to-source sample window validation and waveform peak caching
+│   └── transport/
+│       └── tempomap.h                      // beat-to-sample and sample-to-beat conversions
+├── wrapper/                                // Qt 6 C++: thin bridges connecting backend to QML (no domain logic)
+│   ├── audiodevice/devicesettingswrap/     // DeviceSettingsWrapper (device list, buffer sizes, routing)
+│   ├── dsp/
+│   │   ├── levelmeterwrap/                 // LevelMeterWrapper (meter snapshot polling and reset delivery)
+│   │   └── stereolevelmeterwrap/           // StereoLevelMeterWrapper (stereo channel meter adapter)
+│   ├── engine/
+│   │   ├── audioenginewrap/                // AudioEngineWrapper (mirrors AudioEngine, engine lifecycle)
+│   │   └── playbackcontrolswrap/           // PlaybackControlsWrapper (transport actions, position updates)
+│   ├── instruments/guitar/guitarsuiteeditorwrap/ // GuitarSuiteEditorWrapper (pedalboard model, preset adapter)
+│   ├── mixer/mixerpanelwrap/               // MixerPanelWrapper (volume/pan/fader property adaptation)
+│   ├── plugins/
+│   │   ├── eq/tenbandeqwrap/               // TenBandEqWrapper (10-band EQ property adaptation)
+│   │   └── trackeffectspanelwrap/          // TrackEffectsPanelWrapper (track FX slot adaptation)
+│   ├── recording/recordingcontrollerwrap/  // RecordingControllerWrapper (take notifications and state bridge)
+│   ├── session/
+│   │   ├── projectactionswrap/             // ProjectActionsWrapper (native dialog state machine bridge)
+│   │   ├── projectsessionwrap/             // ProjectSessionWrapper (document dirty/path signals)
+│   │   └── tracklistwrap/                  // TrackListWrapper (QAbstractListModel adapter for tracks)
+│   ├── settings/
+│   │   ├── appsettingswrap/                // AppSettingsWrapper (QSettings platform bridge)
+│   │   └── quicksettingswrap/              // QuickSettingsWrapper (time signature, snap grid bridge)
+│   ├── tempo/tempoeditorwrap/              // TempoEditorWrapper (tempo input adapter)
+│   └── timeline/timelinewrap/              // TimelineWrapper (selection, snap, and viewport adapter)
+├── frontend/                               // QML only: presentation, visual controls, styling, user interactions
+│   ├── audiodevice/DeviceSettings.qml      // buffer size and audio device selection UI
+│   ├── dsp/
+│   │   ├── LevelMeter.qml                  // single-channel level meter display
+│   │   └── StereoLevelMeter.qml            // stereo dual-channel level meter
+│   ├── engine/PlaybackControls.qml         // transport buttons (play, stop, record, repeat) and time display
+│   ├── instruments/guitar/
+│   │   ├── GuitarSuiteEditor.qml           // pedalboard editor, pedal slots, controls, presets
+│   │   └── GuitarSuitePanel.qml            // pedalboard container panel
+│   ├── mixer/MixerPanel.qml                // track channel strips, volume faders, pan sliders, meters
+│   ├── plugins/
+│   │   ├── eq/Tenbandeq.qml                // 10-band graphic equalizer sliders and preset manager
+│   │   └── TrackEffectsPanel.qml           // track FX slot list and selector
+│   ├── session/
+│   │   ├── ProjectActions.qml              // New/Open/Save/Save As actions and confirmation dialogs
+│   │   └── TrackList.qml                   // track header cards, arm/mute/solo buttons, color picker
+│   ├── settings/
+│   │   ├── AppSettings.qml                 // application preferences menu
+│   │   └── QuickSettings.qml               // quick transport settings popup (meter, snap, count-in)
+│   ├── tempo/TempoEditor.qml               // interactive tempo editor with input validation
+│   ├── timeline/Timeline.qml               // arrangement lanes, audio clips, waveform display, playhead
+│   ├── transportbar/TransportBar.qml       // bottom transport bar composing PlaybackControls & QuickSettings
 │   ├── window/
-│   │   └── StatusStrip.qml                 // the strip along the bottom
-│   ├── Icons.qml                           // every icon by name
-│   └── Theme.qml                           // every colour and size
-├── tests/                                  // backendtests is Qt-free; wrappertests exercises Qt models
-│   ├── ui/transport_qtcheck.cpp            // real mouse/keyboard editing and pedalboard-open BPM test
-│   │   └── TransportHarness.qml            // real controller, transport and pedalboard test scene
-│   ├── wrapper/presets_qtcheck.cpp          // EQ round-trip, async cabinet loading and failure recovery
-│   ├── backendtests.cpp                    // runs them
-│   ├── testkit.h                           // TEST, CHECK and CHECK_NEAR
-│   └── testsignals.h                       // test signals, measuring, and rendering in blocks
-├── templates/                              // copy-me files, not built
-├── EducationPurpose/                       // this file
-├── resources/presets/guitarsuite/           // embedded, editable whole-chain factory presets
-│   ├── Djent.gspreset                       // gate, distortion, amp, cabinet and post EQ
-│   └── Jazz.gspreset                        // compressor, clean amp, cabinet, warm EQ and reverb
-├── dependencies/                           // empty on purpose
-├── CMakeLists.txt                          // builds dawengine, the app and the tests
-├── CMakePresets.json                       // the default, rt, tsan and asan builds
-├── main.cpp                                // starts the app
-└── Main.qml                                // the window
-
-Phase 2 verification: tests/plugins/phase2_test.cpp checks gating, compression, wah response, modulation, pitch accuracy, analysis routing, block independence, and finite output.
-
-Tempo: EngineController.bpm is authoritative. TempoEditor commits through TransportBar in Main.qml; the timeline reads EngineController.bpm; AudioEngine validates and stores it atomically, then supplies ProcessContext.bpm to each live block. tests/plugins/tremolosync_test.cpp covers timing, tempo handoff, and smooth changes.
-
-Input calibration: GuitarSuiteModel.inputTrimDb (saved in presets) feeds the engine through EngineController. AudioEngine smooths trim before track EQ and the pedal chain; raw-input analysis remains untouched. PeakMeter accumulates raw, pre-pedal, and stereo output peaks without allocations; EngineController polls at 20 Hz for QML. tests/plugins/monitorlevels_test.cpp covers trim, metering, clips, and raw input preservation.
-
-Amp/cab stage: PedalSlot.resourcePath references an external IR. GuitarSuiteModel uses QtConcurrent
-and QFutureWatcher to decode/resample/prepare replacements away from the audio thread, then publishes
-an EngineSnapshot. Failed loads preserve the current board. Resource-bearing presets prepare as one
-candidate chain before committing; paths are relative to the preset folder. App builds link Qt Concurrent.
-
-EQ presets: TrackListModel exposes factory names/apply and versioned .eqpreset save/load using QSaveFile.
-All ten frequencies/gains are validated before the selected track is changed. TrackList.qml hosts the
-factory selector and custom file dialogs. tests/plugins/{ampcab,impulsewav}_test.cpp cover DSP and WAV
-validation; wrappertests (DAW_BUILD_APP builds) covers Qt model persistence and async resource lifecycle.
-
-Pitch pedals share PitchVoice (streaming phase vocoder, 1024-point FFT / 128-sample hop), with
-separate channel state and no audio-thread allocation. Wet-path latency is approximately 1024 samples;
-dry mixes remain immediate. Settings use the existing registry, slot bypass and preset model.
-The pedalboard is nonmodal and closes on Escape or its close button so transport controls remain usable.
-Transport UI tests are a separate Qt Test target (when available), isolated from desktop audio servers.
-
-Crunch and Distortion are separate Processor modules sharing Oversampler4x and DCBlocker. They use
-smoothed atomic parameter descriptors, the existing live GuitarSuite snapshot path, bypass/reordering,
-and .gspreset persistence; recording is not required. tests/plugins/drives_test.cpp covers response,
-EQ/tight controls, stereo isolation, sample rates, block independence, output smoothing and the actual
-monitor/bypass/disarm path. Qt preset tests cover both pedal types and their saved values.
-
-Additional effects: Parametric EQ, Fuzz and Phaser use the existing registry, monitoring snapshot and
-preset model. Tremolo and Phaser share tempo note-division conversion. Their BPM controls share the
-pedalboard's modulation UI, while the separate track ten-band EQ remains independent.
-Pedal cards snapshot descriptor metadata once and bind live values separately; parameter updates no
-longer rebuild dial delegates or invalidate their focus/grab. tests/plugins/extrafx_test.cpp covers the
-new effects; Qt tests cover their presets, Phaser sync controls and stable live dial updates.
-
-Factory chains: GuitarSuiteModel.factoryPresetNames/applyFactoryPreset expose exactly Djent/Jazz.
-CMake embeds their .gspreset JSON in appChaosMaker, wrappertests and transporttests under
-:/GuitarSuitePresets/. Custom and factory data share the existing parser and snapshot publication.
-Factory application keeps current trim and reuses the first loaded cabinet processor at the same
-sample rate without resetting/reopening its IR; it uses a new slot/bypass state and enables it.
-Other chain settings come from the factory data. Normal file presets retain their saved trim/IR
-behavior. Targeted factory/picker tests verify these changes without rerunning pedal DSP tests.
-
-Recording/playback and startup-session milestone (2026-11-01):
-- backend/recording/takerecorder.h/.cpp: bounded mono SPSC input ring and worker-owned float32
-  WAV writer. Worker builds immutable AudioData for immediate playback; loadTakeWav validates
-  and decodes this take format on restoration. Stop/overflow/close finalize the file off audio.
-- AudioEngine now executes Play/Pause/Stop/Seek/Repeat/Record commands and reports sample-clock
-  transport state through atomics. Raw input is copied before monitoring. A second SnapshotSlot
-  holds project playback independently of the live GuitarSuite chain. New playback publications
-  atomically replace unconsumed ones, with discarded/retired snapshots freed on the UI thread.
-- TrackListModel owns take media, compiles clip/gain/mute/solo playback snapshots, and serializes
-  the startup document. Restore validates a candidate, preserves missing media references, scales
-  timeline samples to the current device rate, and disarms tracks. Current playback is dry;
-  per-track insert/EQ DSP routing and recording latency compensation remain future work.
-- EngineController connects transport commands, take lifecycle, clip attachment and normal-exit
-  finalization. It uses QSettings for the optional restore preference and QSaveFile for one atomic
-  last-session.json, embedding GuitarSuite session data with absolute cabinet IR references.
-- frontend/window/TopBar.qml: Settings menu with Restore session on startup. Main.qml attaches
-  the project and finalizes on close. Timeline.qml and TransportBar.qml read engine position/state.
-- Tremolo adds an envelope/attack detector and delayed modulation fade-in for Sustain only.
-  Parameter metadata drives its delay/fade/threshold controls and existing preset serialization.
-- tests/recording/recording_test.cpp: sample timing, raw capture, WAV roundtrip, clipping boundaries,
-  gain/mute/solo/loop, variable blocks, overflow, shutdown and latest-snapshot publication.
-- tests/plugins/tremolosustain_test.cpp: attack preservation, sustained modulation, retriggering,
-  silence/noise, decaying low notes and block independence.
-- tests/wrapper/recording_qtcheck.cpp: injected offline AudioDevice exercises controller Record →
-  Stop → clip → Play → session reopen, close during a take and corrupt-session preservation.
-  presets_qtcheck.cpp covers media/control roundtrip and missing files; transport_qtcheck.cpp
-  covers the actual sustain checkbox, startup setting and unavailable-audio behavior.
+│   │   ├── StatusStrip.qml                 // bottom status notification bar
+│   │   └── TopBar.qml                      // top bar composing ProjectActions, AppSettings, DeviceSettings
+│   ├── Icons.qml                           // vector icon repository singleton
+│   └── Theme.qml                           // visual design system singleton (colors, paddings, fonts)
+└── tests/                                  // unit and integration tests
+    ├── audiodevice/                        // devicesettings tests
+    ├── core/                               // valueformat tests
+    ├── dsp/                                // levelscale and levelmeter tests
+    ├── engine/                             // playbackcontrols, snapshotbuilder tests
+    ├── instruments/                        // catalog, tuner, and guitar pedal tests
+    ├── mixer/                              // mixerpanel tests
+    ├── persistence/                        // projectdocument serialization tests
+    ├── plugins/                            // tenbandeq, eqpresetstore, trackeffectspanel tests
+    ├── recording/                          // recordingcontroller tests
+    ├── session/                            // project, tracklist, projectsession, projectactions tests
+    ├── settings/                           // quicksettings and appsettings tests
+    ├── tempo/                              // tempoeditor tests
+    ├── timeline/                           // timeline and clipwaveform tests
+    ├── ui/                                 // end-to-end UI interaction tests
+    └── wrapper/                            // focused Qt wrapper integration tests

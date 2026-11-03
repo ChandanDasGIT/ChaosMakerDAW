@@ -4,7 +4,9 @@ Copy-me files. Nothing in this folder is built. Copy a file to its real place, r
 | New thing | Copy | To |
 | --- | --- | --- |
 | Backend part | `component.h`, `component.cpp` | `backend/abc/abc.h`, `backend/abc/abc.cpp` |
-| Effect or instrument | `exampleeffect.h`, `exampleeffect.cpp` | `backend/plugins/abc/abc.h`, `backend/plugins/abc/abc.cpp` |
+| Shared effect | `exampleeffect.h`, `exampleeffect.cpp` | `backend/plugins/abc/abc.h`, `backend/plugins/abc/abc.cpp` |
+| Guitar pedal | `exampleeffect.h`, `exampleeffect.cpp` | `backend/instruments/guitar/plugins/abc/abc.h`, `backend/instruments/guitar/plugins/abc/abc.cpp` |
+| Instrument | `component.h`, `component.cpp` | `backend/instruments/abc/abc.h`, `backend/instruments/abc/abc.cpp` |
 | Test for a backend part | `component_test.cpp` | `tests/abc/abc_test.cpp` |
 | Test for a plugin | `exampleeffect_test.cpp` | `tests/plugins/abc_test.cpp` |
 | Wrapper | `examplecontroller.h`, `examplecontroller.cpp` | `wrapper/abcWrap/abccontroller.h`, `.cpp` |
@@ -12,3 +14,5 @@ Copy-me files. Nothing in this folder is built. Copy a file to its real place, r
 
 The name of a QML file must start with a capital letter and be unique across all of `frontend/`.
 In a test, the first word of `TEST` must match the file name: `abc_test.cpp` uses `TEST(abc, ...)`.
+
+Keep guitar-specific backend code, including its DSP helpers and cabinet IR loading, under `backend/instruments/guitar/`. Shared track effects such as the ten-band EQ belong in `backend/plugins/`. Update the copied example's include paths to match its destination.

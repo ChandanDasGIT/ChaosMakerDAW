@@ -9,8 +9,11 @@ These preferences apply to all work in this repository.
    default. Expand testing only when a failure or a concrete dependency warrants it,
    and explain why first. Documentation-only changes need documentation checks,
    not application or DSP test runs.
-3. **Work one task at a time and wait between tasks.** Always proceed step by
-   step. Verify the current batch first, then report the results and say it is
-   done only when verification passes. Stop and wait for the user's explicit
-   "go ahead" before starting the next task or batch. A suggested sequence of
-   future tasks is not permission to start them.
+3. **Work one step at a time and wait between steps.** Do not execute an entire batch
+   at once. Break each batch down into clear, individual steps so the user can follow along.
+   Verify the current step first, report the results, state what the next step is, and stop.
+   Wait for the user's explicit instruction before starting the next step.
+4. **Full access within ProjectDAW.** The assistant has unconditional permission
+   to write, read, and edit any file within this directory `/home/iusearchbtw/ThisPC/C++ projects/ProjectDAW`
+   and all its subfolders. Do not ask the user for permission in chat to create,
+   read, or edit files in this repository.

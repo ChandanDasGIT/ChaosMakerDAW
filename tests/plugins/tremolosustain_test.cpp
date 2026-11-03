@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "plugins/tremolo/tremolo.h"
+#include "instruments/guitar/plugins/tremolo/tremolo.h"
 namespace {
 void set(Tremolo& p,const char* id,float value) { for(const auto& v:p.parameters()) if(v->id==id) v->set(value); }
 std::vector<float> render(int block, bool sustain) {

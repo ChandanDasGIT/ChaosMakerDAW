@@ -1,0 +1,152 @@
+#include "settings/appsettings.h"
+
+#include <algorithm>
+#include <cctype>
+#include <fstream>
+#include <sstream>
+
+namespace {
+
+std::string trim(std::string_view s) {
+    auto start = s.begin();
+    while (start != s.end() && std::isspace(static_cast<unsigned char>(*start))) {
+        ++start;
+    }
+    auto end = s.end();
+    do {
+        if (end == start) break;
+        --end;
+    } while (std::isspace(static_cast<unsigned char>(*end)));
+    return (start < end + 1) ? std::string(start, end + 1) : std::string();
+}
+
+bool parseBool(std::string_view val, bool defaultVal = false) {
+    std::string s = trim(val);
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+    if (s == "true" || s == "1" || s == "yes" || s == "on")
+        return true;
+    if (s == "false" || s == "0" || s == "no" || s == "off")
+        return false;
+    return defaultVal;
+}
+
+} // namespace
+
+AppSettings::AppSettings() = default;
+AppSettings::~AppSettings() = default;
+
+void AppSettings::setRestoreSessionOnStartup(bool enabled) noexcept {
+    m_restoreSessionOnStartup = enabled;
+}
+
+void AppSettings::setDefaultProjectDirectory(std::string path) {
+    m_defaultProjectDirectory = trim(path);
+}
+
+void AppSettings::setAutoSaveEnabled(bool enabled) noexcept {
+    m_autoSaveEnabled = enabled;
+}
+
+bool AppSettings::setAutoSaveIntervalSeconds(int seconds) noexcept {
+    if (!validateAutoSaveInterval(seconds))
+        return false;
+    m_autoSaveIntervalSeconds = seconds;
+    return true;
+}
+
+void AppSettings::resetToDefaults() noexcept {
+    m_restoreSessionOnStartup = false;
+    m_defaultProjectDirectory.clear();
+    m_autoSaveEnabled = true;
+    m_autoSaveIntervalSeconds = 60;
+    m_lastError.clear();
+}
+
+bool AppSettings::validateAutoSaveInterval(int seconds) noexcept {
+    return seconds >= 5 && seconds <= 3600;
+}
+
+void AppSettings::importValue(std::string_view key, std::string_view value) {
+    if (key == KeyRestoreSessionOnStartup) {
+        m_restoreSessionOnStartup = parseBool(value, false);
+    } else if (key == KeyDefaultProjectDir) {
+        m_defaultProjectDirectory = trim(value);
+    } else if (key == KeyAutoSaveEnabled) {
+        m_autoSaveEnabled = parseBool(value, true);
+    } else if (key == KeyAutoSaveInterval) {
+        try {
+            int interval = std::stoi(trim(value));
+            if (validateAutoSaveInterval(interval)) {
+                m_autoSaveIntervalSeconds = interval;
+            }
+        } catch (...) {
+            // invalid integer ignored
+        }
+    }
+}
+
+std::string AppSettings::exportValue(std::string_view key) const {
+    if (key == KeyRestoreSessionOnStartup) {
+        return m_restoreSessionOnStartup ? "true" : "false";
+    }
+    if (key == KeyDefaultProjectDir) {
+        return m_defaultProjectDirectory;
+    }
+    if (key == KeyAutoSaveEnabled) {
+        return m_autoSaveEnabled ? "true" : "false";
+    }
+    if (key == KeyAutoSaveInterval) {
+        return std::to_string(m_autoSaveIntervalSeconds);
+    }
+    return {};
+}
+
+std::string AppSettings::serialize() const {
+    std::ostringstream ss;
+    ss << KeyRestoreSessionOnStartup << "=" << (m_restoreSessionOnStartup ? "true" : "false") << "\n";
+    ss << KeyDefaultProjectDir << "=" << m_defaultProjectDirectory << "\n";
+    ss << KeyAutoSaveEnabled << "=" << (m_autoSaveEnabled ? "true" : "false") << "\n";
+    ss << KeyAutoSaveInterval << "=" << m_autoSaveIntervalSeconds << "\n";
+    return ss.str();
+}
+
+bool AppSettings::deserialize(std::string_view text) {
+    std::string textStr(text);
+    std::istringstream ss(textStr);
+    std::string line;
+    while (std::getline(ss, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == ';')
+            continue;
+        auto pos = line.find('=');
+        if (pos == std::string::npos)
+            continue;
+        std::string key = trim(line.substr(0, pos));
+        std::string val = trim(line.substr(pos + 1));
+        importValue(key, val);
+    }
+    return true;
+}
+
+bool AppSettings::loadFromFile(const std::string& path) {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        m_lastError = "Could not open settings file: " + path;
+        return false;
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    m_lastError.clear();
+    return deserialize(buffer.str());
+}
+
+bool AppSettings::saveToFile(const std::string& path) const {
+    std::ofstream file(path);
+    if (!file.is_open()) {
+        m_lastError = "Could not write settings file: " + path;
+        return false;
+    }
+    file << serialize();
+    m_lastError.clear();
+    return true;
+}

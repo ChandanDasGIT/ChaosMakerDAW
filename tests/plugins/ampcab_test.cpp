@@ -1,8 +1,8 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "plugins/amp/amp.h"
-#include "plugins/cabinet/cabinet.h"
-#include "dsp/partitionedconvolver.h"
+#include "instruments/guitar/plugins/amp/amp.h"
+#include "instruments/guitar/plugins/cabinet/cabinet.h"
+#include "instruments/guitar/dsp/partitionedconvolver.h"
 #include "plugins/eq/eqpresets.h"
 #include "plugins/eq/tenbandeq.h"
 #include <numeric>

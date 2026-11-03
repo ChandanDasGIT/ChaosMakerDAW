@@ -1,8 +1,16 @@
 #include "project.h"
+#include "instruments/instrumentcatalog.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
+
+bool Track::hasLiveInput() const
+{
+    if (kind == TrackKind::Audio) return true;
+    const auto* definition = instrumentcatalog::find(type);
+    return definition && definition->hasLiveInput;
+}
 
 Track& Project::addTrack(TrackKind kind, const std::string& name, const std::string& type)
 {

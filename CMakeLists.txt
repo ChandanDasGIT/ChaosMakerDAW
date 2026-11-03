@@ -103,10 +103,18 @@ endforeach()
 if(DAW_BUILD_APP)
     add_executable(wrappertests
         tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp tests/wrapper/clipediting_qtcheck.cpp
+        tests/wrapper/audioengine_qtcheck.cpp
         wrapper/engineWrap/enginecontroller.cpp wrapper/engineWrap/enginecontroller.h
-        wrapper/session/tracklistmodel.cpp wrapper/session/tracklistmodel.h
-        wrapper/pluginWrap/guitarsuitemodel.cpp wrapper/pluginWrap/guitarsuitemodel.h
-        wrapper/pluginWrap/pedalregistry.cpp wrapper/pluginWrap/pedalregistry.h)
+        wrapper/session/tracklistwrap/tracklistwrapper.cpp wrapper/session/tracklistwrap/tracklistwrapper.h
+        wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.cpp wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h
+        wrapper/recording/recordingcontrollerwrap/recordingcontrollerwrapper.cpp wrapper/recording/recordingcontrollerwrap/recordingcontrollerwrapper.h
+        wrapper/session/projectsessionwrap/projectsessionwrapper.cpp wrapper/session/projectsessionwrap/projectsessionwrapper.h
+        wrapper/session/projectactionswrap/projectactionswrapper.cpp wrapper/session/projectactionswrap/projectactionswrapper.h
+        wrapper/settings/quicksettingswrap/quicksettingswrapper.cpp wrapper/settings/quicksettingswrap/quicksettingswrapper.h
+        wrapper/audiodevice/devicesettingswrap/devicesettingswrapper.cpp wrapper/audiodevice/devicesettingswrap/devicesettingswrapper.h
+        wrapper/settings/appsettingswrap/appsettingswrapper.cpp wrapper/settings/appsettingswrap/appsettingswrapper.h
+        wrapper/engine/playbackcontrolswrap/playbackcontrolswrapper.cpp wrapper/engine/playbackcontrolswrap/playbackcontrolswrapper.h
+        wrapper/engine/audioenginewrap/audioenginewrapper.cpp wrapper/engine/audioenginewrap/audioenginewrapper.h)
     target_include_directories(wrappertests PRIVATE "${CMAKE_CURRENT_LIST_DIR}" "${CMAKE_CURRENT_LIST_DIR}/tests" ${WRAPPER_DIRS})
     target_compile_options(wrappertests PRIVATE -Wall -Wextra)
     target_link_libraries(wrappertests PRIVATE Qt6::Qml Qt6::Concurrent dawengine)
@@ -117,6 +125,7 @@ if(DAW_BUILD_APP)
     add_test(NAME qtprojectfiles COMMAND wrappertests qtprojectfiles)
     add_test(NAME qttracknames COMMAND wrappertests qttracknames)
     add_test(NAME qttrackcolours COMMAND wrappertests qttrackcolours)
+    add_test(NAME qtaudioengine COMMAND wrappertests qtaudioengine)
 endif()
 
 # Exercise actual mouse/keyboard tempo editing when Qt Test is available.
@@ -126,14 +135,17 @@ if(DAW_BUILD_APP)
         qt_add_executable(transporttests tests/ui/transport_qtcheck.cpp)
         qt_add_qml_module(transporttests URI TransportTests
             QML_FILES frontend/Theme.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
-                      frontend/transportbar/TempoEditor.qml
-                      frontend/plugins/guitarsuite/GuitarSuitePanel.qml
-                      frontend/plugins/guitarsuite/GuitarSuiteEditor.qml
-                      frontend/plugins/TrackEffectsPanel.qml frontend/plugins/TrackEqualizer.qml
-                      frontend/timeline/TrackList.qml frontend/timeline/Timeline.qml
+                      frontend/engine/PlaybackControls.qml
+                      frontend/session/ProjectActions.qml frontend/audiodevice/DeviceSettings.qml
+                      frontend/settings/AppSettings.qml
+                      frontend/tempo/TempoEditor.qml
+                      frontend/instruments/guitar/GuitarSuitePanel.qml
+                      frontend/instruments/guitar/GuitarSuiteEditor.qml
+                      frontend/plugins/TrackEffectsPanel.qml frontend/plugins/eq/Tenbandeq.qml
+                      frontend/session/TrackList.qml frontend/timeline/Timeline.qml
                       frontend/mixer/MixerPanel.qml
-                      frontend/mixer/StereoLevelMeter.qml
-                      frontend/plugins/guitarsuite/LevelMeter.qml
+                      frontend/dsp/StereoLevelMeter.qml
+                      frontend/dsp/LevelMeter.qml
                       tests/ui/TransportHarness.qml
             SOURCES ${WRAPPER_SOURCES})
         target_include_directories(transporttests PRIVATE "${CMAKE_CURRENT_LIST_DIR}" ${WRAPPER_DIRS})
