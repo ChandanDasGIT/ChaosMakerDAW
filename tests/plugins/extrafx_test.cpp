@@ -1,9 +1,9 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "plugins/parametriceq/parametriceq.h"
-#include "plugins/fuzz/fuzz.h"
-#include "plugins/phaser/phaser.h"
-#include "plugins/guitarsuite/guitarsuite.h"
+#include "instruments/guitar/plugins/parametriceq/parametriceq.h"
+#include "instruments/guitar/plugins/fuzz/fuzz.h"
+#include "instruments/guitar/plugins/phaser/phaser.h"
+#include "instruments/guitar/plugins/guitarsuite/guitarsuite.h"
 #include <memory>
 
 namespace {

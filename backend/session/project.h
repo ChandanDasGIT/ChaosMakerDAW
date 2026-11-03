@@ -38,7 +38,7 @@ struct Track {
     std::array<float, 10> eqGainDb{};
     std::vector<AudioClip> audioClips;
 
-    bool hasLiveInput() const { return kind == TrackKind::Audio || type == "Electric Guitar" || type == "Acoustic Guitar"; }
+    bool hasLiveInput() const;
     bool recordsWithFx() const { return hasLiveInput() && !recordDry; }
 };
 

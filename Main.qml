@@ -15,7 +15,7 @@ Window {
     palette.toolTipBase: Theme.tooltipBg
     palette.toolTipText: Theme.tooltipText
 
-    TrackListModel { id: trackModel }
+    TrackListWrapper { id: trackModel }
 
     onClosing: event => {
         if (!closeApproved && EngineController.projectDirty) {

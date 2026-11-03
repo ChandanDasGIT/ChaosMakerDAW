@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "wrapper/session/tracklistmodel.h"
+#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
 
 TEST(qtclipediting, delete_resize_undo_redo_preserve_audio_ids_and_other_tracks) {
-    TrackListModel tracks;
+    TrackListWrapper tracks;
     const int a=tracks.addAudioTrack(), b=tracks.addVocalTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="take.wav"; audio->frames=48000;
     audio->channels={std::vector<float>(48000,0.25f)};
@@ -21,7 +21,7 @@ TEST(qtclipediting, delete_resize_undo_redo_preserve_audio_ids_and_other_tracks)
 }
 
 TEST(qtclipediting, move_is_one_undoable_edit_and_keeps_source_audio_unchanged) {
-    TrackListModel tracks; const int track=tracks.addAudioTrack();
+    TrackListWrapper tracks; const int track=tracks.addAudioTrack();
     const int clip=tracks.addAudioClip(track,"take",24000,48000,123);
     CHECK(tracks.moveClipAtBeat(track,clip,4));
     auto c=tracks.project().findTrack(track)->audioClips[0];
@@ -32,7 +32,7 @@ TEST(qtclipediting, move_is_one_undoable_edit_and_keeps_source_audio_unchanged) 
 }
 
 TEST(qtclipediting, waveform_uses_clip_source_offset_and_recording_sample_rate) {
-    TrackListModel tracks; const int track=tracks.addAudioTrack();
+    TrackListWrapper tracks; const int track=tracks.addAudioTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="wave.wav"; audio->sampleRate=24000; audio->frames=512;
     audio->channels={std::vector<float>(512)}; audio->channels[0][256]=0.8f; audio->buildWaveform();
     CHECK(tracks.attachTake(track,0,audio));
@@ -43,7 +43,7 @@ TEST(qtclipediting, waveform_uses_clip_source_offset_and_recording_sample_rate) 
 }
 
 TEST(qtclipediting, split_and_both_trims_preserve_source_samples_and_undo_atomically) {
-    TrackListModel tracks; const int track=tracks.addAudioTrack();
+    TrackListWrapper tracks; const int track=tracks.addAudioTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="edit.wav"; audio->sampleRate=24000; audio->frames=48000;
     audio->channels={std::vector<float>(48000,0.2f)}; CHECK(tracks.attachTake(track,0,audio));
     const int id=tracks.project().findTrack(track)->audioClips[0].id;
@@ -61,7 +61,7 @@ TEST(qtclipediting, split_and_both_trims_preserve_source_samples_and_undo_atomic
 }
 
 TEST(qtclipediting, merging_split_clips_preserves_audio_and_is_one_undoable_edit) {
-    TrackListModel tracks; const int track=tracks.addAudioTrack(),other=tracks.addAudioTrack();
+    TrackListWrapper tracks; const int track=tracks.addAudioTrack(),other=tracks.addAudioTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="merge.wav"; audio->sampleRate=24000; audio->frames=48000;
     audio->channels={std::vector<float>(48000,0.25f)}; CHECK(tracks.attachTake(track,0,audio));
     const int left=tracks.project().findTrack(track)->audioClips[0].id;
@@ -84,7 +84,7 @@ TEST(qtclipediting, merging_split_clips_preserves_audio_and_is_one_undoable_edit
 }
 
 TEST(qtclipediting, group_edits_across_tracks_are_atomic_and_preserve_offsets) {
-    TrackListModel tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack(),c=tracks.addAudioTrack();
+    TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack(),c=tracks.addAudioTrack();
     const int x=tracks.addAudioClip(a,"x",48000,96000,24000);
     const int y=tracks.addAudioClip(b,"y",72000,144000,48000);
     const int z=tracks.addClipAtBeat(c,2,4);
@@ -114,7 +114,7 @@ TEST(qtclipediting, group_edits_across_tracks_are_atomic_and_preserve_offsets) {
 }
 
 TEST(qtclipediting, playback_endpoint_exists_only_when_the_arrangement_has_clips) {
-    TrackListModel tracks;
+    TrackListWrapper tracks;
     CHECK(tracks.playbackSnapshot()->playbackEnd==-1);
     const int track=tracks.addAudioTrack();
     CHECK(tracks.playbackSnapshot()->playbackEnd==-1);
@@ -126,7 +126,7 @@ TEST(qtclipediting, playback_endpoint_exists_only_when_the_arrangement_has_clips
 }
 
 TEST(qtclipediting, adjacent_empty_cells_merge_as_one_undoable_group) {
-    TrackListModel tracks; const int track=tracks.addAudioTrack(),other=tracks.addAudioTrack();
+    TrackListWrapper tracks; const int track=tracks.addAudioTrack(),other=tracks.addAudioTrack();
     const int a=tracks.addClipAtBeat(track,0,2),b=tracks.addClipAtBeat(track,2,2),c=tracks.addClipAtBeat(track,4,2);
     const int foreign=tracks.addClipAtBeat(other,6,2);
     CHECK(tracks.canMergeClips(track,a,b)); CHECK(tracks.canMergeSelectedClips({c,a,b}));
@@ -141,7 +141,7 @@ TEST(qtclipediting, adjacent_empty_cells_merge_as_one_undoable_group) {
     CHECK(!tracks.canMergeSelectedClips({a,b,c})); CHECK(!tracks.mergeSelectedClips({a,b,c}));
 }
 TEST(qtclipediting, three_split_recorded_pieces_merge_without_changing_source_audio) {
-    TrackListModel tracks; const int track=tracks.addAudioTrack();
+    TrackListWrapper tracks; const int track=tracks.addAudioTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="three.wav"; audio->sampleRate=24000; audio->frames=48000;
     audio->channels={std::vector<float>(48000,0.2f)}; CHECK(tracks.attachTake(track,0,audio));
     const int a=tracks.project().findTrack(track)->audioClips[0].id,b=tracks.splitClipAtBeat(track,a,2),c=tracks.splitClipAtBeat(track,b,3);
@@ -152,7 +152,7 @@ TEST(qtclipediting, three_split_recorded_pieces_merge_without_changing_source_au
     CHECK(tracks.undo()); CHECK(tracks.project().findTrack(track)->audioClips.size()==3);
 }
 TEST(qtclipediting, cross_track_move_preserves_source_offsets_and_group_history) {
-    TrackListModel tracks; const int a=tracks.addAudioTrack(),gap=tracks.addAudioTrack(); CHECK(tracks.removeTrack(gap));
+    TrackListWrapper tracks; const int a=tracks.addAudioTrack(),gap=tracks.addAudioTrack(); CHECK(tracks.removeTrack(gap));
     const int b=tracks.addVocalTrack(),c=tracks.addAudioTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="transfer.wav"; audio->frames=48000;
     audio->channels={std::vector<float>(48000,0.2f)}; CHECK(tracks.attachTake(a,24000,audio,false));

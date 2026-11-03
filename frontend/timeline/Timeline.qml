@@ -7,20 +7,23 @@ Item {
     property int timeSignature: 4
     property int timeSignatureDenominator: 4
     property real bpm: 120
-    property int snapMode: 1 // Bars, beats, beat subdivisions, off.
-    readonly property real snapStepBeats: snapMode === 6 ? 0
-        : snapMode === 0 ? timeSignature * 4 / timeSignatureDenominator
-        : (4 / timeSignatureDenominator) / Math.pow(2, snapMode - 1)
-    function snapBeat(beat, direction) {
-        if (snapStepBeats <= 0) return Math.max(0, beat)
-        const units = beat / snapStepBeats
-        return Math.max(0, (direction === "floor" ? Math.floor(units + 1e-9)
-            : direction === "ceil" ? Math.ceil(units - 1e-9) : Math.round(units)) * snapStepBeats)
+    property alias snapMode: editor.snapMode // Backend-owned bars/beats/subdivision/off choice.
+    TimelineWrapper {
+        id: editor
+        trackModel: root.trackModel ?? null
+        numerator: root.timeSignature
+        denominator: root.timeSignatureDenominator
+        bpm: root.bpm
+        takeBusy: root.transport.takeBusy
+        projectLoading: root.transport.projectLoading
+        recording: root.recording
+        onSeekRequested: beat => root.transport.seekBeat(beat)
+        onRepeatRangeRequested: (start, end) => editor.acceptRepeatRange(root.transport.setRepeatRange(start, end))
     }
-    // Zoom is measured in time so tempo changes redraw the musical grid without
-    // stretching recorded audio. Keep zoom separate from the BPM binding.
+    readonly property real snapStepBeats: editor.snapStepBeats
+    // Pixel geometry and scroll/zoom state are presentation concerns.
     property real pixelsPerSecond: 96
-    readonly property real beatWidth: pixelsPerSecond * 60 / bpm
+    readonly property real beatWidth: pixelsPerSecond * editor.secondsPerBeat
     readonly property real playhead: root.transport.positionBeats * beatWidth
     readonly property bool playing: root.transport.playing
     readonly property bool recording: root.transport.recording
@@ -29,49 +32,25 @@ Item {
     property bool followPlayhead: true
     property real lastTransportPlayhead: 0
     onPlayingChanged: { if (playing) followPlayhead = true }
-    property var selectedClipIds: []
+    readonly property var selectedClipIds: editor.selectedClipIds
+    readonly property int selectedClipId: editor.selectedClipId
+    readonly property int selectedTrackId: editor.selectedTrackId
     readonly property var keyboardFocusItem: Window.window ? Window.window.activeFocusItem : null
     readonly property bool editingText: keyboardFocusItem instanceof TextInput || keyboardFocusItem instanceof TextEdit
-    readonly property bool clipKeyboardActive: activeFocus && visible && enabled && !!trackModel
-        && !editingText && !selecting && editOperation === "" && !transport.projectLoading
-    readonly property bool canEditClipSelection: clipKeyboardActive && selectedClipIds.length > 0 && !transport.takeBusy
-    function deselectClips() {
-        selectedClipIds = []; selectedClipId = -1; selectedTrackId = -1
-        hasSelection = false
-    }
-    function selectAllClips() {
-        const clips = trackModel.clips
-        selectedClipIds = clips.map(clip => clip.clipId)
-        selectedClipId = clips.length > 0 ? clips[0].clipId : -1
-        selectedTrackId = clips.length > 0 ? clips[0].trackId : -1
-        hasSelection = false
-    }
-    function nudgeClips(direction) {
-        const step = snapStepBeats > 0 ? snapStepBeats : bpm / 60000
-        trackModel.editClips(selectedClipIds, "move", direction * step)
-    }
-    property string editOperation: ""
-    property real editDelta: 0
-    property int editLaneDelta: 0
-    function updateGroupLane(delta) {
-        for (const clip of trackModel.clips.filter(c => selectedClipIds.indexOf(c.clipId) >= 0))
-            delta = Math.max(-clip.laneIndex, Math.min(trackModel.count - 1 - clip.laneIndex, delta))
-        editLaneDelta = delta
-    }
-    function updateGroupEdit(delta) {
-        const clips = trackModel.clips.filter(c => selectedClipIds.indexOf(c.clipId) >= 0)
-        for (const clip of clips) {
-            if (editOperation === "move" || editOperation === "trimStart") delta = Math.max(delta, -clip.startBeat)
-            if (editOperation === "resize") delta = Math.max(delta, 1e-6 - clip.lengthBeats)
-            if (editOperation === "trimStart") delta = Math.min(delta, clip.lengthBeats - 1e-6)
-        }
-        editDelta = delta
-    }
-    function commitGroupEdit() {
-        const operation = editOperation, delta = editDelta, lanes = editLaneDelta
-        editOperation = ""; editDelta = 0; editLaneDelta = 0
-        if (operation && trackModel) trackModel.editClips(selectedClipIds, operation, delta, operation === "move" ? lanes : 0)
-    }
+    readonly property bool clipKeyboardActive: activeFocus && visible && enabled && !editingText && editor.keyboardAllowed
+    readonly property bool canEditClipSelection: clipKeyboardActive && editor.canEditSelection
+    readonly property string editOperation: editor.editOperation
+    readonly property real editDelta: editor.editDelta
+    readonly property int editLaneDelta: editor.editLaneDelta
+    readonly property bool canMergeSelection: editor.canMergeSelection
+    readonly property bool selecting: editor.selecting
+    readonly property bool hasSelection: editor.hasSelection
+    readonly property bool clipSelectionDrag: editor.clipSelectionDrag
+    property alias timeRangeStartBeat: editor.timeRangeStartBeat
+    property alias timeRangeEndBeat: editor.timeRangeEndBeat
+    readonly property real rangeStartBeat: editor.rangeStartBeat
+    readonly property real rangeEndBeat: editor.rangeEndBeat
+
     Shortcut {
         sequence: "Delete"
         enabled: root.canEditClipSelection
@@ -82,148 +61,60 @@ Item {
         sequence: "Left"
         enabled: root.canEditClipSelection
         autoRepeat: true
-        onActivated: root.nudgeClips(-1)
+        onActivated: editor.nudgeClips(-1)
     }
     Shortcut {
         sequence: "Right"
         enabled: root.canEditClipSelection
         autoRepeat: true
-        onActivated: root.nudgeClips(1)
+        onActivated: editor.nudgeClips(1)
     }
     Shortcut {
         sequences: [StandardKey.SelectAll]
         enabled: root.clipKeyboardActive
         autoRepeat: false
-        onActivated: root.selectAllClips()
+        onActivated: editor.selectAllClips()
     }
     Shortcut {
         sequence: "Escape"
         enabled: root.clipKeyboardActive && root.selectedClipIds.length > 0
         autoRepeat: false
-        onActivated: root.deselectClips()
+        onActivated: editor.deselectClips()
     }
-    readonly property bool canMergeSelection: {
-        if (!trackModel || selectedClipIds.length < 2) return false
-        const clips = trackModel.clips // Re-evaluate compatibility after moving or trimming clips.
-        return clips.length >= selectedClipIds.length && trackModel.canMergeSelectedClips(selectedClipIds)
-    }
-    function selectClip(trackId, clipId, toggle, preserve) {
-        const ids = selectedClipIds.slice()
-        const at = ids.indexOf(clipId)
-        if (toggle) {
-            if (at >= 0) ids.splice(at, 1)
-            else ids.push(clipId)
-            selectedClipIds = ids
-        } else if (!preserve || at < 0) selectedClipIds = [clipId]
-        selectedClipId = selectedClipIds.indexOf(clipId) >= 0 ? clipId : -1
-        selectedTrackId = selectedClipId >= 0 ? trackId : -1
-        hasSelection = false
-    }
-    onTrackModelChanged: {
-        selectedClipIds = []; selectedClipId = -1; selectedTrackId = -1
-        timeRangeStartBeat = 0; timeRangeEndBeat = 0; hasSelection = false
-    }
-    Connections {
-        target: root.trackModel || null
-        function onClipsChanged() {
-            const clips = root.trackModel.clips
-            root.selectedClipIds = root.selectedClipIds.filter(id => clips.some(c => c.clipId === id))
-            const primary = clips.find(c => c.clipId === root.selectedClipId)
-                || clips.find(c => root.selectedClipIds.indexOf(c.clipId) >= 0)
-            root.selectedClipId = primary ? primary.clipId : -1
-            root.selectedTrackId = primary ? primary.trackId : -1
-        }
-    }
-    property int selectedClipId: -1
-    property int selectedTrackId: -1
-    property bool selecting: false
-    property bool hasSelection: false
-    property bool clipSelectionDrag: false
-    property real timeRangeStartBeat: 0
-    property real timeRangeEndBeat: 0
-    readonly property real rangeStartBeat: selecting && !clipSelectionDrag
-        ? snapBeat(Math.min(selectionStartX, selectionEndX) / beatWidth, "floor") : timeRangeStartBeat
-    readonly property real rangeEndBeat: selecting && !clipSelectionDrag && Math.abs(selectionEndX-selectionStartX)>2
-        ? snapBeat(Math.max(selectionStartX, selectionEndX) / beatWidth, "ceil") : timeRangeEndBeat
     function beginSelection(x, y, clips) {
-        selectedClipIds = []; selectedClipId = -1; selectedTrackId = -1
-        selecting = true; hasSelection = true; clipSelectionDrag = clips
         forceActiveFocus()
         selectionStartX = x; selectionEndX = x
         selectionStartY = y; selectionEndY = y
+        editor.beginSelection(x / beatWidth, y / laneHeight, clips)
+    }
+    function updateSelection(x, y) {
+        selectionEndX = x; selectionEndY = y
+        editor.updateSelection(x / beatWidth, y / laneHeight, Math.abs(x - selectionStartX) > 2)
     }
     function finishSelection() {
-        if (!clipSelectionDrag) {
-            const start = rangeStartBeat, end = Math.abs(selectionEndX-selectionStartX)>2 ? rangeEndBeat : 0
-            if (!recording && transport.setRepeatRange(end>start ? start : 0, end)) {
-                timeRangeStartBeat = end>start ? start : 0; timeRangeEndBeat = end
-            }
-            selecting = false
-            return
-        }
-        selecting = false
-        const left = Math.min(selectionStartX, selectionEndX) / beatWidth
-        const right = Math.max(selectionStartX, selectionEndX) / beatWidth
-        const top = Math.min(selectionStartY, selectionEndY)
-        const bottom = Math.max(selectionStartY, selectionEndY) + 1
-        if (trackModel && right > left)
-            selectedClipIds = trackModel.clips.filter(c => c.startBeat < right && c.startBeat+c.lengthBeats > left
-                && c.laneIndex*laneHeight+8 < bottom && (c.laneIndex+1)*laneHeight-10 > top).map(c => c.clipId)
+        editor.finishSelection(8 / laneHeight, 10 / laneHeight, 1 / laneHeight)
     }
     property real selectionStartX: 0
     property real selectionEndX: 0
     property real selectionStartY: 0
     property real selectionEndY: 0
-    property var trackModel
+    property var trackModel: null
     property int laneCount: 5
     property int laneHeight: 106
     property int rulerHeight: 38
     readonly property real verticalScrollPosition: scroll.contentY
-    readonly property real beatUnitWidth: beatWidth * 4 / timeSignatureDenominator
-    readonly property real barWidth: beatUnitWidth * timeSignature
-    readonly property real contentEndBars: trackModel
-        ? trackModel.contentEndBeats / (timeSignature * 4.0 / timeSignatureDenominator)
-        : 0
+    readonly property real beatUnitWidth: beatWidth * editor.beatUnit
+    readonly property real barWidth: beatWidth * editor.beatsPerBar
+    readonly property real contentEndBars: editor.contentEndBars
     readonly property real contentWidth: Math.max(width, (Math.ceil(contentEndBars) + 1) * barWidth, recordingTailX)
     readonly property real barLabelStride: Math.max(1, Math.ceil(48 / barWidth))
     readonly property real firstVisibleBar: Math.floor(scroll.contentX / (barWidth * barLabelStride)) * barLabelStride
     readonly property int visibleBarCount: Math.ceil(width / (barWidth * barLabelStride)) + 3
-    readonly property real gridStepBeats: snapStepBeats > 0 ? snapStepBeats : 4 / timeSignatureDenominator
+    readonly property real gridStepBeats: editor.gridStepBeats
     readonly property real gridUnitWidth: gridStepBeats * beatWidth
     readonly property real beatGridStride: Math.max(1, Math.ceil(8 / gridUnitWidth))
     readonly property real firstVisibleBeat: Math.floor(scroll.contentX / (gridUnitWidth * beatGridStride)) * beatGridStride
     readonly property int visibleBeatCount: Math.ceil(width / (gridUnitWidth * beatGridStride)) + 3
-
-    function setPlayhead(position) {
-        root.transport.seekBeat(snapBeat(position / beatWidth))
-    }
-
-    function hasClipOverlap(trackId, startBeat, lengthBeats) {
-        if (!trackModel)
-            return false
-        const endBeat = startBeat + lengthBeats
-        for (let i = 0; i < trackModel.clips.length; ++i) {
-            const clip = trackModel.clips[i]
-            if (clip.trackId === trackId
-                && startBeat < clip.startBeat + clip.lengthBeats
-                && endBeat > clip.startBeat)
-                return true
-        }
-        return false
-    }
-
-    function createClipAt(x, y) {
-        if (!trackModel)
-            return
-        const lane = Math.floor(y / laneHeight)
-        if (lane < 0 || lane >= laneCount)
-            return
-        const trackId = trackModel.trackIdAt(lane)
-        const beatsPerBar = timeSignature * 4.0 / timeSignatureDenominator
-        const barStartBeat = snapBeat(x / beatWidth, "floor")
-        if (trackId >= 0 && !hasClipOverlap(trackId, barStartBeat, beatsPerBar))
-            trackModel.addClipAtBeat(trackId, barStartBeat, beatsPerBar)
-    }
 
     function scrollVertically(amount) {
         scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, scroll.contentY + amount))
@@ -245,7 +136,7 @@ Item {
 
     Shortcut {
         sequence: "S"
-        enabled: root.activeFocus && root.selectedClipIds.length === 1 && root.selectedClipId >= 0 && !root.recording
+        enabled: root.activeFocus && editor.canSplitSelection
         onActivated: root.trackModel.splitClipAtBeat(root.selectedTrackId, root.selectedClipId, root.transport.positionBeats)
     }
     Menu {
@@ -268,8 +159,7 @@ Item {
         MenuItem {
             id: splitClipAction
             text: "Split at playhead"
-            enabled: !root.recording && root.transport.positionBeats > clipContextMenu.targetStart
-                     && root.transport.positionBeats < clipContextMenu.targetStart + clipContextMenu.targetLength
+            enabled: editor.canEditSelection && editor.canSplit(clipContextMenu.targetTrackId, clipContextMenu.targetClipId, root.transport.positionBeats)
             implicitHeight: 32
             leftPadding: Theme.margin
             contentItem: Text { text: splitClipAction.text; color: !splitClipAction.enabled ? Theme.textMuted : splitClipAction.highlighted ? Theme.accent : Theme.text; font.pixelSize: Theme.bodySize; verticalAlignment: Text.AlignVCenter }
@@ -279,13 +169,13 @@ Item {
         MenuItem {
             objectName: "mergeSelectedClips"
             text: "Merge selected clips"
-            enabled: root.canMergeSelection && !root.recording
+            enabled: root.canMergeSelection
             onTriggered: root.trackModel.mergeSelectedClips(root.selectedClipIds)
         }
         MenuItem {
             id: deleteClipAction
             text: root.selectedClipIds.length > 1 ? "Delete selected clips" : "Delete"
-            enabled: !root.recording
+            enabled: editor.canEditSelection
             implicitHeight: 32
             leftPadding: Theme.margin
             rightPadding: Theme.margin
@@ -361,7 +251,7 @@ Item {
                 Rectangle { width: 1; height: parent.height; color: "#4a4a4a" }
                 Text {
                     x: 8; y: 11
-                    text: (root.firstVisibleBar + index * root.barLabelStride + 1).toString()
+                    text: editor.barLabel(root.firstVisibleBar + index * root.barLabelStride)
                     color: Theme.textMuted
                     font.pixelSize: 11
                 }
@@ -402,8 +292,7 @@ Item {
                 y: root.rulerHeight
                 width: 1
                 height: scroll.contentHeight - root.rulerHeight
-                color: Math.abs(beatNumber * root.gridStepBeats / (root.timeSignature * 4 / root.timeSignatureDenominator)
-                    - Math.round(beatNumber * root.gridStepBeats / (root.timeSignature * 4 / root.timeSignatureDenominator))) < 1e-7 ? "#454545" : "#303030"
+                color: editor.isBarLine(beatNumber * root.gridStepBeats, editor.beatsPerBar) ? "#454545" : "#303030"
                 z: 1
             }
         }
@@ -422,24 +311,15 @@ Item {
                 required property bool effectsPrinted
                 required property color trackColour
                 objectName: "clipBlock" + clipId
-                property real previewStartBeat: startBeat
-                property real previewLengthBeats: lengthBeats
-                onStartBeatChanged: previewStartBeat = startBeat
-
-                onLengthBeatsChanged: previewLengthBeats = lengthBeats
-
-                readonly property bool groupEditing: root.editOperation !== "" && root.selectedClipIds.indexOf(clipId) >= 0
-                x: (groupEditing && (root.editOperation === "move" || root.editOperation === "trimStart")
-                    ? startBeat + root.editDelta : previewStartBeat) * root.beatWidth + 4
-                y: root.rulerHeight + (laneIndex + (groupEditing && root.editOperation === "move" ? root.editLaneDelta : 0)) * root.laneHeight + 8
-                width: Math.max(4, (groupEditing && root.editOperation === "resize" ? lengthBeats + root.editDelta
-                    : groupEditing && root.editOperation === "trimStart" ? lengthBeats - root.editDelta
-                    : previewLengthBeats) * root.beatWidth - 8)
+                readonly property var preview: editor.previews[String(clipId)] ?? ({})
+                x: (preview.startBeat ?? startBeat) * root.beatWidth + 4
+                y: root.rulerHeight + (preview.laneIndex ?? laneIndex) * root.laneHeight + 8
+                width: Math.max(4, (preview.lengthBeats ?? lengthBeats) * root.beatWidth - 8)
                 height: root.laneHeight - 18
                 radius: 4
                 color: Qt.darker(trackColour, 2.4)
-                border.color: root.selectedClipIds.indexOf(clipId) >= 0 ? Theme.accent : trackColour
-                border.width: root.selectedClipIds.indexOf(clipId) >= 0 ? 2 : 1
+                border.color: (preview.selected ?? false) ? Theme.accent : trackColour
+                border.width: (preview.selected ?? false) ? 2 : 1
                 z: 3
                 Text {
                     anchors.left: parent.left; anchors.leftMargin: 10
@@ -487,36 +367,36 @@ Item {
                             root.beginSelection(point.x, point.y-root.rulerHeight, true)
                             return
                         }
-                        root.selectClip(clipItem.trackId, clipItem.clipId,
+                        editor.selectClip(clipItem.trackId, clipItem.clipId,
                             mouse.button === Qt.LeftButton && !!(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)),
                             true)
                         root.forceActiveFocus()
                         pointerStartX = mapToItem(scroll.contentItem, mouse.x, mouse.y).x
                         originalBeat = clipItem.startBeat; originalLane = clipItem.laneIndex
                         if (mouse.button === Qt.LeftButton && !(mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier))) {
-                            root.editOperation = "move"; root.editDelta = 0; root.editLaneDelta = 0
+                            editor.beginEdit("move")
                         }
                     }
                     onPositionChanged: mouse => {
                         if (root.selecting && root.clipSelectionDrag) {
                             const point = mapToItem(scroll.contentItem, mouse.x, mouse.y)
-                            root.selectionEndX = point.x; root.selectionEndY = point.y-root.rulerHeight
+                            root.updateSelection(point.x, point.y-root.rulerHeight)
                             return
                         }
                         if (!(pressedButtons & Qt.LeftButton) || root.recording || (mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier))) return
                         const delta = mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStartX
                         const pointerY = mapToItem(scroll.contentItem, mouse.x, mouse.y).y
-                        root.updateGroupLane(Math.floor((pointerY-root.rulerHeight)/root.laneHeight)-originalLane)
+                        editor.updateGroupLane(Math.floor((pointerY-root.rulerHeight)/root.laneHeight)-originalLane)
                         const verticalOnly = root.editLaneDelta !== 0 && Math.abs(delta) < Qt.styleHints.startDragDistance
-                        root.updateGroupEdit(verticalOnly ? 0 : root.snapBeat(originalBeat + delta / root.beatWidth) - originalBeat)
+                        editor.updateDrag(originalBeat, delta / root.beatWidth, verticalOnly)
                     }
                     onReleased: mouse => {
                         if (mouse.button === Qt.LeftButton) {
                             if (root.selecting) root.finishSelection()
-                            else root.commitGroupEdit()
+                            else editor.commitGroupEdit()
                         }
                     }
-                    onCanceled: { root.editOperation = ""; root.editDelta = 0; root.editLaneDelta = 0; root.selecting = false }
+                    onCanceled: { editor.cancelEdit(); editor.cancelSelection() }
                     onClicked: mouse => {
                         if (mouse.button !== Qt.RightButton) return
                         clipContextMenu.targetTrackId = clipItem.trackId
@@ -539,18 +419,18 @@ Item {
                         property real originalStart: 0
                         property real originalEnd: 0
                         onPressed: mouse => {
-                            root.selectClip(clipItem.trackId, clipItem.clipId, false, true)
+                            editor.selectClip(clipItem.trackId, clipItem.clipId, false, true)
                             pointerStart = mapToItem(scroll.contentItem, mouse.x, mouse.y).x
-                            originalStart = clipItem.startBeat; originalEnd = clipItem.startBeat + clipItem.lengthBeats
-                            root.editOperation = "trimStart"; root.editDelta = 0
+                            originalStart = clipItem.startBeat
+                            editor.beginEdit("trimStart")
                         }
                         onPositionChanged: mouse => {
                             if (!pressed || root.recording) return
                             const delta = (mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStart) / root.beatWidth
-                            root.updateGroupEdit(root.snapBeat(originalStart + delta) - originalStart)
+                            editor.updateDrag(originalStart, delta)
                         }
-                        onReleased: root.commitGroupEdit()
-                        onCanceled: { root.editOperation = ""; root.editDelta = 0 }
+                        onReleased: editor.commitGroupEdit()
+                        onCanceled: { editor.cancelEdit() }
                         ToolTip.visible: containsMouse; ToolTip.text: "Drag to trim the start"
                     }
                 }
@@ -575,14 +455,14 @@ Item {
                         function updatePreview(mouseX) {
                             const pointerX = mapToItem(scroll.contentItem, mouseX, height / 2).x
                             const delta = (pointerX - pointerStartX) / root.beatWidth
-                            root.updateGroupEdit(root.snapBeat(lengthStart + delta) - lengthStart)
+                            editor.updateDrag(lengthStart, delta)
                         }
 
                         onPressed: mouse => {
-                            root.selectClip(clipItem.trackId, clipItem.clipId, false, true)
+                            editor.selectClip(clipItem.trackId, clipItem.clipId, false, true)
                             pointerStartX = mapToItem(scroll.contentItem, mouse.x, mouse.y).x
-                            lengthStart = clipItem.startBeat + clipItem.lengthBeats
-                            root.editOperation = "resize"; root.editDelta = 0
+                            lengthStart = editor.clipEndBeat(clipItem.trackId, clipItem.clipId)
+                            editor.beginEdit("resize")
                         }
                         onPositionChanged: mouse => {
                             if (pressed)
@@ -590,9 +470,9 @@ Item {
                         }
                         onReleased: mouse => {
                             updatePreview(mouse.x)
-                            root.commitGroupEdit()
+                            editor.commitGroupEdit()
                         }
-                        onCanceled: { root.editOperation = ""; root.editDelta = 0 }
+                        onCanceled: { editor.cancelEdit() }
                         ToolTip.visible: containsMouse
                         ToolTip.text: root.snapStepBeats > 0 ? "Drag to trim or extend on the snap grid" : "Drag to trim or extend freely"
                         ToolTip.delay: 450
@@ -604,8 +484,8 @@ Item {
         MouseArea {
             x: 0; y: 0; width: root.contentWidth; height: root.rulerHeight; z: 3
             acceptedButtons: Qt.LeftButton
-            onPressed: mouse => root.setPlayhead(mouse.x)
-            onPositionChanged: mouse => { if (pressed) root.setPlayhead(mouse.x) }
+            onPressed: mouse => editor.seek(mouse.x / root.beatWidth)
+            onPositionChanged: mouse => { if (pressed) editor.seek(mouse.x / root.beatWidth) }
             cursorShape: Qt.PointingHandCursor
         }
 
@@ -616,11 +496,11 @@ Item {
             acceptedButtons: Qt.LeftButton
             onPressed: mouse => root.beginSelection(mouse.x, mouse.y, !!(mouse.modifiers & Qt.ShiftModifier))
             onPositionChanged: mouse => {
-                if (pressed) { root.selectionEndX = mouse.x; root.selectionEndY = mouse.y }
+                if (pressed) { root.updateSelection(mouse.x, mouse.y) }
             }
             onReleased: root.finishSelection()
-            onCanceled: { root.selecting = false; root.hasSelection = false }
-            onDoubleClicked: mouse => root.createClipAt(mouse.x, mouse.y)
+            onCanceled: { editor.cancelSelection() }
+            onDoubleClicked: mouse => editor.createClipAt(mouse.x / root.beatWidth, Math.floor(mouse.y / root.laneHeight))
         }
         Rectangle {
             objectName: "timelineSelection"

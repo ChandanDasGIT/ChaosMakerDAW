@@ -9,22 +9,28 @@
 #include <memory>
 #include <map>
 #include <QPointer>
-#include "wrapper/session/tracklistmodel.h"
+#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
 class TakeRecorder;
 struct RecordingGroup;
+#include "recording/recordingcontroller.h"
+#include "session/projectsession.h"
 
-class GuitarSuiteModel;
+class GuitarSuiteEditorWrapper;
+using GuitarSuiteModel = GuitarSuiteEditorWrapper;
 class GuitarSuite;
 class TrackInput;
 struct EngineSnapshot;
+#include "engine/snapshotbuilder.h"
 
 class QQmlEngine;
 class QJSEngine;
 class AudioEngine;
 class AudioDevice;
 
+#include "audioenginewrapper.h"
+
 // The engine in QML. Phase 1 adds the AudioEngine here: start, stop, xrun count and the test tone.
-class EngineController : public QObject {
+class EngineController : public AudioEngineWrapper {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
@@ -79,13 +85,13 @@ public:
     void setCountInEnabled(bool enabled);
     bool countingIn() const;
     int countInBeatsRemaining() const;
-    bool takeBusy() const { return !m_takes.empty(); }
+    bool takeBusy() const { return m_recordingController.isBusy(); }
     QVariantList recordingTracks() const;
     QVariantList monitoredTracks() const;
     double positionBeats() const;
     double positionSeconds() const;
-    double recordingStartBeats() const { return m_recordStartBeat; }
-    int recordingTrackId() const { return m_recordTrack; }
+    double recordingStartBeats() const { return m_recordingController.recordStartBeat(); }
+    int recordingTrackId() const { return m_recordingController.primaryRecordingTrackId(); }
     int numerator() const { return m_numerator; }
     int denominator() const { return m_denominator; }
     bool repeating() const { return m_repeating; }
@@ -96,14 +102,16 @@ public:
     QString transportMessage() const { return m_transportMessage; }
     bool restoreSessionOnStartup() const;
     void setRestoreSessionOnStartup(bool enabled);
-    Q_INVOKABLE void attachProject(TrackListModel* model);
+    Q_INVOKABLE void attachProject(TrackListWrapper* model);
     Q_INVOKABLE void transportAction(const QString& action);
     Q_INVOKABLE void seekBeat(double beat);
     Q_INVOKABLE bool setRepeatRange(double startBeat, double endBeat);
     Q_INVOKABLE void setMeter(int numerator, int denominator);
     Q_INVOKABLE bool saveSession();
-    QUrl projectFile() const { return m_projectFile; }
-    bool projectDirty() const { return m_projectDirty; }
+    QUrl projectFile() const {
+        return m_projectSession.currentFilePath().empty() ? QUrl() : QUrl::fromLocalFile(QString::fromStdString(m_projectSession.currentFilePath()));
+    }
+    bool projectDirty() const { return m_projectSession.isDirty(); }
     bool projectLoading() const { return bool(m_loadingProject); }
     Q_INVOKABLE bool saveProject(const QUrl& file = QUrl());
     Q_INVOKABLE bool openProject(const QUrl& file);
@@ -164,9 +172,9 @@ private:
     void finishProjectLoad();
     void cancelProjectLoad();
     void bindTrackEffects(int trackId, GuitarSuiteModel* model);
-    QUrl m_projectFile, m_loadingFile;
-    bool m_projectDirty = false;
-    std::unique_ptr<TrackListModel> m_loadingProject;
+    QUrl m_loadingFile;
+    ProjectSession m_projectSession;
+    std::unique_ptr<TrackListWrapper> m_loadingProject;
     std::vector<GuitarSuiteModel*> m_loadingEffects;
     QString m_loadingWarning;
     explicit EngineController(QObject* parent);
@@ -180,13 +188,8 @@ private:
     void clearTrackEffects();
     void watchEffects(GuitarSuiteModel* model);
     bool effectsBusy() const;
-    struct TrackEffects {
-        std::shared_ptr<TrackMeters> meters = std::make_shared<TrackMeters>();
+    struct TrackEffects : public SnapshotBuilder::TrackEffects {
         GuitarSuiteModel* model = nullptr;
-        std::shared_ptr<TrackInput> input, playbackInput;
-        std::shared_ptr<GuitarSuite> chain, playbackChain;
-        int inputChannel = -1;
-        QString source;
     };
     std::map<int, TrackEffects> m_trackEffects;
     int m_monitoredTrack = -1;
@@ -201,18 +204,14 @@ private:
     bool postRepeatLoop();
     bool postMetronome(bool enabled, double volume);
     bool postTransport(int type, qint64 a = 0, qint64 b = 0);
-    QPointer<TrackListModel> m_project;
-    std::map<int,std::unique_ptr<TakeRecorder>> m_takes;
-    std::unique_ptr<RecordingGroup> m_group;
-    QSet<int> m_attachedTakes;
+    QPointer<TrackListWrapper> m_project;
+    RecordingController m_recordingController;
     QTimer m_sessionTimer;
     bool m_repeating = false, m_shutdown = false, m_restoring = false, m_sessionSaveBlocked = false, m_restoringPreset = false;
-    int m_recordTrack = -1, m_numerator = 4, m_denominator = 4;
-    double m_recordStartBeat = 0;
+    int m_numerator = 4, m_denominator = 4;
     double m_repeatStartBeat = 0, m_repeatEndBeat = 0;
     QString m_transportMessage;
     QString m_status = QStringLiteral("not started");
-    std::unique_ptr<AudioEngine> m_engine;
     GuitarSuiteModel* m_guitarSuite = nullptr;
     QTimer m_snapshotTimer;
     QTimer m_meterTimer;
@@ -221,7 +220,6 @@ private:
     double m_bpm = 120.0;
     bool m_metronomeEnabled = false, m_countInEnabled = false, m_countInMessagePending = false;
     double m_metronomeVolume = 0.5;
-    bool m_audioReady = false;
     bool m_monitorEnabled = false;
     bool m_inputConnected = false;
     bool m_outputConnected = false;

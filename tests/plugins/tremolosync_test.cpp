@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "plugins/tremolo/tremolo.h"
+#include "instruments/guitar/plugins/tremolo/tremolo.h"
 #include "engine/audioengine.h"
 #include <limits>
 

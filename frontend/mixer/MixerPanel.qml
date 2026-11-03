@@ -8,6 +8,11 @@ Rectangle {
     property var levels: EngineController.trackLevels
     readonly property int stripCount: trackStrips.count
 
+    MixerPanelWrapper {
+        id: panelWrapper
+        trackList: root.trackModel instanceof TrackListWrapper ? root.trackModel : null
+    }
+
     color: "#1d1d1d"
     border.color: Theme.divider
     Text {
@@ -45,7 +50,7 @@ Rectangle {
                     required property bool isSolo
                     required property real volume
                     readonly property var levels: root.levels[String(trackId)] ?? ({})
-                    property real channelWidth: 108
+                    property real channelWidth: panelWrapper.defaultStripWidth
                     objectName: "mixerStrip" + trackId
                     width: channelWidth
                     height: stripRow.height
@@ -72,7 +77,7 @@ Rectangle {
                             Layout.fillWidth: true
                         }
                         Text {
-                            text: strip.volume > 0 ? (20 * Math.log(strip.volume) / Math.LN10).toFixed(1) + " dB" : "−∞ dB"
+                            text: panelWrapper.formatVolume(strip.volume)
                             color: Theme.textMuted
                             font.pixelSize: 10
                             Layout.alignment: Qt.AlignHCenter
@@ -88,16 +93,16 @@ Rectangle {
                                 Layout.preferredWidth: 24
                                 Layout.alignment: Qt.AlignHCenter
                                 orientation: Qt.Vertical
-                                from: 0; to: 2; stepSize: 0.01
+                                from: panelWrapper.minVolume; to: panelWrapper.maxVolume; stepSize: 0.01
                                 value: strip.volume
-                                onMoved: root.trackModel.setVolume(strip.trackId, value)
+                                onMoved: root.trackModel ? root.trackModel.setVolume(strip.trackId, value) : panelWrapper.setVolume(strip.trackId, value)
                                 TapHandler {
                                     acceptedButtons: Qt.LeftButton
                                     // Apply after the slider handles the mouse release.
-                                    onDoubleTapped: Qt.callLater(() => root.trackModel.setVolume(strip.trackId, 1.0))
+                                    onDoubleTapped: Qt.callLater(() => root.trackModel ? root.trackModel.setVolume(strip.trackId, panelWrapper.defaultVolume) : panelWrapper.resetVolume(strip.trackId))
                                 }
                                 ToolTip.visible: hovered
-                                ToolTip.text: "Track volume " + Math.round(value * 100) + "%; double-click for 0 dB"
+                                ToolTip.text: panelWrapper.formatVolumeTooltip(value)
                             }
                             StereoLevelMeter {
                                 objectName: "mixerInput" + strip.trackId
@@ -129,21 +134,21 @@ Rectangle {
                                 objectName: "mixerMute" + strip.trackId
                                 property bool active: strip.isMuted
                                 text: "M"; implicitWidth: 30; implicitHeight: 24
-                                onClicked: root.trackModel.setMuted(strip.trackId, !active)
+                                onClicked: root.trackModel ? root.trackModel.setMuted(strip.trackId, !active) : panelWrapper.setMuted(strip.trackId, !active)
                                 contentItem: Text { text: parent.text; color: parent.active ? "#ffb0a8" : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                                 background: Rectangle { color: parent.active ? "#663238" : "#303030"; radius: 3 }
                                 ToolTip.visible: hovered
-                                ToolTip.text: active ? "Mute enabled" : "Mute disabled"
+                                ToolTip.text: panelWrapper.formatMuteTooltip(active)
                             }
                             ToolButton {
                                 objectName: "mixerSolo" + strip.trackId
                                 property bool active: strip.isSolo
                                 text: "S"; implicitWidth: 30; implicitHeight: 24
-                                onClicked: root.trackModel.setSolo(strip.trackId, !active)
+                                onClicked: root.trackModel ? root.trackModel.setSolo(strip.trackId, !active) : panelWrapper.setSolo(strip.trackId, !active)
                                 contentItem: Text { text: parent.text; color: parent.active ? "#ffe08a" : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                                 background: Rectangle { color: parent.active ? "#665322" : "#303030"; radius: 3 }
                                 ToolTip.visible: hovered
-                                ToolTip.text: active ? "Solo enabled" : "Solo disabled"
+                                ToolTip.text: panelWrapper.formatSoloTooltip(active)
                             }
                         }
                     }
@@ -173,7 +178,7 @@ Rectangle {
                             onPositionChanged: mouse => {
                                 if (pressed) {
                                     const pointerX = mapToItem(root, mouse.x, mouse.y).x
-                                    strip.channelWidth = Math.max(82, Math.min(220, startWidth + pointerX - startX))
+                                    strip.channelWidth = panelWrapper.clampStripWidth(startWidth + pointerX - startX)
                                 }
                             }
                         }

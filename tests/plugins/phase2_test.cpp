@@ -1,14 +1,14 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "plugins/noisegate/noisegate.h"
-#include "plugins/compressor/compressor.h"
-#include "plugins/wah/wah.h"
-#include "plugins/chorus/chorus.h"
-#include "plugins/tremolo/tremolo.h"
-#include "plugins/tuner/tuner.h"
-#include "plugins/tuner/standardtuning.h"
-#include "plugins/delay/delaypedal.h"
-#include "plugins/guitarsuite/guitarsuite.h"
+#include "instruments/guitar/plugins/noisegate/noisegate.h"
+#include "instruments/guitar/plugins/compressor/compressor.h"
+#include "instruments/guitar/plugins/wah/wah.h"
+#include "instruments/guitar/plugins/chorus/chorus.h"
+#include "instruments/guitar/plugins/tremolo/tremolo.h"
+#include "instruments/guitar/plugins/tuner/tuner.h"
+#include "instruments/guitar/plugins/tuner/standardtuning.h"
+#include "instruments/guitar/plugins/delay/delaypedal.h"
+#include "instruments/guitar/plugins/guitarsuite/guitarsuite.h"
 #include <memory>
 
 namespace {

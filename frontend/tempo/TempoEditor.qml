@@ -1,0 +1,70 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+Rectangle {
+    id: root
+    property real value: 120
+    signal valueEdited(real value)
+    implicitWidth: 124
+    implicitHeight: 29
+    radius: 6
+    color: "#191a1e"
+    border.color: field.activeFocus && !editor.acceptableInput ? Theme.record
+                  : field.activeFocus ? Theme.accent : "#3a3d45"
+
+    TempoEditorWrapper {
+        id: editor
+        value: root.value
+        onValueEdited: value => root.valueEdited(value)
+    }
+    RowLayout {
+        anchors.fill: parent
+        anchors.margins: 2
+        spacing: 0
+        ToolButton {
+            objectName: "bpmDecrease"
+            Layout.preferredWidth: 23; Layout.fillHeight: true
+            text: "−"
+            onClicked: editor.adjust(-1)
+            contentItem: Text { text: "−"; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+            background: Rectangle { color: parent.down ? "#414650" : parent.hovered ? "#2d3038" : "transparent"; radius: 4 }
+            ToolTip.visible: hovered; ToolTip.text: "Decrease BPM by 1"
+        }
+        TextField {
+            id: field
+            objectName: "bpmField"
+            Layout.fillWidth: true; Layout.fillHeight: true
+            padding: 0
+            text: editor.text
+            onTextEdited: editor.text = text
+            color: Theme.text
+            font.pixelSize: 12; font.bold: true
+            horizontalAlignment: TextInput.AlignHCenter
+            verticalAlignment: TextInput.AlignVCenter
+            selectByMouse: true
+            activeFocusOnTab: true
+            inputMethodHints: Qt.ImhFormattedNumbersOnly
+            background: Item {}
+            Accessible.name: "Tempo in BPM"
+            onActiveFocusChanged: {
+                editor.editing = activeFocus
+                if (activeFocus) Qt.callLater(function() { if (field.activeFocus) field.selectAll() })
+            }
+            onAccepted: { editor.commit(); focus = false }
+            onEditingFinished: editor.commit()
+            ToolTip.visible: hovered
+            ToolTip.text: "Enter 0.01–10000 BPM; press Enter or click elsewhere to apply"
+            ToolTip.delay: 450
+        }
+        ToolButton {
+            objectName: "bpmIncrease"
+            Layout.preferredWidth: 23; Layout.fillHeight: true
+            text: "+"
+            onClicked: editor.adjust(1)
+            contentItem: Text { text: "+"; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+            background: Rectangle { color: parent.down ? "#414650" : parent.hovered ? "#2d3038" : "transparent"; radius: 4 }
+            ToolTip.visible: hovered; ToolTip.text: "Increase BPM by 1"
+        }
+    }
+}

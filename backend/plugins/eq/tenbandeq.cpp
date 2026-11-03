@@ -1,4 +1,5 @@
 #include "tenbandeq.h"
+#include "core/valueformat.h"
 
 #include <algorithm>
 #include <cmath>
@@ -10,6 +11,49 @@ TenBandEq::TenBandEq()
         m_gains[static_cast<std::size_t>(band)] = &addParameter(id, id, -12.0f, 12.0f, 0.0f, "dB");
         m_appliedGain[static_cast<std::size_t>(band)] = 0.0f;
     }
+}
+
+const std::array<BandDescriptor, 10>& TenBandEq::bandDescriptors()
+{
+    static const std::array<BandDescriptor, 10> descriptors = {{
+        {0, 31.25f,  "31",  "31.25 Hz", -12.0f, 12.0f, 0.0f, 0.5f},
+        {1, 62.5f,   "62",  "62.5 Hz",  -12.0f, 12.0f, 0.0f, 0.5f},
+        {2, 125.0f,  "125", "125 Hz",   -12.0f, 12.0f, 0.0f, 0.5f},
+        {3, 250.0f,  "250", "250 Hz",   -12.0f, 12.0f, 0.0f, 0.5f},
+        {4, 500.0f,  "500", "500 Hz",   -12.0f, 12.0f, 0.0f, 0.5f},
+        {5, 1000.0f, "1k",  "1 kHz",    -12.0f, 12.0f, 0.0f, 0.5f},
+        {6, 2000.0f, "2k",  "2 kHz",    -12.0f, 12.0f, 0.0f, 0.5f},
+        {7, 4000.0f, "4k",  "4 kHz",    -12.0f, 12.0f, 0.0f, 0.5f},
+        {8, 8000.0f, "8k",  "8 kHz",    -12.0f, 12.0f, 0.0f, 0.5f},
+        {9, 16000.0f,"16k", "16 kHz",   -12.0f, 12.0f, 0.0f, 0.5f}
+    }};
+    return descriptors;
+}
+
+const BandDescriptor& TenBandEq::bandDescriptor(int index)
+{
+    const auto& descriptors = bandDescriptors();
+    if (index < 0 || static_cast<std::size_t>(index) >= descriptors.size()) {
+        static const BandDescriptor fallback{};
+        return fallback;
+    }
+    return descriptors[static_cast<std::size_t>(index)];
+}
+
+std::string TenBandEq::formatGain(float gainDb)
+{
+    return valueformat::withUnit(gainDb, 1, "dB");
+}
+
+bool TenBandEq::isValidGain(float gainDb) noexcept
+{
+    return std::isfinite(gainDb) && gainDb >= MinGainDb && gainDb <= MaxGainDb;
+}
+
+float TenBandEq::clampGain(float gainDb) noexcept
+{
+    if (!std::isfinite(gainDb)) return DefaultGainDb;
+    return std::clamp(gainDb, MinGainDb, MaxGainDb);
 }
 
 void TenBandEq::prepare(double sampleRate, int)
@@ -30,7 +74,14 @@ void TenBandEq::reset() noexcept
 void TenBandEq::setBandGain(int band, float gainDb) noexcept
 {
     if (band >= 0 && band < static_cast<int>(m_gains.size()))
-        m_gains[static_cast<std::size_t>(band)]->set(gainDb);
+        m_gains[static_cast<std::size_t>(band)]->set(clampGain(gainDb));
+}
+
+float TenBandEq::bandGain(int band) const noexcept
+{
+    if (band >= 0 && band < static_cast<int>(m_gains.size()) && m_gains[static_cast<std::size_t>(band)])
+        return m_gains[static_cast<std::size_t>(band)]->get();
+    return 0.0f;
 }
 
 void TenBandEq::updateBand(int band, float gainDb) noexcept

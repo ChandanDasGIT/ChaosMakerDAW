@@ -12,19 +12,19 @@ Popup {
     property bool hasLiveInput: true
     property bool recordDry: false
     property var effectsModel: null
-    property string selectedEffect: "eq"
-    readonly property bool supportsGuitarSuite: hasLiveInput && trackType !== "Vocal"
-    onSupportsGuitarSuiteChanged: {
-        if (!supportsGuitarSuite && selectedEffect === "pedals") selectedEffect = "eq"
+    property alias selectedEffect: panelBridge.selectedEffect
+    readonly property bool supportsGuitarSuite: panelBridge.supportsGuitarSuite
+    readonly property var effectEntries: panelBridge.effectEntries
+
+    TrackEffectsPanelWrapper {
+        id: panelBridge
+        trackId: root.trackId
+        trackName: root.trackName
+        trackType: root.trackType
+        hasLiveInput: root.hasLiveInput
+        recordDry: root.recordDry
     }
-    onSelectedEffectChanged: {
-        if (!supportsGuitarSuite && selectedEffect === "pedals") selectedEffect = "eq"
-    }
-    // Add future editor entries here; navigation stays in the same workspace.
-    readonly property var effectEntries: [
-        { key: "eq", title: "Equalizer", subtitle: "10-band tone shaping", available: true },
-        { key: "pedals", title: "GuitarSuite", subtitle: "Pedals and signal chain", available: supportsGuitarSuite }
-    ].filter(entry => entry.available)
+
     parent: Overlay.overlay
     x: (parent.width - width) / 2
     y: (parent.height - height) / 2
@@ -49,7 +49,7 @@ Popup {
                     Layout.fillWidth: true
                     spacing: 3
                     Text { text: root.trackName + " · Effects"; color: Theme.text; font.pixelSize: 17; font.bold: true }
-                    Text { text: root.recordDry ? "Dry recording · current effects are applied during playback" : "Print FX · effects are baked into new recordings"; color: Theme.textMuted; font.pixelSize: 11 }
+                    Text { text: panelBridge.recordModeDescription; color: Theme.textMuted; font.pixelSize: 11 }
                 }
                 ComboBox {
                     objectName: "trackRecordingMode"
@@ -103,7 +103,7 @@ Popup {
                             implicitHeight: 62
                             visible: modelData.available && (modelData.title + " " + modelData.subtitle).toLowerCase().includes(search.text.toLowerCase())
                             highlighted: root.selectedEffect === modelData.key
-                            onClicked: root.selectedEffect = modelData.key
+                            onClicked: panelBridge.selectEffect(modelData.key)
                             background: Rectangle {
                                 radius: 6
                                 color: parent.highlighted ? "#344044" : parent.hovered ? "#2b3038" : "transparent"
@@ -130,7 +130,7 @@ Popup {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 currentIndex: root.supportsGuitarSuite && root.selectedEffect === "pedals" ? 1 : 0
-                TrackEqualizer {
+                Tenbandeq {
                     trackModel: root.trackModel
                     trackId: root.trackId
                     trackName: root.trackName

@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "audiofile/impulsewav.h"
+#include "instruments/guitar/audiofile/impulsewav.h"
 #include <bit>
 #include <cmath>
 #include <chrono>

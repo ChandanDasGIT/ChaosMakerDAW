@@ -1,0 +1,126 @@
+#include "testkit.h"
+#include "engine/playbackcontrols.h"
+
+TEST(playbackcontrols, state_transitions)
+{
+    PlaybackControls ctrl;
+    CHECK(ctrl.state() == PlaybackControls::State::Stopped);
+    CHECK(!ctrl.isPlaying());
+    CHECK(!ctrl.isRecording());
+
+    ctrl.setState(PlaybackControls::State::Playing);
+    CHECK(ctrl.isPlaying());
+    CHECK(!ctrl.isRecording());
+
+    ctrl.setState(PlaybackControls::State::Recording);
+    CHECK(ctrl.isPlaying());
+    CHECK(ctrl.isRecording());
+
+    ctrl.setState(PlaybackControls::State::Paused);
+    CHECK(!ctrl.isPlaying());
+    CHECK(!ctrl.isRecording());
+
+    ctrl.setRepeating(true);
+    CHECK(ctrl.isRepeating());
+    ctrl.setRepeating(false);
+    CHECK(!ctrl.isRepeating());
+
+    ctrl.setCountingIn(true);
+    CHECK(ctrl.isCountingIn());
+}
+
+TEST(playbackcontrols, position_conversions)
+{
+    const double sampleRate = 48000.0;
+    const double bpm = 120.0; // 2 beats per second -> 24000 samples per beat
+
+    CHECK(PlaybackControls::beatsToSamples(1.0, sampleRate, bpm) == 24000);
+    CHECK(PlaybackControls::samplesToBeats(24000, sampleRate, bpm) == 1.0);
+    CHECK(PlaybackControls::beatsToSamples(4.0, sampleRate, bpm) == 96000);
+
+    CHECK(PlaybackControls::samplesToSeconds(48000, sampleRate) == 1.0);
+    CHECK(PlaybackControls::secondsToSamples(1.5, sampleRate) == 72000);
+
+    CHECK(PlaybackControls::calculateForwardSeekBeat(0.0, 4, 4) == 4.0);
+    CHECK(PlaybackControls::calculateForwardSeekBeat(2.0, 3, 4) == 5.0);
+}
+
+TEST(playbackcontrols, formatting)
+{
+    CHECK(PlaybackControls::formatTime(0.0) == "00:00:00.000");
+    CHECK(PlaybackControls::formatTime(65.432) == "00:01:05.432");
+    CHECK(PlaybackControls::formatTime(3661.123) == "01:01:01.123");
+
+    CHECK(PlaybackControls::formatBarsBeats(0.0, 4, 4) == "1.1.00");
+    CHECK(PlaybackControls::formatBarsBeats(4.0, 4, 4) == "2.1.00");
+    CHECK(PlaybackControls::formatBarsBeats(5.5, 4, 4) == "2.2.50");
+}
+
+TEST(playbackcontrols, repeat_range_and_loop_calculation)
+{
+    PlaybackControls ctrl;
+    const double sampleRate = 48000.0;
+    const double bpm = 120.0;
+
+    CHECK(!ctrl.hasExplicitRepeatRange());
+    auto autoLoop = ctrl.calculateLoopSamples(8.0, 4, 4, sampleRate, bpm);
+    CHECK(autoLoop.isValid);
+    CHECK(autoLoop.startSample == 0);
+    CHECK(autoLoop.endSample == 8 * 24000);
+
+    CHECK(ctrl.setRepeatRange(2.0, 6.0, sampleRate, bpm));
+    CHECK(ctrl.hasExplicitRepeatRange());
+    CHECK(ctrl.repeatRange().startBeat == 2.0);
+    CHECK(ctrl.repeatRange().endBeat == 6.0);
+
+    auto explicitLoop = ctrl.calculateLoopSamples(12.0, 4, 4, sampleRate, bpm);
+    CHECK(explicitLoop.isValid);
+    CHECK(explicitLoop.startSample == 2 * 24000);
+    CHECK(explicitLoop.endSample == 6 * 24000);
+
+    // Invalid range
+    CHECK(!ctrl.setRepeatRange(6.0, 2.0, sampleRate, bpm));
+    CHECK(!ctrl.setRepeatRange(-1.0, 4.0, sampleRate, bpm));
+}
+
+TEST(playbackcontrols, action_evaluation)
+{
+    PlaybackControls ctrl;
+    const double sampleRate = 48000.0;
+    const double bpm = 120.0;
+
+    // Play without audio
+    auto plan1 = ctrl.evaluateAction(PlaybackControls::Action::Play, 0.0, sampleRate, bpm,
+                                     4, 4, 0.0, false, true, true, false);
+    CHECK(plan1.command == PlaybackControls::ActionPlan::Command::Error);
+
+    // Play with audio ready
+    auto plan2 = ctrl.evaluateAction(PlaybackControls::Action::Play, 0.0, sampleRate, bpm,
+                                     4, 4, 0.0, true, true, true, false);
+    CHECK(plan2.command == PlaybackControls::ActionPlan::Command::Play);
+
+    // Pause & Stop
+    auto pausePlan = ctrl.evaluateAction(PlaybackControls::Action::Pause, 0.0, sampleRate, bpm,
+                                         4, 4, 0.0, true, true, true, false);
+    CHECK(pausePlan.command == PlaybackControls::ActionPlan::Command::Pause);
+
+    auto stopPlan = ctrl.evaluateAction(PlaybackControls::Action::Stop, 0.0, sampleRate, bpm,
+                                        4, 4, 0.0, true, true, true, false);
+    CHECK(stopPlan.command == PlaybackControls::ActionPlan::Command::Stop);
+
+    // Rewind
+    auto rewindPlan = ctrl.evaluateAction(PlaybackControls::Action::Rewind, 4.0, sampleRate, bpm,
+                                          4, 4, 0.0, true, true, true, false);
+    CHECK(rewindPlan.command == PlaybackControls::ActionPlan::Command::Seek);
+    CHECK(rewindPlan.argA == 0);
+
+    // Record without input
+    auto recPlan1 = ctrl.evaluateAction(PlaybackControls::Action::Record, 0.0, sampleRate, bpm,
+                                        4, 4, 0.0, true, false, true, false);
+    CHECK(recPlan1.command == PlaybackControls::ActionPlan::Command::Error);
+
+    // Record ready
+    auto recPlan2 = ctrl.evaluateAction(PlaybackControls::Action::Record, 0.0, sampleRate, bpm,
+                                        4, 4, 0.0, true, true, true, false);
+    CHECK(recPlan2.command == PlaybackControls::ActionPlan::Command::Record);
+}

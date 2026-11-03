@@ -1,8 +1,8 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "plugins/crunch/crunch.h"
-#include "plugins/distortion/distortion.h"
-#include "plugins/guitarsuite/guitarsuite.h"
+#include "instruments/guitar/plugins/crunch/crunch.h"
+#include "instruments/guitar/plugins/distortion/distortion.h"
+#include "instruments/guitar/plugins/guitarsuite/guitarsuite.h"
 #include "engine/audioengine.h"
 #include <memory>
 
