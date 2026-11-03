@@ -251,14 +251,14 @@ void EngineController::syncTrackEffects()
     }
     m_trackRoutingError.clear();
     QSet<QString> sources;
-    for(const auto& track:m_project->project().tracks())if(track->hasLiveInput() && track->recordArmed)
+    for(const auto& track:m_project->project().tracks())if(track->hasLiveInput() && (track->recordArmed || track->monitorEnabled))
         sources.insert(track->inputPort.empty() ? m_selectedInput : QString::fromStdString(track->inputPort));
     const bool capacity=sources.size()<=m_engine->inputChannelCapacity();
     if(!capacity)m_trackRoutingError="The audio device cannot route all selected track inputs independently.";
     m_monitoredTrack=-1;
     for(const auto& track:m_project->project().tracks()) {
         auto& fx=m_trackEffects.at(track->id);
-        if(!track->hasLiveInput() || !track->recordArmed)continue;
+        if(!track->hasLiveInput() || (!track->recordArmed && !track->monitorEnabled))continue;
         const QString source=track->inputPort.empty() ? m_selectedInput : QString::fromStdString(track->inputPort);
         if(!capacity || !m_inputPorts.contains(source)) {
             fx.inputChannel=-1;
@@ -274,11 +274,11 @@ void EngineController::syncTrackEffects()
             if(m_trackRoutingError.isEmpty())m_trackRoutingError="Could not connect track input: "+source;
             continue;
         }
-        if(m_monitoredTrack<0)m_monitoredTrack=track->id;
+        if(track->monitorEnabled && m_monitoredTrack<0)m_monitoredTrack=track->id;
     }
     const bool monitor=m_monitoredTrack>=0;
     if(monitor!=m_monitorEnabled)setCleanMonitorEnabled(monitor);
-    // Arm/input changes have already reached the model; notify even when the
+    // Monitor/arm/input changes have already reached the model; notify even when the
     // first monitored track stays the same so every editor updates membership.
     emit monitoredTrackChanged();
     if(!m_trackRoutingError.isEmpty())setStatus(m_trackRoutingError);
@@ -634,6 +634,7 @@ void EngineController::setBpm(double bpm)
 {
     if (!m_engine || !m_engine->setTempoBpm(bpm) || m_bpm == bpm) return;
     m_bpm = bpm;
+    if (m_repeating && !takeBusy()) postRepeatLoop();
     if (m_project) m_project->setTempo(bpm, m_numerator, m_denominator);
     emit bpmChanged(); emit transportChanged();
     if (!m_restoring) m_sessionTimer.start();
@@ -682,6 +683,7 @@ void EngineController::attachProject(TrackListModel* model) {
     m_restoringPreset = false;
     m_sessionSaveBlocked = false;
     m_project = model;
+    m_repeatStartBeat=0; m_repeatEndBeat=0;
     model->setSampleRate(m_engine->sampleRate() > 1000 ? m_engine->sampleRate() : 48000);
     m_restoring = true;
     if (restoreSessionOnStartup()) {
@@ -749,7 +751,7 @@ void EngineController::publishPlayback() {
             track.meters=fx.meters;
             track.inputChannel=fx.inputChannel;
             track.armed=document->hasLiveInput() && document->recordArmed;
-            track.monitoring=track.armed && fx.inputChannel>=0;
+            track.monitoring=document->hasLiveInput() && document->monitorEnabled && fx.inputChannel>=0;
             track.monitorChain.push_back(fx.input.get()); snapshot->keepProcessors.push_back(fx.input);
             if(fx.chain) { track.monitorChain.push_back(fx.chain.get()); snapshot->keepProcessors.push_back(fx.chain); }
         }
@@ -781,6 +783,29 @@ void EngineController::seekBeat(double beat) {
     if (samples > double(INT64_MAX / 4)) return;
     postTransport(int(EngineCommand::Type::Seek), std::llround(samples));
 }
+bool EngineController::postRepeatLoop() {
+    const double start=m_repeatEndBeat>m_repeatStartBeat ? m_repeatStartBeat : 0;
+    const double end=m_repeatEndBeat>m_repeatStartBeat ? m_repeatEndBeat
+        : (m_project ? std::max(m_project->contentEndBeats(),m_numerator*4.0/m_denominator) : 4);
+    const double rate=m_engine->sampleRate()>1000 ? m_engine->sampleRate() : 48000;
+    const double a=start*60*rate/m_bpm,b=end*60*rate/m_bpm;
+    if (!std::isfinite(a) || !std::isfinite(b) || b>=double(INT64_MAX/4) || std::llround(b)<=std::llround(a)) return false;
+    return postTransport(int(EngineCommand::Type::SetLoop),std::llround(a),std::llround(b));
+}
+
+bool EngineController::setRepeatRange(double startBeat, double endBeat) {
+    if (takeBusy() || !std::isfinite(startBeat) || !std::isfinite(endBeat) || startBeat<0
+        || (endBeat<=startBeat && (startBeat!=0 || endBeat!=0))) return false;
+    const double samples=endBeat*60*(m_engine->sampleRate()>1000 ? m_engine->sampleRate() : 48000)/m_bpm;
+    if (!std::isfinite(samples) || samples>=double(INT64_MAX/4)) return false;
+    const double oldStart=m_repeatStartBeat,oldEnd=m_repeatEndBeat;
+    m_repeatStartBeat=startBeat; m_repeatEndBeat=endBeat;
+    if (m_repeating && !postRepeatLoop()) {
+        m_repeatStartBeat=oldStart; m_repeatEndBeat=oldEnd; return false;
+    }
+    return true;
+}
+
 void EngineController::transportAction(const QString& action) {
     using Type = EngineCommand::Type;
     if (action == "stop") { postTransport(int(Type::Stop)); return; }
@@ -790,15 +815,13 @@ void EngineController::transportAction(const QString& action) {
     if (action == "forward") { seekBeat(positionBeats() + m_numerator * 4.0 / m_denominator); return; }
     if (action == "repeat") {
         if (takeBusy()) { setTransportMessage("Finish the take before changing repeat."); return; }
-        const double end = m_project ? std::max(m_project->contentEndBeats(), m_numerator * 4.0 / m_denominator) : 4;
-        const double rate = m_engine->sampleRate() > 1000 ? m_engine->sampleRate() : 48000;
-        if (postTransport(int(m_repeating ? Type::ClearLoop : Type::SetLoop), 0, std::max<qint64>(1, std::llround(std::min(double(INT64_MAX / 4), end * 60 * rate / m_bpm))))) {
+        if (m_repeating ? postTransport(int(Type::ClearLoop)) : postRepeatLoop()) {
             m_repeating = !m_repeating; emit transportChanged();
         }
         return;
     }
     if (action != "record") return;
-    if (takeBusy()) { postTransport(int(Type::StopRecording)); return; }
+    if (takeBusy()) { postTransport(int(Type::Pause)); return; }
     if (!m_audioReady || !m_inputConnected || !m_outputConnected || !m_project) {
         setTransportMessage("Recording needs a connected audio input and output."); return;
     }
@@ -845,7 +868,7 @@ QVariantList EngineController::monitoredTracks() const {
     QVariantList result;
     if(m_monitorEnabled && m_project)for(const auto& track:m_project->project().tracks()) {
         const auto it=m_trackEffects.find(track->id);
-        if(track->hasLiveInput() && track->recordArmed && it!=m_trackEffects.end() && it->second.inputChannel>=0)result.push_back(track->id);
+        if(track->hasLiveInput() && track->monitorEnabled && it!=m_trackEffects.end() && it->second.inputChannel>=0)result.push_back(track->id);
     }
     return result;
 }
@@ -958,7 +981,7 @@ void EngineController::finishProjectLoad() {
     m_project->adoptDocument(*m_loadingProject);
     m_numerator=m_project->project().tempo().numerator(); m_denominator=m_project->project().tempo().denominator();
     setBpm(m_project->project().tempo().bpm()); emit meterChanged();
-    m_repeating=false; m_engine->post({EngineCommand::Type::ClearLoop});
+    m_repeating=false; m_repeatStartBeat=0; m_repeatEndBeat=0; m_engine->post({EngineCommand::Type::ClearLoop});
     m_projectFile=m_loadingFile; m_loadingProject.reset(); m_sessionSaveBlocked=false;
     m_restoringPreset=false; m_restoring=false; refreshProject(); setProjectDirty(false);
     emit projectFileChanged(); emit projectLoadingChanged();

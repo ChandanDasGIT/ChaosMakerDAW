@@ -59,3 +59,56 @@ TEST(qtclipediting, split_and_both_trims_preserve_source_samples_and_undo_atomic
     CHECK(tracks.splitClipAtBeat(track,id,0)==-1); CHECK(!tracks.trimClipStartAtBeat(track,right,4));
     CHECK(audio->frames==48000 && audio->channels[0].size()==48000);
 }
+
+TEST(qtclipediting, merging_split_clips_preserves_audio_and_is_one_undoable_edit) {
+    TrackListModel tracks; const int track=tracks.addAudioTrack(),other=tracks.addAudioTrack();
+    auto audio=std::make_shared<AudioData>(); audio->path="merge.wav"; audio->sampleRate=24000; audio->frames=48000;
+    audio->channels={std::vector<float>(48000,0.25f)}; CHECK(tracks.attachTake(track,0,audio));
+    const int left=tracks.project().findTrack(track)->audioClips[0].id;
+    const int right=tracks.splitClipAtBeat(track,left,2); CHECK(right>=0);
+    const int unrelated=tracks.addClipAtBeat(other,0,4);
+    CHECK(!tracks.canMergeClips(track,left,unrelated)); CHECK(!tracks.mergeClips(track,left,left));
+    CHECK(tracks.canMergeClips(track,right,left)); CHECK(tracks.mergeClips(track,right,left));
+    auto clips=tracks.project().findTrack(track)->audioClips;
+    CHECK(clips.size()==1); CHECK(clips[0].id==left && clips[0].start==0 && clips[0].length==96000 && clips[0].sourceOffset==0);
+    CHECK(tracks.playbackSnapshot()->keepAudio.front().get()==audio.get());
+    CHECK(tracks.undo()); CHECK(tracks.project().findTrack(track)->audioClips.size()==2);
+    CHECK(tracks.redo()); CHECK(tracks.project().findTrack(track)->audioClips.size()==1);
+    CHECK(tracks.undo()); CHECK(tracks.moveClipAtBeat(track,right,3));
+    CHECK(!tracks.canMergeClips(track,left,right)); CHECK(!tracks.mergeClips(track,left,right));
+    CHECK(tracks.undo()); tracks.lockRecordingTrack(track);
+    CHECK(!tracks.mergeClips(track,left,right)); tracks.lockRecordingTrack(-1);
+    CHECK(tracks.project().findTrack(other)->audioClips.size()==1);
+    const int different=tracks.addAudioClip(track,"different.wav",48000,48000,24000);
+    CHECK(!tracks.canMergeClips(track,left,different));
+}
+
+TEST(qtclipediting, group_edits_across_tracks_are_atomic_and_preserve_offsets) {
+    TrackListModel tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack(),c=tracks.addAudioTrack();
+    const int x=tracks.addAudioClip(a,"x",48000,96000,24000);
+    const int y=tracks.addAudioClip(b,"y",72000,144000,48000);
+    const int z=tracks.addClipAtBeat(c,2,4);
+    QVariantList ids{x,y};
+    CHECK(tracks.editClips(ids,"move",2));
+    CHECK(tracks.project().findTrack(a)->audioClips[0].start==96000);
+    CHECK(tracks.project().findTrack(b)->audioClips[0].start==120000);
+    CHECK(tracks.project().findTrack(b)->audioClips[0].sourceOffset==48000);
+    CHECK(tracks.undo()); CHECK(tracks.project().findTrack(b)->audioClips[0].start==72000);
+    CHECK(tracks.redo()); CHECK(tracks.undo());
+    CHECK(!tracks.editClips(ids,"move",-3));
+    CHECK(tracks.project().findTrack(b)->audioClips[0].start==72000);
+    CHECK(tracks.editClips(ids,"trimStart",1));
+    CHECK(tracks.project().findTrack(a)->audioClips[0].sourceOffset==48000);
+    CHECK(tracks.project().findTrack(b)->audioClips[0].sourceOffset==72000);
+    CHECK(tracks.undo()); CHECK(tracks.editClips(ids,"resize",-1));
+    CHECK(tracks.project().findTrack(a)->audioClips[0].length==72000);
+    CHECK(tracks.project().findTrack(b)->audioClips[0].length==120000);
+    CHECK(tracks.undo()); CHECK(!tracks.editClips({x,99999},"delete"));
+    CHECK(tracks.project().findTrack(a)->audioClips.size()==1);
+    CHECK(tracks.editClips(ids,"delete"));
+    CHECK(tracks.project().findTrack(a)->audioClips.empty()); CHECK(tracks.project().findTrack(b)->audioClips.empty());
+    CHECK(tracks.project().findTrack(c)->audioClips[0].id==z);
+    CHECK(tracks.undo()); CHECK(tracks.project().findTrack(a)->audioClips[0].id==x);
+    CHECK(tracks.project().findTrack(b)->audioClips[0].id==y);
+    tracks.lockRecordingTrack(a); CHECK(!tracks.editClips(ids,"move",1));
+}

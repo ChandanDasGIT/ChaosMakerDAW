@@ -325,9 +325,14 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
         if (m_resetPlayback) for (auto* processor : track.chain) if (processor) processor->reset();
     }
     m_resetPlayback = false;
+    const bool bounded=snapshot && snapshot->playbackEnd>=0 && !m_looping && !m_recorder;
     for (int offset = 0; offset < frames && m_playing;) {
-        if (m_looping && !m_recorder && m_position >= m_loopEnd) m_position = m_loopStart;
+        if (bounded && m_position>=snapshot->playbackEnd) {
+            m_position=snapshot->playbackEnd; m_playing=false; m_resetPlayback=true; break;
+        }
+        if (m_looping && !m_recorder && (m_position < m_loopStart || m_position >= m_loopEnd)) m_position = m_loopStart;
         int count = std::min(m_fxBlockFrames, frames-offset);
+        if (bounded) count=int(std::min<std::int64_t>(count,snapshot->playbackEnd-m_position));
         if (m_looping && !m_recorder) count = int(std::min<std::int64_t>(count,m_loopEnd-m_position));
         for (int c=0;c<2;++c) {
             if (io.output.channelCount>0) std::copy_n(io.output.channel(std::min(c,io.output.channelCount-1))+offset,count,m_liveAudio[c].data());
@@ -390,6 +395,7 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
                 if(audible)io.output.channel(c)[offset+i]+=(channels[0][i]+m_printedAudio[0][i])*track.gain;
         }
         m_position=std::min<std::int64_t>(INT64_MAX/2,m_position+count); offset+=count;
+        if (bounded && m_position==snapshot->playbackEnd) { m_playing=false; m_resetPlayback=true; }
     }
     for(int c=0;c<io.output.channelCount;++c)for(int i=0;i<frames;++i) {
         float& sample=io.output.channel(c)[i]; sample=std::isfinite(sample)?std::clamp(sample,-1.0f,1.0f):0.0f;
@@ -422,8 +428,13 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
         }
     }
     for(int offset=0;offset<frames;) {
-        if(m_playing && m_looping && !m_recordingGroup && m_position>=m_loopEnd)m_position=m_loopStart;
+        const bool bounded=snapshot.playbackEnd>=0 && !m_looping && !m_recordingGroup;
+        if (bounded && m_playing && m_position>=snapshot.playbackEnd) {
+            m_position=snapshot.playbackEnd; m_playing=false; m_resetPlayback=true;
+        }
+        if(m_playing && m_looping && !m_recordingGroup && (m_position<m_loopStart || m_position>=m_loopEnd))m_position=m_loopStart;
         int count=std::min(m_fxBlockFrames,frames-offset);
+        if (bounded && m_playing) count=int(std::min<std::int64_t>(count,snapshot.playbackEnd-m_position));
         if(m_playing && m_looping && !m_recordingGroup)count=int(std::min<std::int64_t>(count,m_loopEnd-m_position));
         bool failed=false;
         for(const auto& track:snapshot.tracks) {
@@ -493,7 +504,7 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
                 float peak=0;
                 for(int i=0;i<count;++i) {
                     float value=0;
-                    if(audible)value=(dry[c][i]+m_printedAudio[c][i]+(live && m_cleanMonitorEnabled ? liveAudio[c][i] : 0))*track.gain;
+                    if(audible)value=(dry[c][i]+m_printedAudio[c][i]+(live && track.monitoring && m_cleanMonitorEnabled ? liveAudio[c][i] : 0))*track.gain;
                     liveAudio[c][i]=value;
                     if(std::isfinite(value))peak=std::max(peak,std::abs(value));
                 }
@@ -503,6 +514,7 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
                 io.output.channel(c)[offset+i]+=liveAudio[c==1?1:0][i];
         }
         if(m_playing)m_position=std::min<std::int64_t>(INT64_MAX/2,m_position+count);
+        if (bounded && m_playing && m_position==snapshot.playbackEnd) { m_playing=false; m_resetPlayback=true; }
         offset+=count;
         if(failed) {
             if(m_recordingGroup)m_recordingGroup->captureFailed.store(true,std::memory_order_relaxed);

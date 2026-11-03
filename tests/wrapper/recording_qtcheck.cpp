@@ -47,6 +47,13 @@ public:
         if(callback) callback->process({{in,missingInput?0:(multipleInputs?3:1),128},{out,2,128},nullptr,128});
     }
 };
+// These existing scenarios exercise recording with live monitoring enabled.
+// Set both controls explicitly now that arming no longer changes monitoring.
+bool setCaptureAndMonitor(TrackListModel& tracks, int id, bool enabled) {
+    const auto* track=tracks.project().findTrack(id);
+    if (track && track->hasLiveInput() && !tracks.setMonitorEnabled(id,enabled)) return false;
+    return tracks.setRecordArmed(id,enabled);
+}
 void application() {
     if(QCoreApplication::instance()) return;
     static int argc=1; static char name[]="recordingtests"; static char* argv[]{name,nullptr};
@@ -72,7 +79,7 @@ TEST(qtrecording, record_stop_creates_a_clip_and_play_renders_it_then_restores_a
         auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); TrackListModel tracks;
         controller.attachProject(&tracks); controller.setRestoreSessionOnStartup(true);
-        const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar"); tracks.setRecordArmed(guitar,true);
+        const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar"); setCaptureAndMonitor(tracks,guitar,true);
         controller.setBpm(90); controller.setMeter(7,8);
         auto* fx=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(guitar)); CHECK(fx->addPedal("Tremolo"));
         const int id=fx->data(fx->index(0),GuitarSuiteModel::PedalIdRole).toInt(); CHECK(fx->setParameter(id,"sustain",0));
@@ -91,7 +98,7 @@ TEST(qtrecording, record_stop_creates_a_clip_and_play_renders_it_then_restores_a
         const auto audio=snapshot->keepAudio.front(); CHECK(audio->channels.size()==2);
         recorded=audio->channels[0];
         CHECK(std::abs(recorded[64]-io->input[64])>0.001f);
-        tracks.setRecordArmed(guitar,false); tick(); io->process(); // publish completed take
+        setCaptureAndMonitor(tracks,guitar,false); tick(); io->process(); // publish completed take
         controller.transportAction("play"); io->process();
         for(int i=0;i<128;++i) CHECK_NEAR(io->output[i],recorded[i],1e-6);
         CHECK(controller.saveSession()); controller.shutdownSession();
@@ -112,7 +119,7 @@ TEST(qtrecording, closing_during_recording_finalizes_take_and_invalid_session_is
     Storage storage;
     auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
     EngineController controller(std::move(device),false); TrackListModel tracks; controller.attachProject(&tracks);
-    const int track=tracks.addAudioTrack(); tracks.setRecordArmed(track,true);
+    const int track=tracks.addAudioTrack(); setCaptureAndMonitor(tracks,track,true);
     controller.setRestoreSessionOnStartup(true); controller.transportAction("record"); io->process();
     controller.shutdownSession(); CHECK(tracks.clips().size()==1); CHECK(!controller.takeBusy());
     const QString path=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+"/last-session.json";
@@ -132,11 +139,11 @@ TEST(qtrecording, audio_takes_remain_dry_with_live_fx_loaded) {
     tick(); io->process();
     std::fill_n(io->input,128,0.25f);
     for(int id : {audio}) {
-        tracks.setRecordArmed(id,true);
+        setCaptureAndMonitor(tracks,id,true);
         controller.transportAction("record"); CHECK(controller.transportMessage().contains("dry input")); io->process();
         controller.transportAction("stop"); io->process();
         for(int i=0;i<100 && controller.takeBusy();++i) tick(10);
-        CHECK(!controller.takeBusy()); tracks.setRecordArmed(id,false);
+        CHECK(!controller.takeBusy()); setCaptureAndMonitor(tracks,id,false);
     }
     auto snapshot=tracks.playbackSnapshot(); CHECK(snapshot->keepAudio.size()==1);
     for(const auto& audio : snapshot->keepAudio) {
@@ -159,7 +166,7 @@ TEST(qtrecording, vocal_and_acoustic_share_live_input_fx_recording_and_session_p
             controller.setRestoreSessionOnStartup(true);
             const int track=vocal ? tracks.addVocalTrack() : tracks.addInstrumentTrackOfType(type);
             CHECK(tracks.setTrackInputPort(track,input)); CHECK(tracks.setVolume(track,0.5));
-            CHECK(tracks.setRecordArmed(track,true)); CHECK(tracks.cleanMonitorArmed());
+            CHECK(setCaptureAndMonitor(tracks,track,true)); CHECK(tracks.cleanMonitorArmed());
             CHECK(tracks.recordingTrackId()==track); CHECK(io->connectedInput==input.toStdString());
             const auto row=tracks.index(tracks.indexOfTrack(track));
             CHECK(tracks.data(row,TrackListModel::LiveInputRole).toBool());
@@ -184,7 +191,7 @@ TEST(qtrecording, vocal_and_acoustic_share_live_input_fx_recording_and_session_p
             CHECK(tracks.setMuted(track,true)); io->process();
             for(float sample : io->output) CHECK(sample==0);
             // Disarming must finish a take for either new instrument type.
-            CHECK(tracks.setRecordArmed(track,false)); tick(); io->process();
+            CHECK(setCaptureAndMonitor(tracks,track,false)); tick(); io->process();
             for(int i=0;i<100 && controller.takeBusy();++i) tick(10);
             CHECK(!controller.takeBusy()); CHECK(!controller.recording());
             auto snapshot=tracks.playbackSnapshot(); CHECK(snapshot->keepAudio.size()==1);
@@ -224,17 +231,17 @@ TEST(qtrecording, switching_live_instruments_keeps_legacy_single_track_queries_u
     CHECK(tracks.setTrackInputPort(vocal,"test:mic")); CHECK(tracks.setTrackInputPort(acoustic,"test:pickup"));
     CHECK(tracks.setVolume(vocal,0.4)); CHECK(tracks.setVolume(acoustic,0.8));
     CHECK(tracks.setEqBand(vocal,4,-3)); CHECK(tracks.setEqBand(acoustic,4,2));
-    CHECK(tracks.setRecordArmed(vocal,true)); CHECK(tracks.recordingTrackId()==vocal);
+    CHECK(setCaptureAndMonitor(tracks,vocal,true)); CHECK(tracks.recordingTrackId()==vocal);
     CHECK(tracks.cleanMonitorInput()=="test:mic"); CHECK_NEAR(tracks.cleanMonitorGain(),0.4,1e-6);
     CHECK(tracks.cleanMonitorEqBands()[4].toDouble()==-3);
-    CHECK(tracks.setRecordArmed(acoustic,true)); CHECK(tracks.recordingTrackId()==-1);
-    CHECK(tracks.setRecordArmed(vocal,false)); CHECK(tracks.recordingTrackId()==acoustic);
+    CHECK(setCaptureAndMonitor(tracks,acoustic,true)); CHECK(tracks.recordingTrackId()==-1);
+    CHECK(setCaptureAndMonitor(tracks,vocal,false)); CHECK(tracks.recordingTrackId()==acoustic);
     CHECK(tracks.cleanMonitorInput()=="test:pickup"); CHECK_NEAR(tracks.cleanMonitorGain(),0.8,1e-6);
     CHECK(tracks.cleanMonitorEqBands()[4].toDouble()==2);
     CHECK(tracks.setSolo(vocal,true)); CHECK(tracks.cleanMonitorGain()==0);
     CHECK(tracks.setSolo(vocal,false)); CHECK_NEAR(tracks.cleanMonitorGain(),0.8,1e-6);
-    CHECK(tracks.setRecordArmed(acoustic,false)); CHECK(!tracks.cleanMonitorArmed());
-    CHECK(tracks.setRecordArmed(drums,true)); CHECK(tracks.recordingTrackId()==-1); CHECK(!tracks.cleanMonitorArmed());
+    CHECK(setCaptureAndMonitor(tracks,acoustic,false)); CHECK(!tracks.cleanMonitorArmed());
+    CHECK(setCaptureAndMonitor(tracks,drums,true)); CHECK(tracks.recordingTrackId()==-1); CHECK(!tracks.cleanMonitorArmed());
 }
 
 TEST(qtrecording, each_track_owns_fx_trim_eq_and_recordings_and_restores_after_id_gaps) {
@@ -256,7 +263,7 @@ TEST(qtrecording, each_track_owns_fx_trim_eq_and_recordings_and_restores_after_i
         for(int row=0;row<a->count();++row) CHECK(a->setBypassed(a->data(a->index(row),GuitarSuiteModel::PedalIdRole).toInt(),true));
         a->setInputTrimDb(-6.020599913); b->setInputTrimDb(-12.041199827);
         std::fill_n(io->input,128,0.25f);
-        CHECK(tracks.setRecordArmed(guitar,true));
+        CHECK(setCaptureAndMonitor(tracks,guitar,true));
         for(int i=0;i<200;++i) io->process();
         CHECK_NEAR(io->output[64],0.125,1e-5);
         // Editing a different track must not switch the monitored chain or touch its parameters.
@@ -267,8 +274,8 @@ TEST(qtrecording, each_track_owns_fx_trim_eq_and_recordings_and_restores_after_i
         CHECK(tracks.setEqBand(vocal,5,0)); b->setInputTrimDb(-12.041199827);
         CHECK(b->removePedal(b->data(b->index(0),GuitarSuiteModel::PedalIdRole).toInt()));
         for(int track : {guitar,vocal,acoustic}) {
-            for(int other : {guitar,vocal,acoustic}) if(other!=track) tracks.setRecordArmed(other,false);
-            tracks.setRecordArmed(track,true);
+            for(int other : {guitar,vocal,acoustic}) if(other!=track) setCaptureAndMonitor(tracks,other,false);
+            setCaptureAndMonitor(tracks,track,true);
             for(int i=0;i<200;++i) io->process();
             const float expected=track==guitar ? 0.125f : track==vocal ? 0.0625f : 0.25f;
             CHECK_NEAR(io->output[64],expected,1e-5);
@@ -281,7 +288,7 @@ TEST(qtrecording, each_track_owns_fx_trim_eq_and_recordings_and_restores_after_i
             const auto& render=*std::find_if(snapshot->tracks.begin(),snapshot->tracks.end(),[track](const auto& t){return t.trackId==track;});
             CHECK(render.clips.size()==1);
             CHECK_NEAR(render.clips[0].audio->channels[0][64],expected,1e-5);
-            tracks.setRecordArmed(track,false);
+            setCaptureAndMonitor(tracks,track,false);
             tracks.setMuted(track,true); // keep previously recorded takes out of later monitor checks
         }
         CHECK(tracks.setEqBand(guitar,2,-3)); CHECK(tracks.setEqBand(vocal,5,4));
@@ -375,7 +382,7 @@ TEST(qtrecording, per_track_async_cabinet_restore_waits_for_all_tracks_and_prese
 TEST(qtprojectfiles, save_as_open_and_new_preserve_clips_fx_and_named_file_state) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
     EngineController controller(std::move(device),false); TrackListModel tracks; controller.attachProject(&tracks);
-    const int track=tracks.addVocalTrack(); CHECK(tracks.setRecordArmed(track,true));
+    const int track=tracks.addVocalTrack(); CHECK(setCaptureAndMonitor(tracks,track,true));
     auto* fx=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(track)); CHECK(fx->addPedal("Tremolo")); fx->setInputTrimDb(-5);
     std::fill_n(io->input,128,0.2f); controller.transportAction("record"); io->process();
     const QUrl first=QUrl::fromLocalFile(storage.dir.path()+"/first.chaos"), second=QUrl::fromLocalFile(storage.dir.path()+"/second.chaos");
@@ -420,22 +427,22 @@ TEST(qtrecording, dry_mode_keeps_raw_audio_and_edits_playback_without_changing_p
     EngineController controller(std::move(device),false); TrackListModel tracks; controller.attachProject(&tracks);
     const int track=tracks.addInstrumentTrackOfType("Electric Guitar"); CHECK(tracks.setRecordDry(track,true));
     auto* fx=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(track)); fx->setInputTrimDb(-6.020599913);
-    CHECK(tracks.setRecordArmed(track,true)); std::fill_n(io->input,128,0.25f);
+    CHECK(setCaptureAndMonitor(tracks,track,true)); std::fill_n(io->input,128,0.25f);
     for(int i=0;i<200;++i)io->process();
     controller.transportAction("record"); io->process(); CHECK(!tracks.setRecordDry(track,false));
     controller.transportAction("stop"); io->process(); for(int i=0;i<100 && controller.takeBusy();++i)tick(10);
     auto raw=tracks.playbackSnapshot()->keepAudio[0]; CHECK(raw->channels[0][64]==0.25f);
     CHECK(!tracks.project().findTrack(track)->audioClips[0].effectsPrinted);
-    CHECK(tracks.setRecordArmed(track,false)); controller.transportAction("play"); io->process();
+    CHECK(setCaptureAndMonitor(tracks,track,false)); controller.transportAction("play"); io->process();
     CHECK_NEAR(io->output[64],0.125,1e-5);
     controller.transportAction("stop"); io->process(); fx->setInputTrimDb(-12.041199827);
     controller.transportAction("play"); io->process(); CHECK_NEAR(io->output[64],0.0625,1e-5);
-    controller.transportAction("stop"); io->process(); CHECK(tracks.setRecordDry(track,false)); CHECK(tracks.setRecordArmed(track,true));
+    controller.transportAction("stop"); io->process(); CHECK(tracks.setRecordDry(track,false)); CHECK(setCaptureAndMonitor(tracks,track,true));
     for(int i=0;i<200;++i)io->process();
     controller.transportAction("record"); io->process(); controller.transportAction("stop"); io->process();
     for(int i=0;i<100 && controller.takeBusy();++i)tick(10);
     CHECK(tracks.project().findTrack(track)->audioClips[1].effectsPrinted);
-    CHECK(tracks.setRecordArmed(track,false)); fx->setInputTrimDb(0); controller.transportAction("play"); io->process();
+    CHECK(setCaptureAndMonitor(tracks,track,false)); fx->setInputTrimDb(0); controller.transportAction("play"); io->process();
     CHECK_NEAR(io->output[64],0.3125,1e-5); // dry at current trim + unchanged printed take
     CHECK(raw->channels[0][64]==0.25f);
     const QUrl path=QUrl::fromLocalFile(storage.dir.path()+"/modes.chaos"); CHECK(controller.saveProject(path));
@@ -449,7 +456,7 @@ TEST(qttrackmeters, controller_polls_track_levels_and_removes_stale_project_mete
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
     EngineController controller(std::move(device),false); TrackListModel tracks; controller.attachProject(&tracks);
     const int a=tracks.addAudioTrack(), b=tracks.addVocalTrack();
-    CHECK(tracks.setRecordArmed(a,true)); std::fill_n(io->input,128,0.25f); io->process(); tick(70);
+    CHECK(setCaptureAndMonitor(tracks,a,true)); std::fill_n(io->input,128,0.25f); io->process(); tick(70);
     auto levels=controller.trackLevels();
     CHECK_NEAR(levels[QString::number(a)].toMap()["inputLeftDb"].toDouble(),-12.0412,0.01);
     CHECK_NEAR(levels[QString::number(a)].toMap()["outputRightDb"].toDouble(),-12.0412,0.01);
@@ -470,7 +477,7 @@ TEST(qtmultirecording, independent_inputs_monitor_fx_and_aligned_wet_dry_takes_s
     fxA->setInputTrimDb(-6.020599913); fxB->setInputTrimDb(-12.041199827);
     CHECK(tracks.setRecordDry(b,true));
     std::fill_n(io->input,128,0.1f); std::fill_n(io->mic,128,0.4f);
-    CHECK(tracks.setRecordArmed(a,true)); CHECK(tracks.setRecordArmed(b,true));
+    CHECK(setCaptureAndMonitor(tracks,a,true)); CHECK(setCaptureAndMonitor(tracks,b,true));
     for(int i=0;i<200;++i)io->process();
     CHECK(controller.monitoredTracks().size()==2);
     CHECK_NEAR(io->output[64],0.15,1e-5);
@@ -491,7 +498,7 @@ TEST(qtmultirecording, independent_inputs_monitor_fx_and_aligned_wet_dry_takes_s
     CHECK(snapshot->keepAudio[0]->channels.size()==2); CHECK(snapshot->keepAudio[1]->channels.size()==1);
     CHECK_NEAR(snapshot->keepAudio[0]->channels[0][64],0.05,1e-5); // independent of the fader
     CHECK_NEAR(snapshot->keepAudio[1]->channels[0][64],0.4,1e-6); // untouched source
-    CHECK(tracks.setRecordArmed(a,false)); CHECK(tracks.setRecordArmed(b,false)); CHECK(tracks.setMuted(b,false));
+    CHECK(setCaptureAndMonitor(tracks,a,false)); CHECK(setCaptureAndMonitor(tracks,b,false)); CHECK(tracks.setMuted(b,false));
     controller.seekBeat(2); controller.transportAction("play"); io->process();
     CHECK_NEAR(io->output[64],0.125,1e-5);
     const auto file=QUrl::fromLocalFile(storage.dir.path()+"/multi.chaos"); CHECK(controller.saveProject(file));
@@ -506,12 +513,12 @@ TEST(qtmultirecording, disarming_one_track_finishes_only_its_take_and_shutdown_f
     EngineController controller(std::move(device),false); TrackListModel tracks; controller.attachProject(&tracks);
     const int a=tracks.addAudioTrack(), b=tracks.addVocalTrack();
     CHECK(tracks.setTrackInputPort(b,"test:mic"));
-    CHECK(tracks.setRecordArmed(a,true)); CHECK(tracks.setRecordArmed(b,true));
+    CHECK(setCaptureAndMonitor(tracks,a,true)); CHECK(setCaptureAndMonitor(tracks,b,true));
     std::fill_n(io->input,128,0.1f); std::fill_n(io->mic,128,0.2f);
     controller.transportAction("record"); io->process(); io->process();
     int monitorUpdates=0;
     QObject::connect(&controller,&EngineController::monitoredTrackChanged,&controller,[&]{++monitorUpdates;});
-    CHECK(tracks.setRecordArmed(a,false)); io->process();
+    CHECK(setCaptureAndMonitor(tracks,a,false)); io->process();
     CHECK(monitorUpdates>0); CHECK(controller.monitoredTracks().size()==1);
     for(int i=0;i<100 && tracks.project().findTrack(a)->audioClips.empty();++i)tick(10);
     CHECK(controller.recording()); CHECK(controller.recordingTracks().size()==1);
@@ -528,7 +535,7 @@ TEST(qtmultirecording, shared_input_can_feed_two_independent_chains_and_invalid_
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get(); io->multipleInputs=true;
     EngineController controller(std::move(device),false); TrackListModel tracks; controller.attachProject(&tracks);
     const int a=tracks.addAudioTrack(), b=tracks.addAudioTrack();
-    CHECK(tracks.setRecordArmed(a,true)); CHECK(tracks.setRecordArmed(b,true));
+    CHECK(setCaptureAndMonitor(tracks,a,true)); CHECK(setCaptureAndMonitor(tracks,b,true));
     CHECK(tracks.setVolume(a,0.5)); std::fill_n(io->input,128,0.2f); io->process();
     CHECK_NEAR(io->output[64],0.3,1e-6);
     CHECK(tracks.setSolo(b,true)); io->process(); CHECK_NEAR(io->output[64],0.2,1e-6);
@@ -548,7 +555,7 @@ TEST(qttracknames, rename_validates_names_notifies_views_and_preserves_track_ide
     Storage storage; TrackListModel tracks;
     const int a=tracks.addVocalTrack(), b=tracks.addInstrumentTrackOfType("Electric Guitar");
     const int clip=tracks.addClipAtBeat(a,1,4); CHECK(clip>0);
-    CHECK(tracks.setRecordArmed(a,true)); CHECK(tracks.setVolume(a,0.6));
+    CHECK(setCaptureAndMonitor(tracks,a,true)); CHECK(tracks.setVolume(a,0.6));
     int changes=0; QList<int> roles;
     QObject::connect(&tracks,&QAbstractItemModel::dataChanged,&tracks,[&](const QModelIndex& first,const QModelIndex&,const QList<int>& changed){
         CHECK(first.row()==0); ++changes; roles=changed;
@@ -582,7 +589,7 @@ TEST(qttracknames, renaming_dirties_project_persists_on_reopen_and_is_safe_durin
     CHECK(tracks.renameTrack(track,"Audio 1")); CHECK(!controller.projectDirty());
     CHECK(!tracks.renameTrack(track,"   ")); CHECK(!controller.projectDirty());
     CHECK(tracks.renameTrack(track,QString::fromUtf8("Rhythm — गिटार"))); CHECK(controller.projectDirty());
-    CHECK(tracks.setRecordArmed(track,true)); std::fill_n(io->input,128,0.25f);
+    CHECK(setCaptureAndMonitor(tracks,track,true)); std::fill_n(io->input,128,0.25f);
     controller.transportAction("record"); io->process(); CHECK(controller.recording());
     CHECK(tracks.renameTrack(track,QString::fromUtf8("Main — गिटार"))); io->process();
     CHECK(controller.recording()); CHECK(tracks.recordingTrackId()==track);

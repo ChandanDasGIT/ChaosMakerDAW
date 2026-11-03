@@ -91,8 +91,13 @@ Rectangle {
                                 from: 0; to: 2; stepSize: 0.01
                                 value: strip.volume
                                 onMoved: root.trackModel.setVolume(strip.trackId, value)
+                                TapHandler {
+                                    acceptedButtons: Qt.LeftButton
+                                    // Apply after the slider handles the mouse release.
+                                    onDoubleTapped: Qt.callLater(() => root.trackModel.setVolume(strip.trackId, 1.0))
+                                }
                                 ToolTip.visible: hovered
-                                ToolTip.text: "Track volume " + Math.round(value * 100) + "%"
+                                ToolTip.text: "Track volume " + Math.round(value * 100) + "%; double-click for 0 dB"
                             }
                             StereoLevelMeter {
                                 objectName: "mixerInput" + strip.trackId

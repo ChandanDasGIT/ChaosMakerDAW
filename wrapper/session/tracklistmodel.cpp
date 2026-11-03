@@ -60,6 +60,8 @@ QVariant TrackListModel::data(const QModelIndex& index, int role) const
         return track.muted;
     case RecordArmedRole:
         return track.recordArmed;
+    case MonitorEnabledRole:
+        return track.monitorEnabled;
     case InputPortRole:
         return QString::fromStdString(track.inputPort);
     case VolumeRole:
@@ -104,6 +106,7 @@ QHash<int, QByteArray> TrackListModel::roleNames() const
         {SoloRole, "isSolo"},
         {MutedRole, "isMuted"},
         {RecordArmedRole, "isRecordArmed"},
+        {MonitorEnabledRole, "monitorEnabled"},
         {InputPortRole, "inputPort"},
         {VolumeRole, "volume"},
         {ClipsRole, "clips"},
@@ -176,6 +179,8 @@ bool TrackListModel::setData(const QModelIndex& index, const QVariant& value, in
     case MutedRole:
         changed = m_project.setTrackMuted(trackId, value.toBool());
         break;
+    case MonitorEnabledRole:
+        return setMonitorEnabled(trackId, value.toBool());
     case RecordArmedRole:
         changed = m_project.setTrackRecordArmed(trackId, value.toBool());
         break;
@@ -190,14 +195,10 @@ bool TrackListModel::setData(const QModelIndex& index, const QVariant& value, in
     }
     if (changed)
         emit dataChanged(index, index, {role});
-    if (changed && role == RecordArmedRole)
-        emit cleanMonitorChanged(cleanMonitorArmed());
-    if (changed && (role == RecordArmedRole || role == InputPortRole))
+    if (changed && role == InputPortRole)
         emit cleanMonitorInputChanged();
-    if (changed && (role == RecordArmedRole || role == VolumeRole))
+    if (changed && role == VolumeRole)
         emit cleanMonitorGainChanged(cleanMonitorGain());
-    if (changed && role == RecordArmedRole)
-        emit cleanMonitorEqChanged();
     return changed;
 }
 
@@ -285,6 +286,19 @@ bool TrackListModel::setTrackColour(int trackId, const QString& colour)
     return true;
 }
 
+bool TrackListModel::moveTrack(int trackId, int destinationRow)
+{
+    const int sourceRow = rowForTrackId(trackId);
+    if (sourceRow < 0 || destinationRow < 0 || destinationRow >= count()) return false;
+    if (sourceRow == destinationRow) return true;
+    if (!beginMoveRows({}, sourceRow, sourceRow, {}, destinationRow > sourceRow ? destinationRow + 1 : destinationRow))
+        return false;
+    m_project.moveTrack(sourceRow, destinationRow);
+    endMoveRows();
+    emit clipsChanged();
+    return true;
+}
+
 bool TrackListModel::removeTrack(int trackId)
 {
     if (m_recordingTracks.contains(trackId)) return false;
@@ -344,20 +358,28 @@ bool TrackListModel::setRecordDry(int trackId, bool dry) {
 
 bool TrackListModel::setRecordArmed(int trackId, bool enabled)
 {
-    const bool changed = notifyTrackChanged(trackId, RecordArmedRole, m_project.setTrackRecordArmed(trackId, enabled));
-    if (changed) {
-        emit cleanMonitorChanged(cleanMonitorArmed());
-        emit cleanMonitorInputChanged();
-        emit cleanMonitorGainChanged(cleanMonitorGain());
-        emit cleanMonitorEqChanged();
-    }
-    return changed;
+    return notifyTrackChanged(trackId, RecordArmedRole, m_project.setTrackRecordArmed(trackId, enabled));
+}
+
+bool TrackListModel::setMonitorEnabled(int trackId, bool enabled)
+{
+    auto* track = m_project.findTrack(trackId);
+    if (!track || !track->hasLiveInput()) return false;
+    if (track->monitorEnabled == enabled) return true;
+    track->monitorEnabled = enabled;
+    const auto changed = index(rowForTrackId(trackId));
+    emit dataChanged(changed, changed, {MonitorEnabledRole});
+    emit cleanMonitorChanged(cleanMonitorArmed());
+    emit cleanMonitorInputChanged();
+    emit cleanMonitorGainChanged(cleanMonitorGain());
+    emit cleanMonitorEqChanged();
+    return true;
 }
 
 bool TrackListModel::cleanMonitorArmed() const
 {
     for (const auto& track : m_project.tracks()) {
-        if (track->hasLiveInput() && track->recordArmed)
+        if (track->hasLiveInput() && track->monitorEnabled)
             return true;
     }
     return false;
@@ -366,7 +388,7 @@ bool TrackListModel::cleanMonitorArmed() const
 QString TrackListModel::cleanMonitorInput() const
 {
     for (const auto& track : m_project.tracks()) {
-        if (track->hasLiveInput() && track->recordArmed)
+        if (track->hasLiveInput() && track->monitorEnabled)
             return QString::fromStdString(track->inputPort);
     }
     return {};
@@ -375,7 +397,7 @@ QString TrackListModel::cleanMonitorInput() const
 double TrackListModel::cleanMonitorGain() const
 {
     for (const auto& track : m_project.tracks()) {
-        if (track->hasLiveInput() && track->recordArmed)
+        if (track->hasLiveInput() && track->monitorEnabled)
             return (track->muted || (std::any_of(m_project.tracks().begin(), m_project.tracks().end(),
                 [](const auto& t) { return t->solo; }) && !track->solo)) ? 0.0 : track->volume;
     }
@@ -385,7 +407,7 @@ double TrackListModel::cleanMonitorGain() const
 QVariantList TrackListModel::cleanMonitorEqBands() const
 {
     for (const auto& track : m_project.tracks()) {
-        if (track->hasLiveInput() && track->recordArmed) {
+        if (track->hasLiveInput() && track->monitorEnabled) {
             QVariantList result;
             for (float gain : track->eqGainDb)
                 result.push_back(gain);
@@ -406,7 +428,7 @@ bool TrackListModel::setEqBand(int trackId, int band, double gainDb)
     const QModelIndex changedIndex = index(row, 0);
     emit dataChanged(changedIndex, changedIndex, {EqBandsRole});
     const Track* track = m_project.findTrack(trackId);
-    if (track && track->hasLiveInput() && track->recordArmed)
+    if (track && track->hasLiveInput() && track->monitorEnabled)
         emit cleanMonitorEqChanged();
     return true;
 }
@@ -527,6 +549,61 @@ int TrackListModel::splitClipAtBeat(int trackId, int clipId, double beat) {
     return -1;
 }
 
+bool TrackListModel::editClips(const QVariantList& ids, const QString& operation, double deltaBeats) {
+    if (!m_recordingTracks.isEmpty() || ids.isEmpty() || !std::isfinite(deltaBeats)
+        || (operation!="move" && operation!="delete" && operation!="trimStart" && operation!="resize")) return false;
+    const double samples=deltaBeats*60*m_project.tempo().sampleRate()/m_project.tempo().bpm();
+    if (!std::isfinite(samples) || std::abs(samples)>=double(INT64_MAX/4)) return false;
+    const qint64 delta=std::llround(samples);
+    if (operation!="delete" && delta==0) return true;
+    std::vector<Project::ClipChange> changes;
+    for (const auto& value:ids) {
+        bool ok=false; const int id=value.toInt(&ok); if (!ok) return false;
+        bool found=false;
+        for (const auto& track:m_project.tracks()) for (const auto& original:track->audioClips) if (original.id==id) {
+            found=true; auto clip=original;
+            const auto audio=m_audio.value(QString::fromStdString(clip.poolId));
+            const double ratio=audio ? audio->sampleRate/m_project.tempo().sampleRate() : 1.0;
+            if (operation=="move" || operation=="trimStart") clip.start+=delta;
+            if (operation=="resize") clip.length+=delta;
+            if (operation=="trimStart") {
+                clip.length-=delta;
+                const double offset=clip.sourceOffset+delta*ratio;
+                if (offset<0 || offset>=double(INT64_MAX/4)) return false;
+                clip.sourceOffset=std::llround(offset);
+            }
+            if (clip.start<0 || clip.length<=0 || clip.start>=INT64_MAX/2 || clip.length>=INT64_MAX/2) return false;
+            if (operation!="delete" && operation!="move" && audio
+                && clip.length>std::llround((audio->frames-clip.sourceOffset)/ratio)) return false;
+            changes.push_back({track->id,clip,operation=="delete"});
+        }
+        if (!found) return false;
+    }
+    if (!m_project.editClipGroup(changes)) return false;
+    notifyClipEdit(-1); return true;
+}
+
+bool TrackListModel::canMergeClips(int trackId, int first, int second) const {
+    if (!m_recordingTracks.isEmpty()) return false;
+    const auto* track=m_project.findTrack(trackId); if (!track) return false;
+    for (const auto& clip:track->audioClips) if (clip.id==first) {
+        const auto audio=m_audio.value(QString::fromStdString(clip.poolId));
+        return m_project.canMergeAudioClips(trackId,first,second,audio ? audio->sampleRate : m_project.tempo().sampleRate());
+    }
+    return false;
+}
+
+bool TrackListModel::mergeClips(int trackId, int first, int second) {
+    if (!canMergeClips(trackId,first,second)) return false;
+    const auto* track=m_project.findTrack(trackId);
+    for (const auto& clip:track->audioClips) if (clip.id==first) {
+        const auto audio=m_audio.value(QString::fromStdString(clip.poolId));
+        if (!m_project.mergeAudioClips(trackId,first,second,audio ? audio->sampleRate : m_project.tempo().sampleRate())) return false;
+        notifyClipEdit(trackId); return true;
+    }
+    return false;
+}
+
 bool TrackListModel::moveClipAtBeat(int trackId, int clipId, double startBeat) {
     const double samples = startBeat * 60.0 * m_project.tempo().sampleRate() / m_project.tempo().bpm();
     if (!m_recordingTracks.isEmpty() || !std::isfinite(samples) || samples < 0 || samples >= double(INT64_MAX / 4)) return false;
@@ -583,18 +660,18 @@ bool TrackListModel::removeAudioClip(int trackId, int clipId)
 }
 
 void TrackListModel::notifyClipEdit(int trackId) {
-    const auto changed = index(rowForTrackId(trackId));
-    emit dataChanged(changed, changed, {ClipsRole});
+    const int row = rowForTrackId(trackId);
+    if (count()>0) emit dataChanged(index(row<0 ? 0 : row), index(row<0 ? count()-1 : row), {ClipsRole});
     emit contentEndBeatsChanged();
     emit clipsChanged();
 }
 bool TrackListModel::undo() {
     if (!canUndo()) return false;
-    notifyClipEdit(m_project.undo()); return true;
+    m_project.undo(); notifyClipEdit(-1); return true;
 }
 bool TrackListModel::redo() {
     if (!canRedo()) return false;
-    notifyClipEdit(m_project.redo()); return true;
+    m_project.redo(); notifyClipEdit(-1); return true;
 }
 
 void TrackListModel::setTempo(double bpm, int numerator, int denominator)
@@ -620,7 +697,7 @@ bool TrackListModel::applyEqBands(int trackId, const std::array<float,10>& bands
     for (int i=0;i<10;++i) m_project.setTrackEqBand(trackId,i,bands[i]);
     const auto changed = index(rowForTrackId(trackId));
     emit dataChanged(changed,changed,{EqBandsRole});
-    if (track->hasLiveInput() && track->recordArmed) emit cleanMonitorEqChanged();
+    if (track->hasLiveInput() && track->monitorEnabled) emit cleanMonitorEqChanged();
     setEqPresetError({}); return true;
 }
 bool TrackListModel::applyEqPreset(int trackId, int preset) {
@@ -700,9 +777,12 @@ std::unique_ptr<EngineSnapshot> TrackListModel::playbackSnapshot() const
 {
     auto snapshot = std::make_unique<EngineSnapshot>();
     snapshot->tempo = m_project.tempo();
+    snapshot->playbackEnd = 0;
     for (const auto& track : m_project.tracks()) {
         TrackRender render;
         render.trackId = track->id; render.gain = track->volume;
+        for (const auto& clip:track->audioClips)
+            snapshot->playbackEnd=std::max(snapshot->playbackEnd,clip.start+clip.length);
         render.muted = track->muted; render.soloed = track->solo;
         for (const auto& clip : track->audioClips) {
             auto audio = m_audio.value(QString::fromStdString(clip.poolId));
@@ -809,7 +889,7 @@ bool TrackListModel::restoreSessionState(const QJsonObject& state, QString& erro
     for (const auto& track : m_project.tracks()) m_instrumentNumbers[QString::fromStdString(track->type)]++;
     endResetModel();
     emit countChanged(); emit clipsChanged(); emit contentEndBeatsChanged();
-    emit cleanMonitorChanged(false); emit cleanMonitorInputChanged();
+    emit cleanMonitorChanged(cleanMonitorArmed()); emit cleanMonitorInputChanged();
     emit cleanMonitorGainChanged(cleanMonitorGain()); emit cleanMonitorEqChanged();
     error = missing.isEmpty() ? QString() : QStringLiteral("Missing audio (clips kept offline): %1").arg(missing.join(", "));
     return true;
@@ -823,5 +903,5 @@ void TrackListModel::adoptDocument(TrackListModel& candidate) {
     m_instrumentNumbers=std::move(candidate.m_instrumentNumbers); m_recordingTracks.clear();
     m_project.clearHistory(); endResetModel();
     emit countChanged(); emit clipsChanged(); emit contentEndBeatsChanged();
-    emit cleanMonitorChanged(false); emit cleanMonitorInputChanged(); emit cleanMonitorGainChanged(cleanMonitorGain()); emit cleanMonitorEqChanged();
+    emit cleanMonitorChanged(cleanMonitorArmed()); emit cleanMonitorInputChanged(); emit cleanMonitorGainChanged(cleanMonitorGain()); emit cleanMonitorEqChanged();
 }

@@ -8,6 +8,7 @@ Rectangle {
     property var trackModel
     property int laneHeight: 106
     property real scrollOffset: 0
+    property int dropRow: -1
     signal verticalScrollRequested(real amount)
     color: Theme.panelBg
     border.color: Theme.divider
@@ -92,6 +93,7 @@ Rectangle {
                     required property bool isSolo
                     required property bool isMuted
                     required property bool isRecordArmed
+                    required property bool monitorEnabled
                     required property string inputPort
                     required property real volume
                     required property bool hasLiveInput
@@ -118,7 +120,8 @@ Rectangle {
                     width: trackScroll.width
                     height: root.laneHeight
                     color: index % 2 ? "#222222" : "#252525"
-                    border.color: Theme.divider
+                    border.color: root.dropRow === index ? Theme.accent : Theme.divider
+                    border.width: root.dropRow === index ? 2 : 1
                     Rectangle {
                         objectName: "trackColourAccent" + trackCard.trackId
                         anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
@@ -161,14 +164,36 @@ Rectangle {
                                     visible: !trackCard.renaming
                                 }
                                 MouseArea {
+                                    objectName: "trackHeader" + trackCard.trackId
                                     anchors.fill: parent
                                     anchors.leftMargin: 20
                                     visible: !trackCard.renaming
                                     hoverEnabled: true
-                                    cursorShape: Qt.IBeamCursor
+                                    cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                                    property real pressY: 0
+                                    property bool reordering: false
+                                    onPressed: mouse => {
+                                        pressY = mapToItem(root, mouse.x, mouse.y).y
+                                        reordering = false
+                                    }
+                                    onPositionChanged: mouse => {
+                                        if (!pressed) return
+                                        if (Math.abs(mapToItem(root, mouse.x, mouse.y).y - pressY) > Qt.styleHints.startDragDistance)
+                                            reordering = true
+                                        if (reordering)
+                                            root.dropRow = Math.max(0, Math.min(root.trackModel.count - 1,
+                                                Math.floor(mapToItem(trackScroll.contentItem, mouse.x, mouse.y).y / root.laneHeight)))
+                                    }
+                                    onReleased: {
+                                        if (reordering && root.dropRow >= 0)
+                                            root.trackModel.moveTrack(trackCard.trackId, root.dropRow)
+                                        root.dropRow = -1
+                                        reordering = false
+                                    }
+                                    onCanceled: { root.dropRow = -1; reordering = false }
                                     onDoubleClicked: trackCard.beginRename()
                                     ToolTip.visible: containsMouse
-                                    ToolTip.text: "Double-click to rename track"
+                                    ToolTip.text: "Drag to reorder; double-click to rename track"
                                     ToolTip.delay: 450
                                 }
                                 TextField {
@@ -231,18 +256,29 @@ Rectangle {
                                 ToolTip.delay: 450
                             }
                             ToolButton {
+                                objectName: "trackMonitorButton" + trackCard.trackId
+                                property bool active: trackCard.monitorEnabled
+                                enabled: trackCard.hasLiveInput
+                                implicitWidth: 26; implicitHeight: 24
+                                text: "MON"
+                                onClicked: root.trackModel.setMonitorEnabled(trackCard.trackId, !active)
+                                contentItem: Text { text: parent.text; color: parent.active ? Theme.accent : Theme.textMuted; font.pixelSize: 7; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                background: Rectangle { radius: 4; color: parent.active ? "#203a45" : "#303030"; border.color: parent.active ? Theme.accent : "#424242" }
+                                ToolTip.visible: hovered
+                                ToolTip.text: active ? "Disable live input monitoring" : "Monitor this track's input without arming recording"
+                                ToolTip.delay: 450
+                            }
+                            ToolButton {
                                 id: recordButton
                                 objectName: "trackRecordButton" + trackCard.trackId
                                 property bool active: trackCard.isRecordArmed
-                                implicitWidth: 54; implicitHeight: 24
+                                implicitWidth: 50; implicitHeight: 24
                                 text: active ? "REC ON" : "REC OFF"
                                 onClicked: root.trackModel.setRecordArmed(trackCard.trackId, !active)
                                 contentItem: Text { text: parent.text; color: parent.active ? "#ffffff" : Theme.textMuted; font.pixelSize: 8; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                                 background: Rectangle { radius: 4; color: parent.active ? "#a9363c" : "#303030"; border.color: parent.active ? Theme.record : "#424242" }
                                 ToolTip.visible: hovered
-                                ToolTip.text: active
-                                    ? (trackCard.hasLiveInput ? "Recording armed · live monitoring enabled" : "Recording armed")
-                                    : (trackCard.hasLiveInput ? "Arm for recording and live monitoring" : "Arm track for recording")
+                                ToolTip.text: active ? "Recording armed" : "Arm track for recording"
                                 ToolTip.delay: 450
                             }
                             ToolButton {
@@ -277,11 +313,17 @@ Rectangle {
                             Text { text: "VOL"; color: Theme.textMuted; font.pixelSize: 8; font.bold: true; Layout.preferredWidth: 24 }
                             Slider {
                                 id: volumeSlider
+                                objectName: "trackVolume" + trackCard.trackId
                                 Layout.fillWidth: true
                                 from: 0; to: 2; value: trackCard.volume
                                 onMoved: root.trackModel.setVolume(trackCard.trackId, value)
+                                TapHandler {
+                                    acceptedButtons: Qt.LeftButton
+                                    // Apply after the slider handles the mouse release.
+                                    onDoubleTapped: Qt.callLater(() => root.trackModel.setVolume(trackCard.trackId, 1.0))
+                                }
                                 ToolTip.visible: hovered
-                                ToolTip.text: "Track volume / monitor gain " + Math.round(value * 100) + "%"
+                                ToolTip.text: "Track volume / monitor gain " + Math.round(value * 100) + "%; double-click for 0 dB"
                                 ToolTip.delay: 450
                             }
                             Text { text: Math.round(volumeSlider.value * 100) + "%"; color: Theme.textMuted; font.pixelSize: 9; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 29 }

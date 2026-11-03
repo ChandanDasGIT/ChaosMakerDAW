@@ -10,6 +10,8 @@ Rectangle {
     property bool playing: false
     property bool recording: false
     property bool repeating: false
+    readonly property var focusedItem: Window.window ? Window.window.activeFocusItem : null
+    readonly property bool editingText: focusedItem instanceof TextInput || focusedItem instanceof TextEdit
     signal numeratorEdited(int value)
     signal denominatorEdited(int value)
     signal bpmEdited(real value)
@@ -17,6 +19,20 @@ Rectangle {
     height: 72
     color: "#242424"
     border.color: Theme.divider
+    Shortcut {
+        sequence: "Space"
+        context: Qt.WindowShortcut
+        enabled: root.visible && root.enabled && !root.editingText && !EngineController.projectLoading
+        autoRepeat: false
+        onActivated: root.transportAction(root.playing ? "pause" : "play")
+    }
+    Shortcut {
+        sequence: "R"
+        context: Qt.WindowShortcut
+        enabled: root.visible && root.enabled && !root.editingText && !EngineController.projectLoading
+        autoRepeat: false
+        onActivated: root.transportAction("record")
+    }
     RowLayout {
         anchors.fill: parent
         anchors.leftMargin: 16
@@ -26,9 +42,9 @@ Rectangle {
             model: [
                 {glyph: "|◀", hintText: "Go to start", command: "rewind"},
                 {glyph: "▶|", hintText: "Skip forward one bar", command: "forward"},
-                {glyph: "●", hintText: "Start recording", command: "record"},
-                {glyph: "▶", hintText: "Play", command: "play"},
-                {glyph: "Ⅱ", hintText: "Pause", command: "pause"},
+                {glyph: "●", hintText: "Start/stop recording (R)", command: "record"},
+                {glyph: "▶", hintText: "Play (Space)", command: "play"},
+                {glyph: "Ⅱ", hintText: "Pause (Space)", command: "pause"},
                 {glyph: "■", hintText: "Stop", command: "stop"},
                 {glyph: "⟳", hintText: "Toggle repeat", command: "repeat"}
             ]
