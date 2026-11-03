@@ -40,6 +40,8 @@ class EngineController : public QObject {
     Q_PROPERTY(int numerator READ numerator NOTIFY meterChanged)
     Q_PROPERTY(int denominator READ denominator NOTIFY meterChanged)
     Q_PROPERTY(bool repeating READ repeating NOTIFY transportChanged)
+    Q_PROPERTY(bool metronomeEnabled READ metronomeEnabled WRITE setMetronomeEnabled NOTIFY metronomeChanged)
+    Q_PROPERTY(double metronomeVolume READ metronomeVolume WRITE setMetronomeVolume NOTIFY metronomeChanged)
     Q_PROPERTY(QString transportMessage READ transportMessage NOTIFY transportMessageChanged)
     Q_PROPERTY(bool restoreSessionOnStartup READ restoreSessionOnStartup WRITE setRestoreSessionOnStartup NOTIFY restoreSessionOnStartupChanged)
     Q_PROPERTY(QVariantMap monitorLevels READ monitorLevels NOTIFY monitorLevelsChanged)
@@ -80,6 +82,10 @@ public:
     int numerator() const { return m_numerator; }
     int denominator() const { return m_denominator; }
     bool repeating() const { return m_repeating; }
+    bool metronomeEnabled() const { return m_metronomeEnabled; }
+    double metronomeVolume() const { return m_metronomeVolume; }
+    void setMetronomeEnabled(bool enabled);
+    void setMetronomeVolume(double volume);
     QString transportMessage() const { return m_transportMessage; }
     bool restoreSessionOnStartup() const;
     void setRestoreSessionOnStartup(bool enabled);
@@ -136,6 +142,7 @@ signals:
     void trackLevelsChanged();
     void monitoredTrackChanged();
     void bpmChanged();
+    void metronomeChanged();
     void statusChanged();
     void audioRoutingChanged();
     void outputDevicesChanged();
@@ -184,6 +191,7 @@ private:
     void completeTake();
     void setTransportMessage(const QString& message);
     bool postRepeatLoop();
+    bool postMetronome(bool enabled, double volume);
     bool postTransport(int type, qint64 a = 0, qint64 b = 0);
     QPointer<TrackListModel> m_project;
     std::map<int,std::unique_ptr<TakeRecorder>> m_takes;
@@ -203,6 +211,8 @@ private:
     QVariantMap m_monitorLevels;
     QVariantMap m_trackLevels;
     double m_bpm = 120.0;
+    bool m_metronomeEnabled = false;
+    double m_metronomeVolume = 0.5;
     bool m_audioReady = false;
     bool m_monitorEnabled = false;
     bool m_inputConnected = false;

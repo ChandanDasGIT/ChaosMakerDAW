@@ -4,6 +4,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
+    property var transport: EngineController
     property int timeSignature: 4
     property int timeSignatureDenominator: 4
     property real bpm: 120
@@ -98,6 +99,37 @@ Rectangle {
         Item { Layout.fillWidth: true }
         ColumnLayout {
             spacing: 3
+            Text { text: "METRONOME"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
+            RowLayout {
+                spacing: 5
+                ToolButton {
+                    objectName: "metronomeToggle"
+                    property bool active: root.transport.metronomeEnabled
+                    Layout.preferredWidth: 48; Layout.preferredHeight: 29
+                    text: "CLICK"
+                    onClicked: root.transport.metronomeEnabled = !active
+                    contentItem: Text { text: parent.text; color: parent.active ? Theme.accent : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                    background: Rectangle { radius: 5; color: parent.active ? "#203a45" : "#2b2d32"; border.color: parent.active ? Theme.accent : "#41444c" }
+                    ToolTip.visible: hovered
+                    ToolTip.text: active ? "Disable metronome" : "Enable metronome; first beat is accented"
+                    Accessible.name: "Metronome"
+                }
+                Slider {
+                    id: clickVolume
+                    objectName: "metronomeVolume"
+                    Layout.preferredWidth: 72; Layout.preferredHeight: 29
+                    from: 0; to: 1; stepSize: 0.01
+                    value: root.transport.metronomeVolume
+                    onMoved: root.transport.metronomeVolume = value
+                    ToolTip.visible: hovered
+                    ToolTip.text: "Metronome volume " + Math.round(value * 100) + "%"
+                    Accessible.name: "Metronome volume"
+                }
+                Text { text: Math.round(root.transport.metronomeVolume * 100) + "%"; color: Theme.textMuted; font.pixelSize: 10; Layout.preferredWidth: 30 }
+            }
+        }
+        ColumnLayout {
+            spacing: 3
             Text { text: "TIME SIGNATURE"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
             Rectangle {
                 Layout.preferredWidth: 87
@@ -171,6 +203,10 @@ Rectangle {
         }
     }
 
+    Connections {
+        target: root.transport
+        function onMetronomeChanged() { clickVolume.value = root.transport.metronomeVolume }
+    }
     Connections {
         target: root
         function onTimeSignatureChanged() { numeratorField.text = String(root.timeSignature) }

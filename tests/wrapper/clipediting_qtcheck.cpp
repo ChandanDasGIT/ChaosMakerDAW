@@ -112,3 +112,15 @@ TEST(qtclipediting, group_edits_across_tracks_are_atomic_and_preserve_offsets) {
     CHECK(tracks.project().findTrack(b)->audioClips[0].id==y);
     tracks.lockRecordingTrack(a); CHECK(!tracks.editClips(ids,"move",1));
 }
+
+TEST(qtclipediting, playback_endpoint_exists_only_when_the_arrangement_has_clips) {
+    TrackListModel tracks;
+    CHECK(tracks.playbackSnapshot()->playbackEnd==-1);
+    const int track=tracks.addAudioTrack();
+    CHECK(tracks.playbackSnapshot()->playbackEnd==-1);
+    const int clip=tracks.addAudioClip(track,"endpoint",100,257);
+    CHECK(tracks.playbackSnapshot()->playbackEnd==357);
+    CHECK(tracks.removeAudioClip(track,clip)); CHECK(tracks.playbackSnapshot()->playbackEnd==-1);
+    CHECK(tracks.undo()); CHECK(tracks.playbackSnapshot()->playbackEnd==357);
+    CHECK(tracks.removeTrack(track)); CHECK(tracks.playbackSnapshot()->playbackEnd==-1);
+}

@@ -49,7 +49,7 @@ struct TrackRender {
 // never destroys anything: the last owner of an old clip or plugin is an old snapshot, freed on the UI thread.
 struct EngineSnapshot {
     bool multiMonitor = false;
-    std::int64_t playbackEnd = -1; // Negative: no automatic endpoint (standalone engine clients).
+    std::int64_t playbackEnd = -1; // Negative: no automatic endpoint, including an empty arrangement.
     std::shared_ptr<TrackMeters> monitorMeters;
     Processor* inputStage = nullptr;                    // optional per-track trim and EQ
     std::vector<TrackRender> tracks;

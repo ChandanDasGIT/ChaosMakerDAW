@@ -15,7 +15,10 @@ Item {
     readonly property bool playing: root.transport.playing
     readonly property bool recording: root.transport.recording
     readonly property bool repeating: root.transport.repeating
-    readonly property real recordingTailX: playing ? playhead + width * 0.2 : 0
+    readonly property real recordingTailX: playhead + width * 0.2
+    property bool followPlayhead: true
+    property real lastTransportPlayhead: 0
+    onPlayingChanged: { if (playing) followPlayhead = true }
     property var selectedClipIds: []
     property string editOperation: ""
     property real editDelta: 0
@@ -164,7 +167,13 @@ Item {
         scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, scroll.contentY + amount))
     }
 
+    function scrollHorizontally(amount) {
+        followPlayhead = false
+        scroll.contentX = Math.max(0, Math.min(scroll.contentWidth - scroll.width, scroll.contentX + amount))
+    }
+
     function zoomAtCursor(factor, cursorX) {
+        followPlayhead = false
         const anchor = scroll.contentX + cursorX
         const nextPixelsPerSecond = Math.max(0.000001, pixelsPerSecond * factor)
         const scale = nextPixelsPerSecond / pixelsPerSecond
@@ -241,10 +250,14 @@ Item {
     Connections {
         target: root.transport
         function onTransportChanged() {
-            if (root.playing && root.playhead > scroll.contentX + scroll.width * 0.82)
+            const returnedToStart = root.playhead === 0 && root.lastTransportPlayhead > 0
+            if (returnedToStart && (!root.playing || root.followPlayhead)) {
+                scroll.contentX = 0
+                if (!root.playing) root.followPlayhead = true
+            } else if (root.followPlayhead && root.playing && root.playhead > scroll.contentX + scroll.width * 0.82)
                 scroll.contentX = Math.max(0, Math.min(root.playhead - scroll.width * 0.82,
                                                      scroll.contentWidth - scroll.width))
-            if (root.playhead === 0) scroll.contentX = 0
+            root.lastTransportPlayhead = root.playhead
         }
     }
 
@@ -255,12 +268,21 @@ Item {
         target: null
         onWheel: event => {
             const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y
-            root.zoomAtCursor(Math.pow(1.12, delta / 120), point.position.x)
+            if (event.modifiers & Qt.ShiftModifier) root.scrollHorizontally(-delta)
+            else root.zoomAtCursor(Math.pow(1.12, delta / 120), point.position.x)
         }
+    }
+    WheelHandler {
+        orientation: Qt.Horizontal
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        blocking: true
+        target: null
+        onWheel: event => root.scrollHorizontally(-(event.pixelDelta.x !== 0 ? event.pixelDelta.x : event.angleDelta.x))
     }
 
     Flickable {
         id: scroll
+        objectName: "timelineScroll"
         anchors.fill: parent
         clip: true
         contentWidth: root.contentWidth
@@ -543,7 +565,7 @@ Item {
             y: root.rulerHeight + Math.min(root.selectionStartY, root.selectionEndY)
             width: Math.abs(root.selectionEndX-root.selectionStartX)
             height: Math.max(1,Math.abs(root.selectionEndY-root.selectionStartY))
-            visible: root.clipSelectionDrag && root.hasSelection && width>2
+            visible: root.clipSelectionDrag && root.selecting && width>2
             color: "#3860cdff"; border.color: Theme.accent; z: 2
         }
         Rectangle {
@@ -571,8 +593,16 @@ Item {
         }
         Rectangle { objectName: "timelinePlayhead"; x: root.playhead; y: 0; width: 2; height: scroll.contentHeight; color: Theme.record; z: 4 }
 
-        ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AlwaysOn }
-        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
+        ScrollBar.horizontal: ScrollBar {
+            objectName: "timelineHorizontalScroll"
+            policy: ScrollBar.AlwaysOn
+            onPressedChanged: { if (pressed) root.followPlayhead = false }
+        }
+        ScrollBar.vertical: ScrollBar {
+            objectName: "timelineVerticalScroll"
+            policy: ScrollBar.AlwaysOn
+            onPressedChanged: { if (pressed) root.followPlayhead = false }
+        }
     }
 
 }

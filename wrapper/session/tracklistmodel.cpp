@@ -777,7 +777,7 @@ std::unique_ptr<EngineSnapshot> TrackListModel::playbackSnapshot() const
 {
     auto snapshot = std::make_unique<EngineSnapshot>();
     snapshot->tempo = m_project.tempo();
-    snapshot->playbackEnd = 0;
+    snapshot->playbackEnd = -1; // An empty arrangement has no endpoint to pause at.
     for (const auto& track : m_project.tracks()) {
         TrackRender render;
         render.trackId = track->id; render.gain = track->volume;

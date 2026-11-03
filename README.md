@@ -71,7 +71,11 @@ Press **Stop** to finish all takes and return to the start, then **Play** to hea
 pauses transport, leaving the red playhead at the take's end. Disarming one track finishes
 only its take; the others keep recording.
 Playback pauses automatically at the final clip's end and leaves the red playhead there; Repeat and active recording continue.
+When there are no clips, playback runs freely, including the metronome, even with no tracks.
 Transport shortcuts: **Space** plays/pauses, and **R** starts/stops recording.
+Enable **CLICK** in the transport for the metronome and use its volume slider (0–100%).
+It follows tempo and time signature during playback and recording, with a stronger, higher-pitched first beat of each bar.
+The click stops with transport and is heard only at the outputs; it is never printed into dry or wet takes.
 Shortcuts do not trigger while typing in text fields, and holding a key does not repeat them.
 Tracks armed after recording starts join capture on the next take; MON can change at any time.
 Input/mode changes and removal of participating tracks stay locked until the group finishes.
@@ -89,7 +93,11 @@ Double-click a volume fader in the mixer or a track card to restore unity gain (
 Drag a track's name header up or down to reorder it; timeline lanes and mixer strips follow the same order.
 Ctrl-click clips to toggle multiple selections, or Shift-drag a rectangle to select intersecting clips on multiple tracks.
 Normal dragging in empty timeline space selects a time range snapped to the beat grid; enable Repeat to loop that range.
+Playback starts at the current playhead, including any lead-in before the selected range, then wraps from the range end to its start.
 Drag a new range to update an active loop, or click empty timeline space to clear the range and repeat the full project.
+Pause keeps the timeline view and playhead in place; Stop returns to the start.
+Use the scrollbars, a horizontal trackpad gesture, or Shift-wheel to scroll manually. Manual navigation suspends playhead following until playback starts again.
+The Shift-drag selection box disappears on release, leaving the selected clips highlighted.
 Drag any selected clip to move the group while preserving track assignments and spacing.
 Drag a selected clip's trim edge to trim the group, or press Delete/right-click Delete selected clips to remove it.
 Each group edit is one undo/redo step; edits that exceed audio or timeline boundaries are rejected together.
