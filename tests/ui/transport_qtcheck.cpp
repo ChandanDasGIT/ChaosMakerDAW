@@ -62,7 +62,92 @@ private slots:
         EngineController::instance()->setBpm(120);
         QCoreApplication::processEvents();
     }
+    void cleanup() {
+        auto* popup=window->findChild<QObject*>("quickSettingsPopup");
+        if(popup)QMetaObject::invokeMethod(popup,"close");
+        QCoreApplication::processEvents();
+    }
     void cleanupTestCase() { engine.reset(); }
+    void quick_settings_popup_contains_controls_and_closes_cleanly() {
+        auto* controller=EngineController::instance(); controller->setMeter(4,4);
+        auto* button=visualItem(window->contentItem(),"quickSettingsButton"); QVERIFY(button); QVERIFY(button->isVisible());
+        auto* popup=window->findChild<QObject*>("quickSettingsPopup"); QVERIFY(popup);
+        QVERIFY(!popup->property("visible").toBool()); QVERIFY(!field->isVisible());
+        QVERIFY(button->property("checkable").toBool()); QVERIFY(!button->property("checked").toBool());
+        click(button); QTRY_VERIFY(popup->property("visible").toBool()); QTest::qWait(20);
+        QVERIFY(button->property("checked").toBool());
+        auto* content=popup->property("contentItem").value<QQuickItem*>(); QVERIFY(content);
+        const auto verifyCenter=[&] {
+            const QPointF center=content->mapToScene(QPointF(content->width()/2,content->height()/2));
+            QVERIFY(std::abs(center.x()-window->width()/2.0)<1);
+            QVERIFY(std::abs(center.y()-window->height()/2.0)<1);
+        };
+        verifyCenter();
+        click(button); QTRY_VERIFY(!popup->property("visible").toBool());
+        QVERIFY(!button->property("checked").toBool());
+        click(button); QTRY_VERIFY(popup->property("visible").toBool()); QVERIFY(button->property("checked").toBool());
+        const QSize original=window->size(); window->resize(1000,800); QTest::qWait(30); verifyCenter();
+        window->resize(original); QTest::qWait(30); verifyCenter();
+        QVERIFY(field->isVisible());
+        auto* numerator=visualItem(window->contentItem(),"meterNumerator");
+        auto* denominator=visualItem(window->contentItem(),"meterDenominator");
+        QVERIFY(numerator); QVERIFY(denominator);
+        QVERIFY(visualItem(window->contentItem(),"metronomeToggle"));
+        QVERIFY(visualItem(window->contentItem(),"metronomeVolume"));
+        QVERIFY(visualItem(window->contentItem(),"countInToggle"));
+        click(numerator); QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
+        QTest::keyClick(window,Qt::Key_3); QTest::keyClick(window,Qt::Key_Return);
+        QCOMPARE(controller->numerator(),3);
+        click(denominator); QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
+        QTest::keyClick(window,Qt::Key_8); QTest::keyClick(window,Qt::Key_Return);
+        QCOMPARE(controller->denominator(),8);
+        click(field); QTest::qWait(10); QTest::keyClick(window,Qt::Key_9); QTest::keyClick(window,Qt::Key_5);
+        auto* close=visualItem(window->contentItem(),"closeQuickSettings"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!popup->property("visible").toBool()); QCOMPARE(controller->bpm(),95.0);
+        QVERIFY(!button->property("checked").toBool());
+        click(button); QTRY_VERIFY(popup->property("visible").toBool()); QCOMPARE(field->property("text").toString(),QString("95"));
+        QTest::keyClick(window,Qt::Key_Escape); QTRY_VERIFY(!popup->property("visible").toBool());
+        QVERIFY(!button->property("checked").toBool());
+        click(button); QTRY_VERIFY(popup->property("visible").toBool());
+        auto* other=window->findChild<QQuickItem*>("otherFocus"); QVERIFY(other); click(other);
+        QTRY_VERIFY(!popup->property("visible").toBool()); QVERIFY(!field->isVisible());
+        QVERIFY(!button->property("checked").toBool());
+        QVERIFY(other->hasActiveFocus());
+        controller->setMeter(4,4);
+    }
+    void recording_count_in_uses_one_bar_and_can_be_cancelled() {
+        auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        TrackListModel tracks; controller.attachProject(&tracks); const int track=tracks.addAudioTrack();
+        QVERIFY(tracks.setRecordArmed(track,true)); controller.setMeter(3,8);
+        const auto restore=qScopeGuard([&] { window->setProperty("transport",QVariant::fromValue(EngineController::instance())); });
+        window->setProperty("transport",QVariant::fromValue(&controller));
+        openQuickSettings();
+        auto* count=visualItem(window->contentItem(),"countInToggle"); QVERIFY(count);
+        QVERIFY(!controller.countInEnabled()); click(count); QVERIFY(controller.countInEnabled());
+        controller.seekBeat(4); controller.transportAction("record"); io->process();
+        QVERIFY(controller.takeBusy()); QVERIFY(controller.countingIn()); QVERIFY(!controller.recording());
+        QCOMPARE(controller.countInBeatsRemaining(),3); QVERIFY(tracks.clips().isEmpty());
+        QTRY_COMPARE(count->property("text").toString(),QString("IN 3")); QVERIFY(!count->isEnabled());
+        controller.setCountInEnabled(false); QVERIFY(controller.countInEnabled());
+        controller.setBpm(90); QCOMPARE(controller.bpm(),120.0);
+        controller.setMeter(4,4); QCOMPARE(controller.numerator(),3); QCOMPARE(controller.denominator(),8);
+        for(int i=0;i<280;++i)io->process();
+        QVERIFY(controller.countingIn()); QCOMPARE(controller.countInBeatsRemaining(),1);
+        io->process(); QVERIFY(!controller.countingIn()); QVERIFY(controller.recording());
+        controller.transportAction("pause"); io->process(); QTRY_VERIFY(!controller.takeBusy());
+        QCOMPARE(tracks.clips().size(),1);
+        const auto& clip=tracks.project().findTrack(track)->audioClips[0];
+        QCOMPARE(clip.start,qint64(96000)); QCOMPARE(clip.length,qint64(96));
+        // R cancels the next count-in without creating a partial take.
+        QTest::keyClick(window,Qt::Key_R); io->process(); QVERIFY(controller.countingIn());
+        QTest::keyClick(window,Qt::Key_R); io->process(); QTRY_VERIFY(!controller.takeBusy());
+        QVERIFY(!controller.countingIn()); QVERIFY(!controller.playing()); QCOMPARE(tracks.clips().size(),1);
+        click(count); QVERIFY(!controller.countInEnabled());
+        QTest::keyClick(window,Qt::Key_R); io->process(); QVERIFY(controller.recording()); QVERIFY(!controller.countingIn());
+        controller.transportAction("pause"); io->process(); QTRY_VERIFY(!controller.takeBusy());
+        QCOMPARE(tracks.clips().size(),2); controller.shutdownSession();
+    }
     void metronome_controls_toggle_click_and_adjust_volume() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
@@ -70,6 +155,7 @@ private slots:
         QCOMPARE(tracks.count(),0);
         const auto restore=qScopeGuard([&] { window->setProperty("transport",QVariant::fromValue(EngineController::instance())); });
         window->setProperty("transport",QVariant::fromValue(&controller));
+        openQuickSettings();
         auto* toggle=visualItem(window->contentItem(),"metronomeToggle");
         auto* volume=visualItem(window->contentItem(),"metronomeVolume"); QVERIFY(toggle); QVERIFY(volume);
         QVERIFY(!controller.metronomeEnabled()); QCOMPARE(controller.metronomeVolume(),0.5);
@@ -1164,7 +1250,15 @@ private:
         for(auto* child:root->childItems())if(auto* result=visualItem(child,name))return result;
         return nullptr;
     }
+    void openQuickSettings() {
+        auto* popup=window->findChild<QObject*>("quickSettingsPopup"); QVERIFY(popup);
+        if(!popup->property("visible").toBool()) {
+            auto* button=visualItem(window->contentItem(),"quickSettingsButton"); QVERIFY(button); click(button);
+        }
+        QTRY_VERIFY(popup->property("visible").toBool()); QTest::qWait(20);
+    }
     void click(QQuickItem* item) {
+        if(item==field || item->objectName()=="bpmIncrease" || item->objectName()=="bpmDecrease")openQuickSettings();
         QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,item->mapToScene(QPointF(item->width()/2,item->height()/2)).toPoint());
     }
     std::unique_ptr<QQmlApplicationEngine> engine;

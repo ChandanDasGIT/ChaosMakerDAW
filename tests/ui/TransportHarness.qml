@@ -11,6 +11,10 @@ Window {
         width: parent.width
         anchors.bottom: parent.bottom
         bpm: EngineController.bpm
+        timeSignature: EngineController.numerator
+        timeSignatureDenominator: EngineController.denominator
+        onNumeratorEdited: value => EngineController.setMeter(value, EngineController.denominator)
+        onDenominatorEdited: value => EngineController.setMeter(EngineController.numerator, value)
         playing: transport.playing
         recording: transport.recording
         onTransportAction: action => transport.transportAction(action)
