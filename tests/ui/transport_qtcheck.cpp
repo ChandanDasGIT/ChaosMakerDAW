@@ -638,6 +638,74 @@ private slots:
         for(auto* view:{list,mixer,timeline}) { view->setVisible(false); view->setProperty("trackModel",QVariant()); }
         list->setHeight(650); timeline->setX(0); timeline->setWidth(1000);
     }
+    void clip_keyboard_operations_across_tracks_data() {
+        QTest::addColumn<int>("mode"); QTest::addColumn<int>("denominator");
+        for(int mode:{0,1,3,6})QTest::newRow(qPrintable(QString("4/4 mode %1").arg(mode))) << mode << 4;
+        for(int mode:{0,1,3})QTest::newRow(qPrintable(QString("3/8 mode %1").arg(mode))) << mode << 8;
+    }
+    void clip_keyboard_operations_across_tracks() {
+        QFETCH(int,mode); QFETCH(int,denominator);
+        auto* controller=EngineController::instance(); controller->setMeter(denominator==8 ? 3 : 4,denominator);
+        TrackListModel tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack(),c=tracks.addAudioTrack();
+        const int first=tracks.addClipAtBeat(a,2,2),second=tracks.addClipAtBeat(b,4,2),hidden=tracks.addClipAtBeat(c,40,2);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] {
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); timeline->setProperty("snapMode",1);
+            controller->setMeter(4,4);
+        });
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setProperty("snapMode",mode); timeline->setVisible(true);
+        timeline->setProperty("timeRangeStartBeat",1); timeline->setProperty("timeRangeEndBeat",4);
+        timeline->forceActiveFocus(); QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
+        const auto selected=[&] { return timeline->property("selectedClipIds").value<QJSValue>().toVariant().toList(); };
+        QCOMPARE(selected().size(),3); QVERIFY(selected().contains(hidden));
+        const double step=mode==6 ? 120.0/60000 : mode==0 ? (denominator==8 ? 1.5 : 4.0)
+            : 4.0/denominator/std::pow(2.0,mode-1);
+        const qint64 delta=std::llround(step*24000);
+        QTest::keyClick(window,Qt::Key_Right);
+        QCOMPARE(tracks.project().findTrack(a)->audioClips[0].start,qint64(48000)+delta);
+        QCOMPARE(tracks.project().findTrack(b)->audioClips[0].start,qint64(96000)+delta);
+        QCOMPARE(tracks.project().findTrack(c)->audioClips[0].start,qint64(960000)+delta);
+        QVERIFY(tracks.undo()); QCOMPARE(tracks.project().findTrack(a)->audioClips[0].start,qint64(48000));
+        QCOMPARE(tracks.project().findTrack(c)->audioClips[0].start,qint64(960000));
+        QVERIFY(tracks.redo()); QTest::keyClick(window,Qt::Key_Left);
+        QCOMPARE(tracks.project().findTrack(a)->audioClips[0].start,qint64(48000));
+        QCOMPARE(tracks.project().findTrack(b)->audioClips[0].start,qint64(96000));
+        QTest::keyClick(window,Qt::Key_Delete); QCOMPARE(tracks.clips().size(),0); QCOMPARE(selected().size(),0);
+        QVERIFY(tracks.undo()); QCOMPARE(tracks.clips().size(),3);
+        QCOMPARE(tracks.project().findTrack(a)->audioClips[0].id,first);
+        QCOMPARE(tracks.project().findTrack(b)->audioClips[0].id,second);
+        QTest::keyClick(window,Qt::Key_Right); QCOMPARE(tracks.project().findTrack(a)->audioClips[0].start,qint64(48000));
+        QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier); QCOMPARE(selected().size(),3);
+        QTest::keyClick(window,Qt::Key_Escape); QCOMPARE(selected().size(),0);
+        QCOMPARE(timeline->property("selectedClipId").toInt(),-1);
+        QCOMPARE(timeline->property("rangeStartBeat").toDouble(),1.0); QCOMPARE(timeline->property("rangeEndBeat").toDouble(),4.0);
+        QTest::keyClick(window,Qt::Key_Delete); QCOMPARE(tracks.clips().size(),3);
+    }
+    void clip_keyboard_operations_preserve_text_and_reject_negative_group_positions() {
+        TrackListModel tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
+        const int first=tracks.addClipAtBeat(a,0,2); tracks.addClipAtBeat(b,4,2);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); EngineController::instance()->setBpm(120); });
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true); QTest::qWait(20);
+        timeline->forceActiveFocus(); QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
+        QSignalSpy changes(&tracks,&TrackListModel::clipsChanged);
+        QTest::keyClick(window,Qt::Key_Left); QCOMPARE(changes.count(),0);
+        QCOMPARE(tracks.project().findTrack(a)->audioClips[0].start,qint64(0));
+        QCOMPARE(tracks.project().findTrack(b)->audioClips[0].start,qint64(96000));
+        QTest::keyClick(window,Qt::Key_Escape);
+        auto* block=visualItem(timeline,"clipBlock"+QString::number(first)); QVERIFY(block); click(block);
+        click(field); QTest::qWait(10); QVERIFY(field->hasActiveFocus());
+        QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
+        QCOMPARE(field->property("selectedText").toString(),QString("120"));
+        QTest::keyClick(window,Qt::Key_Left); QTest::keyClick(window,Qt::Key_Delete);
+        QCOMPARE(field->property("text").toString(),QString("20")); QCOMPARE(changes.count(),0);
+        QCOMPARE(timeline->property("selectedClipIds").value<QJSValue>().toVariant().toList().size(),1);
+        QTest::keyClick(window,Qt::Key_Escape);
+        QCOMPARE(timeline->property("selectedClipIds").value<QJSValue>().toVariant().toList().size(),1);
+        auto* other=window->findChild<QQuickItem*>("otherFocus"); QVERIFY(other); click(other);
+        QTest::keyClick(window,Qt::Key_Delete); QTest::keyClick(window,Qt::Key_Right); QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
+        QCOMPARE(changes.count(),0); QCOMPARE(tracks.clips().size(),2);
+    }
     void adjustable_snap_grid_applies_to_group_edits_and_ranges_data() {
         QTest::addColumn<int>("mode"); QTest::addColumn<int>("numerator"); QTest::addColumn<int>("denominator");
         for(int mode=0;mode<7;++mode)QTest::newRow(qPrintable(QString("4/4 mode %1").arg(mode))) << mode << 4 << 4;

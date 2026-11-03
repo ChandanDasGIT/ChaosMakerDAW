@@ -30,6 +30,26 @@ Item {
     property real lastTransportPlayhead: 0
     onPlayingChanged: { if (playing) followPlayhead = true }
     property var selectedClipIds: []
+    readonly property var keyboardFocusItem: Window.window ? Window.window.activeFocusItem : null
+    readonly property bool editingText: keyboardFocusItem instanceof TextInput || keyboardFocusItem instanceof TextEdit
+    readonly property bool clipKeyboardActive: activeFocus && visible && enabled && !!trackModel
+        && !editingText && !selecting && editOperation === "" && !transport.projectLoading
+    readonly property bool canEditClipSelection: clipKeyboardActive && selectedClipIds.length > 0 && !transport.takeBusy
+    function deselectClips() {
+        selectedClipIds = []; selectedClipId = -1; selectedTrackId = -1
+        hasSelection = false
+    }
+    function selectAllClips() {
+        const clips = trackModel.clips
+        selectedClipIds = clips.map(clip => clip.clipId)
+        selectedClipId = clips.length > 0 ? clips[0].clipId : -1
+        selectedTrackId = clips.length > 0 ? clips[0].trackId : -1
+        hasSelection = false
+    }
+    function nudgeClips(direction) {
+        const step = snapStepBeats > 0 ? snapStepBeats : bpm / 60000
+        trackModel.editClips(selectedClipIds, "move", direction * step)
+    }
     property string editOperation: ""
     property real editDelta: 0
     function updateGroupEdit(delta) {
@@ -48,9 +68,33 @@ Item {
     }
     Shortcut {
         sequence: "Delete"
-        enabled: root.activeFocus && root.selectedClipIds.length > 0 && !root.recording
+        enabled: root.canEditClipSelection
         autoRepeat: false
         onActivated: root.trackModel.editClips(root.selectedClipIds, "delete", 0)
+    }
+    Shortcut {
+        sequence: "Left"
+        enabled: root.canEditClipSelection
+        autoRepeat: true
+        onActivated: root.nudgeClips(-1)
+    }
+    Shortcut {
+        sequence: "Right"
+        enabled: root.canEditClipSelection
+        autoRepeat: true
+        onActivated: root.nudgeClips(1)
+    }
+    Shortcut {
+        sequences: [StandardKey.SelectAll]
+        enabled: root.clipKeyboardActive
+        autoRepeat: false
+        onActivated: root.selectAllClips()
+    }
+    Shortcut {
+        sequence: "Escape"
+        enabled: root.clipKeyboardActive && root.selectedClipIds.length > 0
+        autoRepeat: false
+        onActivated: root.deselectClips()
     }
     readonly property bool canMergeSelection: {
         if (!trackModel || selectedClipIds.length !== 2) return false
