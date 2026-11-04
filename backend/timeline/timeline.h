@@ -47,12 +47,21 @@ public:
     bool canEditSelection() const;
     bool canMergeSelection() const;
     bool canSplitSelection() const;
+    bool canCopySelection() const;
+    bool canCutSelection() const;
+    bool canPaste() const;
+    bool canDuplicateSelection() const;
     const std::vector<int>& selectedIds() const { return m_selectedIds; }
     int selectedClipId() const { return m_selectedClipId; }
-    int selectedTrackId() const { return m_selectedTrackId; }
+    int selectedTrackId() const;
+    bool selectTrack(int trackId);
     void deselect();
     void selectAll();
     void selectClip(int trackId, int clipId, bool toggle, bool preserve);
+    bool copySelectedClips();
+    std::vector<int> cutSelectedClips();
+    std::vector<int> pasteClips(double targetBeat = -1, int targetTrackId = -1);
+    std::vector<int> duplicateSelectedClips(double beatOffset = 0.0);
     void beginEdit(const std::string& operation);
     void updateEdit(double delta);
     void updateDrag(double originalBeat, double deltaBeats, bool verticalOnly = false);

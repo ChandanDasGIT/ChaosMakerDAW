@@ -662,6 +662,32 @@ void EngineController::clearTrackClips(int trackId)
     if(it!=m_trackEffects.end())it->second.meters->clearClips();
 }
 
+void EngineController::setMasterVolume(double volume)
+{
+    if (!std::isfinite(volume)) return;
+    const double clamped = std::clamp(volume, 0.0, 2.0);
+    if (m_masterVolume == clamped) return;
+    m_masterVolume = clamped;
+    if (m_engine) m_engine->setMasterVolume(static_cast<float>(clamped));
+    if (m_project && m_project->masterVolume() != clamped) {
+        m_project->setMasterVolume(clamped);
+    }
+    emit masterVolumeChanged();
+    if (!m_restoring) m_sessionTimer.start();
+}
+
+void EngineController::setMasterMuted(bool muted)
+{
+    if (m_masterMuted == muted) return;
+    m_masterMuted = muted;
+    if (m_engine) m_engine->setMasterMuted(muted);
+    if (m_project && m_project->masterMuted() != muted) {
+        m_project->setMasterMuted(muted);
+    }
+    emit masterMutedChanged();
+    if (!m_restoring) m_sessionTimer.start();
+}
+
 namespace {
 QString sessionPath() {
     return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/last-session.json");
@@ -730,6 +756,14 @@ void EngineController::attachProject(TrackListWrapper* model) {
         }
     }
     m_restoring = false;
+    setMasterVolume(model->masterVolume());
+    setMasterMuted(model->masterMuted());
+    connect(model, &TrackListWrapper::masterVolumeChanged, this, [this] {
+        if (m_project) setMasterVolume(m_project->masterVolume());
+    });
+    connect(model, &TrackListWrapper::masterMutedChanged, this, [this] {
+        if (m_project) setMasterMuted(m_project->masterMuted());
+    });
     connect(model, &TrackListWrapper::projectChanged, this, &EngineController::refreshProject);
     refreshProject();
     setProjectDirty(model->count()>0);

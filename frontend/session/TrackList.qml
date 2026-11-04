@@ -102,6 +102,7 @@ Rectangle {
                     required property bool recordsWithFx
                     required property var eqBands
                     property bool renaming: false
+                    readonly property bool isSelected: !!root.trackModel && root.trackModel.selectedTrackId === trackCard.trackId
 
                     function beginRename() {
                         nameEditor.text = trackCard.name
@@ -120,14 +121,19 @@ Rectangle {
                     y: index * root.laneHeight
                     width: trackScroll.width
                     height: root.laneHeight
-                    color: index % 2 ? "#222222" : "#252525"
-                    border.color: root.dropRow === index ? Theme.accent : Theme.divider
-                    border.width: root.dropRow === index ? 2 : 1
+                    color: isSelected ? "#2a343d" : (index % 2 ? "#222222" : "#252525")
+                    border.color: isSelected ? Theme.accent : (root.dropRow === index ? Theme.accent : Theme.divider)
+                    border.width: isSelected || root.dropRow === index ? 2 : 1
                     Rectangle {
                         objectName: "trackColourAccent" + trackCard.trackId
                         anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
-                        width: 3
-                        color: trackCard.trackColour
+                        width: isSelected ? 5 : 3
+                        color: isSelected ? Theme.accent : trackCard.trackColour
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onPressed: if (root.trackModel) root.trackModel.selectTrack(trackCard.trackId)
                     }
 
                     ColumnLayout {
@@ -174,6 +180,7 @@ Rectangle {
                                     property real pressY: 0
                                     property bool reordering: false
                                     onPressed: mouse => {
+                                        if (root.trackModel) root.trackModel.selectTrack(trackCard.trackId)
                                         pressY = mapToItem(root, mouse.x, mouse.y).y
                                         reordering = false
                                     }

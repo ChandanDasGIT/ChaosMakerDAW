@@ -57,6 +57,10 @@ public:
     int inputChannelCapacity() const { return m_device ? m_device->inputChannelCapacity() : 0; }
     bool connectOutput(const std::string& left, const std::string& right);
     void setMonitorEqBand(int band, float gainDb) noexcept { m_monitorEq.setBandGain(band, gainDb); }
+    float masterVolume() const noexcept { return m_masterVolume.load(std::memory_order_relaxed); }
+    void setMasterVolume(float volume) noexcept { m_masterVolume.store(std::clamp(volume, 0.0f, 2.0f), std::memory_order_relaxed); }
+    bool masterMuted() const noexcept { return m_masterMuted.load(std::memory_order_relaxed); }
+    void setMasterMuted(bool muted) noexcept { m_masterMuted.store(muted, std::memory_order_relaxed); }
 
     // Offline rendering uses the same path as the real-time one.
     void renderBlock(const AudioIO& io) noexcept;
@@ -94,6 +98,8 @@ private:
     std::array<std::array<float,1024>,2> m_printedAudio{}, m_liveAudio{};
     bool m_resetPlayback = false;
     std::atomic<float> m_inputTrimGain{1.0f};
+    std::atomic<float> m_masterVolume{1.0f};
+    std::atomic<bool> m_masterMuted{false};
     Smoother m_inputTrim;
     PeakMeter m_rawMeter, m_preFxMeter, m_leftMeter, m_rightMeter;
     bool m_cleanMonitorEnabled = false;                   // audio thread only

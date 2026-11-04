@@ -26,7 +26,7 @@ QVariantMap clipMap(const TrackList::ClipInfo& clip)
     return {{"clipId", clip.clipId}, {"trackId", clip.trackId}, {"laneIndex", clip.laneIndex},
         {"startBeat", clip.startBeat}, {"lengthBeats", clip.lengthBeats},
         {"label", QString::fromStdString(clip.label)}, {"trackColour", QString::fromStdString(clip.colour)},
-        {"effectsPrinted", clip.effectsPrinted}};
+        {"effectsPrinted", clip.effectsPrinted}, {"gainDb", clip.gainDb}};
 }
 QVariantList choices(const std::vector<TrackList::TrackChoice>& entries)
 {
@@ -49,6 +49,8 @@ std::optional<std::vector<int>> clipIds(const QVariantList& values)
 
 TrackListWrapper::TrackListWrapper(QObject* parent)
     : QAbstractListModel(parent)
+    , m_notifiedTrackId(m_state.selectedTrackId())
+    , m_notifiedClipId(m_state.selectedClipId())
 {
     connect(this, &QAbstractItemModel::dataChanged, this, &TrackListWrapper::projectChanged);
     connect(this, &TrackListWrapper::countChanged, this, &TrackListWrapper::projectChanged);
@@ -177,13 +179,72 @@ Qt::ItemFlags TrackListWrapper::flags(const QModelIndex& index) const
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
 }
 
+void TrackListWrapper::syncSelectionState()
+{
+    const int currentClip = m_state.selectedClipId();
+    if (m_notifiedClipId != currentClip) {
+        m_notifiedClipId = currentClip;
+        emit selectedClipChanged(m_notifiedClipId);
+    }
+    const int currentTrack = m_state.selectedTrackId();
+    if (m_notifiedTrackId != currentTrack) {
+        m_notifiedTrackId = currentTrack;
+        emit selectedTrackChanged(m_notifiedTrackId);
+    }
+}
+
 int TrackListWrapper::appendTrack(const std::function<int()>& insert)
 {
     const int row = rowCount();
     beginInsertRows({}, row, row);
     const int id = insert();
     endInsertRows(); emit countChanged();
+    syncSelectionState();
     return id;
+}
+
+bool TrackListWrapper::selectTrack(int id)
+{
+    if (id >= 0 && !m_project.findTrack(id)) return false;
+    m_state.selectTrack(id);
+    syncSelectionState();
+    return true;
+}
+
+void TrackListWrapper::setSelectedClipId(int id)
+{
+    if (id < 0) {
+        m_state.clearSelectedClip();
+    } else {
+        for (const auto& track : m_project.tracks()) {
+            if (m_state.findClip(track->id, id)) {
+                m_state.selectClip(track->id, id);
+                break;
+            }
+        }
+    }
+    syncSelectionState();
+}
+
+void TrackListWrapper::selectClip(int trackId, int clipId)
+{
+    if (!m_state.selectClip(trackId, clipId)) return;
+    syncSelectionState();
+}
+
+bool TrackListWrapper::setClipGain(int trackId, int clipId, double gainDb)
+{
+    const auto change = m_state.setClipGain(trackId, clipId, gainDb);
+    if (change.changed) {
+        notifyClipEdit(trackId);
+    }
+    return change.accepted;
+}
+
+double TrackListWrapper::clipGain(int trackId, int clipId) const
+{
+    const auto* clip = m_state.findClip(trackId, clipId);
+    return clip ? clip->gainDb : 0.0;
 }
 
 int TrackListWrapper::addAudioTrack()
@@ -239,6 +300,7 @@ bool TrackListWrapper::removeTrack(int id)
     if (!m_state.canRemoveTrack(id)) return false;
     const int row = rowForTrackId(id);
     beginRemoveRows({}, row, row); m_state.removeTrack(id); endRemoveRows();
+    syncSelectionState();
     emit countChanged(); emit contentEndBeatsChanged(); emit clipsChanged();
     emit cleanMonitorChanged(cleanMonitorArmed()); emit cleanMonitorInputChanged();
     emit cleanMonitorGainChanged(cleanMonitorGain()); emit cleanMonitorEqChanged();
@@ -331,6 +393,31 @@ bool TrackListWrapper::setVolume(int id, double value)
     return change.accepted;
 }
 
+bool TrackListWrapper::setMasterVolume(double value)
+{
+    const auto change = m_state.setMasterVolume(value);
+    if (change.changed) {
+        emit masterVolumeChanged();
+        emit projectChanged();
+    }
+    return change.accepted;
+}
+
+void TrackListWrapper::resetMasterVolume()
+{
+    setMasterVolume(1.0);
+}
+
+bool TrackListWrapper::setMasterMuted(bool value)
+{
+    const auto change = m_state.setMasterMuted(value);
+    if (change.changed) {
+        emit masterMutedChanged();
+        emit projectChanged();
+    }
+    return change.accepted;
+}
+
 int TrackListWrapper::addAudioClip(int id, const QString& pool, qint64 start, qint64 length, qint64 offset, bool printed)
 {
     const int clip = m_state.addAudioClip(id, pool.toStdString(), start, length, offset, printed);
@@ -403,6 +490,59 @@ bool TrackListWrapper::removeAudioClip(int id, int clip)
 {
     if (!m_state.removeAudioClip(id, clip)) return false;
     notifyClipEdit(id); return true;
+}
+
+bool TrackListWrapper::copyClips(const QVariantList& ids)
+{
+    std::vector<int> intIds;
+    intIds.reserve(ids.size());
+    for (const auto& id : ids) intIds.push_back(id.toInt());
+    const bool ok = m_state.copyClips(intIds);
+    if (ok) emit clipboardChanged();
+    return ok;
+}
+
+QVariantList TrackListWrapper::cutClips(const QVariantList& ids)
+{
+    std::vector<int> intIds;
+    intIds.reserve(ids.size());
+    for (const auto& id : ids) intIds.push_back(id.toInt());
+    const auto cut = m_state.cutClips(intIds);
+    if (!cut.empty()) {
+        emit clipboardChanged();
+        notifyClipEdit(-1);
+    }
+    QVariantList result;
+    result.reserve(cut.size());
+    for (int id : cut) result.append(id);
+    return result;
+}
+
+QVariantList TrackListWrapper::pasteClips(int targetTrackId, double targetBeat)
+{
+    const auto pasted = m_state.pasteClips(targetTrackId, targetBeat);
+    if (!pasted.empty()) {
+        notifyClipEdit(targetTrackId);
+    }
+    QVariantList result;
+    result.reserve(pasted.size());
+    for (int id : pasted) result.append(id);
+    return result;
+}
+
+QVariantList TrackListWrapper::duplicateClips(const QVariantList& ids, double beatOffset)
+{
+    std::vector<int> intIds;
+    intIds.reserve(ids.size());
+    for (const auto& id : ids) intIds.push_back(id.toInt());
+    const auto duplicated = m_state.duplicateClips(intIds, beatOffset);
+    if (!duplicated.empty()) {
+        notifyClipEdit(-1);
+    }
+    QVariantList result;
+    result.reserve(duplicated.size());
+    for (int id : duplicated) result.append(id);
+    return result;
 }
 
 void TrackListWrapper::notifyClipEdit(int trackId) {
@@ -576,9 +716,11 @@ bool TrackListWrapper::restoreSessionState(const QJsonObject& state, QString& er
     beginResetModel();
     m_state.replaceDocument(std::move(candidate), std::move(audio), std::move(mediaPaths));
     endResetModel();
+    syncSelectionState();
     emit countChanged(); emit clipsChanged(); emit contentEndBeatsChanged();
     emit cleanMonitorChanged(cleanMonitorArmed()); emit cleanMonitorInputChanged();
     emit cleanMonitorGainChanged(cleanMonitorGain()); emit cleanMonitorEqChanged();
+    emit masterVolumeChanged(); emit masterMutedChanged();
     error = missing.isEmpty() ? QString() : QStringLiteral("Missing audio (clips kept offline): %1").arg(missing.join(", "));
     return true;
 }
@@ -588,17 +730,21 @@ void TrackListWrapper::replaceDocument(Project project, TrackList::AudioMap audi
     beginResetModel();
     m_state.replaceDocument(std::move(project), std::move(audio), std::move(paths));
     endResetModel();
+    syncSelectionState();
     emit countChanged(); emit clipsChanged(); emit contentEndBeatsChanged();
     emit cleanMonitorChanged(cleanMonitorArmed()); emit cleanMonitorInputChanged();
     emit cleanMonitorGainChanged(cleanMonitorGain()); emit cleanMonitorEqChanged();
+    emit masterVolumeChanged(); emit masterMutedChanged();
 }
 
 void TrackListWrapper::adoptDocument(TrackListWrapper& candidate) {
     beginResetModel();
     m_state.adoptDocument(std::move(candidate.m_state));
     endResetModel();
+    syncSelectionState();
     emit countChanged(); emit clipsChanged(); emit contentEndBeatsChanged();
     emit cleanMonitorChanged(cleanMonitorArmed()); emit cleanMonitorInputChanged(); emit cleanMonitorGainChanged(cleanMonitorGain()); emit cleanMonitorEqChanged();
+    emit masterVolumeChanged(); emit masterMutedChanged();
 }
 
 QVariantList TrackListWrapper::trackChoices() const { return choices(TrackList::trackChoices()); }

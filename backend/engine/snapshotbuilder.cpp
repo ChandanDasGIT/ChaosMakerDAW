@@ -4,6 +4,8 @@ SnapshotBuilder::Context SnapshotBuilder::Context::fromProject(const Project& pr
 {
     Context ctx;
     ctx.tempo = project.tempo();
+    ctx.masterVolume = project.masterVolume();
+    ctx.masterMuted = project.masterMuted();
     ctx.tracks.reserve(project.tracks().size());
     for (const auto& track : project.tracks()) {
         TrackInfo info;
@@ -131,6 +133,8 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
     auto snapshot = std::make_unique<EngineSnapshot>();
     snapshot->tempo = context.tempo;
     snapshot->multiMonitor = multiMonitor;
+    snapshot->masterGain = context.masterVolume;
+    snapshot->masterMuted = context.masterMuted;
     snapshot->playbackEnd = -1;
 
     for (const auto& track : context.tracks) {

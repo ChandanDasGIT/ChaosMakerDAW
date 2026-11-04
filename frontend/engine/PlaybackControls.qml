@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import ChaosMaker
 
 RowLayout {
     id: root
@@ -18,12 +17,7 @@ RowLayout {
 
     PlaybackControlsWrapper {
         id: playbackBridge
-        onActionRequested: action => {
-            root.transportAction(action)
-            if (root.transport && typeof root.transport.transportAction === "function") {
-                root.transport.transportAction(action)
-            }
-        }
+        onActionRequested: action => root.transportAction(action)
     }
 
     Shortcut {

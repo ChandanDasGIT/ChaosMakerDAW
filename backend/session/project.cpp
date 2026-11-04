@@ -102,6 +102,22 @@ bool Project::setTrackMuted(int id, bool enabled)
     return true;
 }
 
+bool Project::setMasterVolume(float volume) noexcept
+{
+    if (!std::isfinite(volume)) return false;
+    const float clamped = std::clamp(volume, 0.0f, 2.0f);
+    if (m_masterVolume == clamped) return false;
+    m_masterVolume = clamped;
+    return true;
+}
+
+bool Project::setMasterMuted(bool muted) noexcept
+{
+    if (m_masterMuted == muted) return false;
+    m_masterMuted = muted;
+    return true;
+}
+
 bool Project::setTrackRecordArmed(int id, bool enabled)
 {
     auto* track = findTrack(id);
@@ -149,6 +165,37 @@ int Project::addAudioClip(int trackId, AudioClip clip)
     track->audioClips.push_back(std::move(clip));
     rememberClipEdit(trackId, std::move(before));
     return track->audioClips.back().id;
+}
+
+std::vector<int> Project::addAudioClips(const std::vector<std::pair<int, AudioClip>>& clips)
+{
+    if (clips.empty()) return {};
+    for (const auto& [trackId, clip] : clips) {
+        const auto* track = findTrack(trackId);
+        if (!track || clip.start < 0 || clip.length <= 0 || clip.sourceOffset < 0
+            || clip.start > std::numeric_limits<std::int64_t>::max() - clip.length)
+            return {};
+    }
+    ClipEdit edit;
+    std::vector<int> newIds;
+    newIds.reserve(clips.size());
+    for (const auto& [trackId, clipCandidate] : clips) {
+        if (std::none_of(edit.tracks.begin(), edit.tracks.end(), [trackId](const auto& t) { return t.trackId == trackId; })) {
+            const auto& existingClips = findTrack(trackId)->audioClips;
+            edit.tracks.push_back({trackId, existingClips, existingClips});
+        }
+        auto trackEdit = std::find_if(edit.tracks.begin(), edit.tracks.end(), [trackId](const auto& t) { return t.trackId == trackId; });
+        AudioClip clip = clipCandidate;
+        clip.id = m_nextClipId++;
+        newIds.push_back(clip.id);
+        trackEdit->after.push_back(std::move(clip));
+    }
+    m_history.erase(m_history.begin() + m_historyPosition, m_history.end());
+    m_history.push_back(std::move(edit));
+    if (m_history.size() > 100) m_history.erase(m_history.begin());
+    m_historyPosition = m_history.size();
+    for (const auto& state : m_history.back().tracks) findTrack(state.trackId)->audioClips = state.after;
+    return newIds;
 }
 
 bool Project::removeAudioClip(int trackId, int clipId)
@@ -242,6 +289,20 @@ bool Project::moveAudioClip(int trackId, int clipId, std::int64_t start) {
     if (clip->start == start) return true;
     auto before = track->audioClips; clip->start = start;
     rememberClipEdit(trackId, std::move(before)); return true;
+}
+
+bool Project::setClipGain(int trackId, int clipId, float gainDb) {
+    auto* track = findTrack(trackId);
+    if (!track || !std::isfinite(gainDb)) return false;
+    const float clampedGain = std::clamp(gainDb, -120.0f, 24.0f);
+    auto it = std::find_if(track->audioClips.begin(), track->audioClips.end(),
+                           [clipId](const auto& c) { return c.id == clipId; });
+    if (it == track->audioClips.end()) return false;
+    if (it->gainDb == clampedGain) return true;
+    auto before = track->audioClips;
+    it->gainDb = clampedGain;
+    rememberClipEdit(trackId, std::move(before));
+    return true;
 }
 
 bool Project::editClipGroup(const std::vector<ClipChange>& changes) {

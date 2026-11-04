@@ -69,6 +69,8 @@ std::string ProjectDocument::serialize(const Project& project,
     projectJson["numerator"] = tempo.numerator();
     projectJson["denominator"] = tempo.denominator();
     projectJson["sampleRate"] = tempo.sampleRate();
+    projectJson["masterVolume"] = project.masterVolume();
+    projectJson["masterMuted"] = project.masterMuted();
     projectJson["tracks"] = tracksJson;
 
     doc["project"] = projectJson;
@@ -165,6 +167,8 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
     const double rate = (targetSampleRate > 1000.0) ? targetSampleRate : 48000.0;
     Project candidate;
     candidate.tempo().set(bpm, numerator, denominator, rate);
+    candidate.setMasterVolume(projectJson.value("masterVolume", 1.0f));
+    candidate.setMasterMuted(projectJson.value("masterMuted", false));
 
     TrackList::AudioMap audio;
     TrackList::MediaPaths mediaPaths;

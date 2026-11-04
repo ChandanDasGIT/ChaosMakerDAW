@@ -20,14 +20,20 @@ class TrackListWrapper : public QAbstractListModel {
     Q_PROPERTY(QStringList eqPresetNames READ eqPresetNames CONSTANT)
     Q_PROPERTY(QString eqPresetError READ eqPresetError NOTIFY eqPresetErrorChanged)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
+    Q_PROPERTY(int selectedTrackId READ selectedTrackId WRITE selectTrack NOTIFY selectedTrackChanged)
+    Q_PROPERTY(int selectedClipId READ selectedClipId WRITE setSelectedClipId NOTIFY selectedClipChanged)
     Q_PROPERTY(double contentEndBeats READ contentEndBeats NOTIFY contentEndBeatsChanged)
     Q_PROPERTY(QVariantList clips READ clips NOTIFY clipsChanged)
+    Q_PROPERTY(bool hasClipboard READ hasClipboard NOTIFY clipboardChanged)
+    Q_PROPERTY(int clipboardClipCount READ clipboardClipCount NOTIFY clipboardChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY historyChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY historyChanged)
     Q_PROPERTY(bool cleanMonitorArmed READ cleanMonitorArmed NOTIFY cleanMonitorChanged)
     Q_PROPERTY(QString cleanMonitorInput READ cleanMonitorInput NOTIFY cleanMonitorInputChanged)
     Q_PROPERTY(double cleanMonitorGain READ cleanMonitorGain NOTIFY cleanMonitorGainChanged)
     Q_PROPERTY(QVariantList cleanMonitorEqBands READ cleanMonitorEqBands NOTIFY cleanMonitorEqChanged)
+    Q_PROPERTY(double masterVolume READ masterVolume WRITE setMasterVolume NOTIFY masterVolumeChanged)
+    Q_PROPERTY(bool masterMuted READ masterMuted WRITE setMasterMuted NOTIFY masterMutedChanged)
 
 public:
     enum Role {
@@ -59,6 +65,13 @@ public:
 
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     int count() const { return rowCount(); }
+    int selectedTrackId() const { return m_state.selectedTrackId(); }
+    Q_INVOKABLE bool selectTrack(int id);
+    int selectedClipId() const { return m_state.selectedClipId(); }
+    Q_INVOKABLE void setSelectedClipId(int id);
+    Q_INVOKABLE void selectClip(int trackId, int clipId);
+    Q_INVOKABLE bool setClipGain(int trackId, int clipId, double gainDb);
+    Q_INVOKABLE double clipGain(int trackId, int clipId) const;
     double contentEndBeats() const { return m_project.contentEndBeats(); }
     QVariantList clips() const;
     Q_INVOKABLE QVariantList clipWaveform(int trackId, int clipId, int bins, double from = 0, double to = 1) const;
@@ -112,6 +125,11 @@ public:
     Q_INVOKABLE bool loadEqPreset(int trackId, const QUrl& file);
     Q_INVOKABLE bool setTrackInputPort(int trackId, const QString& port);
     Q_INVOKABLE bool setVolume(int trackId, double volume);
+    double masterVolume() const { return m_state.masterVolume(); }
+    Q_INVOKABLE bool setMasterVolume(double volume);
+    Q_INVOKABLE void resetMasterVolume();
+    bool masterMuted() const { return m_state.masterMuted(); }
+    Q_INVOKABLE bool setMasterMuted(bool muted);
     Q_INVOKABLE int addAudioClip(int trackId, const QString& poolId,
                                  qint64 startSample, qint64 lengthSamples,
                                  qint64 sourceOffset = 0, bool effectsPrinted = true);
@@ -126,9 +144,18 @@ public:
     Q_INVOKABLE bool moveClipAtBeat(int trackId, int clipId, double startBeat);
     Q_INVOKABLE bool resizeClipAtBeat(int trackId, int clipId, double lengthBeats);
     Q_INVOKABLE bool removeAudioClip(int trackId, int clipId);
+    bool hasClipboard() const { return m_state.hasClipboard(); }
+    int clipboardClipCount() const { return m_state.clipboardClipCount(); }
+    Q_INVOKABLE bool copyClips(const QVariantList& ids);
+    Q_INVOKABLE QVariantList cutClips(const QVariantList& ids);
+    Q_INVOKABLE QVariantList pasteClips(int targetTrackId, double targetBeat);
+    Q_INVOKABLE QVariantList duplicateClips(const QVariantList& ids, double beatOffset = 0.0);
     Q_INVOKABLE void setTempo(double bpm, int numerator, int denominator);
 
 signals:
+    void selectedTrackChanged(int trackId);
+    void selectedClipChanged(int clipId);
+    void clipboardChanged();
     void historyChanged();
     void projectChanged();
     void eqPresetErrorChanged();
@@ -139,11 +166,14 @@ signals:
     void cleanMonitorInputChanged();
     void cleanMonitorGainChanged(double gain);
     void cleanMonitorEqChanged();
+    void masterVolumeChanged();
+    void masterMutedChanged();
 
 private:
     void notifyClipEdit(int trackId);
     void setEqPresetError(const QString& error);
     bool applyEqBands(int trackId, const std::array<float,10>& bands);
+    void syncSelectionState();
     QString m_eqPresetError;
     int rowForTrackId(int trackId) const;
     int appendTrack(const std::function<int()>& insert);
@@ -154,4 +184,6 @@ private:
     Project& m_project = m_state.project();
     TrackList::AudioMap& m_audio = m_state.audio();
     TrackList::MediaPaths& m_mediaPaths = m_state.mediaPaths();
+    int m_notifiedTrackId = -1;
+    int m_notifiedClipId = -1;
 };
