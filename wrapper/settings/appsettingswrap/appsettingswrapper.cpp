@@ -23,6 +23,10 @@ void AppSettingsWrapper::loadFromPlatform()
         m_settings.importValue(AppSettings::KeyRestoreSessionOnStartup,
                                qs.value(QStringLiteral("session/restoreOnStartup")).toBool() ? "true" : "false");
     }
+    if (qs.contains(QStringLiteral("ui/pianoRollPresentation"))) {
+        m_settings.importValue(AppSettings::KeyPianoRollPresentation,
+                               qs.value(QStringLiteral("ui/pianoRollPresentation")).toString().toStdString());
+    }
     if (qs.contains(QStringLiteral("paths/defaultProjectDirectory"))) {
         m_settings.importValue(AppSettings::KeyDefaultProjectDir,
                                qs.value(QStringLiteral("paths/defaultProjectDirectory")).toString().toStdString());
@@ -41,6 +45,7 @@ void AppSettingsWrapper::saveToPlatform()
 {
     QSettings qs;
     qs.setValue(QStringLiteral("session/restoreOnStartup"), m_settings.restoreSessionOnStartup());
+    qs.setValue(QStringLiteral("ui/pianoRollPresentation"), QString::fromStdString(m_settings.pianoRollPresentation()));
     qs.setValue(QStringLiteral("paths/defaultProjectDirectory"), QString::fromStdString(m_settings.defaultProjectDirectory()));
     qs.setValue(QStringLiteral("autosave/enabled"), m_settings.autoSaveEnabled());
     qs.setValue(QStringLiteral("autosave/intervalSeconds"), m_settings.autoSaveIntervalSeconds());
@@ -54,6 +59,21 @@ void AppSettingsWrapper::setRestoreSessionOnStartup(bool enabled)
         saveToPlatform();
         emit restoreSessionOnStartupChanged();
         emit preferenceSaved(QString::fromLatin1(AppSettings::KeyRestoreSessionOnStartup));
+    }
+}
+
+QString AppSettingsWrapper::pianoRollPresentation() const
+{
+    return QString::fromStdString(m_settings.pianoRollPresentation());
+}
+
+void AppSettingsWrapper::setPianoRollPresentation(const QString& presentation)
+{
+    if (m_settings.pianoRollPresentation() != presentation.toStdString()) {
+        m_settings.setPianoRollPresentation(presentation.toStdString());
+        saveToPlatform();
+        emit pianoRollPresentationChanged();
+        emit preferenceSaved(QString::fromLatin1(AppSettings::KeyPianoRollPresentation));
     }
 }
 

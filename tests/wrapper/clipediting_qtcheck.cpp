@@ -183,6 +183,7 @@ TEST(qtclipediting, per_clip_gain_updates_model_role_and_is_independent_of_track
     auto clipsList = tracks.clips();
     CHECK(!clipsList.isEmpty());
     CHECK_NEAR(clipsList.front().toMap().value("gainDb").toDouble(), 0.0, 1e-6);
+    CHECK(!clipsList.front().toMap().value("isRecorded").toBool());
 
     // Track volume starts at default 1.0 (independent)
     CHECK_NEAR(tracks.project().findTrack(track)->volume, 1.0f, 1e-6);

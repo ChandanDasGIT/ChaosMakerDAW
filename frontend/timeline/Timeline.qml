@@ -55,6 +55,8 @@ Item {
     readonly property real rangeStartBeat: editor.rangeStartBeat
     readonly property real rangeEndBeat: editor.rangeEndBeat
 
+    signal openPianoRollRequested(int trackId, int clipId, string label, real lengthBeats)
+
     Shortcut {
         sequence: "Delete"
         enabled: root.canEditClipSelection
@@ -177,11 +179,46 @@ Item {
         property int targetClipId: -1
         property real targetStart: 0
         property real targetLength: 0
+        property bool targetIsRecorded: false
+        property string targetLabel: ""
 
         background: Rectangle {
             color: Theme.panelBg
             border.color: Theme.divider
             radius: 6
+        }
+
+        MenuItem {
+            id: openPianoRollAction
+            objectName: "openPianoRollAction"
+            text: "Open Piano Roll"
+            visible: !clipContextMenu.targetIsRecorded
+            enabled: visible
+            implicitHeight: visible ? 32 : 0
+            leftPadding: Theme.margin
+            rightPadding: Theme.margin
+            contentItem: Text {
+                text: openPianoRollAction.text
+                color: !openPianoRollAction.enabled ? Theme.textMuted : openPianoRollAction.highlighted ? Theme.accent : Theme.text
+                font.pixelSize: Theme.bodySize
+                verticalAlignment: Text.AlignVCenter
+            }
+            background: Rectangle {
+                color: openPianoRollAction.highlighted ? Theme.tooltipBg : "transparent"
+                radius: 4
+            }
+            onTriggered: {
+                root.openPianoRollRequested(clipContextMenu.targetTrackId, clipContextMenu.targetClipId,
+                    clipContextMenu.targetLabel, clipContextMenu.targetLength)
+            }
+        }
+
+        MenuSeparator {
+            visible: openPianoRollAction.visible
+            contentItem: Rectangle {
+                implicitHeight: 1
+                color: Theme.divider
+            }
         }
 
         MenuItem {
@@ -383,6 +420,7 @@ Item {
                 required property string label
                 required property bool effectsPrinted
                 required property color trackColour
+                required property bool isRecorded
                 objectName: "clipBlock" + clipId
                 readonly property var preview: editor.previews[String(clipId)] ?? ({})
                 x: (preview.startBeat ?? startBeat) * root.beatWidth + 4
@@ -476,6 +514,8 @@ Item {
                         clipContextMenu.targetClipId = clipItem.clipId
                         clipContextMenu.targetStart = clipItem.startBeat
                         clipContextMenu.targetLength = clipItem.lengthBeats
+                        clipContextMenu.targetIsRecorded = clipItem.isRecorded
+                        clipContextMenu.targetLabel = clipItem.label
                         const position = mapToItem(root, mouse.x, mouse.y)
                         clipContextMenu.popup(position.x, position.y)
                     }

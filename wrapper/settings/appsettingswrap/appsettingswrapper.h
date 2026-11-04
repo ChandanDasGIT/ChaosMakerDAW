@@ -10,6 +10,7 @@ class AppSettingsWrapper : public QObject {
     QML_ELEMENT
 
     Q_PROPERTY(bool restoreSessionOnStartup READ restoreSessionOnStartup WRITE setRestoreSessionOnStartup NOTIFY restoreSessionOnStartupChanged)
+    Q_PROPERTY(QString pianoRollPresentation READ pianoRollPresentation WRITE setPianoRollPresentation NOTIFY pianoRollPresentationChanged)
     Q_PROPERTY(QString defaultProjectDirectory READ defaultProjectDirectory WRITE setDefaultProjectDirectory NOTIFY defaultProjectDirectoryChanged)
     Q_PROPERTY(bool autoSaveEnabled READ autoSaveEnabled WRITE setAutoSaveEnabled NOTIFY autoSaveChanged)
     Q_PROPERTY(int autoSaveIntervalSeconds READ autoSaveIntervalSeconds WRITE setAutoSaveIntervalSeconds NOTIFY autoSaveChanged)
@@ -23,6 +24,9 @@ public:
 
     bool restoreSessionOnStartup() const noexcept { return m_settings.restoreSessionOnStartup(); }
     void setRestoreSessionOnStartup(bool enabled);
+
+    QString pianoRollPresentation() const;
+    void setPianoRollPresentation(const QString& presentation);
 
     QString defaultProjectDirectory() const;
     void setDefaultProjectDirectory(const QString& path);
@@ -38,6 +42,7 @@ public:
 
 signals:
     void restoreSessionOnStartupChanged();
+    void pianoRollPresentationChanged();
     void defaultProjectDirectoryChanged();
     void autoSaveChanged();
     void preferenceSaved(const QString& key);

@@ -10,6 +10,7 @@ public:
     static constexpr const char* KeyDefaultProjectDir = "paths/defaultProjectDirectory";
     static constexpr const char* KeyAutoSaveEnabled = "autosave/enabled";
     static constexpr const char* KeyAutoSaveInterval = "autosave/intervalSeconds";
+    static constexpr const char* KeyPianoRollPresentation = "ui/pianoRollPresentation";
 
     AppSettings();
     ~AppSettings();
@@ -17,6 +18,10 @@ public:
     // Startup session restore preference
     bool restoreSessionOnStartup() const noexcept { return m_restoreSessionOnStartup; }
     void setRestoreSessionOnStartup(bool enabled) noexcept;
+
+    // Piano roll presentation ("dock" or "window")
+    const std::string& pianoRollPresentation() const noexcept { return m_pianoRollPresentation; }
+    void setPianoRollPresentation(std::string presentation) noexcept;
 
     // Default project directory
     const std::string& defaultProjectDirectory() const noexcept { return m_defaultProjectDirectory; }
@@ -48,6 +53,7 @@ public:
 
 private:
     bool m_restoreSessionOnStartup = false;
+    std::string m_pianoRollPresentation = "dock";
     std::string m_defaultProjectDirectory;
     bool m_autoSaveEnabled = true;
     int m_autoSaveIntervalSeconds = 60;

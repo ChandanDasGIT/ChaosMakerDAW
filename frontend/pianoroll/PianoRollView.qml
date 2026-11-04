@@ -1,0 +1,1146 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import ".."
+
+Item {
+    id: root
+
+    implicitWidth: 1040
+    implicitHeight: 640
+
+    property int trackId: -1
+    property int clipId: -1
+    property string clipLabel: "Clip"
+    property real clipLengthBeats: 4.0
+    property real bpm: 120.0
+    property real pixelsPerBeat: 96.0
+    property real keyHeight: 18.0
+    property string activeTool: "pencil" // "pointer", "pencil", "eraser"
+    property string snapDivision: "1/16"
+    property string snapStyle: "straight"
+    property string colorMode: "Velocity"
+    property bool keySnap: false
+
+    property real playheadBeat: 0.0
+    property string currentPosText: "1.1.00"
+    property string currentNoteText: "C4 60"
+
+    property int dragCreatedNoteId: -1
+    property real dragStartBeat: 0.0
+
+    signal closeRequested()
+
+    PianoRollWrapper {
+        id: pianoRollBackend
+    }
+
+    readonly property alias notes: pianoRollBackend.notes
+
+    focus: true
+
+    Shortcut {
+        sequence: "Delete"
+        onActivated: pianoRollBackend.deleteSelected()
+    }
+    Shortcut {
+        sequence: "Backspace"
+        onActivated: pianoRollBackend.deleteSelected()
+    }
+    Shortcut {
+        sequence: "Ctrl+A"
+        onActivated: pianoRollBackend.selectAll()
+    }
+    Shortcut {
+        sequence: "Escape"
+        onActivated: pianoRollBackend.clearSelection()
+    }
+
+    function getSnapBeats() {
+        switch (root.snapDivision) {
+            case "1/4": return 1.0
+            case "1/8": return 0.5
+            case "1/16": return 0.25
+            case "1/32": return 0.125
+            case "1/64": return 0.0625
+            case "Off": return 0.0
+            default: return 0.25
+        }
+    }
+
+    // Snap a drag distance (in beats) to the nearest grid step. Snapping the delta rather than
+    // the absolute position keeps the note under the cursor at the point where it was grabbed.
+    function snapDelta(deltaBeats) {
+        const step = getSnapBeats()
+        if (step <= 0) return deltaBeats
+        return Math.round(deltaBeats / step) * step
+    }
+
+    // ---- Edge auto-scroll while dragging / resizing / drawing ----
+    // The active MouseArea registers itself here; it must expose applyDrag(contentX, contentY).
+    property var autoScrollArea: null
+    property bool autoScrollVertical: true
+    property point autoScrollViewportPt: Qt.point(0, 0)
+    readonly property real autoScrollZone: 24      // px from the edge where scrolling starts
+    readonly property real autoScrollMaxStep: 40   // px per tick at full speed
+
+    // viewportPt must be mapped BEFORE applyDrag() moves the item, or the item's own
+    // movement gets counted twice.
+    function trackAutoScroll(area, viewportPt, vertical) {
+        autoScrollArea = area
+        autoScrollVertical = vertical
+        autoScrollViewportPt = viewportPt
+        autoScrollTimer.running = autoScrollSpeed().x !== 0 || autoScrollSpeed().y !== 0
+    }
+
+    // Stops scrolling only; dragEndBeats is cleared after the edit is committed (see releases)
+    // so the grid never shrinks under the cursor before the note lands.
+    function endAutoScroll() {
+        autoScrollTimer.running = false
+        autoScrollArea = null
+    }
+
+    function edgeSpeed(pos, size) {
+        const z = autoScrollZone
+        let over = 0
+        if (pos < z) over = pos - z
+        else if (pos > size - z) over = pos - (size - z)
+        if (over === 0) return 0
+        const step = Math.min(autoScrollMaxStep, Math.abs(over) * 0.35 + 2)
+        return over < 0 ? -step : step
+    }
+
+    function autoScrollSpeed() {
+        const f = gridVerticalFlickable
+        // Leave out the overlaid scrollbars (14px right, 10px bottom)
+        const vx = edgeSpeed(autoScrollViewportPt.x, f.width - 14)
+        const vy = autoScrollVertical ? edgeSpeed(autoScrollViewportPt.y, f.height - 10) : 0
+        return Qt.point(vx, vy)
+    }
+
+    Timer {
+        id: autoScrollTimer
+        interval: 16
+        repeat: true
+        onTriggered: {
+            const f = gridVerticalFlickable
+            if (!root.autoScrollArea) { running = false; return }
+            const v = root.autoScrollSpeed()
+            const oldX = f.contentX, oldY = f.contentY
+            f.contentX = Math.max(0, Math.min(Math.max(0, f.contentWidth - f.width), f.contentX + v.x))
+            f.contentY = Math.max(0, Math.min(Math.max(0, f.contentHeight - f.height), f.contentY + v.y))
+            if (f.contentX === oldX && f.contentY === oldY) return
+            // Content moved under a still cursor: re-apply the drag at the new content position
+            root.autoScrollArea.applyDrag(root.autoScrollViewportPt.x + f.contentX,
+                                          root.autoScrollViewportPt.y + f.contentY)
+        }
+    }
+
+    function snapToGrid(beat) {
+        const step = getSnapBeats()
+        if (step <= 0) return Math.max(0, beat)
+        return Math.max(0, Math.floor(beat / step) * step)
+    }
+
+    // Grid line spacing: one line per snap division ("Off" -> beats only), coarsened by
+    // doubling until lines are at least 6px apart so zoomed-out grids stay readable.
+    readonly property real gridLineBeats: {
+        const step = getSnapBeats()
+        let beats = step > 0 ? Math.min(1.0, step) : 1.0
+        while (beats < 1.0 && beats * pixelsPerBeat < 6)
+            beats *= 2
+        return beats
+    }
+    readonly property int gridSubsPerBeat: Math.max(1, Math.round(1.0 / gridLineBeats))
+
+    // Note fill colour. "Velocity" mode blends dim blue (soft) -> bright teal (loud);
+    // other modes keep the default note colour for now.
+    function noteFillColor(velocity) {
+        if (colorMode !== "Velocity")
+            return "#2d7088"
+        const t = Math.max(0, Math.min(1, velocity / 127.0))
+        const lo = Qt.color("#24405e")
+        const hi = Qt.color("#38c2b4")
+        return Qt.rgba(lo.r + (hi.r - lo.r) * t, lo.g + (hi.g - lo.g) * t, lo.b + (hi.b - lo.b) * t, 1)
+    }
+
+    readonly property real clipWidthPixels: clipLengthBeats * pixelsPerBeat
+    // Furthest note end (beats), so the grid keeps room to scroll/drag past the clip end
+    property real dragEndBeats: 0
+    readonly property real notesEndBeats: {
+        let end = 0
+        for (let i = 0; i < notes.length; ++i)
+            end = Math.max(end, (notes[i].startBeat ?? 0) + (notes[i].lengthBeats ?? 0))
+        return end
+    }
+    readonly property real totalGridWidth: Math.max(gridContainer.width,
+        (Math.max(clipLengthBeats, notesEndBeats, dragEndBeats) + 8) * pixelsPerBeat)
+    readonly property real contentGridHeight: 128 * keyHeight
+
+    // Fixed chrome: menu bar (22) + tool strip (28) + ruler (34) + footer (30).
+    readonly property real chromeHeight: 22 + 28 + 34 + 30
+    // The note grid always keeps at least this many pixels; the velocity lane shrinks first.
+    readonly property real minimumGridHeight: 6 * keyHeight
+    readonly property real minimumVelocityHeight: 45
+    readonly property real minimumDockHeight: chromeHeight + minimumGridHeight + minimumVelocityHeight
+
+    function centerOnMiddleC() {
+        if (!gridVerticalFlickable) return
+        const viewH = (gridVerticalFlickable.height > 50) ? gridVerticalFlickable.height : (root.height > 212 ? root.height - 212 : 400)
+        const noteC4Y = (127 - 60) * root.keyHeight // note 60 (C4)
+        const targetY = Math.round(noteC4Y - (viewH - root.keyHeight) / 2)
+        const clampedY = Math.max(0, Math.min(root.contentGridHeight - viewH, targetY))
+        gridVerticalFlickable.contentY = clampedY
+        keysFlickable.contentY = clampedY
+    }
+
+    onVisibleChanged: {
+        if (visible) {
+            Qt.callLater(centerOnMiddleC)
+        }
+    }
+
+    Component.onCompleted: {
+        Qt.callLater(centerOnMiddleC)
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color: "#23252a"
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 0
+
+        // 1. Top Window Menu Bar: File, Edit, Navigate, Options, View, Contents, Actions
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 22
+            color: "#32353e"
+            border.color: "#212328"
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                spacing: 14
+
+                Repeater {
+                    model: ["File", "Edit", "Navigate", "Options", "View", "Contents", "Actions"]
+                    delegate: Text {
+                        required property string modelData
+                        text: modelData
+                        color: menuHover.containsMouse ? "#ffffff" : "#b0b6c2"
+                        font.pixelSize: 11
+                        verticalAlignment: Text.AlignVCenter
+
+                        MouseArea {
+                            id: menuHover
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                        }
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Text {
+                    text: root.clipLabel
+                    color: "#8a919f"
+                    font.pixelSize: 11
+                }
+
+                Button {
+                    text: "✕"
+                    flat: true
+                    implicitWidth: 20
+                    implicitHeight: 20
+                    onClicked: root.closeRequested()
+                }
+            }
+        }
+
+        // 2. Icon Toolbar Strip (tools, quantize, magnet snap, etc.)
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 28
+            color: "#2a2c33"
+            border.color: "#1d1f24"
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                spacing: 4
+
+                Rectangle {
+                    width: 24; height: 22; radius: 2
+                    color: root.activeTool === "pointer" ? "#4a505e" : tool1Hover.containsMouse ? "#373a44" : "#2f323a"
+                    border.color: root.activeTool === "pointer" ? "#60cdff" : "#202227"
+                    Text { anchors.centerIn: parent; text: "⌖"; color: "#d8dce4"; font.pixelSize: 13 }
+                    MouseArea { id: tool1Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "pointer" }
+                    ToolTip.visible: tool1Hover.containsMouse; ToolTip.text: "Select (Pointer)"
+                }
+
+                Rectangle {
+                    width: 24; height: 22; radius: 2
+                    color: root.activeTool === "pencil" ? "#4a505e" : tool2Hover.containsMouse ? "#373a44" : "#2f323a"
+                    border.color: root.activeTool === "pencil" ? "#60cdff" : "#202227"
+                    Text { anchors.centerIn: parent; text: "✎"; color: "#d8dce4"; font.pixelSize: 13 }
+                    MouseArea { id: tool2Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "pencil" }
+                    ToolTip.visible: tool2Hover.containsMouse; ToolTip.text: "Draw (Pencil)"
+                }
+
+                Rectangle {
+                    width: 24; height: 22; radius: 2
+                    color: root.activeTool === "eraser" ? "#4a505e" : tool3Hover.containsMouse ? "#373a44" : "#2f323a"
+                    border.color: root.activeTool === "eraser" ? "#60cdff" : "#202227"
+                    Text { anchors.centerIn: parent; text: "⌫"; color: "#d8dce4"; font.pixelSize: 13 }
+                    MouseArea { id: tool3Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "eraser" }
+                    ToolTip.visible: tool3Hover.containsMouse; ToolTip.text: "Erase"
+                }
+
+                Rectangle { width: 1; height: 18; color: "#3d414c" }
+
+                Rectangle {
+                    width: 24; height: 22; radius: 2
+                    color: snapHover.containsMouse ? "#373a44" : "#2f323a"
+                    border.color: "#202227"
+                    Text { anchors.centerIn: parent; text: "🧲"; color: "#d8dce4"; font.pixelSize: 11 }
+                    MouseArea { id: snapHover; anchors.fill: parent; hoverEnabled: true }
+                    ToolTip.visible: snapHover.containsMouse; ToolTip.text: "Toggle Snap"
+                }
+
+                Rectangle {
+                    width: 24; height: 22; radius: 2
+                    color: qHover.containsMouse ? "#373a44" : "#2f323a"
+                    border.color: "#202227"
+                    Text { anchors.centerIn: parent; text: "⇥Q"; color: "#d8dce4"; font.pixelSize: 10; font.bold: true }
+                    MouseArea { id: qHover; anchors.fill: parent; hoverEnabled: true }
+                    ToolTip.visible: qHover.containsMouse; ToolTip.text: "Quantize Notes (Q)"
+                }
+
+                Rectangle {
+                    width: 24; height: 22; radius: 2
+                    color: undoHover.containsMouse ? "#373a44" : "#2f323a"
+                    border.color: "#202227"
+                    Text { anchors.centerIn: parent; text: "↶"; color: "#d8dce4"; font.pixelSize: 13 }
+                    MouseArea { id: undoHover; anchors.fill: parent; hoverEnabled: true }
+                    ToolTip.visible: undoHover.containsMouse; ToolTip.text: "Undo"
+                }
+
+                Rectangle {
+                    width: 24; height: 22; radius: 2
+                    color: redoHover.containsMouse ? "#373a44" : "#2f323a"
+                    border.color: "#202227"
+                    Text { anchors.centerIn: parent; text: "↷"; color: "#d8dce4"; font.pixelSize: 13 }
+                    MouseArea { id: redoHover; anchors.fill: parent; hoverEnabled: true }
+                    ToolTip.visible: redoHover.containsMouse; ToolTip.text: "Redo"
+                }
+
+                Item { Layout.fillWidth: true }
+            }
+        }
+
+        // 3. Top Info Readouts & Time Ruler
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 34
+            Layout.minimumHeight: 34
+            Layout.maximumHeight: 34
+            spacing: 0
+
+            // Pinned header directly above the piano keys (width 90): cursor position & note readouts
+            Rectangle {
+                Layout.preferredWidth: 90
+                Layout.fillHeight: true
+                color: "#2c2e35"
+                border.color: "#1e2025"
+
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 4
+
+                    Repeater {
+                        model: [
+                            { text: root.currentPosText, tip: "Cursor position (bar.beat.hundredths)" },
+                            { text: root.currentNoteText, tip: "Note under cursor (name & MIDI number)" }
+                        ]
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: 40
+                            height: 18
+                            radius: 2
+                            color: "#1b1d22"
+                            border.color: "#454a56"
+
+                            Text {
+                                anchors.fill: parent
+                                anchors.leftMargin: 2
+                                anchors.rightMargin: 2
+                                text: modelData.text
+                                color: "#d8dce5"
+                                font.pixelSize: 10
+                                font.family: "monospace"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                fontSizeMode: Text.HorizontalFit
+                                minimumPixelSize: 7
+                            }
+
+                            HoverHandler { id: readoutHover }
+                            ToolTip.visible: readoutHover.hovered
+                            ToolTip.text: modelData.tip
+                        }
+                    }
+                }
+            }
+
+            // Fractional musical time ruler
+            Flickable {
+                id: rulerFlickable
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                contentWidth: root.totalGridWidth
+                contentX: gridVerticalFlickable.contentX
+                interactive: false
+                clip: true
+
+                Rectangle {
+                    width: root.totalGridWidth
+                    height: parent.height
+                    color: "#282a31"
+                    border.color: "#1d1f25"
+
+                    Rectangle {
+                        x: 0
+                        y: 0
+                        width: root.clipWidthPixels
+                        height: 4
+                        color: "#38b2ac"
+                    }
+
+                    Repeater {
+                        model: Math.ceil(root.totalGridWidth / (root.pixelsPerBeat / 4))
+                        delegate: Item {
+                            required property int index
+                            readonly property int bar: Math.floor(index / 16) + 1
+                            readonly property int beat: Math.floor((index % 16) / 4) + 1
+                            readonly property bool isMajorBar: (index % 16 === 0)
+                            readonly property bool isBeat: (index % 4 === 0)
+
+                            visible: isBeat
+                            x: index * (root.pixelsPerBeat / 4)
+                            y: 0
+                            width: root.pixelsPerBeat
+                            height: parent.height
+
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: isMajorBar ? 1.5 : 1
+                                color: isMajorBar ? "#606675" : "#3e424e"
+                            }
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 3
+                                anchors.top: parent.top
+                                anchors.topMargin: isMajorBar ? 4 : 8
+                                text: isMajorBar ? String(bar) : (bar + "." + beat)
+                                color: isMajorBar ? "#d8dce5" : "#7c8393"
+                                font.pixelSize: isMajorBar ? 11 : 9
+                                font.bold: isMajorBar
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Main Note Grid & Piano Keys Area
+        Item {
+            id: gridContainer
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.minimumHeight: root.minimumGridHeight
+
+            RowLayout {
+                anchors.fill: parent
+                spacing: 0
+
+                // Pinned Left Piano Keys
+                Flickable {
+                    id: keysFlickable
+                    Layout.preferredWidth: 90
+                    Layout.fillHeight: true
+                    contentWidth: 90
+                    contentHeight: root.contentGridHeight
+                    contentY: gridVerticalFlickable.contentY
+                    interactive: false
+                    clip: true
+
+                    PianoKeys {
+                        id: pianoKeys
+                        width: 90
+                        height: root.contentGridHeight
+                        keyHeight: root.keyHeight
+                        onKeyHovered: (note, noteName) => {
+                            root.currentNoteText = noteName + " " + note
+                        }
+                        onKeyClicked: note => {
+                            root.currentNoteText = pianoKeys.noteLabel(note) + " " + note
+                        }
+                        onWheelScrolled: delta => {
+                            gridVerticalFlickable.scrollVertical(delta)
+                        }
+                    }
+                }
+
+                // Center Scrollable Note Grid (Horizontal & Vertical)
+                Flickable {
+                    id: gridVerticalFlickable
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    contentWidth: root.totalGridWidth
+                    contentHeight: root.contentGridHeight
+                    contentY: Math.round((127 - 60) * root.keyHeight - (height > 50 ? (height - root.keyHeight) / 2 : 200))
+                    boundsBehavior: Flickable.StopAtBounds
+                    clip: true
+
+                    function scrollVertical(delta) {
+                        const step = (delta / 120) * (root.keyHeight * 3)
+                        const maxY = Math.max(0, contentHeight - height)
+                        contentY = Math.max(0, Math.min(maxY, contentY - step))
+                    }
+
+                    function scrollHorizontal(delta) {
+                        const step = (delta / 120) * (root.pixelsPerBeat * 0.5)
+                        const maxX = Math.max(0, contentWidth - width)
+                        contentX = Math.max(0, Math.min(maxX, contentX - step))
+                    }
+
+                    WheelHandler {
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                        target: null
+                        onWheel: event => {
+                            const deltaY = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y
+                            if (event.modifiers & Qt.ShiftModifier) {
+                                gridVerticalFlickable.scrollHorizontal(deltaY)
+                            } else {
+                                gridVerticalFlickable.scrollVertical(deltaY)
+                            }
+                        }
+                    }
+
+                    WheelHandler {
+                        orientation: Qt.Horizontal
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                        target: null
+                        onWheel: event => {
+                            const deltaX = event.pixelDelta.x !== 0 ? event.pixelDelta.x : event.angleDelta.x
+                            gridVerticalFlickable.scrollHorizontal(deltaX)
+                        }
+                    }
+
+                    ScrollBar.vertical: ScrollBar {
+                        id: vScrollBar
+                        policy: ScrollBar.AlwaysOn
+                        width: 14
+                        active: true
+                        contentItem: Rectangle {
+                            implicitWidth: 10
+                            radius: 4
+                            color: vScrollBar.pressed ? "#6b7280" : (vScrollBar.hovered ? "#565b67" : "#424652")
+                        }
+                        background: Rectangle {
+                            color: "#1a1c22"
+                        }
+                    }
+
+                    ScrollBar.horizontal: ScrollBar {
+                        id: hScrollBar
+                        policy: ScrollBar.AlwaysOn
+                        height: 10
+                        active: true
+                        contentItem: Rectangle {
+                            implicitHeight: 8
+                            radius: 4
+                            color: hScrollBar.pressed ? "#6b7280" : (hScrollBar.hovered ? "#565b67" : "#424652")
+                        }
+                        background: Rectangle {
+                            color: "#1a1c22"
+                        }
+                    }
+
+                    // Active Clip Background Highlight vs Dimmed Outside
+                    Rectangle {
+                        x: 0
+                        y: 0
+                        width: root.clipWidthPixels
+                        height: root.contentGridHeight
+                        color: "#0a283020"
+                    }
+
+                    Rectangle {
+                        x: root.clipWidthPixels
+                        y: 0
+                        width: Math.max(0, root.totalGridWidth - root.clipWidthPixels)
+                        height: root.contentGridHeight
+                        color: "#00000040"
+                    }
+
+                    // Zebra Striped Semitone Rows
+                    Column {
+                        Repeater {
+                            model: 128
+                            delegate: Rectangle {
+                                required property int index
+                                readonly property int note: 127 - index
+                                readonly property int pitchClass: note % 12
+                                readonly property bool black: pitchClass === 1 || pitchClass === 3 || pitchClass === 6 || pitchClass === 8 || pitchClass === 10
+                                readonly property bool isOctaveBorder: pitchClass === 0
+
+                                width: root.totalGridWidth
+                                height: root.keyHeight
+                                color: black ? "#1d1f24" : "#26282f"
+                                border.color: isOctaveBorder ? "#424652" : "#202227"
+                                border.width: 1
+                            }
+                        }
+                    }
+
+                    // Vertical Bar / Beat / Subdivision Grid Lines (follow the Grid setting)
+                    Repeater {
+                        model: Math.ceil(root.totalGridWidth / (root.gridLineBeats * root.pixelsPerBeat)) + 1
+                        delegate: Rectangle {
+                            required property int index
+                            readonly property bool isMajorBar: (index % (root.gridSubsPerBeat * 4) === 0)
+                            readonly property bool isBeat: (index % root.gridSubsPerBeat === 0)
+
+                            // Whole-pixel positions & widths keep every line crisp
+                            x: Math.round(index * root.gridLineBeats * root.pixelsPerBeat)
+                            y: 0
+                            width: isMajorBar ? 2 : 1
+                            height: root.contentGridHeight
+                            color: isMajorBar ? "#4c515e" : (isBeat ? "#363944" : "#2b2d34")
+                        }
+                    }
+
+                    // Cyan Playhead Line (matching demo)
+                    Rectangle {
+                        x: root.playheadBeat * root.pixelsPerBeat
+                        y: 0
+                        width: 1
+                        height: root.contentGridHeight
+                        color: "#38b2ac"
+                        z: 5
+                    }
+
+                    // Ghost Drawing Preview
+                    Rectangle {
+                        id: drawingPreview
+                        visible: gridMouse.isDrawing
+                        x: gridMouse.drawStartBeat * root.pixelsPerBeat + 1
+                        y: (127 - gridMouse.drawPitch) * root.keyHeight + 1
+                        width: Math.max(6, gridMouse.drawLength * root.pixelsPerBeat - 2)
+                        height: root.keyHeight - 2
+                        radius: 2
+                        color: "#38b2ac80"
+                        border.color: "#a4e2f5"
+                        border.width: 1
+                        z: 8
+                    }
+
+                    // Notes Blocks
+                    Repeater {
+                        model: root.notes
+                        delegate: Rectangle {
+                            id: noteCard
+                            required property var modelData
+                            required property int index
+                            readonly property int noteId: modelData.id ?? 0
+                            readonly property int notePitch: modelData.note ?? 60
+                            readonly property real startBeat: modelData.startBeat ?? 0
+                            readonly property real lengthBeats: modelData.lengthBeats ?? 1
+                            readonly property bool isSelected: modelData.selected ?? false
+
+                            property real visualBeat: startBeat
+                            property int visualPitch: notePitch
+                            property real visualLength: lengthBeats
+                            property bool isDragging: false
+                            property bool isResizing: false
+
+                            onStartBeatChanged: if (!isDragging) visualBeat = startBeat
+                            onNotePitchChanged: if (!isDragging) visualPitch = notePitch
+                            onLengthBeatsChanged: if (!isResizing) visualLength = lengthBeats
+
+                            x: visualBeat * root.pixelsPerBeat + 1
+                            y: (127 - visualPitch) * root.keyHeight + 1
+                            width: Math.max(6, visualLength * root.pixelsPerBeat - 2)
+                            height: root.keyHeight - 2
+                            radius: 2
+                            z: (isDragging || isResizing) ? 10 : 1
+                            readonly property int noteVelocity: modelData.velocity ?? 100
+                            readonly property bool isHovered: noteMouse.containsMouse || resizeMouse.containsMouse
+                            readonly property color baseFill: root.noteFillColor(noteVelocity)
+                            readonly property bool showSelected: isSelected || isDragging
+                            color: showSelected ? Qt.lighter(baseFill, 1.35) : (isHovered ? Qt.lighter(baseFill, 1.18) : baseFill)
+                            border.color: showSelected ? "#ffffff" : (isHovered ? "#a4e2f5" : "#5bc0de")
+                            border.width: isSelected ? 1.5 : 1
+
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: 3
+                                color: isSelected ? "#e6fffa" : "#a4e2f5"
+                            }
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 5
+                                anchors.right: resizeHandle.left
+                                anchors.rightMargin: 2
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: pianoKeys.noteLabel(noteCard.visualPitch)
+                                color: "#f0f8ff"
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+
+                            // Body MouseArea for moving / selecting note
+                            MouseArea {
+                                id: noteMouse
+                                // Keep the grid Flickable from stealing the drag (it would cancel the move)
+                                preventStealing: true
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                anchors.right: resizeHandle.left
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                hoverEnabled: true
+                                cursorShape: root.activeTool === "eraser" ? Qt.PointingHandCursor : (noteCard.isDragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
+                                ToolTip.visible: noteMouse.containsMouse
+                                ToolTip.text: "Drag to move · Right-click/Eraser to delete"
+
+                                property real pressStartBeat: 0
+                                property int pressPitch: 0
+                                property real pressGlobalX: 0
+                                property real pressGlobalY: 0
+                                property bool pressAddToSelection: false
+
+                                onPressed: mouse => {
+                                    if (mouse.button === Qt.RightButton || root.activeTool === "eraser") {
+                                        pianoRollBackend.removeNote(noteCard.noteId)
+                                        return
+                                    }
+
+                                    if (mouse.button === Qt.LeftButton) {
+                                        root.forceActiveFocus()
+                                        // Do NOT touch the backend here: any notesChanged rebuilds every note
+                                        // delegate (including this one) mid-press and kills the drag.
+                                        // Selection is applied on release instead.
+                                        pressAddToSelection = (mouse.modifiers & Qt.ShiftModifier) || (mouse.modifiers & Qt.ControlModifier)
+                                        pressStartBeat = noteCard.startBeat
+                                        pressPitch = noteCard.notePitch
+                                        const pt = mapToItem(gridVerticalFlickable.contentItem, mouse.x, mouse.y)
+                                        pressGlobalX = pt.x
+                                        pressGlobalY = pt.y
+                                        noteCard.visualBeat = noteCard.startBeat
+                                        noteCard.visualPitch = noteCard.notePitch
+                                        noteCard.isDragging = false
+                                    }
+                                }
+
+                                // cx/cy are in grid content coordinates (also called by the auto-scroll timer)
+                                function applyDrag(cx, cy) {
+                                    const dx = cx - pressGlobalX
+                                    const dy = cy - pressGlobalY
+                                    if (!noteCard.isDragging && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+                                        noteCard.isDragging = true
+                                    }
+                                    if (noteCard.isDragging) {
+                                        const beatDelta = root.snapDelta(dx / root.pixelsPerBeat)
+                                        noteCard.visualBeat = Math.max(0, pressStartBeat + beatDelta)
+
+                                        const pitchDelta = -Math.round(dy / root.keyHeight)
+                                        noteCard.visualPitch = Math.max(0, Math.min(127, pressPitch + pitchDelta))
+
+                                        root.dragEndBeats = noteCard.visualBeat + noteCard.lengthBeats
+                                        root.currentNoteText = pianoKeys.noteLabel(noteCard.visualPitch) + " " + noteCard.visualPitch
+                                    }
+                                }
+
+                                onPositionChanged: mouse => {
+                                    if (pressed && (mouse.buttons & Qt.LeftButton) && root.activeTool !== "eraser") {
+                                        const pt = mapToItem(gridVerticalFlickable.contentItem, mouse.x, mouse.y)
+                                        const vp = mapToItem(gridVerticalFlickable, mouse.x, mouse.y)
+                                        applyDrag(pt.x, pt.y)
+                                        if (noteCard.isDragging)
+                                            root.trackAutoScroll(noteMouse, vp, true)
+                                    }
+                                }
+
+                                onCanceled: {
+                                    root.endAutoScroll()
+                                    root.dragEndBeats = 0
+                                    noteCard.isDragging = false
+                                    noteCard.visualBeat = noteCard.startBeat
+                                    noteCard.visualPitch = noteCard.notePitch
+                                }
+
+                                onReleased: mouse => {
+                                    if (mouse.button !== Qt.LeftButton || root.activeTool === "eraser")
+                                        return
+                                    // Capture everything first: each backend call below rebuilds the note
+                                    // delegates, so this delegate's context is gone after the first call.
+                                    const backend = pianoRollBackend
+                                    const view = root
+                                    const id = noteCard.noteId
+                                    const addToSelection = pressAddToSelection
+                                    const wasDragging = noteCard.isDragging
+                                    const pitch = noteCard.visualPitch
+                                    const beat = noteCard.visualBeat
+                                    root.endAutoScroll()
+                                    noteCard.isDragging = false
+                                    if (wasDragging)
+                                        backend.moveNote(id, pitch, beat)
+                                    backend.selectNote(id, addToSelection)
+                                    view.dragEndBeats = 0
+                                }
+                            }
+
+                            // Right Edge Handle for resizing note length
+                            Item {
+                                id: resizeHandle
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: 8
+
+                                MouseArea {
+                                    id: resizeMouse
+                                    preventStealing: true
+                                    anchors.fill: parent
+                                    acceptedButtons: Qt.LeftButton
+                                    hoverEnabled: true
+                                    cursorShape: Qt.SizeHorCursor
+                                    ToolTip.visible: resizeMouse.containsMouse
+                                    ToolTip.text: "Drag edge to change length"
+
+                                    property real pressStartLength: 0
+                                    property real pressGlobalX: 0
+
+                                    onPressed: mouse => {
+                                        root.forceActiveFocus()
+                                        pressStartLength = noteCard.lengthBeats
+                                        const pt = mapToItem(gridVerticalFlickable.contentItem, mouse.x, mouse.y)
+                                        pressGlobalX = pt.x
+                                        noteCard.visualLength = noteCard.lengthBeats
+                                        noteCard.isResizing = true
+                                    }
+
+                                    function applyDrag(cx, cy) {
+                                        const dx = cx - pressGlobalX
+                                        const step = root.getSnapBeats()
+                                        const unitStep = step > 0 ? step : 0.25
+                                        const lenDelta = root.snapDelta(dx / root.pixelsPerBeat)
+                                        noteCard.visualLength = Math.max(unitStep, pressStartLength + lenDelta)
+                                        root.dragEndBeats = noteCard.startBeat + noteCard.visualLength
+                                    }
+
+                                    onPositionChanged: mouse => {
+                                        if (pressed && (mouse.buttons & Qt.LeftButton) && noteCard.isResizing) {
+                                            const pt = mapToItem(gridVerticalFlickable.contentItem, mouse.x, mouse.y)
+                                            const vp = mapToItem(gridVerticalFlickable, mouse.x, mouse.y)
+                                            applyDrag(pt.x, pt.y)
+                                            root.trackAutoScroll(resizeMouse, vp, false)
+                                        }
+                                    }
+
+                                    onCanceled: {
+                                        root.endAutoScroll()
+                                        root.dragEndBeats = 0
+                                        noteCard.isResizing = false
+                                        noteCard.visualLength = noteCard.lengthBeats
+                                    }
+
+                                    onReleased: mouse => {
+                                        root.endAutoScroll()
+                                        if (noteCard.isResizing) {
+                                            // Capture first: resizeNote rebuilds this delegate
+                                            const view = root
+                                            noteCard.isResizing = false
+                                            pianoRollBackend.resizeNote(noteCard.noteId, noteCard.visualLength)
+                                            view.dragEndBeats = 0
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Interactive Grid Clicking
+                    MouseArea {
+                        id: gridMouse
+                        // Pencil-drag must not turn into a Flickable scroll
+                        preventStealing: true
+                        anchors.fill: parent
+                        z: -1
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        cursorShape: root.activeTool === "pencil" ? Qt.CrossCursor : (root.activeTool === "eraser" ? Qt.PointingHandCursor : Qt.ArrowCursor)
+                        hoverEnabled: true
+
+                        property bool isDrawing: false
+                        property int drawPitch: 60
+                        property real drawStartBeat: 0.0
+                        property real drawLength: 0.25
+
+                        onPositionChanged: mouse => {
+                            const beat = mouse.x / root.pixelsPerBeat
+                            const bar = Math.floor(beat / 4) + 1
+                            const b = Math.floor(beat % 4) + 1
+                            const sub = Math.floor((beat % 1) * 100)
+                            root.currentPosText = bar + "." + b + "." + (sub < 10 ? "0" : "") + sub
+
+                            const notePitch = Math.max(0, Math.min(127, 127 - Math.floor(mouse.y / root.keyHeight)))
+                            root.currentNoteText = pianoKeys.noteLabel(notePitch) + " " + notePitch
+
+                            if (pressed && (mouse.buttons & Qt.LeftButton) && isDrawing) {
+                                applyDrag(mouse.x, mouse.y)
+                                root.trackAutoScroll(gridMouse, mapToItem(gridVerticalFlickable, mouse.x, mouse.y), false)
+                            }
+                        }
+
+                        // gridMouse fills the content item, so cx is already a content coordinate
+                        function applyDrag(cx, cy) {
+                            const step = root.getSnapBeats()
+                            const snappedCurrent = root.snapToGrid(cx / root.pixelsPerBeat)
+                            const unitLen = step > 0 ? step : 0.25
+                            drawLength = Math.max(unitLen, (snappedCurrent - drawStartBeat) + unitLen)
+                            root.dragEndBeats = drawStartBeat + drawLength
+                        }
+
+                        onCanceled: {
+                            root.endAutoScroll()
+                            root.dragEndBeats = 0
+                            isDrawing = false
+                        }
+
+                        onPressed: mouse => {
+                            root.forceActiveFocus()
+                            const beat = mouse.x / root.pixelsPerBeat
+                            const pitch = Math.max(0, Math.min(127, 127 - Math.floor(mouse.y / root.keyHeight)))
+
+                            if (mouse.button === Qt.RightButton || root.activeTool === "eraser") {
+                                pianoRollBackend.removeNotesAt(pitch, beat)
+                                return
+                            }
+
+                            if (mouse.button === Qt.LeftButton) {
+                                if (root.activeTool === "pencil") {
+                                    const step = root.getSnapBeats()
+                                    drawStartBeat = root.snapToGrid(beat)
+                                    drawPitch = pitch
+                                    drawLength = step > 0 ? step : 0.25
+                                    isDrawing = true
+                                } else {
+                                    pianoRollBackend.clearSelection()
+                                }
+                            }
+                        }
+
+                        onReleased: mouse => {
+                            root.endAutoScroll()
+                            if (isDrawing) {
+                                isDrawing = false
+                                pianoRollBackend.addNote(drawPitch, drawStartBeat, drawLength, 100)
+                                root.dragEndBeats = 0
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Bottom Velocity / CC Lane (header pinned, stalks follow the grid's horizontal scroll)
+        VelocityLane {
+            id: velocityLane
+            Layout.fillWidth: true
+            // Shrink the lane (never the grid) when the panel is short, e.g. when docked.
+            Layout.preferredHeight: Math.max(0, Math.min(velocityLane.laneHeight,
+                                                          root.height - root.chromeHeight - root.minimumGridHeight))
+            visible: Layout.preferredHeight >= 20
+            headerWidth: 90
+            beatWidth: root.pixelsPerBeat
+            contentWidth: root.totalGridWidth
+            contentX: gridVerticalFlickable.contentX
+            notes: root.notes
+        }
+
+        // 6. Bottom Footer Control Bar
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 30
+            color: "#2c2e35"
+            border.color: "#1d1f24"
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                spacing: 8
+
+                Row {
+                    spacing: 3
+                    Repeater {
+                        model: [
+                            { text: "|◀", tt: "Rewind" },
+                            { text: "▶", tt: "Play" },
+                            { text: "❚❚", tt: "Pause" },
+                            { text: "■", tt: "Stop" },
+                            { text: "▶|", tt: "Fast Forward" },
+                            { text: "🔍", tt: "Zoom Tool" }
+                        ]
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: 22
+                            height: 20
+                            radius: 2
+                            color: transHover.containsMouse ? "#454955" : "#353842"
+                            border.color: "#202227"
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData.text
+                                color: "#c8ccd6"
+                                font.pixelSize: 10
+                            }
+
+                            MouseArea {
+                                id: transHover
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                ToolTip.visible: containsMouse
+                                ToolTip.text: modelData.tt
+                            }
+                        }
+                    }
+                }
+
+                Rectangle { width: 1; height: 16; color: "#3e424d" }
+
+                Text { text: "Grid:"; color: "#8f95a3"; font.pixelSize: 11 }
+                PianoRollComboBox {
+                    implicitWidth: 70
+                    implicitHeight: 22
+                    model: ["1/4", "1/8", "1/16", "1/32", "1/64", "Off"]
+                    currentIndex: 2
+                    onCurrentTextChanged: root.snapDivision = currentText
+                }
+
+                PianoRollComboBox {
+                    implicitWidth: 80
+                    implicitHeight: 22
+                    model: ["straight", "triplet", "dotted", "swing"]
+                    currentIndex: 0
+                    onCurrentTextChanged: root.snapStyle = currentText
+                }
+
+                Text { text: "Notes:"; color: "#8f95a3"; font.pixelSize: 11 }
+                PianoRollComboBox {
+                    implicitWidth: 70
+                    implicitHeight: 22
+                    model: ["Grid", "1/16", "1/8", "1/4"]
+                    currentIndex: 0
+                }
+
+                CheckBox {
+                    id: keySnapCheck
+                    text: "Key snap"
+                    checked: root.keySnap
+                    onToggled: root.keySnap = checked
+                    spacing: 4
+                    indicator: Rectangle {
+                        x: keySnapCheck.leftPadding
+                        y: (keySnapCheck.height - height) / 2
+                        implicitWidth: 13
+                        implicitHeight: 13
+                        radius: 2
+                        color: keySnapCheck.checked ? "#2d7088" : (keySnapCheck.hovered ? "#3c404b" : "#32353e")
+                        border.color: keySnapCheck.checked ? "#60cdff" : "#1d1f24"
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: keySnapCheck.checked
+                            text: "✓"
+                            color: "#e6fffa"
+                            font.pixelSize: 10
+                            font.bold: true
+                        }
+                    }
+                    contentItem: Text {
+                        text: keySnapCheck.text
+                        color: "#c2c7d2"
+                        font.pixelSize: 11
+                        leftPadding: keySnapCheck.indicator.width + keySnapCheck.spacing
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                Text { text: "Color:"; color: "#8f95a3"; font.pixelSize: 11 }
+                PianoRollComboBox {
+                    implicitWidth: 90
+                    implicitHeight: 22
+                    model: ["Velocity", "Pitch", "Channel", "Track"]
+                    currentIndex: 0
+                    onCurrentTextChanged: root.colorMode = currentText
+                }
+
+                Item { Layout.fillWidth: true }
+
+                PianoRollComboBox {
+                    implicitWidth: 80
+                    implicitHeight: 22
+                    model: ["Track 1", "Track 2", "Track 3"]
+                    currentIndex: 0
+                }
+
+                PianoRollComboBox {
+                    implicitWidth: 95
+                    implicitHeight: 22
+                    model: ["All channels", "Channel 1", "Channel 2"]
+                    currentIndex: 0
+                }
+
+                Row {
+                    spacing: 2
+                    Rectangle {
+                        width: 18; height: 18; radius: 2
+                        color: zoutHover.containsMouse ? "#454955" : "#353842"
+                        border.color: "#202227"
+                        Text { anchors.centerIn: parent; text: "-"; color: "#c8ccd6"; font.pixelSize: 12 }
+                        MouseArea {
+                            id: zoutHover; anchors.fill: parent; hoverEnabled: true
+                            onClicked: root.pixelsPerBeat = Math.max(40, root.pixelsPerBeat - 16)
+                        }
+                    }
+                    Rectangle {
+                        width: 18; height: 18; radius: 2
+                        color: zinHover.containsMouse ? "#454955" : "#353842"
+                        border.color: "#202227"
+                        Text { anchors.centerIn: parent; text: "+"; color: "#c8ccd6"; font.pixelSize: 12 }
+                        MouseArea {
+                            id: zinHover; anchors.fill: parent; hoverEnabled: true
+                            onClicked: root.pixelsPerBeat = Math.min(240, root.pixelsPerBeat + 16)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

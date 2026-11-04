@@ -10,6 +10,7 @@ Rectangle {
     id: root
     property var trackModel: null
     property bool mixerVisible: true
+    readonly property alias appSettings: appSettings
     signal closeRequested()
     signal toggleMixerRequested()
 

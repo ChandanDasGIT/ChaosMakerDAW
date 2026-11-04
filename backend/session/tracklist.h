@@ -23,6 +23,7 @@ public:
         std::string label, colour;
         bool effectsPrinted;
         double gainDb = 0.0;
+        bool isRecorded = false;
     };
     struct ClipboardClip {
         std::string poolId;
