@@ -39,6 +39,10 @@ Item {
     readonly property bool editingText: keyboardFocusItem instanceof TextInput || keyboardFocusItem instanceof TextEdit
     readonly property bool clipKeyboardActive: activeFocus && visible && enabled && !editingText && editor.keyboardAllowed
     readonly property bool canEditClipSelection: clipKeyboardActive && editor.canEditSelection
+    readonly property bool canCopy: clipKeyboardActive && editor.canCopy
+    readonly property bool canCut: clipKeyboardActive && editor.canCut
+    readonly property bool canPaste: clipKeyboardActive && editor.canPaste
+    readonly property bool canDuplicate: clipKeyboardActive && editor.canDuplicate
     readonly property string editOperation: editor.editOperation
     readonly property real editDelta: editor.editDelta
     readonly property int editLaneDelta: editor.editLaneDelta
@@ -56,6 +60,30 @@ Item {
         enabled: root.canEditClipSelection
         autoRepeat: false
         onActivated: root.trackModel.editClips(root.selectedClipIds, "delete", 0)
+    }
+    Shortcut {
+        sequences: [StandardKey.Cut]
+        enabled: root.canCut
+        autoRepeat: false
+        onActivated: editor.cutSelectedClips()
+    }
+    Shortcut {
+        sequences: [StandardKey.Copy]
+        enabled: root.canCopy
+        autoRepeat: false
+        onActivated: editor.copySelectedClips()
+    }
+    Shortcut {
+        sequences: [StandardKey.Paste]
+        enabled: root.canPaste
+        autoRepeat: false
+        onActivated: editor.pasteClips(root.transport.positionBeats, editor.selectedTrackId)
+    }
+    Shortcut {
+        sequence: "Ctrl+D"
+        enabled: root.canDuplicate
+        autoRepeat: false
+        onActivated: editor.duplicateSelectedClips()
     }
     Shortcut {
         sequence: "Left"
@@ -156,6 +184,50 @@ Item {
             radius: 6
         }
 
+        MenuItem {
+            id: cutClipAction
+            text: "Cut"
+            enabled: editor.canCut
+            implicitHeight: 32
+            leftPadding: Theme.margin
+            rightPadding: Theme.margin
+            contentItem: Text { text: cutClipAction.text; color: !cutClipAction.enabled ? Theme.textMuted : cutClipAction.highlighted ? Theme.accent : Theme.text; font.pixelSize: Theme.bodySize; verticalAlignment: Text.AlignVCenter }
+            background: Rectangle { color: cutClipAction.highlighted ? Theme.tooltipBg : "transparent"; radius: 4 }
+            onTriggered: editor.cutSelectedClips()
+        }
+        MenuItem {
+            id: copyClipAction
+            text: "Copy"
+            enabled: editor.canCopy
+            implicitHeight: 32
+            leftPadding: Theme.margin
+            rightPadding: Theme.margin
+            contentItem: Text { text: copyClipAction.text; color: !copyClipAction.enabled ? Theme.textMuted : copyClipAction.highlighted ? Theme.accent : Theme.text; font.pixelSize: Theme.bodySize; verticalAlignment: Text.AlignVCenter }
+            background: Rectangle { color: copyClipAction.highlighted ? Theme.tooltipBg : "transparent"; radius: 4 }
+            onTriggered: editor.copySelectedClips()
+        }
+        MenuItem {
+            id: pasteClipAction
+            text: "Paste"
+            enabled: editor.canPaste
+            implicitHeight: 32
+            leftPadding: Theme.margin
+            rightPadding: Theme.margin
+            contentItem: Text { text: pasteClipAction.text; color: !pasteClipAction.enabled ? Theme.textMuted : pasteClipAction.highlighted ? Theme.accent : Theme.text; font.pixelSize: Theme.bodySize; verticalAlignment: Text.AlignVCenter }
+            background: Rectangle { color: pasteClipAction.highlighted ? Theme.tooltipBg : "transparent"; radius: 4 }
+            onTriggered: editor.pasteClips(root.transport.positionBeats, clipContextMenu.targetTrackId >= 0 ? clipContextMenu.targetTrackId : editor.selectedTrackId)
+        }
+        MenuItem {
+            id: duplicateClipAction
+            text: "Duplicate"
+            enabled: editor.canDuplicate
+            implicitHeight: 32
+            leftPadding: Theme.margin
+            rightPadding: Theme.margin
+            contentItem: Text { text: duplicateClipAction.text; color: !duplicateClipAction.enabled ? Theme.textMuted : duplicateClipAction.highlighted ? Theme.accent : Theme.text; font.pixelSize: Theme.bodySize; verticalAlignment: Text.AlignVCenter }
+            background: Rectangle { color: duplicateClipAction.highlighted ? Theme.tooltipBg : "transparent"; radius: 4 }
+            onTriggered: editor.duplicateSelectedClips()
+        }
         MenuItem {
             id: splitClipAction
             text: "Split at playhead"
@@ -261,12 +333,13 @@ Item {
         Repeater {
             model: root.laneCount
             delegate: Rectangle {
+                readonly property bool isSelected: !!root.trackModel && root.trackModel.indexOfTrack(root.selectedTrackId) === index
                 x: 0
                 y: root.rulerHeight + index * root.laneHeight
                 width: root.contentWidth
                 height: root.laneHeight
-                color: index % 2 ? "#1c1c1c" : "#202020"
-                border.color: "#303030"
+                color: isSelected ? "#232932" : (index % 2 ? "#1c1c1c" : "#202020")
+                border.color: isSelected ? "#3a4454" : "#303030"
             }
         }
 
@@ -494,7 +567,13 @@ Item {
         MouseArea {
             x: 0; y: root.rulerHeight; width: root.contentWidth; height: scroll.contentHeight - root.rulerHeight; z: 1
             acceptedButtons: Qt.LeftButton
-            onPressed: mouse => root.beginSelection(mouse.x, mouse.y, !!(mouse.modifiers & Qt.ShiftModifier))
+            onPressed: mouse => {
+                const lane = Math.floor(mouse.y / root.laneHeight)
+                if (root.trackModel && lane >= 0 && lane < root.trackModel.count) {
+                    root.trackModel.selectTrack(root.trackModel.trackIdAt(lane))
+                }
+                root.beginSelection(mouse.x, mouse.y, !!(mouse.modifiers & Qt.ShiftModifier))
+            }
             onPositionChanged: mouse => {
                 if (pressed) { root.updateSelection(mouse.x, mouse.y) }
             }

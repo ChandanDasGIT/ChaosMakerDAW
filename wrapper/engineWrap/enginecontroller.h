@@ -71,6 +71,8 @@ class EngineController : public AudioEngineWrapper {
     Q_PROPERTY(QUrl projectFile READ projectFile NOTIFY projectFileChanged)
     Q_PROPERTY(bool projectDirty READ projectDirty NOTIFY projectDirtyChanged)
     Q_PROPERTY(bool projectLoading READ projectLoading NOTIFY projectLoadingChanged)
+    Q_PROPERTY(double masterVolume READ masterVolume WRITE setMasterVolume NOTIFY masterVolumeChanged)
+    Q_PROPERTY(bool masterMuted READ masterMuted WRITE setMasterMuted NOTIFY masterMutedChanged)
 
 public:
     // Inject a device for offline integration checks; system discovery is only for JACK.
@@ -121,6 +123,10 @@ public:
     QVariantMap trackLevels() const { return m_trackLevels; }
     Q_INVOKABLE void clearTrackClips(int trackId);
     Q_INVOKABLE void clearMonitorClips();
+    double masterVolume() const { return m_masterVolume; }
+    Q_INVOKABLE void setMasterVolume(double volume);
+    bool masterMuted() const { return m_masterMuted; }
+    Q_INVOKABLE void setMasterMuted(bool muted);
     double bpm() const { return m_bpm; }
     void setBpm(double bpm);
     QString version() const;
@@ -165,6 +171,8 @@ signals:
     void outputDeviceChanged();
     void inputDevicesChanged();
     void bufferSizeChanged();
+    void masterVolumeChanged();
+    void masterMutedChanged();
 
 private:
     void setProjectDirty(bool dirty);
@@ -210,6 +218,8 @@ private:
     bool m_repeating = false, m_shutdown = false, m_restoring = false, m_sessionSaveBlocked = false, m_restoringPreset = false;
     int m_numerator = 4, m_denominator = 4;
     double m_repeatStartBeat = 0, m_repeatEndBeat = 0;
+    double m_masterVolume = 1.0;
+    bool m_masterMuted = false;
     QString m_transportMessage;
     QString m_status = QStringLiteral("not started");
     GuitarSuiteModel* m_guitarSuite = nullptr;

@@ -28,7 +28,7 @@ ColumnLayout {
         Layout.fillHeight: true
         implicitWidth: 14
         implicitHeight: 50
-        color: "#17191e"
+        color: Theme.meterBackdrop
         radius: 2
         clip: true
         Row {
@@ -47,11 +47,11 @@ ColumnLayout {
                         anchors.bottom: parent.bottom
                         width: parent.width
                         height: parent.height * parent.normalized
-                        color: parent.classification === 2 ? Theme.record : parent.classification === 1 ? "#e5b56b" : "#74d69a"
+                        color: parent.classification === 2 ? Theme.meterClip : parent.classification === 1 ? Theme.meterWarning : Theme.meterNormal
                     }
                     Rectangle {
                         width: parent.width; height: 3
-                        color: parent.clipped ? Theme.record : "#393b42"
+                        color: parent.clipped ? Theme.meterClip : "#393b42"
                     }
                 }
             }

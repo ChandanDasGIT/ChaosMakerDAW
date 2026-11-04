@@ -79,9 +79,77 @@ bool Timeline::canSplitSelection() const
 {
     return canEditSelection() && !m_recording && m_selectedIds.size() == 1 && m_selectedClipId >= 0;
 }
+bool Timeline::canCopySelection() const
+{
+    return keyboardAllowed() && !m_recording && !m_busy && !m_selectedIds.empty();
+}
+bool Timeline::canCutSelection() const
+{
+    return canCopySelection() && canEditSelection();
+}
+bool Timeline::canPaste() const
+{
+    return keyboardAllowed() && !m_recording && !m_busy && m_tracks && !m_tracks->editsLocked() && m_tracks->hasClipboard();
+}
+bool Timeline::canDuplicateSelection() const
+{
+    return canCopySelection() && canEditSelection();
+}
+bool Timeline::copySelectedClips()
+{
+    if (!canCopySelection()) return false;
+    return m_tracks->copyClips(m_selectedIds);
+}
+std::vector<int> Timeline::cutSelectedClips()
+{
+    if (!canCutSelection()) return {};
+    const auto cut = m_tracks->cutClips(m_selectedIds);
+    if (!cut.empty()) {
+        deselect();
+        sync();
+    }
+    return cut;
+}
+std::vector<int> Timeline::pasteClips(double targetBeat, int targetTrackId)
+{
+    if (!canPaste()) return {};
+    if (targetTrackId < 0) {
+        targetTrackId = m_selectedTrackId >= 0 ? m_selectedTrackId : (m_tracks->count() > 0 ? m_tracks->trackIdAt(0) : -1);
+    }
+    if (targetBeat < 0.0) targetBeat = 0.0;
+    const auto pasted = m_tracks->pasteClips(targetTrackId, targetBeat);
+    if (!pasted.empty()) {
+        m_selectedIds = pasted;
+        m_selectedClipId = pasted.front();
+        m_selectedTrackId = targetTrackId;
+        sync();
+    }
+    return pasted;
+}
+std::vector<int> Timeline::duplicateSelectedClips(double beatOffset)
+{
+    if (!canDuplicateSelection()) return {};
+    const auto duplicated = m_tracks->duplicateClips(m_selectedIds, beatOffset);
+    if (!duplicated.empty()) {
+        m_selectedIds = duplicated;
+        m_selectedClipId = duplicated.front();
+        sync();
+    }
+    return duplicated;
+}
+int Timeline::selectedTrackId() const
+{
+    return m_tracks ? m_tracks->selectedTrackId() : m_selectedTrackId;
+}
+bool Timeline::selectTrack(int id)
+{
+    if (m_tracks) return m_tracks->selectTrack(id);
+    m_selectedTrackId = id;
+    return true;
+}
 void Timeline::deselect()
 {
-    m_selectedIds.clear(); m_selectedClipId = m_selectedTrackId = -1; m_hasSelection = false;
+    m_selectedIds.clear(); m_selectedClipId = -1; m_hasSelection = false;
 }
 void Timeline::selectAll()
 {
@@ -89,7 +157,7 @@ void Timeline::selectAll()
     if (!m_tracks) return;
     const auto clips = m_tracks->clips();
     for (const auto& clip : clips) m_selectedIds.push_back(clip.clipId);
-    if (!clips.empty()) { m_selectedClipId = clips.front().clipId; m_selectedTrackId = clips.front().trackId; }
+    if (!clips.empty()) { m_selectedClipId = clips.front().clipId; selectTrack(clips.front().trackId); }
 }
 void Timeline::selectClip(int id, int clipId, bool toggle, bool preserve)
 {
@@ -100,7 +168,7 @@ void Timeline::selectClip(int id, int clipId, bool toggle, bool preserve)
         else m_selectedIds.erase(at);
     } else if (!preserve || at == m_selectedIds.end()) m_selectedIds = {clipId};
     m_selectedClipId = selected(clipId) ? clipId : -1;
-    m_selectedTrackId = m_selectedClipId >= 0 ? id : -1;
+    if (m_selectedClipId >= 0) selectTrack(id);
     m_hasSelection = false;
 }
 void Timeline::sync()
@@ -111,7 +179,7 @@ void Timeline::sync()
     auto primary = std::find_if(clips.begin(), clips.end(), [&](const auto& c) { return c.clipId == m_selectedClipId; });
     if (primary == clips.end()) primary = std::find_if(clips.begin(), clips.end(), [&](const auto& c) { return selected(c.clipId); });
     m_selectedClipId = primary == clips.end() ? -1 : primary->clipId;
-    m_selectedTrackId = primary == clips.end() ? -1 : primary->trackId;
+    if (primary != clips.end()) selectTrack(primary->trackId);
     if (m_selectedIds.empty()) cancelEdit();
 }
 void Timeline::beginEdit(const std::string& operation)

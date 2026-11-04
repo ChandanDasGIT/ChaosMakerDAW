@@ -9,7 +9,13 @@ import "../settings"
 Rectangle {
     id: root
     property var trackModel: null
+    property bool mixerVisible: true
     signal closeRequested()
+    signal toggleMixerRequested()
+
+    function requestProjectAction(action) {
+        projectActions.requestAction(action)
+    }
 
     Shortcut { sequences: [StandardKey.Undo]; enabled: !!root.trackModel && root.trackModel.canUndo; onActivated: root.trackModel.undo() }
     Shortcut { sequences: [StandardKey.Redo]; enabled: !!root.trackModel && root.trackModel.canRedo; onActivated: root.trackModel.redo() }
@@ -24,39 +30,41 @@ Rectangle {
         spacing: 6
 
         ProjectActions {
+            id: projectActions
             trackModel: root.trackModel
             onCloseRequested: root.closeRequested()
         }
 
-        Repeater {
-            model: ["↶", "↷"]
-            delegate: ToolButton {
-                text: modelData
-                objectName: modelData === "↶" ? "undoClipEdit" : "redoClipEdit"
-                enabled: modelData === "↶" ? !!root.trackModel && root.trackModel.canUndo
-                         : !!root.trackModel && root.trackModel.canRedo
-                onClicked: {
-                    if (modelData === "↶") root.trackModel.undo()
-                    else root.trackModel.redo()
+        AppSettings {
+            id: appSettings
+        }
+        ToolButton {
+            id: mixerToggleBtn
+            objectName: "toggleMixerButton"
+            implicitHeight: 32
+            onClicked: root.toggleMixerRequested()
+            ToolTip.visible: hovered
+            ToolTip.text: "Toggle bottom mixer panel (M)"
+            contentItem: RowLayout {
+                spacing: 6
+                Rectangle {
+                    width: 7; height: 7; radius: 3.5
+                    color: root.mixerVisible ? Theme.accent : Theme.textMuted
                 }
-                ToolTip.visible: hovered
-                ToolTip.text: modelData === "↶" ? "Undo clip edit (Ctrl+Z)" : "Redo clip edit (Ctrl+Shift+Z)"
-                implicitHeight: 32
-                contentItem: Text {
-                    text: parent.text
-                    color: parent.enabled ? Theme.text : Theme.textMuted
-                    font.pixelSize: 13
+                Text {
+                    text: "Mixer"
+                    color: root.mixerVisible ? Theme.text : Theme.textMuted
+                    font.pixelSize: Theme.bodySize
+                    font.bold: root.mixerVisible
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
-                background: Rectangle {
-                    radius: 4
-                    color: parent.down ? "#383838" : "transparent"
-                }
             }
-        }
-        AppSettings {
-            id: appSettings
+            background: Rectangle {
+                radius: 4
+                color: parent.down ? Theme.controlBgActive : parent.hovered ? Theme.controlBgHover : root.mixerVisible ? Theme.cardBgAlt : "transparent"
+                border.color: root.mixerVisible ? Theme.divider : "transparent"
+            }
         }
         Item { Layout.fillWidth: true }
         DeviceSettings {

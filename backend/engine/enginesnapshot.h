@@ -54,6 +54,8 @@ struct EngineSnapshot {
     Processor* inputStage = nullptr;                    // optional per-track trim and EQ
     std::vector<TrackRender> tracks;
     std::vector<Processor*> masterChain;
+    float masterGain = 1.0f;
+    bool masterMuted = false;
     TempoMap tempo;
     std::vector<std::shared_ptr<const AudioData>> keepAudio;
     std::vector<std::shared_ptr<Processor>> keepProcessors;

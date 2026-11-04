@@ -28,11 +28,11 @@ ColumnLayout {
     Rectangle {
         Layout.fillWidth: true
         Layout.preferredHeight: 10
-        radius: 2; color: "#17191e"
+        radius: 2; color: Theme.meterBackdrop
         Rectangle {
             width: parent.width * root.normalized
             height: parent.height; radius: 2
-            color: root.classification === 2 ? Theme.record : root.classification === 1 ? "#e5b56b" : "#74d69a"
+            color: root.classification === 2 ? Theme.meterClip : root.classification === 1 ? Theme.meterWarning : Theme.meterNormal
         }
         Rectangle {
             visible: root.showTarget
@@ -43,7 +43,7 @@ ColumnLayout {
         Rectangle {
             anchors.right: parent.right
             width: 4; height: parent.height
-            color: root.clipped ? Theme.record : "#393b42"
+            color: root.clipped ? Theme.meterClip : "#393b42"
         }
     }
 }

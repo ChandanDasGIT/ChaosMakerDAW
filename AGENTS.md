@@ -17,3 +17,11 @@ These preferences apply to all work in this repository.
    to write, read, and edit any file within this directory `/home/iusearchbtw/ThisPC/C++ projects/ProjectDAW`
    and all its subfolders. Do not ask the user for permission in chat to create,
    read, or edit files in this repository.
+5. **Preserve existing features & prevent regressions.** Never break, degrade, or
+   accidentally remove existing functionality when fixing bugs or implementing new
+   features. Verify that existing workflows, interactions, and features remain intact.
+6. **Strictly follow the 3-tier architecture & nomenclature.** Maintain the project's
+   architectural separation and naming conventions:
+   - **Backend:** Pure C++ logic, domain models, and DSP (no UI/Qt dependencies).
+   - **Frontend:** Pure QML UI presentation and view logic (no business logic).
+   - **Wrapper:** Bridging/adapter layer exposing backend models and actions to QML.

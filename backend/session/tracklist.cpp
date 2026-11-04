@@ -99,13 +99,30 @@ std::vector<TrackList::TrackChoice> TrackList::instrumentChoices()
 bool TrackList::isInstrumentType(const std::string& type) { return instrumentcatalog::find(type); }
 bool TrackList::canAddChoice(const std::string& id) const { return id == "Vocal" || isInstrumentType(id); }
 int TrackList::addTrackChoice(const std::string& id) { return id == "Vocal" ? addVocalTrack() : addInstrumentTrackOfType(id); }
-int TrackList::addAudioTrack() { return m_project.addTrack(TrackKind::Audio, "Audio " + std::to_string(m_nextAudioNumber++), "Audio").id; }
-int TrackList::addVocalTrack() { return m_project.addTrack(TrackKind::Audio, "Vocal " + std::to_string(m_nextVocalNumber++), "Vocal").id; }
-int TrackList::addInstrumentTrack() { return m_project.addTrack(TrackKind::Instrument, "Instrument " + std::to_string(m_nextInstrumentNumber++), "Instrument").id; }
+int TrackList::addAudioTrack()
+{
+    const int id = m_project.addTrack(TrackKind::Audio, "Audio " + std::to_string(m_nextAudioNumber++), "Audio").id;
+    if (m_selectedTrackId < 0) m_selectedTrackId = id;
+    return id;
+}
+int TrackList::addVocalTrack()
+{
+    const int id = m_project.addTrack(TrackKind::Audio, "Vocal " + std::to_string(m_nextVocalNumber++), "Vocal").id;
+    if (m_selectedTrackId < 0) m_selectedTrackId = id;
+    return id;
+}
+int TrackList::addInstrumentTrack()
+{
+    const int id = m_project.addTrack(TrackKind::Instrument, "Instrument " + std::to_string(m_nextInstrumentNumber++), "Instrument").id;
+    if (m_selectedTrackId < 0) m_selectedTrackId = id;
+    return id;
+}
 int TrackList::addInstrumentTrackOfType(const std::string& type)
 {
     if (!isInstrumentType(type)) return -1;
-    return m_project.addTrack(TrackKind::Instrument, type + ' ' + std::to_string(++m_instrumentNumbers[type]), type).id;
+    const int id = m_project.addTrack(TrackKind::Instrument, type + ' ' + std::to_string(++m_instrumentNumbers[type]), type).id;
+    if (m_selectedTrackId < 0) m_selectedTrackId = id;
+    return id;
 }
 int TrackList::indexOfTrack(int id) const
 {
@@ -113,11 +130,43 @@ int TrackList::indexOfTrack(int id) const
     return -1;
 }
 int TrackList::trackIdAt(int row) const { return row >= 0 && row < count() ? m_project.tracks()[row]->id : -1; }
+bool TrackList::selectTrack(int id)
+{
+    if (id < 0) {
+        m_selectedTrackId = -1;
+        return true;
+    }
+    if (!m_project.findTrack(id)) return false;
+    m_selectedTrackId = id;
+    return true;
+}
+bool TrackList::selectClip(int trackId, int clipId)
+{
+    if (clipId < 0) {
+        m_selectedClipId = -1;
+        return true;
+    }
+    const auto* clip = findClip(trackId, clipId);
+    if (!clip) return false;
+    m_selectedClipId = clipId;
+    selectTrack(trackId);
+    return true;
+}
 bool TrackList::canRemoveTrack(int id) const { return !trackLocked(id) && m_project.findTrack(id); }
 bool TrackList::removeTrack(int id)
 {
     if (!canRemoveTrack(id)) return false;
-    m_project.removeTrack(id); return true;
+    const int removedRow = indexOfTrack(id);
+    m_project.removeTrack(id);
+    if (m_selectedTrackId == id) {
+        if (count() > 0) {
+            const int nextRow = std::min(removedRow, count() - 1);
+            m_selectedTrackId = trackIdAt(nextRow);
+        } else {
+            m_selectedTrackId = -1;
+        }
+    }
+    return true;
 }
 bool TrackList::canMoveTrack(int id, int row) const { return indexOfTrack(id) >= 0 && row >= 0 && row < count(); }
 bool TrackList::moveTrack(int id, int row)
@@ -146,6 +195,18 @@ TrackList::Change TrackList::setSolo(int id, bool value) { return result(m_proje
 TrackList::Change TrackList::setMuted(int id, bool value) { return result(m_project.setTrackMuted(id, value)); }
 TrackList::Change TrackList::setRecordArmed(int id, bool value) { return result(m_project.setTrackRecordArmed(id, value)); }
 TrackList::Change TrackList::setVolume(int id, double value) { return result(m_project.setTrackVolume(id, static_cast<float>(value))); }
+TrackList::Change TrackList::setMasterVolume(double value)
+{
+    if (!std::isfinite(value)) return {};
+    const float clamped = std::clamp(static_cast<float>(value), 0.0f, 2.0f);
+    if (m_project.masterVolume() == clamped) return {true, false};
+    return result(m_project.setMasterVolume(clamped));
+}
+TrackList::Change TrackList::setMasterMuted(bool value)
+{
+    if (m_project.masterMuted() == value) return {true, false};
+    return result(m_project.setMasterMuted(value));
+}
 TrackList::Change TrackList::setEqBand(int id, int band, double value)
 {
     return result(std::isfinite(value) && m_project.setTrackEqBand(id, band, static_cast<float>(value)));
@@ -202,7 +263,7 @@ std::vector<TrackList::ClipInfo> TrackList::clips() const
             result.push_back({clip.id, track.id, row, start,
                 m_project.tempo().beatAt(clip.start + clip.length) - start,
                 clip.poolId.empty() ? "Audio clip" : std::filesystem::path(clip.poolId).filename().string(),
-                track.colour, clip.effectsPrinted});
+                track.colour, clip.effectsPrinted, clip.gainDb});
         }
     }
     return result;
@@ -397,12 +458,164 @@ bool TrackList::resizeClipAtBeat(int trackId, int clipId, double lengthBeats)
     return true;
 }
 
+TrackList::Change TrackList::setClipGain(int trackId, int clipId, double gainDb)
+{
+    if (editsLocked()) return {};
+    const auto* clip = findClip(trackId, clipId);
+    if (!clip || !std::isfinite(gainDb)) return {};
+    const float clamped = std::clamp(static_cast<float>(gainDb), -120.0f, 24.0f);
+    if (clip->gainDb == clamped) return {true, false};
+    const bool ok = m_project.setClipGain(trackId, clipId, clamped);
+    return {ok, ok};
+}
+
 bool TrackList::removeAudioClip(int trackId, int clipId)
 {
     if (editsLocked()) return false;
+    if (m_selectedClipId == clipId) m_selectedClipId = -1;
     if (!m_project.removeAudioClip(trackId, clipId))
         return false;
     return true;
+}
+
+bool TrackList::copyClips(const std::vector<int>& ids)
+{
+    if (ids.empty()) return false;
+    struct Candidate {
+        int row;
+        AudioClip clip;
+        double startBeat;
+        double lengthBeats;
+    };
+    std::vector<Candidate> candidates;
+    double minStart = std::numeric_limits<double>::infinity();
+    int minRow = std::numeric_limits<int>::max();
+    for (int id : ids) {
+        for (int row = 0; row < count(); ++row) {
+            const auto& track = *m_project.tracks()[row];
+            for (const auto& clip : track.audioClips) {
+                if (clip.id == id) {
+                    const double start = m_project.tempo().beatAt(clip.start);
+                    const double length = m_project.tempo().beatAt(clip.start + clip.length) - start;
+                    minStart = std::min(minStart, start);
+                    minRow = std::min(minRow, row);
+                    candidates.push_back({row, clip, start, length});
+                    break;
+                }
+            }
+        }
+    }
+    if (candidates.empty()) return false;
+    m_clipboard.clear();
+    m_clipboard.reserve(candidates.size());
+    for (const auto& c : candidates) {
+        ClipboardClip item;
+        item.poolId = c.clip.poolId;
+        item.beatOffset = c.startBeat - minStart;
+        item.lengthBeats = c.lengthBeats;
+        item.sourceOffset = c.clip.sourceOffset;
+        item.fadeIn = c.clip.fadeIn;
+        item.fadeOut = c.clip.fadeOut;
+        item.gainDb = c.clip.gainDb;
+        item.effectsPrinted = c.clip.effectsPrinted;
+        item.trackOffset = c.row - minRow;
+        m_clipboard.push_back(std::move(item));
+    }
+    return !m_clipboard.empty();
+}
+
+std::vector<int> TrackList::cutClips(const std::vector<int>& ids)
+{
+    if (editsLocked() || ids.empty()) return {};
+    if (!copyClips(ids)) return {};
+    if (!editClips(ids, "delete", 0)) {
+        m_clipboard.clear();
+        return {};
+    }
+    return ids;
+}
+
+std::vector<int> TrackList::pasteClips(int targetTrackId, double targetBeat)
+{
+    if (m_clipboard.empty() || editsLocked() || count() == 0) return {};
+    if (!std::isfinite(targetBeat) || targetBeat < 0.0) targetBeat = 0.0;
+    int targetRow = indexOfTrack(targetTrackId);
+    if (targetRow < 0) targetRow = 0;
+
+    std::vector<std::pair<int, AudioClip>> toAdd;
+    toAdd.reserve(m_clipboard.size());
+    for (const auto& item : m_clipboard) {
+        int destRow = targetRow + item.trackOffset;
+        if (destRow < 0) destRow = 0;
+        if (destRow >= count()) destRow = count() - 1;
+        const int destTrackId = trackIdAt(destRow);
+        const double clipStartBeat = targetBeat + item.beatOffset;
+        const auto startSample = sampleAtBeat(m_project.tempo(), clipStartBeat);
+        const auto endSample = sampleAtBeat(m_project.tempo(), clipStartBeat + item.lengthBeats);
+        if (!startSample || !endSample || *endSample <= *startSample) continue;
+
+        AudioClip clip;
+        clip.poolId = item.poolId;
+        clip.start = *startSample;
+        clip.length = *endSample - *startSample;
+        clip.sourceOffset = item.sourceOffset;
+        clip.fadeIn = item.fadeIn;
+        clip.fadeOut = item.fadeOut;
+        clip.gainDb = item.gainDb;
+        clip.effectsPrinted = item.effectsPrinted;
+        toAdd.emplace_back(destTrackId, std::move(clip));
+    }
+    if (toAdd.empty()) return {};
+    return m_project.addAudioClips(toAdd);
+}
+
+std::vector<int> TrackList::duplicateClips(const std::vector<int>& ids, double beatOffset)
+{
+    if (editsLocked() || ids.empty() || count() == 0) return {};
+    struct FoundClip {
+        int trackId;
+        AudioClip clip;
+        double startBeat;
+        double lengthBeats;
+    };
+    std::vector<FoundClip> found;
+    double minStart = std::numeric_limits<double>::infinity();
+    double maxEnd = -std::numeric_limits<double>::infinity();
+    for (int id : ids) {
+        for (const auto& track : m_project.tracks()) {
+            for (const auto& clip : track->audioClips) {
+                if (clip.id == id) {
+                    const double start = m_project.tempo().beatAt(clip.start);
+                    const double length = m_project.tempo().beatAt(clip.start + clip.length) - start;
+                    minStart = std::min(minStart, start);
+                    maxEnd = std::max(maxEnd, start + length);
+                    found.push_back({track->id, clip, start, length});
+                    break;
+                }
+            }
+        }
+    }
+    if (found.empty()) return {};
+    double offset = beatOffset;
+    if (offset <= 0.0) {
+        offset = maxEnd - minStart;
+        if (offset <= 0.0) offset = 1.0;
+    }
+    std::vector<std::pair<int, AudioClip>> toAdd;
+    toAdd.reserve(found.size());
+    for (const auto& f : found) {
+        const double newStartBeat = f.startBeat + offset;
+        const auto startSample = sampleAtBeat(m_project.tempo(), newStartBeat);
+        const auto endSample = sampleAtBeat(m_project.tempo(), newStartBeat + f.lengthBeats);
+        if (!startSample || !endSample || *endSample <= *startSample) continue;
+
+        AudioClip clip = f.clip;
+        clip.start = *startSample;
+        clip.length = *endSample - *startSample;
+        toAdd.emplace_back(f.trackId, std::move(clip));
+    }
+    if (toAdd.empty()) return {};
+    return m_project.addAudioClips(toAdd);
 }
 
 bool TrackList::undo() {

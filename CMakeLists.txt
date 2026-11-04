@@ -134,10 +134,10 @@ if(DAW_BUILD_APP)
     if(TARGET Qt6::Test)
         qt_add_executable(transporttests tests/ui/transport_qtcheck.cpp)
         qt_add_qml_module(transporttests URI TransportTests
-            QML_FILES frontend/Theme.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
+            QML_FILES frontend/Theme.qml frontend/Icons.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
                       frontend/engine/PlaybackControls.qml
                       frontend/session/ProjectActions.qml frontend/audiodevice/DeviceSettings.qml
-                      frontend/settings/AppSettings.qml
+                      frontend/settings/AppSettings.qml frontend/settings/QuickSettings.qml
                       frontend/tempo/TempoEditor.qml
                       frontend/instruments/guitar/GuitarSuitePanel.qml
                       frontend/instruments/guitar/GuitarSuiteEditor.qml

@@ -36,6 +36,8 @@ public:
     // Lightweight descriptor extracted on UI/caller thread for safe off-thread building
     struct Context {
         TempoMap tempo;
+        float masterVolume = 1.0f;
+        bool masterMuted = false;
         struct TrackInfo {
             int id = 0;
             float volume = 1.0f;

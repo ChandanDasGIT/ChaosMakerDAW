@@ -117,3 +117,114 @@ TEST(tracklist, extreme_clip_edits_and_invalid_media_rates_are_rejected_before_a
     CHECK(!tracks.attachTake(id, 0, audio, true));
     CHECK(!tracks.audioFor("invalid.wav"));
 }
+
+TEST(tracklist, track_selection_lifecycle_and_removal_adjustment)
+{
+    TrackList tracks;
+    CHECK(tracks.selectedTrackId() == -1);
+
+    const int t1 = tracks.addAudioTrack();
+    CHECK(tracks.selectedTrackId() == t1);
+
+    const int t2 = tracks.addAudioTrack();
+    const int t3 = tracks.addVocalTrack();
+    CHECK(tracks.selectedTrackId() == t1); // remains t1
+
+    // Select t2
+    CHECK(tracks.selectTrack(t2));
+    CHECK(tracks.selectedTrackId() == t2);
+
+    // Reject nonexistent track
+    CHECK(!tracks.selectTrack(9999));
+    CHECK(tracks.selectedTrackId() == t2);
+
+    // Deselect
+    CHECK(tracks.selectTrack(-1));
+    CHECK(tracks.selectedTrackId() == -1);
+
+    // Reselect t2 and remove it -> selection moves to adjacent track
+    CHECK(tracks.selectTrack(t2));
+    CHECK(tracks.removeTrack(t2));
+    CHECK(tracks.selectedTrackId() == t3);
+
+    // Remove remaining tracks
+    CHECK(tracks.removeTrack(t3));
+    CHECK(tracks.selectedTrackId() == t1);
+    CHECK(tracks.removeTrack(t1));
+    CHECK(tracks.selectedTrackId() == -1);
+}
+
+TEST(tracklist, clip_gain_operations_and_clip_info)
+{
+    TrackList tracks;
+    const int t = tracks.addAudioTrack();
+    const int c = tracks.addClipAtBeat(t, 0, 4);
+    CHECK(c > 0);
+
+    const auto clipsInitial = tracks.clips();
+    CHECK(clipsInitial.size() == 1);
+    CHECK_NEAR(clipsInitial[0].gainDb, 0.0, 1e-6);
+
+    // Set clip gain
+    const auto change = tracks.setClipGain(t, c, 4.5);
+    CHECK(change.accepted);
+    CHECK(change.changed);
+
+    const auto clipsUpdated = tracks.clips();
+    CHECK_NEAR(clipsUpdated[0].gainDb, 4.5, 1e-6);
+    CHECK_NEAR(tracks.findClip(t, c)->gainDb, 4.5, 1e-6);
+
+    // Setting the same gain returns accepted=true, changed=false
+    const auto noChange = tracks.setClipGain(t, c, 4.5);
+    CHECK(noChange.accepted);
+    CHECK(!noChange.changed);
+
+    // Clamping checks
+    CHECK(tracks.setClipGain(t, c, 50.0).accepted);
+    CHECK_NEAR(tracks.findClip(t, c)->gainDb, 24.0, 1e-6);
+
+    CHECK(tracks.setClipGain(t, c, -200.0).accepted);
+    CHECK_NEAR(tracks.findClip(t, c)->gainDb, -120.0, 1e-6);
+
+    // Invalid values rejected
+    CHECK(!tracks.setClipGain(t, c, std::numeric_limits<double>::quiet_NaN()).accepted);
+    CHECK(!tracks.setClipGain(999, c, 3.0).accepted);
+    CHECK(!tracks.setClipGain(t, 999, 3.0).accepted);
+
+    // Undo / Redo
+    CHECK(tracks.undo());
+    CHECK_NEAR(tracks.findClip(t, c)->gainDb, 24.0, 1e-6);
+    CHECK(tracks.redo());
+    CHECK_NEAR(tracks.findClip(t, c)->gainDb, -120.0, 1e-6);
+
+    // Selection tracking
+    CHECK(tracks.selectClip(t, c));
+    CHECK(tracks.selectedClipId() == c);
+    CHECK(tracks.selectedTrackId() == t);
+}
+
+TEST(tracklist, master_volume_and_mute)
+{
+    TrackList tracks;
+    CHECK_NEAR(tracks.masterVolume(), 1.0, 1e-6);
+    CHECK(!tracks.masterMuted());
+
+    CHECK(tracks.setMasterVolume(1.5).changed);
+    CHECK_NEAR(tracks.masterVolume(), 1.5, 1e-6);
+
+    // Clamping
+    CHECK(tracks.setMasterVolume(3.0).changed);
+    CHECK_NEAR(tracks.masterVolume(), 2.0, 1e-6);
+    CHECK(tracks.setMasterVolume(-0.5).changed);
+    CHECK_NEAR(tracks.masterVolume(), 0.0, 1e-6);
+
+    // No-change check
+    CHECK(!tracks.setMasterVolume(0.0).changed);
+
+    // Master mute
+    CHECK(tracks.setMasterMuted(true).changed);
+    CHECK(tracks.masterMuted());
+    CHECK(!tracks.setMasterMuted(true).changed);
+    CHECK(tracks.setMasterMuted(false).changed);
+    CHECK(!tracks.masterMuted());
+}

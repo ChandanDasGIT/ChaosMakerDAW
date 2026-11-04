@@ -172,3 +172,105 @@ TEST(qtclipediting, cross_track_move_preserves_source_offsets_and_group_history)
     CHECK(!tracks.editClips({x,y},"move",0,2)); CHECK(tracks.project().findTrack(a)->audioClips[0].id==x);
     tracks.lockRecordingTrack(b); CHECK(!tracks.editClips({x},"move",0,1));
 }
+
+TEST(qtclipediting, per_clip_gain_updates_model_role_and_is_independent_of_track_volume) {
+    TrackListWrapper tracks; const int track = tracks.addAudioTrack();
+    const int clip = tracks.addClipAtBeat(track, 0, 4);
+    CHECK(clip > 0);
+
+    // Initial clip gain is 0.0 dB
+    CHECK_NEAR(tracks.clipGain(track, clip), 0.0, 1e-6);
+    auto clipsList = tracks.clips();
+    CHECK(!clipsList.isEmpty());
+    CHECK_NEAR(clipsList.front().toMap().value("gainDb").toDouble(), 0.0, 1e-6);
+
+    // Track volume starts at default 1.0 (independent)
+    CHECK_NEAR(tracks.project().findTrack(track)->volume, 1.0f, 1e-6);
+
+    // Set clip gain to 3.5 dB and verify dataChanged was emitted for ClipsRole
+    int dataChangedCount = 0;
+    QObject::connect(&tracks, &QAbstractItemModel::dataChanged, [&](const QModelIndex&, const QModelIndex&, const QList<int>& roles) {
+        if (roles.contains(TrackListWrapper::ClipsRole)) ++dataChangedCount;
+    });
+
+    CHECK(tracks.setClipGain(track, clip, 3.5));
+    CHECK_NEAR(tracks.clipGain(track, clip), 3.5, 1e-6);
+    CHECK(dataChangedCount > 0);
+
+    // Verify track model role directly
+    const auto rowClips = tracks.data(tracks.index(0), TrackListWrapper::ClipsRole).toList();
+    CHECK(!rowClips.isEmpty());
+    CHECK_NEAR(rowClips.front().toMap().value("gainDb").toDouble(), 3.5, 1e-6);
+
+    // Verify track volume was completely unaffected
+    CHECK_NEAR(tracks.project().findTrack(track)->volume, 1.0f, 1e-6);
+
+    // Setting track volume does not affect clip gain
+    CHECK(tracks.setVolume(track, 0.5));
+    CHECK_NEAR(tracks.project().findTrack(track)->volume, 0.5f, 1e-6);
+    CHECK_NEAR(tracks.clipGain(track, clip), 3.5, 1e-6);
+
+    // Verify clips role map includes the updated gainDb
+    clipsList = tracks.clips();
+    CHECK_NEAR(clipsList.front().toMap().value("gainDb").toDouble(), 3.5, 1e-6);
+
+    // Undo clip gain restores previous value
+    CHECK(tracks.undo());
+    CHECK_NEAR(tracks.clipGain(track, clip), 0.0, 1e-6);
+    CHECK_NEAR(tracks.project().findTrack(track)->volume, 0.5f, 1e-6);
+}
+
+TEST(qtclipediting, clip_selection_auto_selects_parent_track_and_notifies_changes) {
+    TrackListWrapper tracks;
+    const int t1 = tracks.addAudioTrack();
+    const int t2 = tracks.addVocalTrack();
+    const int c1 = tracks.addClipAtBeat(t1, 0, 4);
+    const int c2 = tracks.addClipAtBeat(t2, 0, 4);
+
+    CHECK(tracks.selectTrack(t1));
+    CHECK(tracks.selectedTrackId() == t1);
+
+    int trackSignalCount = 0;
+    int lastNotifiedTrack = -1;
+    QObject::connect(&tracks, &TrackListWrapper::selectedTrackChanged, [&](int trackId) {
+        ++trackSignalCount;
+        lastNotifiedTrack = trackId;
+    });
+
+    int clipSignalCount = 0;
+    int lastNotifiedClip = -1;
+    QObject::connect(&tracks, &TrackListWrapper::selectedClipChanged, [&](int clipId) {
+        ++clipSignalCount;
+        lastNotifiedClip = clipId;
+    });
+
+    // Selecting clip c2 on track t2 should auto-select track t2 and notify both signals
+    tracks.setSelectedClipId(c2);
+    CHECK(tracks.selectedClipId() == c2);
+    CHECK(tracks.selectedTrackId() == t2);
+    CHECK(clipSignalCount == 1);
+    CHECK(lastNotifiedClip == c2);
+    CHECK(trackSignalCount == 1);
+    CHECK(lastNotifiedTrack == t2);
+
+    // Selecting that track explicitly after clip selection must succeed and not be blocked
+    CHECK(tracks.selectTrack(t2));
+    CHECK(tracks.selectedTrackId() == t2);
+
+    // Switching to track t1
+    CHECK(tracks.selectTrack(t1));
+    CHECK(tracks.selectedTrackId() == t1);
+    CHECK(lastNotifiedTrack == t1);
+    CHECK(trackSignalCount == 2);
+
+    // Selecting clip c1 on track t1 auto-selects track t1
+    tracks.selectClip(t1, c1);
+    CHECK(tracks.selectedClipId() == c1);
+    CHECK(tracks.selectedTrackId() == t1);
+    CHECK(lastNotifiedClip == c1);
+
+    // Switching back to track t2 works
+    CHECK(tracks.selectTrack(t2));
+    CHECK(tracks.selectedTrackId() == t2);
+    CHECK(lastNotifiedTrack == t2);
+}

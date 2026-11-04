@@ -292,6 +292,20 @@ void AudioEngine::process(const AudioIO& io) noexcept
         }
     }
     mixPlayback(io, playback, renderedFrames, liveActive ? liveMeters : nullptr);
+    const float masterVol = m_masterMuted.load(std::memory_order_relaxed) ? 0.0f
+        : (playback && playback->masterMuted ? 0.0f : m_masterVolume.load(std::memory_order_relaxed));
+    for (int c = 0; c < io.output.channelCount; ++c) {
+        float* ch = io.output.channel(c);
+        for (int i = 0; i < renderedFrames; ++i) {
+            ch[i] = std::clamp(ch[i] * masterVol, -1.0f, 1.0f);
+        }
+    }
+    if (io.output.channelCount > 0 && renderedFrames > 0) {
+        float* leftCh = io.output.channel(0);
+        float* rightCh = io.output.channel(std::min(1, io.output.channelCount - 1));
+        m_leftMeter.capture(AudioView{&leftCh, 1, renderedFrames});
+        m_rightMeter.capture(AudioView{&rightCh, 1, renderedFrames});
+    }
     m_reportedPosition.store(m_position, std::memory_order_relaxed);
     m_reportedPlaying.store(m_playing, std::memory_order_relaxed);
     m_reportedRecording.store(m_recorder != nullptr, std::memory_order_relaxed);
@@ -560,7 +574,15 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
             finishRecording(); m_playing=false; break;
         }
     }
+    const float masterVol = m_masterMuted.load(std::memory_order_relaxed) ? 0.0f
+        : (snapshot.masterMuted ? 0.0f : m_masterVolume.load(std::memory_order_relaxed));
     for(int c=0;c<io.output.channelCount;++c)for(int i=0;i<frames;++i) {
-        float& value=io.output.channel(c)[i]; value=std::isfinite(value)?std::clamp(value,-1.0f,1.0f):0;
+        float& value=io.output.channel(c)[i]; value=std::isfinite(value)?std::clamp(value * masterVol,-1.0f,1.0f):0;
+    }
+    if (io.output.channelCount > 0 && frames > 0) {
+        float* leftCh = io.output.channel(0);
+        float* rightCh = io.output.channel(std::min(1, io.output.channelCount - 1));
+        m_leftMeter.capture(AudioView{&leftCh, 1, frames});
+        m_rightMeter.capture(AudioView{&rightCh, 1, frames});
     }
 }

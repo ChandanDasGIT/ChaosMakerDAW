@@ -9,6 +9,13 @@ double clampVolume(double gain) noexcept
     return gain;
 }
 
+double clampClipGain(double gainDb) noexcept
+{
+    if (!std::isfinite(gainDb) || gainDb < minClipGainDb) return minClipGainDb;
+    if (gainDb > maxClipGainDb) return maxClipGainDb;
+    return gainDb;
+}
+
 double clampStripWidth(double width) noexcept
 {
     if (!std::isfinite(width) || width < minStripWidth) return minStripWidth;
@@ -40,9 +47,41 @@ std::string formatVolumeTooltip(double gain)
     return "Track volume " + std::to_string(percent) + "%; double-click for 0 dB";
 }
 
+std::string formatMasterVolumeTooltip(double gain)
+{
+    const int percent = static_cast<int>(std::round(clampVolume(gain) * 100.0));
+    return "Master volume " + std::to_string(percent) + "%; double-click for 0 dB";
+}
+
+std::string formatClipGainDb(double gainDb)
+{
+    if (!std::isfinite(gainDb)) {
+        return "\xe2\x80\x94"; // "—"
+    }
+    const double rounded = std::round(gainDb * 10.0) / 10.0;
+    if (rounded > 0.0) {
+        return "+" + valueformat::withUnit(rounded, 1, "dB");
+    }
+    return valueformat::withUnit(rounded, 1, "dB");
+}
+
+std::string formatClipGainTooltip(double gainDb)
+{
+    if (!std::isfinite(gainDb)) {
+        return "No clip selected";
+    }
+    const std::string val = formatClipGainDb(gainDb);
+    return "Clip gain " + val + "; double-click for 0 dB";
+}
+
 std::string formatMuteTooltip(bool muted)
 {
     return muted ? "Mute enabled" : "Mute disabled";
+}
+
+std::string formatMasterMuteTooltip(bool muted)
+{
+    return muted ? "Master mute enabled" : "Master mute disabled";
 }
 
 std::string formatSoloTooltip(bool solo)
@@ -52,7 +91,7 @@ std::string formatSoloTooltip(bool solo)
 
 StripState MixerPanel::makeStrip(int trackId, std::string name, std::string colour,
                                  bool muted, bool solo, double volume,
-                                 double stripWidth)
+                                 double stripWidth, double clipGain)
 {
     StripState state;
     state.trackId = trackId;
@@ -61,11 +100,26 @@ StripState MixerPanel::makeStrip(int trackId, std::string name, std::string colo
     state.isMuted = muted;
     state.isSolo = solo;
     state.volume = clampVolume(volume);
+    state.clipGain = clampClipGain(clipGain);
     state.stripWidth = clampStripWidth(stripWidth);
     state.volumeText = formatVolumeDb(state.volume);
     state.volumeTooltip = formatVolumeTooltip(state.volume);
+    state.clipGainText = formatClipGainDb(state.clipGain);
+    state.clipGainTooltip = formatClipGainTooltip(state.clipGain);
     state.muteTooltip = formatMuteTooltip(state.isMuted);
     state.soloTooltip = formatSoloTooltip(state.isSolo);
+    return state;
+}
+
+MasterStripState MixerPanel::makeMasterStrip(bool muted, double volume, double stripWidth)
+{
+    MasterStripState state;
+    state.isMuted = muted;
+    state.volume = clampVolume(volume);
+    state.stripWidth = clampStripWidth(stripWidth);
+    state.volumeText = formatVolumeDb(state.volume);
+    state.volumeTooltip = formatMasterVolumeTooltip(state.volume);
+    state.muteTooltip = formatMasterMuteTooltip(state.isMuted);
     return state;
 }
 

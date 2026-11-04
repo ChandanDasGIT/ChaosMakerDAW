@@ -75,6 +75,14 @@ TEST(qtaudioengine, lifecycle_and_properties)
 
     wrapper.clearMonitorClips();
 
+    // Master volume and mute
+    CHECK_NEAR(wrapper.engine()->masterVolume(), 1.0f, 1e-6);
+    CHECK(!wrapper.engine()->masterMuted());
+    wrapper.engine()->setMasterVolume(1.4f);
+    CHECK_NEAR(wrapper.engine()->masterVolume(), 1.4f, 1e-6);
+    wrapper.engine()->setMasterMuted(true);
+    CHECK(wrapper.engine()->masterMuted());
+
     wrapper.stop();
     CHECK(!wrapper.isAudioReady());
 }

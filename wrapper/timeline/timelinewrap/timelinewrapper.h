@@ -30,6 +30,10 @@ class TimelineWrapper : public QObject {
     Q_PROPERTY(bool canEditSelection READ canEditSelection NOTIFY stateChanged)
     Q_PROPERTY(bool canMergeSelection READ canMergeSelection NOTIFY stateChanged)
     Q_PROPERTY(bool canSplitSelection READ canSplitSelection NOTIFY stateChanged)
+    Q_PROPERTY(bool canCopy READ canCopy NOTIFY stateChanged)
+    Q_PROPERTY(bool canCut READ canCut NOTIFY stateChanged)
+    Q_PROPERTY(bool canPaste READ canPaste NOTIFY stateChanged)
+    Q_PROPERTY(bool canDuplicate READ canDuplicate NOTIFY stateChanged)
     Q_PROPERTY(QString editOperation READ editOperation NOTIFY stateChanged)
     Q_PROPERTY(double editDelta READ editDelta NOTIFY stateChanged)
     Q_PROPERTY(int editLaneDelta READ editLaneDelta NOTIFY stateChanged)
@@ -73,6 +77,10 @@ public:
     bool canEditSelection() const { return m_timeline.canEditSelection(); }
     bool canMergeSelection() const { return m_timeline.canMergeSelection(); }
     bool canSplitSelection() const { return m_timeline.canSplitSelection(); }
+    bool canCopy() const { return m_timeline.canCopySelection(); }
+    bool canCut() const { return m_timeline.canCutSelection(); }
+    bool canPaste() const { return m_timeline.canPaste(); }
+    bool canDuplicate() const { return m_timeline.canDuplicateSelection(); }
     QString editOperation() const { return QString::fromStdString(m_timeline.editOperation()); }
     double editDelta() const { return m_timeline.editDelta(); }
     int editLaneDelta() const { return m_timeline.editLaneDelta(); }
@@ -87,9 +95,29 @@ public:
     void setTimeRangeStartBeat(double value) { m_timeline.setRangeStart(value); emit stateChanged(); }
     void setTimeRangeEndBeat(double value) { m_timeline.setRangeEnd(value); emit stateChanged(); }
 
-    Q_INVOKABLE void deselectClips() { m_timeline.deselect(); emit stateChanged(); }
-    Q_INVOKABLE void selectAllClips() { m_timeline.selectAll(); emit stateChanged(); }
-    Q_INVOKABLE void selectClip(int id, int clip, bool toggle, bool preserve) { m_timeline.selectClip(id, clip, toggle, preserve); emit stateChanged(); }
+    Q_INVOKABLE void deselectClips() {
+        m_timeline.deselect();
+        if (m_tracks) m_tracks->setSelectedClipId(-1);
+        emit stateChanged();
+    }
+    Q_INVOKABLE void selectAllClips() {
+        m_timeline.selectAll();
+        if (m_tracks) m_tracks->setSelectedClipId(m_timeline.selectedClipId());
+        emit stateChanged();
+    }
+    Q_INVOKABLE void selectTrack(int id) { if (m_tracks) m_tracks->selectTrack(id); else m_timeline.selectTrack(id); emit stateChanged(); }
+    Q_INVOKABLE void selectClip(int id, int clip, bool toggle, bool preserve) {
+        m_timeline.selectClip(id, clip, toggle, preserve);
+        if (m_tracks) {
+            m_tracks->setSelectedClipId(m_timeline.selectedClipId());
+            if (m_timeline.selectedClipId() >= 0) m_tracks->selectTrack(id);
+        }
+        emit stateChanged();
+    }
+    Q_INVOKABLE bool copySelectedClips();
+    Q_INVOKABLE QVariantList cutSelectedClips();
+    Q_INVOKABLE QVariantList pasteClips(double targetBeat = -1, int targetTrackId = -1);
+    Q_INVOKABLE QVariantList duplicateSelectedClips(double beatOffset = 0.0);
     Q_INVOKABLE void beginEdit(const QString& op) { m_timeline.beginEdit(op.toStdString()); emit stateChanged(); }
     Q_INVOKABLE void updateGroupEdit(double delta) { m_timeline.updateEdit(delta); emit stateChanged(); }
     Q_INVOKABLE void updateDrag(double original, double delta, bool verticalOnly = false) { m_timeline.updateDrag(original, delta, verticalOnly); emit stateChanged(); }
