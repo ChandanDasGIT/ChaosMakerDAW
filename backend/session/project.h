@@ -1,5 +1,6 @@
 #pragma once
 #include "transport/tempomap.h"
+#include "midi/midinote.h"
 
 #include <cstdint>
 #include <array>
@@ -18,6 +19,9 @@ struct AudioClip {
     std::int64_t fadeOut = 0;
     float gainDb = 0.0f;
     bool effectsPrinted = true;
+    // Pattern notes. startBeat is measured from the clip's content origin
+    // (start - sourceOffset), so trims/splits keep notes fixed in time like audio.
+    std::vector<MidiNote> notes;
 };
 
 enum class TrackKind { Audio, Instrument };
@@ -67,6 +71,8 @@ public:
     bool mergeAudioClips(int trackId, int first, int second, double sourceRate);
     bool moveAudioClip(int trackId, int clipId, std::int64_t start);
     bool setClipGain(int trackId, int clipId, float gainDb);
+    // Replace a clip's pattern notes (origin-relative beats) as one undoable edit.
+    bool setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes);
     struct ClipChange { int trackId; AudioClip clip; bool remove = false; int destinationTrackId = -1; };
     bool editClipGroup(const std::vector<ClipChange>& changes);
     bool canUndo() const { return m_historyPosition > 0; }

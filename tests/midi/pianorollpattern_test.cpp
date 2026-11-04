@@ -31,3 +31,19 @@ TEST(pianorollpattern, add_move_and_delete_notes)
     pattern.deleteSelected();
     CHECK(pattern.notes().empty());
 }
+
+TEST(pianorollpattern, set_notes_keeps_hidden_starts_and_fixes_ids)
+{
+    PianoRollPattern pattern;
+    MidiNote a; a.id = 5; a.note = 200; a.startBeat = -1.5; a.selected = true;
+    MidiNote b; b.id = 5; b.note = 60; b.startBeat = 2.0; b.lengthBeats = 0.0; // duplicate id
+    pattern.setNotes({a, b});
+    CHECK(pattern.notes().size() == 2);
+    CHECK(pattern.notes()[0].startBeat == -1.5);       // hidden (left-trimmed) note survives
+    CHECK(pattern.notes()[0].note == 127);
+    CHECK(!pattern.notes()[0].selected);
+    CHECK(pattern.notes()[1].id != pattern.notes()[0].id);
+    CHECK(pattern.notes()[1].lengthBeats > 0.0);
+    const int fresh = pattern.addNote(62, 0.0, 1.0);    // new ids never collide
+    CHECK(fresh != pattern.notes()[0].id && fresh != pattern.notes()[1].id);
+}

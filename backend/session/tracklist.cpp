@@ -260,15 +260,56 @@ std::vector<TrackList::ClipInfo> TrackList::clips() const
         const auto& track = *m_project.tracks()[row];
         for (const auto& clip : track.audioClips) {
             const double start = m_project.tempo().beatAt(clip.start);
-            const bool blank = clip.poolId.starts_with("Clip ") && !m_mediaPaths.contains(clip.poolId) && !m_audio.contains(clip.poolId);
+            const bool blank = isPatternClip(clip);
             result.push_back({clip.id, track.id, row, start,
                 m_project.tempo().beatAt(clip.start + clip.length) - start,
                 clip.poolId.empty() ? "Audio clip" : std::filesystem::path(clip.poolId).filename().string(),
-                track.colour, clip.effectsPrinted, clip.gainDb, !blank});
+                track.colour, clip.effectsPrinted, clip.gainDb, !blank,
+                blank ? clipNotes(track.id, clip.id) : std::vector<MidiNote>{}});
         }
     }
     return result;
 }
+bool TrackList::isPatternClip(const AudioClip& clip) const
+{
+    const auto& name = clip.poolId;
+    return name.starts_with("Clip ") && !m_mediaPaths.contains(name) && !m_audio.contains(name);
+}
+
+// Pattern clips have no media, so sourceOffset is in project samples (ratio 1).
+double TrackList::offsetBeats(const AudioClip& clip) const
+{
+    const auto& tempo = m_project.tempo();
+    return double(clip.sourceOffset) * tempo.bpm() / (60.0 * tempo.sampleRate());
+}
+
+std::vector<MidiNote> TrackList::clipNotes(int trackId, int clipId) const
+{
+    const auto* clip = findClip(trackId, clipId);
+    if (!clip) return {};
+    auto notes = clip->notes;
+    const double offset = offsetBeats(*clip);
+    for (auto& n : notes) n.startBeat -= offset;
+    return notes;
+}
+
+TrackList::Change TrackList::setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes)
+{
+    if (editsLocked()) return {};
+    const auto* clip = findClip(trackId, clipId);
+    if (!clip || !isPatternClip(*clip)) return {};
+    const double offset = offsetBeats(*clip);
+    for (auto& n : notes) {
+        if (!std::isfinite(n.startBeat) || !std::isfinite(n.lengthBeats) || n.lengthBeats <= 0
+            || n.note < 0 || n.note > 127 || n.velocity < 0 || n.velocity > 127) return {};
+        n.startBeat += offset;
+        n.selected = false;
+    }
+    if (clip->notes == notes) return {true, false};
+    const bool ok = m_project.setClipNotes(trackId, clipId, std::move(notes));
+    return {ok, ok};
+}
+
 const AudioClip* TrackList::findClip(int trackId, int clipId) const
 {
     const auto* track = m_project.findTrack(trackId);
@@ -380,11 +421,7 @@ bool TrackList::canMergeClips(int trackId, int first, int second) const {
     const AudioClip *a=nullptr,*b=nullptr;
     for (const auto& clip:track->audioClips) { if (clip.id==first)a=&clip; if (clip.id==second)b=&clip; }
     if (!a || !b) return false;
-    const auto blank=[&](const AudioClip& clip) {
-        const auto& name=clip.poolId;
-        return name.starts_with("Clip ") && !m_mediaPaths.contains(name) && !m_audio.contains(name);
-    };
-    if (blank(*a) && blank(*b)) {
+    if (isPatternClip(*a) && isPatternClip(*b)) {
         if (a->start>b->start)std::swap(a,b);
         return a->start+a->length==b->start && a->effectsPrinted==b->effectsPrinted && a->gainDb==b->gainDb
             && a->fadeOut==0 && b->fadeIn==0;
@@ -417,6 +454,12 @@ bool TrackList::mergeSelectedClips(const std::vector<int>& ids) {
         if (std::find(ids.begin(),ids.end(),clip.id)!=ids.end()) { clips.push_back(clip); trackId=track->id; }
     std::sort(clips.begin(),clips.end(),[](const auto& a,const auto& b){return a.start<b.start;});
     auto merged=clips.front(); merged.length=clips.back().start+clips.back().length-merged.start; merged.fadeOut=clips.back().fadeOut;
+    // Re-base the other clips' origin-relative notes onto the first clip's origin.
+    const auto originBeats=[&](const AudioClip& c){ return m_project.tempo().beatAt(c.start)-offsetBeats(c); };
+    for (std::size_t i=1;i<clips.size();++i) {
+        const double shift=originBeats(clips[i])-originBeats(merged);
+        for (auto n:clips[i].notes) { n.startBeat+=shift; merged.notes.push_back(n); }
+    }
     std::vector<Project::ClipChange> changes{{trackId,merged}};
     for (std::size_t i=1;i<clips.size();++i)changes.push_back({trackId,clips[i],true});
     if (!m_project.editClipGroup(changes)) return false;
@@ -520,6 +563,7 @@ bool TrackList::copyClips(const std::vector<int>& ids)
         item.gainDb = c.clip.gainDb;
         item.effectsPrinted = c.clip.effectsPrinted;
         item.trackOffset = c.row - minRow;
+        item.notes = c.clip.notes;
         m_clipboard.push_back(std::move(item));
     }
     return !m_clipboard.empty();
@@ -564,6 +608,7 @@ std::vector<int> TrackList::pasteClips(int targetTrackId, double targetBeat)
         clip.fadeOut = item.fadeOut;
         clip.gainDb = item.gainDb;
         clip.effectsPrinted = item.effectsPrinted;
+        clip.notes = item.notes;
         toAdd.emplace_back(destTrackId, std::move(clip));
     }
     if (toAdd.empty()) return {};

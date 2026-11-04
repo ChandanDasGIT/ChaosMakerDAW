@@ -9,6 +9,14 @@ namespace persistence {
 
 using json = nlohmann::json;
 
+namespace {
+// Pattern clips keep sourceOffset in project samples; this converts it to beats.
+double offsetBeats(const TempoMap& tempo, std::int64_t sourceOffset)
+{
+    return double(sourceOffset) * tempo.bpm() / (60.0 * tempo.sampleRate());
+}
+}
+
 std::string ProjectDocument::serialize(const Project& project,
                                        const TrackList::MediaPaths& mediaPaths,
                                        const std::vector<std::string>& trackEffectsJson,
@@ -44,6 +52,17 @@ std::string ProjectDocument::serialize(const Project& project,
             clipObj["offset"] = std::to_string(clip.sourceOffset);
             clipObj["gainDb"] = clip.gainDb;
             clipObj["effectsPrinted"] = clip.effectsPrinted;
+            if (!clip.notes.empty()) {
+                // Stored clip-relative (0 = clip start) so notes stay on the clip even if the
+                // project is reopened at another sample rate.
+                const double offset = offsetBeats(project.tempo(), clip.sourceOffset);
+                json notesJson = json::array();
+                for (const auto& n : clip.notes) {
+                    notesJson.push_back({{"pitch", n.note}, {"start", n.startBeat - offset},
+                                         {"length", n.lengthBeats}, {"velocity", n.velocity}});
+                }
+                clipObj["notes"] = std::move(notesJson);
+            }
             clipsJson.push_back(clipObj);
         }
 
@@ -256,6 +275,37 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             if (!std::isfinite(clip.gainDb) || clip.gainDb < -120.0f || clip.gainDb > 24.0f) {
                 error = "Invalid clip gain.";
                 return false;
+            }
+
+            if (c.contains("notes")) { // optional; older projects have none
+                const auto& notesJson = c["notes"];
+                if (!notesJson.is_array()) {
+                    error = "Invalid clip notes.";
+                    return false;
+                }
+                const double offset = offsetBeats(candidate.tempo(), clip.sourceOffset);
+                int nextNoteId = 1;
+                for (const auto& nj : notesJson) {
+                    if (!nj.is_object() || !nj.contains("pitch") || !nj["pitch"].is_number_integer()
+                        || !nj.contains("start") || !nj["start"].is_number()
+                        || !nj.contains("length") || !nj["length"].is_number()
+                        || !nj.contains("velocity") || !nj["velocity"].is_number_integer()) {
+                        error = "Invalid clip notes.";
+                        return false;
+                    }
+                    MidiNote n;
+                    n.id = nextNoteId++;
+                    n.note = nj["pitch"].get<int>();
+                    n.startBeat = nj["start"].get<double>() + offset;
+                    n.lengthBeats = nj["length"].get<double>();
+                    n.velocity = nj["velocity"].get<int>();
+                    if (n.note < 0 || n.note > 127 || n.velocity < 0 || n.velocity > 127
+                        || !std::isfinite(n.startBeat) || !std::isfinite(n.lengthBeats) || n.lengthBeats <= 0) {
+                        error = "Invalid clip notes.";
+                        return false;
+                    }
+                    clip.notes.push_back(n);
+                }
             }
 
             const bool hasAudio = c.value("hasAudio", false);

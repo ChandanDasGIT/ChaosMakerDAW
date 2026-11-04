@@ -103,7 +103,8 @@ endforeach()
 if(DAW_BUILD_APP)
     add_executable(wrappertests
         tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp tests/wrapper/clipediting_qtcheck.cpp
-        tests/wrapper/audioengine_qtcheck.cpp
+        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp
+        wrapper/pianorollwrap/pianorollwrapper.cpp wrapper/pianorollwrap/pianorollwrapper.h
         wrapper/engineWrap/enginecontroller.cpp wrapper/engineWrap/enginecontroller.h
         wrapper/session/tracklistwrap/tracklistwrapper.cpp wrapper/session/tracklistwrap/tracklistwrapper.h
         wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.cpp wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h
@@ -126,6 +127,7 @@ if(DAW_BUILD_APP)
     add_test(NAME qttracknames COMMAND wrappertests qttracknames)
     add_test(NAME qttrackcolours COMMAND wrappertests qttrackcolours)
     add_test(NAME qtaudioengine COMMAND wrappertests qtaudioengine)
+    add_test(NAME qtpianoroll COMMAND wrappertests qtpianoroll)
 endif()
 
 # Exercise actual mouse/keyboard tempo editing when Qt Test is available.

@@ -164,3 +164,78 @@ TEST(projectdocument, legacy_v1_compatibility)
     CHECK(loaded.trackEffectsJson[0].find("-2.0") != std::string::npos);
     CHECK(loaded.trackEffectsJson[1].find("-2.0") != std::string::npos);
 }
+
+namespace {
+std::string sessionWithClip(const std::string& clipExtra)
+{
+    return R"({"format":"ChaosMakerProject","version":2,"project":{"version":1,"bpm":120.0,
+        "sampleRate":48000.0,"numerator":4,"denominator":4,"tracks":[{"name":"Keys","type":"Piano",
+        "instrument":true,"volume":1.0,"eq":[0,0,0,0,0,0,0,0,0,0],"clips":[{"path":"Clip 1",
+        "hasAudio":false,"start":"0","length":"96000","offset":"24000")" + clipExtra + R"(}]}]},
+        "trackEffects":[""]})";
+}
+}
+
+TEST(projectdocument, clip_notes_round_trip_and_stay_clip_relative)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    auto& t = project.addTrack(TrackKind::Instrument, "Keys", "Piano");
+    AudioClip clip;
+    clip.poolId = "Clip 1";
+    // 120 bpm @ 48 kHz: 1 beat = 24000 samples
+    clip.start = 48000;          // beat 2
+    clip.length = 96000;         // 4 beats
+    clip.sourceOffset = 12000;   // left-trimmed by 0.5 beat
+    MidiNote a; a.note = 60; a.startBeat = 1.0; a.lengthBeats = 0.25; a.velocity = 90; a.selected = true;
+    MidiNote hidden; hidden.note = 72; hidden.startBeat = 0.25; hidden.lengthBeats = 0.5; hidden.velocity = 30;
+    clip.notes = {a, hidden};
+    project.addAudioClip(t.id, std::move(clip));
+
+    const std::string jsonStr = ProjectDocument::serialize(project, {}, {""});
+    // Clip-relative in the file: 1.0 - 0.5 offset = 0.5; the trimmed-off note is kept at -0.25
+    CHECK(jsonStr.find("\"start\":0.5") != std::string::npos);
+    CHECK(jsonStr.find("\"start\":-0.25") != std::string::npos);
+    CHECK(jsonStr.find("selected") == std::string::npos);
+
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(jsonStr, loaded, error, 48000.0));
+    const auto& notes = loaded.project.tracks()[0]->audioClips[0].notes;
+    CHECK(notes.size() == 2);
+    CHECK(notes[0].note == 60 && notes[0].velocity == 90 && !notes[0].selected);
+    CHECK_NEAR(notes[0].startBeat, 1.0, 1e-9);
+    CHECK_NEAR(notes[0].lengthBeats, 0.25, 1e-9);
+    CHECK(notes[1].note == 72);
+    CHECK_NEAR(notes[1].startBeat, 0.25, 1e-9);
+    CHECK(notes[0].id != notes[1].id);
+
+    // Reopened at another rate: the offset isn't rescaled, but clip-relative times are kept
+    ProjectFileContent at96k;
+    CHECK(ProjectDocument::deserialize(jsonStr, at96k, error, 96000.0));
+    const auto& c96 = at96k.project.tracks()[0]->audioClips[0];
+    const double offset96 = double(c96.sourceOffset) * 120.0 / (60.0 * 96000.0);
+    CHECK_NEAR(c96.notes[0].startBeat - offset96, 0.5, 1e-9);
+}
+
+TEST(projectdocument, clip_notes_are_optional_and_validated)
+{
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(sessionWithClip(""), loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->audioClips[0].notes.empty());
+
+    CHECK(ProjectDocument::deserialize(sessionWithClip(
+        R"(,"notes":[{"pitch":64,"start":0.0,"length":1.0,"velocity":100}])"), loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->audioClips[0].notes.size() == 1);
+
+    for (const char* bad : {R"(,"notes":{})", R"(,"notes":[{"pitch":128,"start":0,"length":1,"velocity":1}])",
+                            R"(,"notes":[{"pitch":60,"start":0,"length":0,"velocity":1}])",
+                            R"(,"notes":[{"pitch":60,"start":0,"length":1,"velocity":200}])",
+                            R"(,"notes":[{"pitch":"C4","start":0,"length":1,"velocity":1}])",
+                            R"(,"notes":[{"pitch":60,"length":1,"velocity":1}])"}) {
+        error.clear();
+        CHECK(!ProjectDocument::deserialize(sessionWithClip(bad), loaded, error, 48000.0));
+        CHECK(error == "Invalid clip notes.");
+    }
+}

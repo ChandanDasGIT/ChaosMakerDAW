@@ -248,7 +248,17 @@ int Project::splitAudioClip(int trackId, int clipId, std::int64_t position, std:
     if (clip == track->audioClips.end() || position <= clip->start || position >= clip->start+clip->length) return -1;
     auto before = track->audioClips; AudioClip right=*clip;
     right.id=m_nextClipId++; right.start=position; right.length=clip->start+clip->length-position; right.sourceOffset=sourceOffset;
-    clip->length=position-clip->start; track->audioClips.push_back(right);
+    clip->length=position-clip->start;
+    if (!clip->notes.empty()) {
+        // Notes are origin-relative, so the split point in note space is the right half's
+        // offset. Notes starting before it stay left, the rest move right (no duplicates).
+        const double splitBeat=double(sourceOffset)*m_tempo.bpm()/(60.0*m_tempo.sampleRate());
+        right.notes.clear();
+        std::vector<MidiNote> left;
+        for (const auto& n:clip->notes) (n.startBeat<splitBeat ? left : right.notes).push_back(n);
+        clip->notes=std::move(left);
+    }
+    track->audioClips.push_back(right);
     rememberClipEdit(trackId,std::move(before)); return right.id;
 }
 
@@ -301,6 +311,20 @@ bool Project::setClipGain(int trackId, int clipId, float gainDb) {
     if (it->gainDb == clampedGain) return true;
     auto before = track->audioClips;
     it->gainDb = clampedGain;
+    rememberClipEdit(trackId, std::move(before));
+    return true;
+}
+
+bool Project::setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes) {
+    auto* track = findTrack(trackId);
+    if (!track) return false;
+    auto it = std::find_if(track->audioClips.begin(), track->audioClips.end(),
+                           [clipId](const auto& c) { return c.id == clipId; });
+    if (it == track->audioClips.end()) return false;
+    for (auto& n : notes) n.selected = false; // selection is editor state, not document state
+    if (it->notes == notes) return true;
+    auto before = track->audioClips;
+    it->notes = std::move(notes);
     rememberClipEdit(trackId, std::move(before));
     return true;
 }

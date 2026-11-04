@@ -421,6 +421,7 @@ Item {
                 required property bool effectsPrinted
                 required property color trackColour
                 required property bool isRecorded
+                required property var notes
                 objectName: "clipBlock" + clipId
                 readonly property var preview: editor.previews[String(clipId)] ?? ({})
                 x: (preview.startBeat ?? startBeat) * root.beatWidth + 4
@@ -463,6 +464,68 @@ Item {
                             ctx.lineTo(px, height * (0.5 - Math.max(-1, peaks[i][0]) * 0.48) + 1)
                         }
                         ctx.stroke()
+                    }
+                }
+                // Reaper-style outlines of the pattern's notes. Vertical scale fits the clip's own
+                // pitch range; only the visible part of the clip is painted (like the waveform).
+                Canvas {
+                    id: noteOutlines
+                    objectName: "clipNotes" + clipItem.clipId
+                    visible: !clipItem.isRecorded && clipItem.notes.length > 0
+                    x: Math.max(0, scroll.contentX - clipItem.x)
+                    y: 26
+                    width: visible ? Math.max(0, Math.min(clipItem.width - x, scroll.width)) : 0
+                    height: Math.max(0, clipItem.height - 30)
+                    // Left-edge trim previews keep notes fixed in time; moves carry them along.
+                    readonly property real trimShift: root.editOperation === "trimStart"
+                        ? (clipItem.preview.startBeat ?? clipItem.startBeat) - clipItem.startBeat : 0
+                    readonly property real visibleLength: clipItem.preview.lengthBeats ?? clipItem.lengthBeats
+                    readonly property color noteColour: Qt.lighter(clipItem.trackColour, 1.7)
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        ctx.clearRect(0, 0, width, height)
+                        const shown = []
+                        let lo = 127, hi = 0
+                        for (let i = 0; i < clipItem.notes.length; ++i) {
+                            const n = clipItem.notes[i]
+                            const start = n.startBeat - trimShift
+                            if (start + n.lengthBeats <= 0 || start >= visibleLength) continue // hidden
+                            shown.push({ start: start, length: n.lengthBeats, note: n.note })
+                            lo = Math.min(lo, n.note); hi = Math.max(hi, n.note)
+                        }
+                        if (shown.length === 0) return
+                        // At least an octave of rows so a single note doesn't fill the clip
+                        const rows = Math.max(12, hi - lo + 1)
+                        const base = lo - Math.floor((rows - (hi - lo + 1)) / 2)
+                        const rowH = height / rows
+                        const barH = Math.max(1.5, Math.min(6, rowH - 1))
+                        ctx.fillStyle = Qt.rgba(noteColour.r, noteColour.g, noteColour.b, 0.55)
+                        ctx.strokeStyle = noteColour
+                        ctx.lineWidth = 1
+                        for (const n of shown) {
+                            // Clip-local x (the block is drawn 4px right of its start beat)
+                            const x0 = Math.max(0, n.start * root.beatWidth - 4) - x
+                            const x1 = Math.min(clipItem.width, (n.start + n.length) * root.beatWidth - 4) - x
+                            if (x1 <= 0 || x0 >= width) continue
+                            const ny = (rows - 1 - (n.note - base)) * rowH + (rowH - barH) / 2
+                            const w = Math.max(2, x1 - x0)
+                            ctx.fillRect(x0, ny, w, barH)
+                            ctx.strokeRect(Math.round(x0) + 0.5, Math.round(ny) + 0.5, Math.max(1, Math.round(w) - 1), Math.max(1, Math.round(barH) - 1))
+                        }
+                    }
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+                    onXChanged: requestPaint()
+                    onTrimShiftChanged: requestPaint()
+                    onVisibleLengthChanged: requestPaint()
+                    onNoteColourChanged: requestPaint()
+                    Connections {
+                        target: clipItem
+                        function onNotesChanged() { noteOutlines.requestPaint() }
+                    }
+                    Connections {
+                        target: root
+                        function onBeatWidthChanged() { noteOutlines.requestPaint() }
                     }
                 }
                 MouseArea {

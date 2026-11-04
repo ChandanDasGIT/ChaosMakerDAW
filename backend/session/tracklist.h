@@ -24,6 +24,7 @@ public:
         bool effectsPrinted;
         double gainDb = 0.0;
         bool isRecorded = false;
+        std::vector<MidiNote> notes; // clip-relative beats (0 = clip start); may lie outside the clip
     };
     struct ClipboardClip {
         std::string poolId;
@@ -35,6 +36,7 @@ public:
         float gainDb = 0.0f;
         bool effectsPrinted = true;
         int trackOffset = 0;
+        std::vector<MidiNote> notes; // origin-relative, as stored in AudioClip
     };
     struct MonitorState {
         bool enabled = false;
@@ -113,6 +115,11 @@ public:
     bool moveClipAtBeat(int trackId, int clipId, double start);
     bool resizeClipAtBeat(int trackId, int clipId, double length);
     Change setClipGain(int trackId, int clipId, double gainDb);
+    // Pattern notes in clip-relative beats (0 = clip start). Only pattern (non-recorded) clips
+    // hold notes. Notes outside the clip bounds are kept (hidden), so trims can be undone.
+    std::vector<MidiNote> clipNotes(int trackId, int clipId) const;
+    Change setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes);
+    bool isPatternClip(const AudioClip& clip) const;
     bool removeAudioClip(int trackId, int clipId);
     bool copyClips(const std::vector<int>& ids);
     std::vector<int> cutClips(const std::vector<int>& ids);
@@ -131,6 +138,7 @@ public:
     bool attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool printed);
 
 private:
+    double offsetBeats(const AudioClip& clip) const;
     Project m_project;
     AudioMap m_audio;
     MediaPaths m_mediaPaths;
