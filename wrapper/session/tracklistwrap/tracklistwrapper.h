@@ -72,6 +72,10 @@ public:
     Q_INVOKABLE void selectClip(int trackId, int clipId);
     Q_INVOKABLE bool setClipGain(int trackId, int clipId, double gainDb);
     Q_INVOKABLE double clipGain(int trackId, int clipId) const;
+    // Pattern notes of a clip in clip-relative beats: [{id, note, startBeat, lengthBeats, velocity}]
+    Q_INVOKABLE QVariantList clipNotes(int trackId, int clipId) const;
+    // C++ adapter used by PianoRollWrapper; one undoable edit, emits clip-edit signals on change.
+    bool setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes);
     double contentEndBeats() const { return m_project.contentEndBeats(); }
     QVariantList clips() const;
     Q_INVOKABLE QVariantList clipWaveform(int trackId, int clipId, int bins, double from = 0, double to = 1) const;

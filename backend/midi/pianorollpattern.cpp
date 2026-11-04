@@ -115,3 +115,19 @@ MidiNote* PianoRollPattern::findNote(int noteId) noexcept {
     }
     return nullptr;
 }
+
+void PianoRollPattern::setNotes(std::vector<MidiNote> notes) {
+    m_notes = std::move(notes);
+    int maxId = 0;
+    for (const auto& n : m_notes) maxId = std::max(maxId, n.id);
+    std::vector<int> seen;
+    for (auto& n : m_notes) {
+        if (n.id <= 0 || std::find(seen.begin(), seen.end(), n.id) != seen.end()) n.id = ++maxId;
+        seen.push_back(n.id);
+        n.note = std::clamp(n.note, 0, 127);
+        n.velocity = std::clamp(n.velocity, 0, 127);
+        n.lengthBeats = std::max(0.01, n.lengthBeats);
+        n.selected = false;
+    }
+    m_nextId = maxId + 1;
+}

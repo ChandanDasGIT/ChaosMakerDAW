@@ -2,15 +2,7 @@
 
 #include <vector>
 #include <cstdint>
-
-struct MidiNote {
-    int id = 0;
-    int note = 60; // 0..127 MIDI note number
-    double startBeat = 0.0;
-    double lengthBeats = 1.0;
-    int velocity = 100; // 0..127
-    bool selected = false;
-};
+#include "midi/midinote.h"
 
 class PianoRollPattern {
 public:
@@ -29,6 +21,10 @@ public:
     bool deleteSelected();
 
     void clear();
+    // Replace all notes (e.g. when loading a clip). Start positions are kept as-is, even
+    // negative ones (notes hidden by a left-trimmed clip), so writing back never loses them.
+    // Pitch/velocity/length are clamped, selection is cleared, and ids are made unique.
+    void setNotes(std::vector<MidiNote> notes);
 
     const std::vector<MidiNote>& notes() const noexcept { return m_notes; }
     int selectedCount() const noexcept;

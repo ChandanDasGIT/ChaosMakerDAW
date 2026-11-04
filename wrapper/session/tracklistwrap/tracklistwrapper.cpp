@@ -21,13 +21,23 @@
 
 
 namespace {
+QVariantList noteList(const std::vector<MidiNote>& notes)
+{
+    QVariantList list;
+    list.reserve(qsizetype(notes.size()));
+    for (const auto& n : notes)
+        list.append(QVariantMap{{"id", n.id}, {"note", n.note}, {"startBeat", n.startBeat},
+                                {"lengthBeats", n.lengthBeats}, {"velocity", n.velocity}});
+    return list;
+}
+
 QVariantMap clipMap(const TrackList::ClipInfo& clip)
 {
     return {{"clipId", clip.clipId}, {"trackId", clip.trackId}, {"laneIndex", clip.laneIndex},
         {"startBeat", clip.startBeat}, {"lengthBeats", clip.lengthBeats},
         {"label", QString::fromStdString(clip.label)}, {"trackColour", QString::fromStdString(clip.colour)},
         {"effectsPrinted", clip.effectsPrinted}, {"gainDb", clip.gainDb},
-        {"isRecorded", clip.isRecorded}};
+        {"isRecorded", clip.isRecorded}, {"notes", noteList(clip.notes)}};
 }
 QVariantList choices(const std::vector<TrackList::TrackChoice>& entries)
 {
@@ -239,6 +249,18 @@ bool TrackListWrapper::setClipGain(int trackId, int clipId, double gainDb)
     if (change.changed) {
         notifyClipEdit(trackId);
     }
+    return change.accepted;
+}
+
+QVariantList TrackListWrapper::clipNotes(int trackId, int clipId) const
+{
+    return noteList(m_state.clipNotes(trackId, clipId));
+}
+
+bool TrackListWrapper::setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes)
+{
+    const auto change = m_state.setClipNotes(trackId, clipId, std::move(notes));
+    if (change.changed) notifyClipEdit(trackId);
     return change.accepted;
 }
 

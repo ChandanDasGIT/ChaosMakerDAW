@@ -9,6 +9,7 @@ Item {
     implicitWidth: 1040
     implicitHeight: 640
 
+    property var trackModel: null // TrackListWrapper; when set, notes are read from / written to the clip
     property int trackId: -1
     property int clipId: -1
     property string clipLabel: "Clip"
@@ -33,6 +34,9 @@ Item {
 
     PianoRollWrapper {
         id: pianoRollBackend
+        trackList: root.trackModel
+        trackId: root.trackId
+        clipId: root.clipId
     }
 
     readonly property alias notes: pianoRollBackend.notes

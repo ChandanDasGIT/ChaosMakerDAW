@@ -217,6 +217,7 @@ Window {
             PianoRollView {
                 id: dockedPianoRoll
                 anchors.fill: parent
+                trackModel: trackModel
                 visible: window.bottomPanelMode === "pianoroll"
                 trackId: window.activePianoRollTrackId
                 clipId: window.activePianoRollClipId
@@ -246,6 +247,7 @@ Window {
         PianoRollView {
             id: floatingPianoRollView
             width: floatingPianoRollWindow.width
+            trackModel: trackModel
             height: floatingPianoRollWindow.height
             trackId: window.activePianoRollTrackId
             clipId: window.activePianoRollClipId

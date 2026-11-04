@@ -1,11 +1,17 @@
 #pragma once
 
 #include <QObject>
+#include <QPointer>
 #include <QVariantList>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 #include "midi/pianorollpattern.h"
+#include "wrapper/session/tracklistwrap/tracklistwrapper.h" // full type needed by Q_PROPERTY
 
+// Adapts PianoRollPattern (editing state + selection) to QML. When bound to a clip through
+// trackList/trackId/clipId, the clip's notes are loaded from the document, every committed
+// edit is written back as one undoable change, and document changes (undo/redo, the other
+// piano roll view, clip removal) reload the notes. Unbound, it edits a local pattern only.
 class PianoRollWrapper : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -13,6 +19,10 @@ class PianoRollWrapper : public QObject {
     Q_PROPERTY(QVariantList notes READ notes NOTIFY notesChanged)
     Q_PROPERTY(int selectedCount READ selectedCount NOTIFY notesChanged)
     Q_PROPERTY(int count READ count NOTIFY notesChanged)
+    Q_PROPERTY(TrackListWrapper* trackList READ trackList WRITE setTrackList NOTIFY bindingChanged)
+    Q_PROPERTY(int trackId READ trackId WRITE setTrackId NOTIFY bindingChanged)
+    Q_PROPERTY(int clipId READ clipId WRITE setClipId NOTIFY bindingChanged)
+    Q_PROPERTY(bool bound READ bound NOTIFY bindingChanged)
 
 public:
     explicit PianoRollWrapper(QObject* parent = nullptr);
@@ -24,6 +34,14 @@ public:
     int selectedCount() const noexcept { return m_pattern.selectedCount(); }
     int count() const noexcept { return static_cast<int>(m_pattern.notes().size()); }
 
+    TrackListWrapper* trackList() const { return m_trackList; }
+    void setTrackList(TrackListWrapper* trackList);
+    int trackId() const noexcept { return m_trackId; }
+    void setTrackId(int id);
+    int clipId() const noexcept { return m_clipId; }
+    void setClipId(int id);
+    bool bound() const;
+
     Q_INVOKABLE int addNote(int note, double startBeat, double lengthBeats, int velocity = 100);
     Q_INVOKABLE bool removeNote(int noteId);
     Q_INVOKABLE bool removeNotesAt(int note, double beat);
@@ -34,10 +52,19 @@ public:
     Q_INVOKABLE void clearSelection();
     Q_INVOKABLE bool deleteSelected();
     Q_INVOKABLE void clear();
+    Q_INVOKABLE void reload();
 
 signals:
     void notesChanged();
+    void bindingChanged();
 
 private:
+    bool commit();       // write the pattern to the bound clip; reverts on rejection
+    void bindingEdited();
+
     PianoRollPattern m_pattern;
+    QPointer<TrackListWrapper> m_trackList;
+    QMetaObject::Connection m_clipsConnection;
+    int m_trackId = -1;
+    int m_clipId = -1;
 };
