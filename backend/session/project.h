@@ -58,6 +58,7 @@ public:
     bool setTrackVolume(int id, float volume);
     bool setTrackEqBand(int id, int band, float gainDb);
     int addAudioClip(int trackId, AudioClip clip);
+    std::vector<int> addAudioClips(const std::vector<std::pair<int, AudioClip>>& clips);
     bool removeAudioClip(int trackId, int clipId);
     bool resizeAudioClip(int trackId, int clipId, std::int64_t lengthSamples);
     bool setClipBounds(int trackId, int clipId, std::int64_t start, std::int64_t length, std::int64_t offset);
@@ -65,6 +66,7 @@ public:
     bool canMergeAudioClips(int trackId, int first, int second, double sourceRate) const;
     bool mergeAudioClips(int trackId, int first, int second, double sourceRate);
     bool moveAudioClip(int trackId, int clipId, std::int64_t start);
+    bool setClipGain(int trackId, int clipId, float gainDb);
     struct ClipChange { int trackId; AudioClip clip; bool remove = false; int destinationTrackId = -1; };
     bool editClipGroup(const std::vector<ClipChange>& changes);
     bool canUndo() const { return m_historyPosition > 0; }
@@ -78,6 +80,11 @@ public:
     TempoMap& tempo() { return m_tempo; }
     const TempoMap& tempo() const { return m_tempo; }
 
+    float masterVolume() const noexcept { return m_masterVolume; }
+    bool setMasterVolume(float volume) noexcept;
+    bool masterMuted() const noexcept { return m_masterMuted; }
+    bool setMasterMuted(bool muted) noexcept;
+
 private:
     struct TrackClipEdit { int trackId; std::vector<AudioClip> before, after; };
     struct ClipEdit { std::vector<TrackClipEdit> tracks; };
@@ -86,6 +93,8 @@ private:
     std::size_t m_historyPosition = 0;
     std::vector<std::unique_ptr<Track>> m_tracks;
     TempoMap m_tempo;
+    float m_masterVolume = 1.0f;
+    bool m_masterMuted = false;
     int m_nextId = 1;
     int m_nextClipId = 1;
 };

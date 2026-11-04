@@ -22,6 +22,18 @@ public:
         double startBeat, lengthBeats;
         std::string label, colour;
         bool effectsPrinted;
+        double gainDb = 0.0;
+    };
+    struct ClipboardClip {
+        std::string poolId;
+        double beatOffset = 0.0;
+        double lengthBeats = 0.0;
+        std::int64_t sourceOffset = 0;
+        std::int64_t fadeIn = 0;
+        std::int64_t fadeOut = 0;
+        float gainDb = 0.0f;
+        bool effectsPrinted = true;
+        int trackOffset = 0;
     };
     struct MonitorState {
         bool enabled = false;
@@ -54,6 +66,11 @@ public:
     int count() const { return static_cast<int>(m_project.tracks().size()); }
     int indexOfTrack(int id) const;
     int trackIdAt(int row) const;
+    int selectedTrackId() const { return m_selectedTrackId; }
+    bool selectTrack(int id);
+    int selectedClipId() const { return m_selectedClipId; }
+    bool selectClip(int trackId, int clipId);
+    void clearSelectedClip() { m_selectedClipId = -1; }
     bool canRemoveTrack(int id) const;
     bool removeTrack(int id);
     bool canMoveTrack(int id, int row) const;
@@ -68,6 +85,10 @@ public:
     Change setTrackInputPort(int id, const std::string& port);
     Change setVolume(int id, double volume);
     Change setEqBand(int id, int band, double gainDb);
+    double masterVolume() const noexcept { return m_project.masterVolume(); }
+    Change setMasterVolume(double volume);
+    bool masterMuted() const noexcept { return m_project.masterMuted(); }
+    Change setMasterMuted(bool muted);
     MonitorState cleanMonitor() const;
     bool isMonitored(int id) const;
     void lockRecordingTracks(std::unordered_set<int> ids) { m_recordingTracks = std::move(ids); }
@@ -90,7 +111,16 @@ public:
     bool mergeClips(int trackId, int first, int second);
     bool moveClipAtBeat(int trackId, int clipId, double start);
     bool resizeClipAtBeat(int trackId, int clipId, double length);
+    Change setClipGain(int trackId, int clipId, double gainDb);
     bool removeAudioClip(int trackId, int clipId);
+    bool copyClips(const std::vector<int>& ids);
+    std::vector<int> cutClips(const std::vector<int>& ids);
+    std::vector<int> pasteClips(int targetTrackId, double targetBeat);
+    std::vector<int> duplicateClips(const std::vector<int>& ids, double beatOffset = 0.0);
+    bool hasClipboard() const { return !m_clipboard.empty(); }
+    int clipboardClipCount() const { return static_cast<int>(m_clipboard.size()); }
+    const std::vector<ClipboardClip>& clipboard() const { return m_clipboard; }
+    void clearClipboard() { m_clipboard.clear(); }
     bool canUndo() const { return !editsLocked() && m_project.canUndo(); }
     bool canRedo() const { return !editsLocked() && m_project.canRedo(); }
     bool undo();
@@ -104,6 +134,9 @@ private:
     AudioMap m_audio;
     MediaPaths m_mediaPaths;
     std::unordered_set<int> m_recordingTracks;
+    std::vector<ClipboardClip> m_clipboard;
+    int m_selectedTrackId = -1;
+    int m_selectedClipId = -1;
     int m_nextAudioNumber = 1, m_nextVocalNumber = 1, m_nextInstrumentNumber = 1, m_nextClipNumber = 1;
     std::unordered_map<std::string, int> m_instrumentNumbers;
 };
