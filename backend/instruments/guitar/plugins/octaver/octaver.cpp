@@ -6,12 +6,14 @@ Octaver::Octaver() : controls{{
     &addParameter("level","Level",-24,6,0,"dB")
 }} {}
 void Octaver::prepare(double rate,int) {
-    for(auto& voice:down)voice.prepare();for(auto& voice:up)voice.prepare();
+    for(auto& voice:down)voice.prepare();
+    for(auto& voice:up)voice.prepare();
     for(auto& smoother:smoothers)smoother.prepare(rate,20);
     reset();
 }
 void Octaver::reset() noexcept {
-    for(auto& voice:down)voice.reset();for(auto& voice:up)voice.reset();
+    for(auto& voice:down)voice.reset();
+    for(auto& voice:up)voice.reset();
     for(int i=0;i<4;++i)smoothers[i].reset(controls[i]->get());
 }
 void Octaver::process(ProcessContext& ctx) noexcept {
