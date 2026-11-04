@@ -195,7 +195,6 @@ Item {
         const targetY = Math.round(noteC4Y - (viewH - root.keyHeight) / 2)
         const clampedY = Math.max(0, Math.min(root.contentGridHeight - viewH, targetY))
         gridVerticalFlickable.contentY = clampedY
-        keysFlickable.contentY = clampedY
     }
 
     onVisibleChanged: {
@@ -487,6 +486,21 @@ Item {
                     interactive: false
                     clip: true
 
+                    Binding {
+                        target: keysFlickable
+                        property: "contentY"
+                        value: gridVerticalFlickable.contentY
+                    }
+
+                    WheelHandler {
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                        target: null
+                        onWheel: event => {
+                            const deltaY = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y
+                            gridVerticalFlickable.scrollVertical(deltaY)
+                        }
+                    }
+
                     PianoKeys {
                         id: pianoKeys
                         width: 90
@@ -497,6 +511,13 @@ Item {
                         }
                         onKeyClicked: note => {
                             root.currentNoteText = pianoKeys.noteLabel(note) + " " + note
+                        }
+                        onKeyPressed: (note, velocity) => {
+                            root.currentNoteText = pianoKeys.noteLabel(note) + " " + note
+                            EngineController.sendLiveNoteOn(root.trackId, note, velocity)
+                        }
+                        onKeyReleased: note => {
+                            EngineController.sendLiveNoteOff(root.trackId, note)
                         }
                         onWheelScrolled: delta => {
                             gridVerticalFlickable.scrollVertical(delta)

@@ -374,3 +374,83 @@ TEST(audioengine_midi, mute_and_solo_silence_instrument_tracks)
         }
     }
 }
+
+TEST(audioengine_midi, live_note_audition_when_stopped)
+{
+    for (bool multi : {false, true}) {
+        AudioEngine engine{nullptr};
+        engine.deviceChanged(48000.0, 128);
+
+        auto synth = std::make_shared<TestSynth>();
+        synth->prepare(48000.0, 128);
+
+        auto snapshot = std::make_unique<EngineSnapshot>();
+        snapshot->multiMonitor = multi;
+        snapshot->tempo.set(120.0, 4, 4, 48000.0);
+
+        TrackRender track;
+        track.trackId = 42;
+        track.chain.push_back(synth.get());
+        snapshot->tracks.push_back(track);
+        snapshot->keepProcessors.push_back(synth);
+
+        engine.publishPlayback(std::move(snapshot));
+
+        float left[128]{}, right[128]{};
+        float* out[]{left, right};
+        AudioIO io{{nullptr, 0, 0}, {out, 2, 128}, nullptr, 128};
+
+        // Initially stopped: buffer should be silence
+        engine.renderBlock(io);
+        for (int i = 0; i < 128; ++i) {
+            CHECK(left[i] == 0.0f);
+            CHECK(right[i] == 0.0f);
+        }
+
+        // Post NoteFromUi Note-On: trackId=42, status=0x90, key=60, vel=100
+        EngineCommand cmdOn;
+        cmdOn.type = EngineCommand::Type::NoteFromUi;
+        cmdOn.a = 42;
+        cmdOn.b = (0x90 << 16) | (60 << 8) | 100;
+        CHECK(engine.post(cmdOn));
+
+        // Render block while stopped
+        std::fill_n(left, 128, 0.0f);
+        std::fill_n(right, 128, 0.0f);
+        engine.renderBlock(io);
+
+        // Audio should now be non-zero
+        float maxAmp = 0.0f;
+        for (int i = 0; i < 128; ++i) {
+            maxAmp = std::max(maxAmp, std::abs(left[i]));
+        }
+        CHECK(maxAmp > 0.01f);
+
+        // Sustaining block (no new events posted, key still held)
+        std::fill_n(left, 128, 0.0f);
+        std::fill_n(right, 128, 0.0f);
+        engine.renderBlock(io);
+        maxAmp = 0.0f;
+        for (int i = 0; i < 128; ++i) {
+            maxAmp = std::max(maxAmp, std::abs(left[i]));
+        }
+        CHECK(maxAmp > 0.01f);
+
+        // Post NoteFromUi Note-Off
+        EngineCommand cmdOff;
+        cmdOff.type = EngineCommand::Type::NoteFromUi;
+        cmdOff.a = 42;
+        cmdOff.b = (0x80 << 16) | (60 << 8) | 0;
+        CHECK(engine.post(cmdOff));
+
+        // Render block with Note-Off: release decay starts, still audible
+        std::fill_n(left, 128, 0.0f);
+        std::fill_n(right, 128, 0.0f);
+        engine.renderBlock(io);
+        maxAmp = 0.0f;
+        for (int i = 0; i < 128; ++i) {
+            maxAmp = std::max(maxAmp, std::abs(left[i]));
+        }
+        CHECK(maxAmp > 0.0f);
+    }
+}

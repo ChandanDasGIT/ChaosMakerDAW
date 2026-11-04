@@ -10,6 +10,8 @@ Item {
     property int activeNote: 60 // C4 (Middle C) active by default
 
     signal keyClicked(int note)
+    signal keyPressed(int note, int velocity)
+    signal keyReleased(int note)
     signal keyHovered(int note, string noteName)
     signal wheelScrolled(real deltaY)
 
@@ -70,16 +72,16 @@ Item {
                     border.color: "#8a909d"
                     border.width: 1
 
-                    // Octave note name on C keys (C1, C2, C3, C4, C5)
+                    // Note name on white keys (C4, D4, E4, F4, G4, A4, B4)
                     Text {
-                        visible: keyRow.pitchClass === 0
+                        visible: !keyRow.black
                         anchors.right: parent.right
-                        anchors.rightMargin: 8
+                        anchors.rightMargin: 6
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "C" + keyRow.octave
-                        color: "#181a1f"
-                        font.pixelSize: 11
-                        font.bold: true
+                        text: root.noteLabel(keyRow.note)
+                        color: keyRow.pitchClass === 0 ? "#111317" : "#555b68"
+                        font.pixelSize: keyRow.pitchClass === 0 ? 11 : 10
+                        font.bold: keyRow.pitchClass === 0
                     }
                 }
 
@@ -98,6 +100,17 @@ Item {
                     }
                     border.color: "#050608"
                     border.width: 1
+
+                    // Note name on black keys (C#4, D#4, F#4, G#4, A#4)
+                    Text {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 4
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.noteLabel(keyRow.note)
+                        color: "#a6acb8"
+                        font.pixelSize: 9
+                        font.bold: false
+                    }
 
                     // Subtle 3D shine line on top
                     Rectangle {
@@ -119,6 +132,16 @@ Item {
                     onEntered: {
                         root.activeNote = keyRow.note
                         root.keyHovered(keyRow.note, root.noteLabel(keyRow.note))
+                    }
+                    onPressed: {
+                        root.activeNote = keyRow.note
+                        root.keyPressed(keyRow.note, 100)
+                    }
+                    onReleased: {
+                        root.keyReleased(keyRow.note)
+                    }
+                    onCanceled: {
+                        root.keyReleased(keyRow.note)
                     }
                     onClicked: {
                         root.activeNote = keyRow.note

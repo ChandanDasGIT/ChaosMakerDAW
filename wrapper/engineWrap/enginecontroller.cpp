@@ -1080,3 +1080,22 @@ void EngineController::shutdownSession() {
     }
     saveSession();
 }
+
+void EngineController::sendLiveNoteOn(int trackId, int note, int velocity) {
+    if (!m_engine || note < 0 || note > 127) return;
+    const int vel = std::clamp(velocity, 0, 127);
+    EngineCommand cmd;
+    cmd.type = EngineCommand::Type::NoteFromUi;
+    cmd.a = trackId;
+    cmd.b = (std::int64_t(0x90) << 16) | (std::int64_t(note & 0x7F) << 8) | vel;
+    m_engine->post(cmd);
+}
+
+void EngineController::sendLiveNoteOff(int trackId, int note) {
+    if (!m_engine || note < 0 || note > 127) return;
+    EngineCommand cmd;
+    cmd.type = EngineCommand::Type::NoteFromUi;
+    cmd.a = trackId;
+    cmd.b = (std::int64_t(0x80) << 16) | (std::int64_t(note & 0x7F) << 8) | 0;
+    m_engine->post(cmd);
+}

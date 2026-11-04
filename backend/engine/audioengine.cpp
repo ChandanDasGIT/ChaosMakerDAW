@@ -161,6 +161,7 @@ void AudioEngine::renderBlock(const AudioIO& io) noexcept
 void AudioEngine::process(const AudioIO& io) noexcept
 {
     DenormalGuard denormalGuard;
+    m_liveMidiCount = 0;
     EngineCommand command;
     while (m_commands.pop(command)) {
         if (command.type == EngineCommand::Type::SetCleanMonitor)
@@ -168,13 +169,37 @@ void AudioEngine::process(const AudioIO& io) noexcept
         else if (command.type == EngineCommand::Type::SetCleanMonitorGain)
             m_cleanMonitorGain = command.value;
         else switch (command.type) {
+        case EngineCommand::Type::NoteFromUi: {
+            const int trackId = static_cast<int>(command.a);
+            const uint8_t status = static_cast<uint8_t>((command.b >> 16) & 0xFF);
+            const uint8_t key = static_cast<uint8_t>((command.b >> 8) & 0xFF);
+            const uint8_t vel = static_cast<uint8_t>(command.b & 0xFF);
+            if (m_liveMidiCount < static_cast<int>(m_liveMidiBatch.size())) {
+                m_liveMidiBatch[m_liveMidiCount++] = LiveMidiMessage{trackId, MidiEvent{0, status, key, vel}};
+            }
+            if (auto* aud = findOrCreateAudition(trackId)) {
+                if ((status & 0xF0) == 0x90 && vel > 0) {
+                    aud->activeNotes++;
+                } else if ((status & 0xF0) == 0x80 || ((status & 0xF0) == 0x90 && vel == 0)) {
+                    if (aud->activeNotes > 0) aud->activeNotes--;
+                    aud->tailSamples = static_cast<int>(m_sampleRate * 2.0);
+                }
+            }
+            break;
+        }
         case EngineCommand::Type::SetMetronome:
             m_metronomeEnabled=command.a!=0;
             if (std::isfinite(command.value)) m_metronomeVolume=std::clamp(command.value,0.0f,1.0f);
             break;
         case EngineCommand::Type::Play: finishRecording(); m_resetPlayback = true; m_playing = true; break;
         case EngineCommand::Type::Pause: finishRecording(); m_resetPlayback = true; m_playing = false; break;
-        case EngineCommand::Type::Stop: finishRecording(); m_resetPlayback = true; m_playing = false; m_position = 0; break;
+        case EngineCommand::Type::Stop:
+            finishRecording();
+            m_resetPlayback = true;
+            m_playing = false;
+            m_position = 0;
+            for (auto& a : m_liveAuditions) { a.activeNotes = 0; a.tailSamples = 0; }
+            break;
         case EngineCommand::Type::Seek:
             if (!m_recorder && !m_recordingGroup) { m_position = std::clamp<std::int64_t>(command.a, 0, INT64_MAX / 2); m_resetPlayback = true; }
             break;
@@ -364,13 +389,58 @@ void AudioEngine::mixMetronome(const AudioIO& io, int offset, int frames, const 
     }
 }
 
-void AudioEngine::populateTrackMidi(const TrackRender& track, std::int64_t position, int count, bool loopWrapped) noexcept
+AudioEngine::LiveTrackAudition* AudioEngine::findOrCreateAudition(int trackId) noexcept
+{
+    for (auto& a : m_liveAuditions) {
+        if (a.trackId == trackId) return &a;
+    }
+    for (auto& a : m_liveAuditions) {
+        if (a.activeNotes == 0 && a.tailSamples <= 0) {
+            a.trackId = trackId;
+            a.activeNotes = 0;
+            a.tailSamples = 0;
+            return &a;
+        }
+    }
+    return nullptr;
+}
+
+AudioEngine::LiveTrackAudition* AudioEngine::findAudition(int trackId) noexcept
+{
+    for (auto& a : m_liveAuditions) {
+        if (a.trackId == trackId) return &a;
+    }
+    for (auto& a : m_liveAuditions) {
+        if (a.trackId < 0 && (a.activeNotes > 0 || a.tailSamples > 0)) return &a;
+    }
+    return nullptr;
+}
+
+bool AudioEngine::isAuditionActive(int trackId) const noexcept
+{
+    for (const auto& a : m_liveAuditions) {
+        if ((a.trackId < 0 || a.trackId == trackId) && (a.activeNotes > 0 || a.tailSamples > 0)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioEngine::anyAuditionActive() const noexcept
+{
+    for (const auto& a : m_liveAuditions) {
+        if (a.activeNotes > 0 || a.tailSamples > 0) return true;
+    }
+    return false;
+}
+
+void AudioEngine::populateTrackMidi(const TrackRender& track, std::int64_t position, int count, bool loopWrapped, bool includeLiveMidi) noexcept
 {
     m_trackMidi.clear();
     if (loopWrapped) {
         m_trackMidi.add(MidiEvent{0, 0xB0, 123, 0});
     }
-    if (!track.notes.empty() || !track.noteOffs.empty()) {
+    if (m_playing && (!track.notes.empty() || !track.noteOffs.empty())) {
         const auto blockEnd = position + count;
         auto itOn = std::lower_bound(track.notes.begin(), track.notes.end(), position,
             [](const NoteRender& n, std::int64_t pos) { return n.on < pos; });
@@ -381,6 +451,13 @@ void AudioEngine::populateTrackMidi(const TrackRender& track, std::int64_t posit
             [](const NoteRender& n, std::int64_t pos) { return n.off < pos; });
         for (; itOff != track.noteOffs.end() && itOff->off < blockEnd; ++itOff) {
             m_trackMidi.add(MidiEvent{int(itOff->off - position), 0x80, itOff->key, 0});
+        }
+    }
+    if (includeLiveMidi) {
+        for (int i = 0; i < m_liveMidiCount; ++i) {
+            if (m_liveMidiBatch[i].trackId < 0 || m_liveMidiBatch[i].trackId == track.trackId) {
+                m_trackMidi.add(m_liveMidiBatch[i].event);
+            }
         }
     }
     m_trackMidi.sort();
@@ -395,18 +472,19 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
     }
     m_resetPlayback = false;
     const bool bounded=snapshot && snapshot->playbackEnd>=0 && !m_looping && !m_recorder;
-    for (int offset = 0; offset < frames && m_playing;) {
-        if (bounded && m_position>=snapshot->playbackEnd) {
+    const bool anyAudition = anyAuditionActive();
+    for (int offset = 0; offset < frames && (m_playing || anyAudition);) {
+        if (bounded && m_playing && m_position>=snapshot->playbackEnd) {
             m_position=snapshot->playbackEnd; m_playing=false; m_resetPlayback=true; break;
         }
         bool blockLoopWrapped = false;
-        if (m_looping && !m_recorder && m_position >= m_loopEnd) {
+        if (m_playing && m_looping && !m_recorder && m_position >= m_loopEnd) {
             m_position = m_loopStart;
             blockLoopWrapped = true;
         }
         int count = std::min(m_fxBlockFrames, frames-offset);
-        if (bounded) count=int(std::min<std::int64_t>(count,snapshot->playbackEnd-m_position));
-        if (m_looping && !m_recorder) count = int(std::min<std::int64_t>(count,m_loopEnd-m_position));
+        if (bounded && m_playing) count=int(std::min<std::int64_t>(count,snapshot->playbackEnd-m_position));
+        if (m_playing && m_looping && !m_recorder) count = int(std::min<std::int64_t>(count,m_loopEnd-m_position));
         for (int c=0;c<2;++c) {
             if (io.output.channelCount>0) std::copy_n(io.output.channel(std::min(c,io.output.channelCount-1))+offset,count,m_liveAudio[c].data());
             else std::fill_n(m_liveAudio[c].data(),count,0);
@@ -417,7 +495,7 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
             float* channels[]{m_playbackAudio[0].data(),m_playbackAudio[1].data()};
             std::fill_n(channels[0],count,0); std::fill_n(channels[1],count,0);
             for (auto& channel : m_printedAudio) std::fill_n(channel.data(),count,0);
-            for (const auto& clip : track.clips) {
+            if (m_playing) for (const auto& clip : track.clips) {
                 if (!clip.audio || clip.audio->channels.empty()) continue;
                 const bool dry = !clip.effectsPrinted && !track.chain.empty();
                 for (int i=0;i<count;++i) {
@@ -447,8 +525,9 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
                 }
                 track.meters->input[c].capturePeak(peak);
             }
-            populateTrackMidi(track, m_position, count, blockLoopWrapped);
-            if (!track.chain.empty()) {
+            populateTrackMidi(track, m_position, count, blockLoopWrapped, offset == 0);
+            const bool liveTrackActive = isAuditionActive(track.trackId);
+            if ((m_playing || liveTrackActive) && !track.chain.empty()) {
                 ProcessContext context;
                 context.audio = {channels, 2, count};
                 context.midi = &m_trackMidi;
@@ -459,7 +538,7 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
                 context.beatsPerBar = snapshot ? snapshot->tempo.beatsPerBar() : 4.0;
                 context.timeSigNumerator = snapshot ? snapshot->tempo.numerator() : 4;
                 context.timeSigDenominator = snapshot ? snapshot->tempo.denominator() : 4;
-                context.playing = true;
+                context.playing = m_playing;
                 for (auto* processor : track.chain) if (processor) processor->process(context);
             }
             for(int c=0;c<2;++c) {
@@ -477,9 +556,17 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
             for(int c=2;c<io.output.channelCount;++c) for(int i=0;i<count;++i)
                 if(audible)io.output.channel(c)[offset+i]+=(channels[0][i]+m_printedAudio[0][i])*track.gain;
         }
+        if (!m_playing) {
+            for (auto& aud : m_liveAuditions) {
+                if (aud.activeNotes == 0 && aud.tailSamples > 0) {
+                    aud.tailSamples = std::max(0, aud.tailSamples - count);
+                }
+            }
+        }
         mixMetronome(io,offset,count,snapshot ? snapshot->tempo : TempoMap{});
-        m_position=std::min<std::int64_t>(INT64_MAX/2,m_position+count); offset+=count;
-        if (bounded && m_position==snapshot->playbackEnd) { m_playing=false; m_resetPlayback=true; }
+        if (m_playing) m_position=std::min<std::int64_t>(INT64_MAX/2,m_position+count);
+        offset+=count;
+        if (bounded && m_playing && m_position==snapshot->playbackEnd) { m_playing=false; m_resetPlayback=true; }
     }
     for(int c=0;c<io.output.channelCount;++c)for(int i=0;i<frames;++i) {
         float& sample=io.output.channel(c)[i]; sample=std::isfinite(sample)?std::clamp(sample,-1.0f,1.0f):0.0f;
@@ -586,8 +673,9 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
                 }
                 track.meters->input[c].capturePeak(peak);
             }
-            populateTrackMidi(track, m_position, count, blockLoopWrapped);
-            if(m_playing && !track.chain.empty()) {
+            populateTrackMidi(track, m_position, count, blockLoopWrapped, offset == 0);
+            const bool liveTrackActive = isAuditionActive(track.trackId);
+            if((m_playing || liveTrackActive) && !track.chain.empty()) {
                 ProcessContext context;
                 context.audio = {dry, 2, count};
                 context.midi = &m_trackMidi;
@@ -598,7 +686,7 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
                 context.beatsPerBar = snapshot.tempo.beatsPerBar();
                 context.timeSigNumerator = snapshot.tempo.numerator();
                 context.timeSigDenominator = snapshot.tempo.denominator();
-                context.playing = true;
+                context.playing = m_playing;
                 for(auto* processor:track.chain)if(processor)processor->process(context);
             }
             for(int c=0;c<2;++c) {
@@ -613,6 +701,13 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
             }
             for(int c=0;c<io.output.channelCount;++c)for(int i=0;i<count;++i)
                 io.output.channel(c)[offset+i]+=liveAudio[c==1?1:0][i];
+        }
+        if (!m_playing) {
+            for (auto& aud : m_liveAuditions) {
+                if (aud.activeNotes == 0 && aud.tailSamples > 0) {
+                    aud.tailSamples = std::max(0, aud.tailSamples - count);
+                }
+            }
         }
         mixMetronome(io,offset,count,snapshot.tempo);
         if(m_playing)m_position=std::min<std::int64_t>(INT64_MAX/2,m_position+count);
