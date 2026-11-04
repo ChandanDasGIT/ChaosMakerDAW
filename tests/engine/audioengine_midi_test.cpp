@@ -1,0 +1,376 @@
+#include "testkit.h"
+#include "engine/audioengine.h"
+#include "processor/processor.h"
+#include "plugins/testsynth/testsynth.h"
+
+#include <vector>
+
+namespace {
+
+class MidiRecordingProcessor : public Processor {
+public:
+    std::string typeId() const override { return "midi_recorder"; }
+    void prepare(double, int) override {}
+    void reset() noexcept override {
+        wasReset = true;
+    }
+    void process(ProcessContext& context) noexcept override {
+        processCalls++;
+        lastBeat = context.beat;
+        if (context.midi) {
+            for (const auto& ev : context.midi->events()) {
+                events.push_back({context.samplePosition, ev});
+            }
+        }
+    }
+
+    struct Recorded {
+        std::int64_t blockPosition = 0;
+        MidiEvent event;
+    };
+
+    bool wasReset = false;
+    int processCalls = 0;
+    double lastBeat = 0.0;
+    std::vector<Recorded> events;
+};
+
+void renderEngine(AudioEngine& engine, int frames)
+{
+    float left[1024]{}, right[1024]{};
+    float* out[]{left, right};
+    AudioIO io{{nullptr, 0, 0}, {out, 2, frames}, nullptr, frames};
+    engine.renderBlock(io);
+}
+
+} // namespace
+
+TEST(audioengine_midi, note_events_exact_offsets_and_multiblock_spanning)
+{
+    for (bool multi : {false, true}) {
+        AudioEngine engine{nullptr};
+        engine.deviceChanged(48000.0, 128);
+
+        auto rec = std::make_shared<MidiRecordingProcessor>();
+
+        auto snapshot = std::make_unique<EngineSnapshot>();
+        snapshot->multiMonitor = multi;
+        snapshot->playbackEnd = 1000;
+        snapshot->tempo.set(120.0, 4, 4, 48000.0);
+
+        TrackRender track;
+        track.trackId = 1;
+        track.chain.push_back(rec.get());
+
+        // Note 1: on = 20, off = 80 (both within block 0 [0, 128))
+        // Note 2: on = 50, off = 200 (on in block 0 [0, 128), off in block 1 [128, 256))
+        // Note 3: Note off at 150, Note 4 Note on at 150 (same offset in block 1 [128, 256))
+        track.notes = {
+            NoteRender{20, 80, 60, 100},
+            NoteRender{50, 200, 64, 110},
+            NoteRender{150, 220, 67, 90}
+        };
+        track.noteOffs = {
+            NoteRender{20, 80, 60, 100},
+            NoteRender{150, 220, 67, 90},
+            NoteRender{50, 200, 64, 110}
+        };
+
+        // Note A ending at 150, Note 3 starting at 150:
+        // Add note A: on = 10, off = 150, key = 65
+        track.notes.push_back(NoteRender{10, 150, 65, 95});
+        track.noteOffs.push_back(NoteRender{10, 150, 65, 95});
+
+        std::sort(track.notes.begin(), track.notes.end(), [](const NoteRender& a, const NoteRender& b) {
+            return a.on < b.on;
+        });
+        std::sort(track.noteOffs.begin(), track.noteOffs.end(), [](const NoteRender& a, const NoteRender& b) {
+            return a.off < b.off;
+        });
+
+        snapshot->tracks.push_back(track);
+        snapshot->keepProcessors.push_back(rec);
+
+        engine.publishPlayback(std::move(snapshot));
+
+        // When stopped: rendering produces no midi events
+        renderEngine(engine, 128);
+        CHECK(rec->events.empty());
+        CHECK(rec->processCalls == 0);
+
+        // Start playback
+        CHECK(engine.post({EngineCommand::Type::Play}));
+
+        // Block 0: frames [0, 128)
+        renderEngine(engine, 128);
+        CHECK(engine.position() == 128);
+
+        // In Block 0, we expect:
+        // on=10 (key 65, offset 10)
+        // on=20 (key 60, offset 20)
+        // on=50 (key 64, offset 50)
+        // off=80 (key 60, offset 80)
+        CHECK(rec->events.size() == 4);
+        CHECK(rec->events[0].event.offset == 10);
+        CHECK(rec->events[0].event.status == 0x90);
+        CHECK(rec->events[0].event.data1 == 65);
+        CHECK(rec->events[0].event.data2 == 95);
+
+        CHECK(rec->events[1].event.offset == 20);
+        CHECK(rec->events[1].event.status == 0x90);
+        CHECK(rec->events[1].event.data1 == 60);
+
+        CHECK(rec->events[2].event.offset == 50);
+        CHECK(rec->events[2].event.status == 0x90);
+        CHECK(rec->events[2].event.data1 == 64);
+
+        CHECK(rec->events[3].event.offset == 80);
+        CHECK(rec->events[3].event.status == 0x80);
+        CHECK(rec->events[3].event.data1 == 60);
+
+        // Block 1: frames [128, 256)
+        renderEngine(engine, 128);
+        CHECK(engine.position() == 256);
+
+        // In Block 1:
+        // At sample 150 (offset = 150 - 128 = 22):
+        // Note-off for key 65 (off=150)
+        // Note-on for key 67 (on=150)
+        // Note-off must come BEFORE Note-on at identical offset!
+        // Also off=200 (key 64, offset = 200 - 128 = 72)
+        // Also off=220 (key 67, offset = 220 - 128 = 92)
+        // Total events so far: 4 from block 0 + 4 from block 1 = 8
+        CHECK(rec->events.size() == 8);
+
+        // Event 4: Note-off for key 65 at offset 22
+        CHECK(rec->events[4].blockPosition == 128);
+        CHECK(rec->events[4].event.offset == 22);
+        CHECK(rec->events[4].event.status == 0x80);
+        CHECK(rec->events[4].event.data1 == 65);
+
+        // Event 5: Note-on for key 67 at offset 22
+        CHECK(rec->events[5].blockPosition == 128);
+        CHECK(rec->events[5].event.offset == 22);
+        CHECK(rec->events[5].event.status == 0x90);
+        CHECK(rec->events[5].event.data1 == 67);
+
+        // Event 6: Note-off for key 64 at offset 72
+        CHECK(rec->events[6].blockPosition == 128);
+        CHECK(rec->events[6].event.offset == 72);
+        CHECK(rec->events[6].event.status == 0x80);
+        CHECK(rec->events[6].event.data1 == 64);
+
+        // Event 7: Note-off for key 67 at offset 92
+        CHECK(rec->events[7].blockPosition == 128);
+        CHECK(rec->events[7].event.offset == 92);
+        CHECK(rec->events[7].event.status == 0x80);
+        CHECK(rec->events[7].event.data1 == 67);
+
+        engine.stop();
+    }
+}
+
+TEST(audioengine_midi, loop_wrap_and_reset_produce_all_notes_off_and_reset)
+{
+    for (bool multi : {false, true}) {
+        AudioEngine engine{nullptr};
+        engine.deviceChanged(48000.0, 128);
+
+        auto rec = std::make_shared<MidiRecordingProcessor>();
+
+        auto snapshot = std::make_unique<EngineSnapshot>();
+        snapshot->multiMonitor = multi;
+        snapshot->playbackEnd = 1000;
+        snapshot->tempo.set(120.0, 4, 4, 48000.0);
+
+        TrackRender track;
+        track.trackId = 1;
+        track.chain.push_back(rec.get());
+
+        // Note starting at 100 and ending at 400
+        track.notes = { NoteRender{100, 400, 60, 100} };
+        track.noteOffs = { NoteRender{100, 400, 60, 100} };
+
+        snapshot->tracks.push_back(track);
+        snapshot->keepProcessors.push_back(rec);
+
+        engine.publishPlayback(std::move(snapshot));
+
+        // Set loop from 0 to 256
+        CHECK(engine.post({EngineCommand::Type::SetLoop, 0, 256}));
+        CHECK(engine.post({EngineCommand::Type::Play}));
+
+        // Block 0 [0, 128)
+        renderEngine(engine, 128);
+        CHECK(engine.position() == 128);
+
+        // Block 1 [128, 256)
+        renderEngine(engine, 128);
+        CHECK(engine.position() == 256);
+
+        // Block 2: Loop wraps to 0. Position becomes 128.
+        // It must output an all-notes-off CC (0xB0, 123, 0) at offset 0!
+        renderEngine(engine, 128);
+        CHECK(engine.position() == 128);
+
+        bool foundAllNotesOff = false;
+        for (const auto& r : rec->events) {
+            if (r.blockPosition == 0 && (r.event.status & 0xF0) == 0xB0 && r.event.data1 == 123) {
+                foundAllNotesOff = true;
+                CHECK(r.event.offset == 0);
+            }
+        }
+        CHECK(foundAllNotesOff);
+
+        // Stop triggers reset()
+        rec->wasReset = false;
+        engine.stop();
+        // Seek triggers reset()
+        CHECK(engine.post({EngineCommand::Type::Seek, 50}));
+        renderEngine(engine, 128);
+        CHECK(rec->wasReset);
+    }
+}
+
+TEST(audioengine_midi, pattern_rendering_produces_sound_with_exact_timing)
+{
+    for (bool multi : {false, true}) {
+        AudioEngine engine{nullptr};
+        engine.deviceChanged(48000.0, 128);
+
+        auto synth = std::make_shared<TestSynth>();
+        synth->prepare(48000.0, 128);
+
+        auto snapshot = std::make_unique<EngineSnapshot>();
+        snapshot->multiMonitor = multi;
+        snapshot->playbackEnd = 1000;
+        snapshot->tempo.set(120.0, 4, 4, 48000.0);
+
+        TrackRender track;
+        track.trackId = 1;
+        track.chain.push_back(synth.get());
+
+        // Note starts at sample 50 and ends at 200
+        track.notes = { NoteRender{50, 200, 69, 100} };
+        track.noteOffs = { NoteRender{50, 200, 69, 100} };
+
+        snapshot->tracks.push_back(track);
+        snapshot->keepProcessors.push_back(synth);
+
+        engine.publishPlayback(std::move(snapshot));
+        CHECK(engine.post({EngineCommand::Type::Play}));
+
+        float left[128]{}, right[128]{};
+        float* out[]{left, right};
+        AudioIO io{{nullptr, 0, 0}, {out, 2, 128}, nullptr, 128};
+        engine.renderBlock(io);
+
+        // Prior to sample 50: silence
+        for (int i = 0; i < 50; ++i) {
+            CHECK(left[i] == 0.0f);
+            CHECK(right[i] == 0.0f);
+        }
+
+        // Voice started at sample 50 with phase 0 (sin(0) = 0).
+        // By sample 52, it must have non-zero amplitude!
+        bool soundDetected = false;
+        for (int i = 51; i < 128; ++i) {
+            if (std::abs(left[i]) > 1e-4f && std::abs(right[i]) > 1e-4f) {
+                soundDetected = true;
+                break;
+            }
+        }
+        CHECK(soundDetected);
+        engine.stop();
+    }
+}
+
+TEST(audioengine_midi, mute_and_solo_silence_instrument_tracks)
+{
+    for (bool multi : {false, true}) {
+        // Case 1: Track is muted -> produces 0.0f output
+        {
+            AudioEngine engine{nullptr};
+            engine.deviceChanged(48000.0, 128);
+
+            auto synth = std::make_shared<TestSynth>();
+            synth->prepare(48000.0, 128);
+
+            auto snapshot = std::make_unique<EngineSnapshot>();
+            snapshot->multiMonitor = multi;
+            snapshot->playbackEnd = 1000;
+            snapshot->tempo.set(120.0, 4, 4, 48000.0);
+
+            TrackRender track;
+            track.trackId = 1;
+            track.muted = true; // MUTED
+            track.chain.push_back(synth.get());
+            track.notes = { NoteRender{10, 100, 69, 100} };
+            track.noteOffs = { NoteRender{10, 100, 69, 100} };
+
+            snapshot->tracks.push_back(track);
+            snapshot->keepProcessors.push_back(synth);
+
+            engine.publishPlayback(std::move(snapshot));
+            CHECK(engine.post({EngineCommand::Type::Play}));
+
+            float left[128]{}, right[128]{};
+            float* out[]{left, right};
+            AudioIO io{{nullptr, 0, 0}, {out, 2, 128}, nullptr, 128};
+            engine.renderBlock(io);
+
+            // Output must be completely silent because track is muted
+            for (int i = 0; i < 128; ++i) {
+                CHECK(left[i] == 0.0f);
+                CHECK(right[i] == 0.0f);
+            }
+            engine.stop();
+        }
+
+        // Case 2: Another track is soloed, this track is not -> produces 0.0f output
+        {
+            AudioEngine engine{nullptr};
+            engine.deviceChanged(48000.0, 128);
+
+            auto synth = std::make_shared<TestSynth>();
+            synth->prepare(48000.0, 128);
+
+            auto snapshot = std::make_unique<EngineSnapshot>();
+            snapshot->multiMonitor = multi;
+            snapshot->playbackEnd = 1000;
+            snapshot->tempo.set(120.0, 4, 4, 48000.0);
+
+            // Track 1: Synth (not soloed)
+            TrackRender track1;
+            track1.trackId = 1;
+            track1.soloed = false;
+            track1.chain.push_back(synth.get());
+            track1.notes = { NoteRender{10, 100, 69, 100} };
+            track1.noteOffs = { NoteRender{10, 100, 69, 100} };
+
+            // Track 2: Other track (soloed)
+            TrackRender track2;
+            track2.trackId = 2;
+            track2.soloed = true;
+
+            snapshot->tracks.push_back(track1);
+            snapshot->tracks.push_back(track2);
+            snapshot->keepProcessors.push_back(synth);
+
+            engine.publishPlayback(std::move(snapshot));
+            CHECK(engine.post({EngineCommand::Type::Play}));
+
+            float left[128]{}, right[128]{};
+            float* out[]{left, right};
+            AudioIO io{{nullptr, 0, 0}, {out, 2, 128}, nullptr, 128};
+            engine.renderBlock(io);
+
+            // Output must be completely silent because another track is soloed
+            for (int i = 0; i < 128; ++i) {
+                CHECK(left[i] == 0.0f);
+                CHECK(right[i] == 0.0f);
+            }
+            engine.stop();
+        }
+    }
+}

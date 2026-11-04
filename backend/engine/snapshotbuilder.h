@@ -19,6 +19,7 @@ class SnapshotBuilder {
 public:
     struct TrackEffects {
         std::shared_ptr<TrackMeters> meters = std::make_shared<TrackMeters>();
+        std::shared_ptr<Processor> instrument;
         std::shared_ptr<TrackInput> input;
         std::shared_ptr<TrackInput> playbackInput;
         std::shared_ptr<Processor> chain;
@@ -40,6 +41,8 @@ public:
         bool masterMuted = false;
         struct TrackInfo {
             int id = 0;
+            TrackKind kind = TrackKind::Audio;
+            std::string type;
             float volume = 1.0f;
             bool solo = false;
             bool muted = false;

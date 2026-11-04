@@ -302,3 +302,208 @@ TEST(snapshotbuilder, sync_routing_capacity_and_monitored_track)
     CHECK(fxMap[t1.id].inputChannel == 0);
     CHECK(fxMap[t2.id].inputChannel == 1);
 }
+
+TEST(snapshotbuilder, build_playback_snapshot_pattern_clip_notes)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+
+    auto& t = project.addTrack(TrackKind::Instrument, "Synth", "Instrument");
+
+    AudioClip clip;
+    clip.poolId = "Clip 1";
+    clip.start = 12000;
+    clip.length = 48000;       // [12000, 60000]
+    clip.sourceOffset = 12000; // origin = 0
+
+    // Notes out of order intentionally to test sorting
+    // Note 1: hidden on the left (on=0, off=6000) -> dropped
+    MidiNote n1; n1.note = 60; n1.velocity = 80; n1.startBeat = 0.0; n1.lengthBeats = 0.25;
+
+    // Note 3: normal note in the middle (on=24000, off=36000)
+    MidiNote n3; n3.note = 64; n3.velocity = 100; n3.startBeat = 1.0; n3.lengthBeats = 0.5;
+
+    // Note 2: left-trimmed (on=6000 clamped to 12000, off=18000)
+    MidiNote n2; n2.note = 62; n2.velocity = 90; n2.startBeat = 0.25; n2.lengthBeats = 0.5;
+
+    // Note 4: right-trimmed across end (on=48000, off=72000 clamped to 60000)
+    MidiNote n4; n4.note = 65; n4.velocity = 110; n4.startBeat = 2.0; n4.lengthBeats = 1.0;
+
+    // Note 5: hidden past the right (on=72000 clamped to 72000, off=84000 clamped to 60000) -> dropped
+    MidiNote n5; n5.note = 67; n5.velocity = 120; n5.startBeat = 3.0; n5.lengthBeats = 0.5;
+
+    // Note 6: starts before Note 3 ends, but ends before Note 3 ends, to test noteOffs sort order vs notes sort order
+    // Let's test noteOffs:
+    // n_long: on = 20000 (beat ~0.8333), off = 40000 (beat ~1.6667)
+    // n_short: on = 22000 (beat ~0.9167), off = 26000 (beat ~1.0833)
+    // Here we have n2 (on=12000, off=18000), n3 (on=24000, off=36000), n4 (on=48000, off=60000)
+    // Let's add n_long and n_short:
+    // origin is 0, so beatsToSamples:
+    // beat 0.8 = 19200 samples; length = 1.0 beat (24000) -> off = 43200 samples
+    // beat 0.9 = 21600 samples; length = 0.1 beat (2400) -> off = 24000 samples
+    MidiNote n_long; n_long.note = 70; n_long.velocity = 100; n_long.startBeat = 0.8; n_long.lengthBeats = 1.0;
+    MidiNote n_short; n_short.note = 71; n_short.velocity = 100; n_short.startBeat = 0.9; n_short.lengthBeats = 0.1;
+
+    clip.notes = { n1, n3, n2, n4, n5, n_long, n_short };
+    project.addAudioClip(t.id, clip);
+
+    auto snapshot = SnapshotBuilder::buildPlaybackSnapshot(project, nullptr, nullptr, false);
+    CHECK(snapshot != nullptr);
+    CHECK(snapshot->tracks.size() == 1);
+    CHECK(snapshot->playbackEnd == 108000); // 60000 + 48000 release tail for instrument tracks
+
+    const auto& render = snapshot->tracks[0];
+    // n1 and n5 should be dropped. 5 notes remain: n2, n3, n4, n_long, n_short.
+    CHECK(render.notes.size() == 5);
+    CHECK(render.noteOffs.size() == 5);
+
+    // Verify render.notes is sorted by .on
+    for (size_t i = 1; i < render.notes.size(); ++i) {
+        CHECK(render.notes[i - 1].on <= render.notes[i].on);
+    }
+
+    // Expected on values:
+    // n2: on=12000, off=18000, key=62, vel=90
+    // n_long: on=19200, off=43200, key=70, vel=100
+    // n_short: on=21600, off=24000, key=71, vel=100
+    // n3: on=24000, off=36000, key=64, vel=100
+    // n4: on=48000, off=60000, key=65, vel=110
+    CHECK(render.notes[0].key == 62);
+    CHECK(render.notes[0].on == 12000);
+    CHECK(render.notes[0].off == 18000);
+    CHECK(render.notes[0].velocity == 90);
+
+    CHECK(render.notes[1].key == 70);
+    CHECK(render.notes[1].on == 19200);
+    CHECK(render.notes[1].off == 43200);
+
+    CHECK(render.notes[2].key == 71);
+    CHECK(render.notes[2].on == 21600);
+    CHECK(render.notes[2].off == 24000);
+
+    CHECK(render.notes[3].key == 64);
+    CHECK(render.notes[3].on == 24000);
+    CHECK(render.notes[3].off == 36000);
+
+    CHECK(render.notes[4].key == 65);
+    CHECK(render.notes[4].on == 48000);
+    CHECK(render.notes[4].off == 60000);
+
+    // Verify render.noteOffs is sorted by .off
+    for (size_t i = 1; i < render.noteOffs.size(); ++i) {
+        CHECK(render.noteOffs[i - 1].off <= render.noteOffs[i].off);
+    }
+
+    // Expected off order:
+    // 1. n2 (off=18000)
+    // 2. n_short (off=24000)
+    // 3. n3 (off=36000)
+    // 4. n_long (off=43200)
+    // 5. n4 (off=60000)
+    CHECK(render.noteOffs[0].key == 62);
+    CHECK(render.noteOffs[0].off == 18000);
+
+    CHECK(render.noteOffs[1].key == 71);
+    CHECK(render.noteOffs[1].off == 24000);
+
+    CHECK(render.noteOffs[2].key == 64);
+    CHECK(render.noteOffs[2].off == 36000);
+
+    CHECK(render.noteOffs[3].key == 70);
+    CHECK(render.noteOffs[3].off == 43200);
+
+    CHECK(render.noteOffs[4].key == 65);
+    CHECK(render.noteOffs[4].off == 60000);
+}
+
+TEST(snapshotbuilder, instrument_track_chain_starts_with_instrument)
+{
+    Project project;
+    auto& tInst = project.addTrack(TrackKind::Instrument, "Synth Track", "Instrument");
+    auto& tAudio = project.addTrack(TrackKind::Audio, "Audio Track", "Audio");
+
+    AudioClip patternClip;
+    patternClip.poolId = "Clip 1";
+    patternClip.start = 0;
+    patternClip.length = 48000;
+    MidiNote n;
+    n.note = 60;
+    n.velocity = 100;
+    n.startBeat = 0.0;
+    n.lengthBeats = 1.0;
+    patternClip.notes = { n };
+    project.addAudioClip(tInst.id, patternClip);
+
+    auto synth = std::make_shared<DummyProcessor>();
+    auto insertEffect = std::make_shared<DummyProcessor>();
+
+    SnapshotBuilder::TrackEffects fxInst;
+    fxInst.instrument = synth;
+    fxInst.playbackChain = insertEffect;
+
+    SnapshotBuilder::TrackEffects fxAudio;
+
+    std::unordered_map<int, SnapshotBuilder::TrackEffects> effectsMap;
+    effectsMap[tInst.id] = fxInst;
+    effectsMap[tAudio.id] = fxAudio;
+
+    auto snapshot = SnapshotBuilder::buildPlaybackSnapshot(project, nullptr, effectsMap, false);
+    CHECK(snapshot != nullptr);
+    CHECK(snapshot->tracks.size() == 2);
+
+    const auto& rInst = snapshot->tracks[0];
+    CHECK(rInst.trackId == tInst.id);
+    // Instrument track chain: instrument first, then insert effect
+    CHECK(rInst.chain.size() == 2);
+    CHECK(rInst.chain[0] == synth.get());
+    CHECK(rInst.chain[1] == insertEffect.get());
+
+    const auto& rAudio = snapshot->tracks[1];
+    CHECK(rAudio.trackId == tAudio.id);
+    // Audio track has no instrument
+    CHECK(rAudio.chain.empty());
+}
+
+TEST(snapshotbuilder, bpm_change_updates_sample_times_and_release_tail)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+
+    auto& tInst = project.addTrack(TrackKind::Instrument, "Synth Track", "Instrument");
+    AudioClip clip;
+    clip.poolId = "Clip 1";
+    clip.start = 0;
+    clip.length = 48000;
+    MidiNote n;
+    n.note = 60;
+    n.velocity = 100;
+    n.startBeat = 1.0;
+    n.lengthBeats = 1.0;
+    clip.notes = { n };
+    project.addAudioClip(tInst.id, clip);
+
+    // At 120 BPM, 48kHz: beat 1.0 is sample 24000, beat 2.0 is sample 48000.
+    auto snap120 = SnapshotBuilder::buildPlaybackSnapshot(project, nullptr, nullptr, false);
+    CHECK(snap120 != nullptr);
+    CHECK(snap120->tracks[0].notes.size() == 1);
+    CHECK(snap120->tracks[0].notes[0].on == 24000);
+    CHECK(snap120->tracks[0].notes[0].off == 48000);
+    // Release tail = 48000 samples -> playbackEnd = 48000 + 48000 = 96000
+    CHECK(snap120->playbackEnd == 96000);
+
+    // Change tempo to 60 BPM with 96000 sample clip
+    Project project60;
+    project60.tempo().set(60.0, 4, 4, 48000.0);
+    clip.length = 96000;
+    auto& t2 = project60.addTrack(TrackKind::Instrument, "Synth", "Instrument");
+    project60.addAudioClip(t2.id, clip);
+
+    auto snap60 = SnapshotBuilder::buildPlaybackSnapshot(project60, nullptr, nullptr, false);
+    CHECK(snap60 != nullptr);
+    CHECK(snap60->tracks[0].notes.size() == 1);
+    // At 60 BPM, 48kHz: beat 1.0 is sample 48000, beat 2.0 is sample 96000.
+    CHECK(snap60->tracks[0].notes[0].on == 48000);
+    CHECK(snap60->tracks[0].notes[0].off == 96000);
+    CHECK(snap60->playbackEnd == 96000 + 48000);
+}
+

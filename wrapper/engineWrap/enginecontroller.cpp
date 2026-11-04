@@ -7,6 +7,7 @@
 #include "engine/enginesnapshot.h"
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
 #include "instruments/guitar/plugins/guitarsuite/guitarsuite.h"
+#include "instruments/instrumentfactory.h"
 #include "persistence/projectdocument.h"
 #include "processor/trackinput.h"
 
@@ -201,6 +202,17 @@ void EngineController::bindTrackEffects(int trackId, GuitarSuiteModel* model)
     fx.input->prepare(rate, frames);
     fx.playbackInput->setTrimDb(fx.model->inputTrimDb()); fx.playbackInput->prepare(rate,frames);
     fx.model->configure(rate, frames);
+    if (m_project) {
+        const auto* track = m_project->project().findTrack(trackId);
+        if (track && track->kind == TrackKind::Instrument) {
+            if (!fx.instrument) {
+                fx.instrument = createInstrument(track->type);
+            }
+            if (fx.instrument) {
+                fx.instrument->prepare(rate, frames);
+            }
+        }
+    }
     connect(fx.model, &GuitarSuiteModel::inputTrimDbChanged, this, [this, trackId] {
         auto& fx = m_trackEffects.at(trackId);
         fx.input->setTrimDb(fx.model->inputTrimDb());
@@ -232,8 +244,19 @@ void EngineController::clearTrackEffects()
 void EngineController::syncTrackEffects()
 {
     if (!m_project) return;
+    const double rate = m_engine && m_engine->sampleRate() > 1000 ? m_engine->sampleRate() : 48000;
+    const int frames = m_engine ? std::max(128, m_engine->latency().captureFrames) : 128;
     for (const auto& track : m_project->project().tracks()) {
         trackEffects(track->id);
+        if (track->kind == TrackKind::Instrument) {
+            auto& fx = m_trackEffects[track->id];
+            if (!fx.instrument) {
+                fx.instrument = createInstrument(track->type);
+            }
+            if (fx.instrument) {
+                fx.instrument->prepare(rate, frames);
+            }
+        }
     }
     SnapshotBuilder::syncTrackEq(m_project->project(), [this](int id) {
         auto it = m_trackEffects.find(id);
@@ -384,6 +407,9 @@ bool EngineController::setBufferSize(int frames)
         fx.playbackInput=std::make_shared<TrackInput>();
         fx.playbackInput->setTrimDb(fx.model->inputTrimDb()); fx.playbackInput->prepare(m_engine->sampleRate(),frames);
         fx.model->configure(m_engine->sampleRate(), frames);
+        if (fx.instrument) {
+            fx.instrument->prepare(m_engine->sampleRate(), frames);
+        }
     }
     syncTrackEffects();
     emit bufferSizeChanged();

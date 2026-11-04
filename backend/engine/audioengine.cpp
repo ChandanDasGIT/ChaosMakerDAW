@@ -364,6 +364,28 @@ void AudioEngine::mixMetronome(const AudioIO& io, int offset, int frames, const 
     }
 }
 
+void AudioEngine::populateTrackMidi(const TrackRender& track, std::int64_t position, int count, bool loopWrapped) noexcept
+{
+    m_trackMidi.clear();
+    if (loopWrapped) {
+        m_trackMidi.add(MidiEvent{0, 0xB0, 123, 0});
+    }
+    if (!track.notes.empty() || !track.noteOffs.empty()) {
+        const auto blockEnd = position + count;
+        auto itOn = std::lower_bound(track.notes.begin(), track.notes.end(), position,
+            [](const NoteRender& n, std::int64_t pos) { return n.on < pos; });
+        for (; itOn != track.notes.end() && itOn->on < blockEnd; ++itOn) {
+            m_trackMidi.add(MidiEvent{int(itOn->on - position), 0x90, itOn->key, itOn->velocity});
+        }
+        auto itOff = std::lower_bound(track.noteOffs.begin(), track.noteOffs.end(), position,
+            [](const NoteRender& n, std::int64_t pos) { return n.off < pos; });
+        for (; itOff != track.noteOffs.end() && itOff->off < blockEnd; ++itOff) {
+            m_trackMidi.add(MidiEvent{int(itOff->off - position), 0x80, itOff->key, 0});
+        }
+    }
+    m_trackMidi.sort();
+}
+
 void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames, TrackMeters* liveMeters) noexcept
 {
     bool anySolo = false;
@@ -377,7 +399,11 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
         if (bounded && m_position>=snapshot->playbackEnd) {
             m_position=snapshot->playbackEnd; m_playing=false; m_resetPlayback=true; break;
         }
-        if (m_looping && !m_recorder && m_position >= m_loopEnd) m_position = m_loopStart;
+        bool blockLoopWrapped = false;
+        if (m_looping && !m_recorder && m_position >= m_loopEnd) {
+            m_position = m_loopStart;
+            blockLoopWrapped = true;
+        }
         int count = std::min(m_fxBlockFrames, frames-offset);
         if (bounded) count=int(std::min<std::int64_t>(count,snapshot->playbackEnd-m_position));
         if (m_looping && !m_recorder) count = int(std::min<std::int64_t>(count,m_loopEnd-m_position));
@@ -421,10 +447,20 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
                 }
                 track.meters->input[c].capturePeak(peak);
             }
+            populateTrackMidi(track, m_position, count, blockLoopWrapped);
             if (!track.chain.empty()) {
-                ProcessContext context; context.audio={channels,2,count}; context.sampleRate=m_sampleRate;
-                context.samplePosition=m_position; context.bpm=m_tempoBpm.load(std::memory_order_relaxed); context.playing=true;
-                for(auto* processor:track.chain)if(processor)processor->process(context);
+                ProcessContext context;
+                context.audio = {channels, 2, count};
+                context.midi = &m_trackMidi;
+                context.sampleRate = m_sampleRate;
+                context.samplePosition = m_position;
+                context.beat = snapshot ? snapshot->tempo.beatAt(m_position) : 0.0;
+                context.bpm = m_tempoBpm.load(std::memory_order_relaxed);
+                context.beatsPerBar = snapshot ? snapshot->tempo.beatsPerBar() : 4.0;
+                context.timeSigNumerator = snapshot ? snapshot->tempo.numerator() : 4;
+                context.timeSigDenominator = snapshot ? snapshot->tempo.denominator() : 4;
+                context.playing = true;
+                for (auto* processor : track.chain) if (processor) processor->process(context);
             }
             for(int c=0;c<2;++c) {
               float peak=0;
@@ -482,7 +518,11 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
         if (bounded && m_playing && m_position>=snapshot.playbackEnd) {
             m_position=snapshot.playbackEnd; m_playing=false; m_resetPlayback=true;
         }
-        if(m_playing && m_looping && !m_recordingGroup && m_position>=m_loopEnd)m_position=m_loopStart;
+        bool blockLoopWrapped = false;
+        if(m_playing && m_looping && !m_recordingGroup && m_position>=m_loopEnd) {
+            m_position=m_loopStart;
+            blockLoopWrapped = true;
+        }
         int count=std::min(m_fxBlockFrames,frames-offset);
         if (m_countInTarget>=0) count=int(std::min<std::int64_t>(count,m_countInTarget-m_position));
         if (bounded && m_playing) count=int(std::min<std::int64_t>(count,snapshot.playbackEnd-m_position));
@@ -546,9 +586,19 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
                 }
                 track.meters->input[c].capturePeak(peak);
             }
+            populateTrackMidi(track, m_position, count, blockLoopWrapped);
             if(m_playing && !track.chain.empty()) {
-                ProcessContext context; context.audio={dry,2,count}; context.sampleRate=m_sampleRate;
-                context.samplePosition=m_position; context.bpm=m_tempoBpm.load(std::memory_order_relaxed); context.playing=true;
+                ProcessContext context;
+                context.audio = {dry, 2, count};
+                context.midi = &m_trackMidi;
+                context.sampleRate = m_sampleRate;
+                context.samplePosition = m_position;
+                context.beat = snapshot.tempo.beatAt(m_position);
+                context.bpm = m_tempoBpm.load(std::memory_order_relaxed);
+                context.beatsPerBar = snapshot.tempo.beatsPerBar();
+                context.timeSigNumerator = snapshot.tempo.numerator();
+                context.timeSigDenominator = snapshot.tempo.denominator();
+                context.playing = true;
                 for(auto* processor:track.chain)if(processor)processor->process(context);
             }
             for(int c=0;c<2;++c) {
