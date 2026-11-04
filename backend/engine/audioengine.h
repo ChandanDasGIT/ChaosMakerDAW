@@ -56,6 +56,9 @@ public:
     int connectInputChannel(const std::string& source);
     int inputChannelCapacity() const { return m_device ? m_device->inputChannelCapacity() : 0; }
     bool connectOutput(const std::string& left, const std::string& right);
+    std::vector<std::string> midiInputNames() const;
+    bool connectMidiInput(const std::string& source);
+    std::string connectedMidiInput() const;
     void setMonitorEqBand(int band, float gainDb) noexcept { m_monitorEq.setBandGain(band, gainDb); }
     float masterVolume() const noexcept { return m_masterVolume.load(std::memory_order_relaxed); }
     void setMasterVolume(float volume) noexcept { m_masterVolume.store(std::clamp(volume, 0.0f, 2.0f), std::memory_order_relaxed); }
@@ -79,7 +82,8 @@ private:
     void renderTracks(const AudioIO& io, const EngineSnapshot& snapshot, int frames) noexcept;
     RecordingGroup* m_recordingGroup = nullptr;
     void mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames, TrackMeters* liveMeters) noexcept;
-    void populateTrackMidi(const TrackRender& track, std::int64_t position, int count, bool loopWrapped, bool includeLiveMidi = true) noexcept;
+    void populateTrackMidi(const TrackRender& track, std::int64_t position, int count, bool loopWrapped, bool includeLiveMidi = true, const MidiBuffer* hwMidi = nullptr, bool routeHwMidi = false) noexcept;
+    static bool trackReceivesHwMidi(const TrackRender& track, const EngineSnapshot* snapshot) noexcept;
     TakeRecorder* m_recorder = nullptr;
     std::atomic<TakeRecorder*> m_releasedRecorder{nullptr};
     std::atomic<std::int64_t> m_reportedPosition{0}, m_recordingStart{0}, m_countInRemaining{0};

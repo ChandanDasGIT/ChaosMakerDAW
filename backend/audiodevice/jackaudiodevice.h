@@ -1,8 +1,10 @@
 #pragma once
 
 #include "audiodevice/audiodevice.h"
+#include "midi/midievent.h"
 
 #include <jack/jack.h>
+#include <jack/midiport.h>
 
 #include <array>
 #include <atomic>
@@ -25,6 +27,9 @@ public:
     int connectInputChannel(const std::string& source) override;
     int inputChannelCapacity() const override { return inputChannels-1; }
     bool connectOutput(const std::string& left, const std::string& right) override;
+    std::vector<std::string> midiInputNames() const override { return m_midiInputNames; }
+    bool connectMidiInput(const std::string& source) override;
+    std::string connectedMidiInput() const override { return m_connectedMidiSource; }
     std::string lastError() const override { return m_error; }
 
 private:
@@ -40,6 +45,8 @@ private:
     static constexpr int inputChannels = 32;
     std::array<jack_port_t*, inputChannels> m_inputs{};
     std::array<std::string, inputChannels> m_sources{};
+    jack_port_t* m_midiInput = nullptr;
+    MidiBuffer m_midiInBuffer;
     std::array<jack_port_t*, 2> m_outputs{};
     std::array<float*, inputChannels> m_inputBuffers{};
     std::array<float*, 2> m_outputBuffers{};
@@ -50,5 +57,7 @@ private:
     bool m_bufferRequestAccepted = false;
     std::vector<std::string> m_inputNames;
     std::vector<std::string> m_outputNames;
+    std::vector<std::string> m_midiInputNames;
+    std::string m_connectedMidiSource;
     std::string m_error;
 };

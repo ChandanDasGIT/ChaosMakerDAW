@@ -700,3 +700,14 @@ bool TrackList::attachTake(int trackId, std::int64_t start, std::shared_ptr<cons
     m_audio[path] = audio; m_mediaPaths.insert(path);
     return addAudioClip(trackId, path, start, std::llround(length), 0, effectsPrinted) >= 0;
 }
+
+bool TrackList::attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes)
+{
+    if (length <= 0 || !m_project.findTrack(trackId)) return false;
+    AudioClip clip;
+    clip.poolId = "Clip " + std::to_string(m_nextClipNumber++);
+    clip.start = start;
+    clip.length = length;
+    clip.notes = std::move(notes);
+    return m_project.addAudioClip(trackId, std::move(clip)) >= 0;
+}

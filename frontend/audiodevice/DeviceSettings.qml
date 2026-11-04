@@ -81,4 +81,38 @@ RowLayout {
             border.color: outputSelector.activeFocus ? Theme.accent : "#444750"
         }
     }
+
+    Text {
+        text: "MIDI IN"
+        color: Theme.textMuted
+        font.pixelSize: 9
+        font.bold: true
+    }
+
+    ComboBox {
+        id: midiSelector
+        Layout.preferredWidth: 200
+        Layout.preferredHeight: 30
+        model: EngineController.midiInputPorts
+        enabled: count > 0
+        currentIndex: model.indexOf(EngineController.connectedMidiPort)
+        onActivated: index => {
+            EngineController.connectMidiInput(currentText)
+        }
+        contentItem: Text {
+            leftPadding: 9
+            rightPadding: 23
+            text: midiSelector.count === 0 ? "No MIDI inputs"
+                  : midiSelector.currentIndex < 0 ? "Auto (MIDI in)" : midiSelector.displayText
+            color: midiSelector.enabled ? Theme.text : "#777b83"
+            font.pixelSize: 10
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideMiddle
+        }
+        background: Rectangle {
+            radius: 5
+            color: midiSelector.enabled ? "#292b30" : "#222328"
+            border.color: midiSelector.activeFocus ? Theme.accent : "#444750"
+        }
+    }
 }

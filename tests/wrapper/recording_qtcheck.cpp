@@ -666,3 +666,41 @@ TEST(qttrackcolours, project_and_session_roundtrip_support_legacy_files_and_reje
     CHECK(tracks.project().findTrack(tracks.trackIdAt(1))->colour=="#6fa8dc");
     CHECK(!controller.projectDirty()); controller.shutdownSession();
 }
+
+TEST(qtmidirecording, armed_instrument_track_records_midi_into_timeline_clip) {
+    Storage storage;
+    auto device = std::make_unique<OfflineDevice>();
+    auto* io = device.get();
+    EngineController controller(std::move(device), false);
+    TrackListWrapper tracks;
+    controller.attachProject(&tracks);
+
+    const int synth = tracks.addInstrumentTrack();
+    CHECK(synth >= 0);
+    CHECK(tracks.setRecordArmed(synth, true));
+
+    tick(); io->process();
+    controller.transportAction("record");
+    CHECK(controller.takeBusy());
+    io->process();
+
+    controller.sendLiveNoteOn(synth, 60, 100);
+    io->process();
+    controller.sendLiveNoteOff(synth, 60);
+    io->process();
+
+    controller.transportAction("stop");
+    io->process();
+    for (int i = 0; i < 100 && controller.takeBusy(); ++i) tick(10);
+
+    CHECK(!controller.takeBusy());
+    const auto clips = tracks.clips();
+    CHECK(clips.size() == 1);
+    const auto clip = clips[0].toMap();
+    CHECK(clip["trackId"].toInt() == synth);
+    const auto notes = clip["notes"].toList();
+    CHECK(notes.size() == 1);
+    CHECK(notes[0].toMap()["note"].toInt() == 60);
+    CHECK(notes[0].toMap()["velocity"].toInt() == 100);
+    controller.shutdownSession();
+}

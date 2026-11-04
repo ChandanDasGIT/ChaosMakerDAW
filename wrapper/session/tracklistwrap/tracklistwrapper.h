@@ -92,6 +92,7 @@ public:
     void adoptDocument(TrackListWrapper& candidate);
     std::unique_ptr<EngineSnapshot> playbackSnapshot() const;
     bool attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool effectsPrinted = true);
+    bool attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes);
     int recordingTrackId() const;
     const Project& project() const { return m_project; }
     void setSampleRate(double rate);

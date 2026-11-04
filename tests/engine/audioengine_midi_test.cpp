@@ -454,3 +454,69 @@ TEST(audioengine_midi, live_note_audition_when_stopped)
         CHECK(maxAmp > 0.0f);
     }
 }
+
+TEST(audioengine_midi, hardware_midi_input_routing)
+{
+    for (bool multi : {false, true}) {
+        AudioEngine engine{nullptr};
+        engine.deviceChanged(48000.0, 128);
+
+        auto synth = std::make_shared<TestSynth>();
+        synth->prepare(48000.0, 128);
+
+        auto snapshot = std::make_unique<EngineSnapshot>();
+        snapshot->multiMonitor = multi;
+        snapshot->tempo.set(120.0, 4, 4, 48000.0);
+
+        TrackRender track;
+        track.trackId = 10;
+        track.armed = true;
+        track.chain.push_back(synth.get());
+        snapshot->tracks.push_back(track);
+        snapshot->keepProcessors.push_back(synth);
+
+        engine.publishPlayback(std::move(snapshot));
+
+        float left[128]{}, right[128]{};
+        float* out[]{left, right};
+
+        // Hardware MIDI buffer with a Note-On at offset 16 (Middle C, vel 90)
+        MidiBuffer hwMidi;
+        hwMidi.add(MidiEvent{16, 0x90, 60, 90});
+
+        AudioIO io{{nullptr, 0, 0}, {out, 2, 128}, &hwMidi, 128};
+
+        // Render block with hardware MIDI input while stopped
+        engine.renderBlock(io);
+
+        float maxAmp = 0.0f;
+        for (int i = 0; i < 128; ++i) {
+            maxAmp = std::max(maxAmp, std::abs(left[i]));
+        }
+        CHECK(maxAmp > 0.01f);
+
+        // Next block: empty hardware MIDI buffer (note sustaining)
+        hwMidi.clear();
+        std::fill_n(left, 128, 0.0f);
+        std::fill_n(right, 128, 0.0f);
+        engine.renderBlock(io);
+
+        maxAmp = 0.0f;
+        for (int i = 0; i < 128; ++i) {
+            maxAmp = std::max(maxAmp, std::abs(left[i]));
+        }
+        CHECK(maxAmp > 0.01f);
+
+        // Note-off via hardware MIDI
+        hwMidi.add(MidiEvent{32, 0x80, 60, 0});
+        std::fill_n(left, 128, 0.0f);
+        std::fill_n(right, 128, 0.0f);
+        engine.renderBlock(io);
+
+        maxAmp = 0.0f;
+        for (int i = 0; i < 128; ++i) {
+            maxAmp = std::max(maxAmp, std::abs(left[i]));
+        }
+        CHECK(maxAmp > 0.0f);
+    }
+}

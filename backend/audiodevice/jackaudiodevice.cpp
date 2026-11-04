@@ -31,13 +31,14 @@ bool JackAudioDevice::open(AudioCallback* callback, int wantedBufferFrames)
         const std::string name=i==0 ? "guitar_in" : "track_in_"+std::to_string(i);
         m_inputs[i]=jack_port_register(m_client,name.c_str(),JACK_DEFAULT_AUDIO_TYPE,JackPortIsInput,0);
     }
+    m_midiInput = jack_port_register(m_client, "midi_in", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
     m_outputs[0] = jack_port_register(m_client, "monitor_l", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
     m_outputs[1] = jack_port_register(m_client, "monitor_r", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-    if (std::any_of(m_inputs.begin(),m_inputs.end(),[](auto* port){return !port;}) || !m_outputs[0] || !m_outputs[1]
+    if (!m_midiInput || std::any_of(m_inputs.begin(),m_inputs.end(),[](auto* port){return !port;}) || !m_outputs[0] || !m_outputs[1]
         || jack_set_process_callback(m_client, &JackAudioDevice::process, this) != 0
         || jack_set_buffer_size_callback(m_client, &JackAudioDevice::bufferSizeChanged, this) != 0
         || jack_set_xrun_callback(m_client, &JackAudioDevice::xrun, this) != 0) {
-        m_error = "Could not register the JACK audio ports.";
+        m_error = "Could not register the JACK audio/MIDI ports.";
         close();
         return false;
     }
@@ -70,6 +71,10 @@ void JackAudioDevice::close()
     m_client = nullptr;
     m_inputs = {}; m_sources = {};
     m_outputs = {};
+    m_midiInput = nullptr;
+    m_midiInBuffer.clear();
+    m_midiInputNames.clear();
+    m_connectedMidiSource.clear();
     m_callback = nullptr;
     m_sampleRateHz = 0.0;
     m_bufferFrames.store(0, std::memory_order_relaxed);
@@ -208,9 +213,29 @@ int JackAudioDevice::processBlock(jack_nframes_t frames) noexcept
     for (std::size_t i = 0; i < m_outputs.size(); ++i)
         m_outputBuffers[i] = static_cast<float*>(jack_port_get_buffer(m_outputs[i], frames));
 
+    m_midiInBuffer.clear();
+    if (m_midiInput) {
+        void* portBuffer = jack_port_get_buffer(m_midiInput, frames);
+        if (portBuffer) {
+            const jack_nframes_t eventCount = jack_midi_get_event_count(portBuffer);
+            for (jack_nframes_t i = 0; i < eventCount; ++i) {
+                jack_midi_event_t event;
+                if (jack_midi_event_get(&event, portBuffer, i) == 0 && event.size >= 1) {
+                    MidiEvent me;
+                    me.offset = static_cast<int>(event.time);
+                    me.status = event.buffer[0];
+                    me.data1 = event.size > 1 ? event.buffer[1] : 0;
+                    me.data2 = event.size > 2 ? event.buffer[2] : 0;
+                    m_midiInBuffer.add(me);
+                }
+            }
+        }
+    }
+
     AudioIO io;
     io.input = {m_inputBuffers.data(), inputChannels, static_cast<int>(frames)};
     io.output = {m_outputBuffers.data(), static_cast<int>(m_outputs.size()), static_cast<int>(frames)};
+    io.midiIn = &m_midiInBuffer;
     io.frames = static_cast<int>(frames);
     m_callback->process(io);
     return 0;
@@ -220,8 +245,10 @@ void JackAudioDevice::enumeratePorts()
 {
     m_inputNames.clear();
     m_outputNames.clear();
+    m_midiInputNames.clear();
     const char** captures = jack_get_ports(m_client, nullptr, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput);
     const char** playbacks = jack_get_ports(m_client, nullptr, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput);
+    const char** midiCaptures = jack_get_ports(m_client, nullptr, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput);
     const std::string ownPrefix = std::string(jack_get_client_name(m_client)) + ":";
     if (captures) {
         for (std::size_t i = 0; captures[i]; ++i) {
@@ -239,6 +266,33 @@ void JackAudioDevice::enumeratePorts()
         }
         jack_free(const_cast<char**>(playbacks));
     }
+    if (midiCaptures) {
+        for (std::size_t i = 0; midiCaptures[i]; ++i) {
+            const std::string name(midiCaptures[i]);
+            if (!name.starts_with(ownPrefix))
+                m_midiInputNames.push_back(name);
+        }
+        jack_free(const_cast<char**>(midiCaptures));
+    }
+    if (m_connectedMidiSource.empty() && !m_midiInputNames.empty()) {
+        connectMidiInput(m_midiInputNames.front());
+    }
+}
+
+bool JackAudioDevice::connectMidiInput(const std::string& source)
+{
+    if (!m_client || !m_midiInput)
+        return false;
+    disconnectAll(m_midiInput, false);
+    m_connectedMidiSource.clear();
+    if (source.empty())
+        return true;
+    if (jack_connect(m_client, source.c_str(), jack_port_name(m_midiInput)) != 0) {
+        m_error = "Could not connect JACK MIDI source: " + source;
+        return false;
+    }
+    m_connectedMidiSource = source;
+    return true;
 }
 
 bool JackAudioDevice::disconnectAll(jack_port_t* port, bool portIsSource)

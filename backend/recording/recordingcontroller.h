@@ -18,6 +18,7 @@
 class RecordingController {
 public:
     using AttachTakeCallback = std::function<void(int trackId, std::int64_t startSample, std::shared_ptr<const AudioData> audio, bool printed)>;
+    using AttachMidiTakeCallback = std::function<void(int trackId, std::int64_t startSample, std::int64_t lengthSamples, std::vector<MidiNote> notes)>;
     using LockTracksCallback = std::function<void(const std::vector<int>& lockedTracks)>;
     using UnlockCallback = std::function<void()>;
     using ChannelLookup = std::function<int(int trackId)>;
@@ -32,12 +33,12 @@ public:
     RecordingController();
     ~RecordingController();
 
-    bool isBusy() const noexcept { return !m_takes.empty(); }
+    bool isBusy() const noexcept { return !m_takes.empty() || !m_midiTakes.empty(); }
     int primaryRecordingTrackId() const noexcept { return m_recordTrack; }
     std::vector<int> activeRecordingTrackIds() const;
     double recordStartBeat() const noexcept { return m_recordStartBeat; }
     void setRecordStartBeat(double beat) noexcept { m_recordStartBeat = beat; }
-    std::size_t takeCount() const noexcept { return m_takes.size(); }
+    std::size_t takeCount() const noexcept { return m_takes.size() + m_midiTakes.size(); }
 
     bool countInMessagePending() const noexcept { return m_countInMessagePending; }
     void clearCountInMessagePending() noexcept { m_countInMessagePending = false; }
@@ -71,24 +72,44 @@ public:
         bool isEngineRecording,
         std::int64_t engineRecordingStart,
         const TempoMap& tempo,
-        const AttachTakeCallback& attachCallback);
+        const AttachTakeCallback& attachCallback,
+        const AttachMidiTakeCallback& attachMidiCallback = nullptr);
 
-    // Finalizes all takes, attaches any remaining audio, unlocks tracks, and resets group state
+    // Finalizes all takes, attaches any remaining audio/MIDI, unlocks tracks, and resets group state
     FinalizeResult completeTake(
         const AttachTakeCallback& attachCallback,
+        const AttachMidiTakeCallback& attachMidiCallback,
         const UnlockCallback& unlockCallback);
+
+    FinalizeResult completeTake(
+        const AttachTakeCallback& attachCallback,
+        const UnlockCallback& unlockCallback)
+    {
+        return completeTake(attachCallback, nullptr, unlockCallback);
+    }
 
     // Finish workers and finalize on shutdown
     void shutdown(
         const AttachTakeCallback& attachCallback,
+        const AttachMidiTakeCallback& attachMidiCallback,
         const UnlockCallback& unlockCallback);
+
+    void shutdown(
+        const AttachTakeCallback& attachCallback,
+        const UnlockCallback& unlockCallback)
+    {
+        shutdown(attachCallback, nullptr, unlockCallback);
+    }
 
 private:
     static std::string generateTakeFilename(const std::string& folder, int trackId);
 
     std::unique_ptr<RecordingGroup> m_group;
     std::map<int, std::unique_ptr<TakeRecorder>> m_takes;
+    std::map<int, std::unique_ptr<MidiTakeRecorder>> m_midiTakes;
     std::unordered_set<int> m_attachedTakes;
+    std::unordered_set<int> m_attachedMidiTakes;
+    TempoMap m_tempo;
     int m_recordTrack = -1;
     double m_recordStartBeat = 0.0;
     bool m_countInMessagePending = false;

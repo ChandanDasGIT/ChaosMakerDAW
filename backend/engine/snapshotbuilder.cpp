@@ -209,8 +209,9 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
             if (fx) {
                 render.meters = fx->meters;
                 render.inputChannel = fx->inputChannel;
-                render.armed = track.hasLiveInput && track.recordArmed;
-                render.monitoring = track.hasLiveInput && track.monitorEnabled && fx->inputChannel >= 0;
+                render.armed = (track.hasLiveInput || track.kind == TrackKind::Instrument) && track.recordArmed;
+                render.monitoring = (track.hasLiveInput && track.monitorEnabled && fx->inputChannel >= 0)
+                                 || (track.kind == TrackKind::Instrument && track.monitorEnabled);
 
                 if (fx->instrument) {
                     render.chain.push_back(fx->instrument.get());
