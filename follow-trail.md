@@ -122,6 +122,43 @@ checkpoint; its dry-only/shared-chain and placeholder-project descriptions are h
 The user will manually check clip editing and project files. Do not treat those
 checks as passed until results are reported.
 
+### Piano roll — open follow-ups (2026-11-04)
+
+Done so far: docked layout, velocity lane alignment, cursor readouts, grid lines that
+follow the snap setting, dark footer, velocity colouring, reliable note drag/resize
+(no lag, edge auto-scroll), clip-owned notes (backend + undo + copy/split/merge),
+note persistence, wrapper binding (docked/floating stay in sync), Reaper-style note
+outlines on timeline clips, and editable velocity (single + selected group, one undo
+step). Remaining, one task at a time, each waiting for the user's go-ahead:
+
+1. **Notes do not play yet (main gap).** The piano roll only edits the document.
+   Missing playback path:
+   - `snapshotbuilder.cpp`: convert each pattern clip's notes into
+     `TrackRender::notes` (`NoteRender` on/off in samples, from the clip's content
+     origin; drop hidden notes and cut notes at the clip end; sorted by `on`).
+   - Put an instrument `Processor` first in `TrackRender::chain` for instrument
+     tracks (the chain is currently only built for unprinted audio clips).
+   - `audioengine.cpp`: per block, turn notes falling in the block into
+     `MidiEvent`s in a per-track `MidiBuffer` and set `ProcessContext::midi`;
+     send note-offs on stop, seek, repeat wrap and clip end.
+   - Later: offline render/export of notes, and playing the instrument from the
+     piano-roll keys or a MIDI keyboard.
+2. **New notes always use velocity 100.** Reaper uses the last velocity the user set.
+3. **A velocity stalk at beat 0** sits on the lane's left edge and is half-clipped.
+4. **No velocity "paint" sweep** across several notes in one drag (Reaper pencil).
+5. **Piano roll clip length is fixed when it opens.** Resizing the clip on the
+   timeline while the piano roll is open does not update its clip highlight.
+6. **Pattern clip `sourceOffset` is not rescaled** when a project is reopened at a
+   different sample rate, so a trimmed pattern clip's left edge can shift slightly.
+   Notes are saved clip-relative, so they stay on the clip.
+7. **Placeholders:** piano roll menu bar, snap/quantize/undo/redo/transport buttons,
+   and a playhead not linked to the transport.
+8. **`PianoRollWrapper::notes` is a plain `QVariantList`**, so every change rebuilds
+   all note delegates (worked around in QML by committing only on release). A list
+   model in the wrapper would update notes individually.
+9. **The mouse-driven piano roll harness was a temporary scratchpad tool.** Consider
+   adding it as a permanent Qt Test target next to `transporttests`.
+
 ### Planned audio import — implementation deferred
 
 Target a first release with mono/stereo WAV, MP3 and FLAC import through a file

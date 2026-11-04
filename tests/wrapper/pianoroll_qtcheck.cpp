@@ -120,3 +120,34 @@ TEST(qtpianoroll, rejected_edits_revert_and_switching_or_removing_clips_reloads)
     CHECK(local.addNote(60, 0.0, 1.0) > 0);
     CHECK(local.count() == 1);
 }
+
+TEST(qtpianoroll, velocity_edits_are_one_undoable_change_and_clamped) {
+    QObject owner;
+    TrackListWrapper tracks;
+    const int t = tracks.addInstrumentTrack();
+    const int c = tracks.addClipAtBeat(t, 0, 4);
+    auto* roll = boundRoll(tracks, t, c, &owner);
+    const int a = roll->addNote(60, 0.0, 1.0, 100);
+    const int b = roll->addNote(64, 1.0, 1.0, 100);
+
+    int clipsChanges = 0;
+    QObject::connect(&tracks, &TrackListWrapper::clipsChanged, &owner, [&] { ++clipsChanges; });
+    CHECK(roll->setNoteVelocities({a, b}, {40, 500}));
+    CHECK(clipsChanges == 1);                                  // one document edit
+    auto stored = tracks.domain().clipNotes(t, c);
+    CHECK(stored[0].velocity == 40 && stored[1].velocity == 127); // clamped
+    CHECK(tracks.clips().at(0).toMap().value("notes").toList()[0].toMap().value("velocity").toInt() == 40);
+
+    CHECK(roll->setNoteVelocities({a}, {40}));                 // no change -> no edit
+    CHECK(clipsChanges == 1);
+    CHECK(!roll->setNoteVelocities({a, b}, {10}));             // mismatched lists rejected
+    CHECK(roll->setNoteVelocities({9999}, {10}));              // unknown ids are ignored
+
+    CHECK(tracks.undo());                                      // single undo restores both
+    CHECK(roll->backend().findNote(a)->velocity == 100);
+    CHECK(roll->backend().findNote(b)->velocity == 100);
+
+    tracks.lockRecordingTrack(t);                              // rejected while recording -> reverted
+    CHECK(!roll->setNoteVelocities({a}, {20}));
+    CHECK(roll->backend().findNote(a)->velocity == 100);
+}

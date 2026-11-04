@@ -690,7 +690,9 @@ Item {
                             z: (isDragging || isResizing) ? 10 : 1
                             readonly property int noteVelocity: modelData.velocity ?? 100
                             readonly property bool isHovered: noteMouse.containsMouse || resizeMouse.containsMouse
-                            readonly property color baseFill: root.noteFillColor(noteVelocity)
+                            // Follows the velocity lane's live drag preview
+                            readonly property int shownVelocity: velocityLane.previewVelocities[String(noteId)] ?? noteVelocity
+                            readonly property color baseFill: root.noteFillColor(shownVelocity)
                             readonly property bool showSelected: isSelected || isDragging
                             color: showSelected ? Qt.lighter(baseFill, 1.35) : (isHovered ? Qt.lighter(baseFill, 1.18) : baseFill)
                             border.color: showSelected ? "#ffffff" : (isHovered ? "#a4e2f5" : "#5bc0de")
@@ -974,6 +976,7 @@ Item {
         // 5. Bottom Velocity / CC Lane (header pinned, stalks follow the grid's horizontal scroll)
         VelocityLane {
             id: velocityLane
+            objectName: "velocityLane"
             Layout.fillWidth: true
             // Shrink the lane (never the grid) when the panel is short, e.g. when docked.
             Layout.preferredHeight: Math.max(0, Math.min(velocityLane.laneHeight,
@@ -984,6 +987,8 @@ Item {
             contentWidth: root.totalGridWidth
             contentX: gridVerticalFlickable.contentX
             notes: root.notes
+            colorSource: root
+            onVelocitiesEdited: (ids, velocities) => pianoRollBackend.setNoteVelocities(ids, velocities)
         }
 
         // 6. Bottom Footer Control Bar
