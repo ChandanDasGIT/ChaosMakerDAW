@@ -582,6 +582,12 @@ Item {
                         const position = mapToItem(root, mouse.x, mouse.y)
                         clipContextMenu.popup(position.x, position.y)
                     }
+                    onDoubleClicked: mouse => {
+                        if (mouse.button === Qt.LeftButton && !clipItem.isRecorded) {
+                            root.openPianoRollRequested(clipItem.trackId, clipItem.clipId,
+                                clipItem.label, clipItem.lengthBeats)
+                        }
+                    }
                 }
                 Rectangle {
                     anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom

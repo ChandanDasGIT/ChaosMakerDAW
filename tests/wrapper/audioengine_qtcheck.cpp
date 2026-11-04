@@ -1,5 +1,6 @@
 #include "testkit.h"
 #include "wrapper/engine/audioenginewrap/audioenginewrapper.h"
+#include "wrapper/engineWrap/enginecontroller.h"
 #include "audiodevice/audiodevice.h"
 
 namespace {
@@ -85,4 +86,16 @@ TEST(qtaudioengine, lifecycle_and_properties)
 
     wrapper.stop();
     CHECK(!wrapper.isAudioReady());
+}
+
+TEST(qtaudioengine, live_note_controller_methods)
+{
+    EngineController controller(std::make_unique<DummyOfflineDevice>(), false);
+    controller.sendLiveNoteOn(1, 60, 100);
+    controller.sendLiveNoteOff(1, 60);
+
+    // Clamping & boundary checks
+    controller.sendLiveNoteOn(1, -1, 100);
+    controller.sendLiveNoteOn(1, 128, 100);
+    controller.sendLiveNoteOff(1, -5);
 }

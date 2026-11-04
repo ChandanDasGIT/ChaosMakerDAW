@@ -150,6 +150,8 @@ public:
     Q_INVOKABLE bool setBufferSize(int frames);
     Q_INVOKABLE QString inputPortForDevice(int index) const;
     Q_INVOKABLE bool setCleanMonitorInput(const QString& port);
+    Q_INVOKABLE void sendLiveNoteOn(int trackId, int note, int velocity = 100);
+    Q_INVOKABLE void sendLiveNoteOff(int trackId, int note);
 
 signals:
     void projectFileChanged();

@@ -79,7 +79,7 @@ private:
     void renderTracks(const AudioIO& io, const EngineSnapshot& snapshot, int frames) noexcept;
     RecordingGroup* m_recordingGroup = nullptr;
     void mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames, TrackMeters* liveMeters) noexcept;
-    void populateTrackMidi(const TrackRender& track, std::int64_t position, int count, bool loopWrapped) noexcept;
+    void populateTrackMidi(const TrackRender& track, std::int64_t position, int count, bool loopWrapped, bool includeLiveMidi = true) noexcept;
     TakeRecorder* m_recorder = nullptr;
     std::atomic<TakeRecorder*> m_releasedRecorder{nullptr};
     std::atomic<std::int64_t> m_reportedPosition{0}, m_recordingStart{0}, m_countInRemaining{0};
@@ -98,6 +98,24 @@ private:
     std::array<std::array<float,1024>,2> m_playbackAudio{};
     std::array<std::array<float,1024>,2> m_printedAudio{}, m_liveAudio{};
     MidiBuffer m_trackMidi;
+    struct LiveMidiMessage {
+        int trackId = -1;
+        MidiEvent event;
+    };
+    struct LiveTrackAudition {
+        int trackId = -1;
+        int activeNotes = 0;
+        int tailSamples = 0;
+    };
+    std::array<LiveMidiMessage, 64> m_liveMidiBatch{};
+    int m_liveMidiCount = 0;
+    std::array<LiveTrackAudition, 16> m_liveAuditions{};
+
+    LiveTrackAudition* findOrCreateAudition(int trackId) noexcept;
+    LiveTrackAudition* findAudition(int trackId) noexcept;
+    bool isAuditionActive(int trackId) const noexcept;
+    bool anyAuditionActive() const noexcept;
+
     bool m_resetPlayback = false;
     std::atomic<float> m_inputTrimGain{1.0f};
     std::atomic<float> m_masterVolume{1.0f};
