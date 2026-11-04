@@ -47,6 +47,9 @@ public:
     Q_INVOKABLE bool removeNotesAt(int note, double beat);
     Q_INVOKABLE bool moveNote(int noteId, int newNote, double newStartBeat);
     Q_INVOKABLE bool resizeNote(int noteId, double newLengthBeats);
+    // Set velocities of several notes (parallel lists, values clamped 0..127) as ONE edit,
+    // so a multi-note velocity drag is a single undo step.
+    Q_INVOKABLE bool setNoteVelocities(const QVariantList& noteIds, const QVariantList& velocities);
     Q_INVOKABLE void selectNote(int noteId, bool addToSelection = false);
     Q_INVOKABLE void selectAll();
     Q_INVOKABLE void clearSelection();

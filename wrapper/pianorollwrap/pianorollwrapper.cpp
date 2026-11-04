@@ -129,6 +129,26 @@ bool PianoRollWrapper::resizeNote(int noteId, double newLengthBeats) {
     return ok;
 }
 
+bool PianoRollWrapper::setNoteVelocities(const QVariantList& noteIds, const QVariantList& velocities) {
+    if (noteIds.isEmpty() || noteIds.size() != velocities.size()) return false;
+    bool changed = false;
+    for (qsizetype i = 0; i < noteIds.size(); ++i) {
+        bool okId = false, okVel = false;
+        const int id = noteIds[i].toInt(&okId);
+        const int velocity = qRound(velocities[i].toDouble(&okVel));
+        const auto* note = okId ? m_pattern.findNote(id) : nullptr;
+        if (!note || !okVel) continue;
+        if (note->velocity != std::clamp(velocity, 0, 127)) {
+            m_pattern.setNoteVelocity(id, velocity); // clamps 0..127
+            changed = true;
+        }
+    }
+    if (!changed) return true;
+    const bool ok = commit();
+    emit notesChanged();
+    return ok;
+}
+
 bool PianoRollWrapper::deleteSelected() {
     if (!m_pattern.deleteSelected()) return false;
     const bool ok = commit();
