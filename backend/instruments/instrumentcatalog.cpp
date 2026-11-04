@@ -7,9 +7,10 @@
 std::span<const InstrumentDefinition> instrumentcatalog::instruments()
 {
     static const auto catalog = [] {
+        std::vector<InstrumentDefinition> entries;
+        entries.push_back({"Piano", "Piano", false, false});
         const auto guitars = guitardefinition::variants();
-        std::vector<InstrumentDefinition> entries(guitars.begin(), guitars.end());
-        // Preserve the remaining choices already offered by TrackListWrapper.
+        entries.insert(entries.end(), guitars.begin(), guitars.end());
         entries.push_back({"Strings", "Strings", false, false});
         entries.push_back({"Drums", "Drums", false, false});
         return entries;

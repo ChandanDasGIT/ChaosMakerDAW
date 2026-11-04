@@ -10,6 +10,8 @@ SnapshotBuilder::Context SnapshotBuilder::Context::fromProject(const Project& pr
     for (const auto& track : project.tracks()) {
         TrackInfo info;
         info.id = track->id;
+        info.kind = track->kind;
+        info.type = track->type;
         info.volume = track->volume;
         info.solo = track->solo;
         info.muted = track->muted;
@@ -145,7 +147,34 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
         render.soloed = track.solo;
 
         for (const auto& clip : track.audioClips) {
-            snapshot->playbackEnd = std::max(snapshot->playbackEnd, clip.start + clip.length);
+            const double rate = context.tempo.sampleRate() > 0.0 ? context.tempo.sampleRate() : 48000.0;
+            const std::int64_t tail = (track.kind == TrackKind::Instrument || !clip.notes.empty())
+                ? static_cast<std::int64_t>(std::llround(rate * 1.0))
+                : 0;
+            snapshot->playbackEnd = std::max(snapshot->playbackEnd, clip.start + clip.length + tail);
+
+            const auto beatsToSamples = [&](double beats) -> std::int64_t {
+                if (context.tempo.bpm() <= 0.0 || context.tempo.sampleRate() <= 0.0) return 0;
+                return context.tempo.sampleAt(beats);
+            };
+            const std::int64_t origin = clip.start - clip.sourceOffset;
+            const std::int64_t clipEnd = clip.start + clip.length;
+
+            for (const auto& n : clip.notes) {
+                std::int64_t on = origin + beatsToSamples(n.startBeat);
+                std::int64_t off = origin + beatsToSamples(n.startBeat + n.lengthBeats);
+                on = std::max(on, clip.start);
+                off = std::min(off, clipEnd);
+                if (off <= on) continue;
+
+                render.notes.push_back({
+                    on,
+                    off,
+                    static_cast<uint8_t>(std::clamp(n.note, 0, 127)),
+                    static_cast<uint8_t>(std::clamp(n.velocity, 0, 127))
+                });
+            }
+
             if (!audioResolver) continue;
             auto audio = audioResolver(clip.poolId);
             if (!audio) continue;
@@ -166,6 +195,15 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
             return a.start < b.start;
         });
 
+        std::stable_sort(render.notes.begin(), render.notes.end(), [](const NoteRender& a, const NoteRender& b) {
+            return a.on < b.on;
+        });
+
+        render.noteOffs = render.notes;
+        std::stable_sort(render.noteOffs.begin(), render.noteOffs.end(), [](const NoteRender& a, const NoteRender& b) {
+            return a.off < b.off;
+        });
+
         if (effectResolver) {
             const auto* fx = effectResolver(track.id);
             if (fx) {
@@ -173,6 +211,11 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
                 render.inputChannel = fx->inputChannel;
                 render.armed = track.hasLiveInput && track.recordArmed;
                 render.monitoring = track.hasLiveInput && track.monitorEnabled && fx->inputChannel >= 0;
+
+                if (fx->instrument) {
+                    render.chain.push_back(fx->instrument.get());
+                    snapshot->keepProcessors.push_back(fx->instrument);
+                }
 
                 if (fx->input) {
                     render.monitorChain.push_back(fx->input.get());
@@ -191,7 +234,7 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
                     }
                 }
 
-                if (hasUnprintedClips) {
+                if (hasUnprintedClips || !render.notes.empty()) {
                     if (fx->playbackInput) {
                         render.chain.push_back(fx->playbackInput.get());
                         snapshot->keepProcessors.push_back(fx->playbackInput);

@@ -25,6 +25,8 @@ struct NoteRender {
     std::int64_t off = 0;
     std::uint8_t key = 60;
     std::uint8_t velocity = 100;
+
+    bool operator==(const NoteRender&) const = default;
 };
 
 struct TrackRender {
@@ -34,6 +36,7 @@ struct TrackRender {
     bool muted = false, soloed = false;
     std::vector<ClipRender> clips;                        // sorted by start
     std::vector<NoteRender> notes;                        // sorted by on
+    std::vector<NoteRender> noteOffs;                     // sorted by off
     std::vector<Processor*> chain;                        // instrument first, then inserts
     const Parameter* volumeDb = nullptr;
     const Parameter* pan = nullptr;

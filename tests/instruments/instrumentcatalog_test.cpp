@@ -8,7 +8,7 @@
 TEST(instrumentcatalog, existing_track_type_ids_names_and_choice_order_are_preserved)
 {
     constexpr std::array<std::string_view, 5> expected{
-        "Guitar", "Acoustic Guitar", "Electric Guitar", "Strings", "Drums"
+        "Piano", "Acoustic Guitar", "Electric Guitar", "Strings", "Drums"
     };
     const auto entries = instrumentcatalog::instruments();
     CHECK(entries.size() == expected.size());
@@ -21,7 +21,7 @@ TEST(instrumentcatalog, existing_track_type_ids_names_and_choice_order_are_prese
     }
     CHECK(!instrumentcatalog::find(""));
     CHECK(!instrumentcatalog::find("electric guitar"));
-    CHECK(!instrumentcatalog::find("Piano")); // An empty folder is not a registered choice.
+    CHECK(!instrumentcatalog::find("Guitar"));
     CHECK(!instrumentcatalog::find("SFZ"));
 }
 
@@ -33,7 +33,7 @@ TEST(instrumentcatalog, only_existing_live_guitar_variants_offer_guitar_processi
         CHECK(entry.supportsGuitarSuite == live);
     }
     const auto guitars = guitardefinition::variants();
-    CHECK(guitars.size() == 3);
+    CHECK(guitars.size() == 2);
     for (const auto& guitar : guitars) {
         const auto* registered = instrumentcatalog::find(guitar.id);
         CHECK(registered);

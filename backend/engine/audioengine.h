@@ -79,6 +79,7 @@ private:
     void renderTracks(const AudioIO& io, const EngineSnapshot& snapshot, int frames) noexcept;
     RecordingGroup* m_recordingGroup = nullptr;
     void mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames, TrackMeters* liveMeters) noexcept;
+    void populateTrackMidi(const TrackRender& track, std::int64_t position, int count, bool loopWrapped) noexcept;
     TakeRecorder* m_recorder = nullptr;
     std::atomic<TakeRecorder*> m_releasedRecorder{nullptr};
     std::atomic<std::int64_t> m_reportedPosition{0}, m_recordingStart{0}, m_countInRemaining{0};
@@ -96,6 +97,7 @@ private:
     int m_fxBlockFrames = 1024;
     std::array<std::array<float,1024>,2> m_playbackAudio{};
     std::array<std::array<float,1024>,2> m_printedAudio{}, m_liveAudio{};
+    MidiBuffer m_trackMidi;
     bool m_resetPlayback = false;
     std::atomic<float> m_inputTrimGain{1.0f};
     std::atomic<float> m_masterVolume{1.0f};
