@@ -641,6 +641,12 @@ bool TrackListWrapper::attachTake(int id, std::int64_t start, std::shared_ptr<co
     notifyClipEdit(id); return true;
 }
 
+bool TrackListWrapper::attachMidiTake(int id, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes)
+{
+    if (!m_state.attachMidiTake(id, start, length, std::move(notes))) return false;
+    notifyClipEdit(id); return true;
+}
+
 std::unique_ptr<EngineSnapshot> TrackListWrapper::playbackSnapshot() const
 {
     return SnapshotBuilder::buildPlaybackSnapshot(

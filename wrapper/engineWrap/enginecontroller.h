@@ -65,6 +65,8 @@ class EngineController : public AudioEngineWrapper {
     Q_PROPERTY(int selectedBufferSize READ selectedBufferSize NOTIFY bufferSizeChanged)
     Q_PROPERTY(int selectedInputIndex READ selectedInputIndex NOTIFY audioRoutingChanged)
     Q_PROPERTY(int selectedOutputIndex READ selectedOutputIndex NOTIFY outputDeviceChanged)
+    Q_PROPERTY(QStringList midiInputPorts READ midiInputPorts NOTIFY midiInputPortsChanged)
+    Q_PROPERTY(QString connectedMidiPort READ connectedMidiPort NOTIFY midiInputPortsChanged)
     Q_PROPERTY(QObject* guitarSuite READ guitarSuite CONSTANT)
     Q_PROPERTY(int monitoredTrackId READ monitoredTrackId NOTIFY monitoredTrackChanged)
     Q_PROPERTY(QVariantList monitoredTracks READ monitoredTracks NOTIFY monitoredTrackChanged)
@@ -152,6 +154,9 @@ public:
     Q_INVOKABLE bool setCleanMonitorInput(const QString& port);
     Q_INVOKABLE void sendLiveNoteOn(int trackId, int note, int velocity = 100);
     Q_INVOKABLE void sendLiveNoteOff(int trackId, int note);
+    QStringList midiInputPorts() const;
+    QString connectedMidiPort() const;
+    Q_INVOKABLE bool connectMidiInput(const QString& portName);
 
 signals:
     void projectFileChanged();
@@ -175,6 +180,7 @@ signals:
     void bufferSizeChanged();
     void masterVolumeChanged();
     void masterMutedChanged();
+    void midiInputPortsChanged();
 
 private:
     void setProjectDirty(bool dirty);

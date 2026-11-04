@@ -55,6 +55,10 @@ EngineController::EngineController(std::unique_ptr<AudioDevice> device, bool dis
             }
             selectInput(preferredInput);
         }
+        const auto midiPorts = m_engine->midiInputNames();
+        if (!midiPorts.empty()) {
+            m_engine->connectMidiInput(midiPorts.front());
+        }
         if (discoverSystemDevices) discoverInputDevices();
     } else {
         setStatus(QStringLiteral("Audio unavailable · %1")
@@ -941,6 +945,9 @@ void EngineController::pollTransport() {
         m_project ? m_project->project().tempo() : TempoMap{},
         [this](int id, int64_t start, std::shared_ptr<const AudioData> audio, bool printed) {
             if (m_project) m_project->attachTake(id, start, audio, printed);
+        },
+        [this](int id, int64_t start, int64_t length, std::vector<MidiNote> notes) {
+            if (m_project) m_project->attachMidiTake(id, start, length, std::move(notes));
         });
     if (done) completeTake();
     emit transportChanged();
@@ -950,6 +957,9 @@ void EngineController::completeTake() {
     auto result = m_recordingController.completeTake(
         [this](int id, int64_t start, std::shared_ptr<const AudioData> audio, bool printed) {
             if (m_project) m_project->attachTake(id, start, audio, printed);
+        },
+        [this](int id, int64_t start, int64_t length, std::vector<MidiNote> notes) {
+            if (m_project) m_project->attachMidiTake(id, start, length, std::move(notes));
         },
         [this]() {
             if (m_project) m_project->lockRecordingTrack(-1);
@@ -1074,6 +1084,9 @@ void EngineController::shutdownSession() {
             [this](int id, int64_t start, std::shared_ptr<const AudioData> audio, bool printed) {
                 if (m_project) m_project->attachTake(id, start, audio, printed);
             },
+            [this](int id, int64_t start, int64_t length, std::vector<MidiNote> notes) {
+                if (m_project) m_project->attachMidiTake(id, start, length, std::move(notes));
+            },
             [this]() {
                 if (m_project) m_project->lockRecordingTrack(-1);
             });
@@ -1098,4 +1111,25 @@ void EngineController::sendLiveNoteOff(int trackId, int note) {
     cmd.a = trackId;
     cmd.b = (std::int64_t(0x80) << 16) | (std::int64_t(note & 0x7F) << 8) | 0;
     m_engine->post(cmd);
+}
+
+QStringList EngineController::midiInputPorts() const {
+    QStringList result;
+    if (m_engine) {
+        for (const auto& port : m_engine->midiInputNames()) {
+            result.push_back(QString::fromStdString(port));
+        }
+    }
+    return result;
+}
+
+QString EngineController::connectedMidiPort() const {
+    return m_engine ? QString::fromStdString(m_engine->connectedMidiInput()) : QString{};
+}
+
+bool EngineController::connectMidiInput(const QString& portName) {
+    if (!m_engine) return false;
+    const bool ok = m_engine->connectMidiInput(portName.toStdString());
+    emit midiInputPortsChanged();
+    return ok;
 }

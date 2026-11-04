@@ -136,6 +136,7 @@ public:
     bool setTempo(double bpm, int numerator, int denominator);
     void setSampleRate(double rate);
     bool attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool printed);
+    bool attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes);
 
 private:
     double offsetBeats(const AudioClip& clip) const;

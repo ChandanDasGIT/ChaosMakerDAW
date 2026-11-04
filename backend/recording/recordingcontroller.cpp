@@ -32,6 +32,11 @@ std::vector<int> RecordingController::activeRecordingTrackIds() const
             result.push_back(id);
         }
     }
+    for (const auto& [id, take] : m_midiTakes) {
+        if (!take->isFinished()) {
+            result.push_back(id);
+        }
+    }
     return result;
 }
 
@@ -46,18 +51,28 @@ bool RecordingController::validateEligibility(
     armedTracks.clear();
     errorMessage.clear();
 
-    if (!audioReady || !inputConnected || !outputConnected) {
+    if (!audioReady || !outputConnected) {
         errorMessage = "Recording needs a connected audio input and output.";
         return false;
     }
 
+    bool hasAudioTracks = false;
     for (const auto& track : project.tracks()) {
         if (!track->recordArmed) continue;
-        if (!track->hasLiveInput()) {
+        if (track->hasLiveInput()) {
+            armedTracks.push_back(track->id);
+            hasAudioTracks = true;
+        } else if (track->kind == TrackKind::Instrument) {
+            armedTracks.push_back(track->id);
+        } else {
             errorMessage = "Disarm tracks without audio inputs before recording.";
             return false;
         }
-        armedTracks.push_back(track->id);
+    }
+
+    if (hasAudioTracks && !inputConnected) {
+        errorMessage = "Recording needs a connected audio input and output.";
+        return false;
     }
 
     if (armedTracks.empty()) {
@@ -90,20 +105,27 @@ bool RecordingController::startRecording(
 
     auto group = std::make_unique<RecordingGroup>();
     std::map<int, std::unique_ptr<TakeRecorder>> takes;
+    std::map<int, std::unique_ptr<MidiTakeRecorder>> midiTakes;
 
     for (int id : armedTracks) {
         const auto* track = project.findTrack(id);
         if (!track) continue;
 
-        const auto filePath = generateTakeFilename(recordingsFolder, id);
-        const auto source = track->recordsWithFx()
-            ? TakeRecorder::Source::PostFx
-            : TakeRecorder::Source::DryInput;
+        if (track->hasLiveInput()) {
+            const auto filePath = generateTakeFilename(recordingsFolder, id);
+            const auto source = track->recordsWithFx()
+                ? TakeRecorder::Source::PostFx
+                : TakeRecorder::Source::DryInput;
 
-        auto take = std::make_unique<TakeRecorder>(filePath, sampleRate, source);
-        const int channel = channelLookup ? channelLookup(id) : 0;
-        group->entries.push_back({id, channel, take.get()});
-        takes.emplace(id, std::move(take));
+            auto take = std::make_unique<TakeRecorder>(filePath, sampleRate, source);
+            const int channel = channelLookup ? channelLookup(id) : 0;
+            group->entries.push_back({id, channel, take.get(), nullptr, true});
+            takes.emplace(id, std::move(take));
+        } else if (track->kind == TrackKind::Instrument) {
+            auto midiTake = std::make_unique<MidiTakeRecorder>(id);
+            group->entries.push_back({id, -1, nullptr, midiTake.get(), true});
+            midiTakes.emplace(id, std::move(midiTake));
+        }
     }
 
     EngineCommand command;
@@ -125,6 +147,8 @@ bool RecordingController::startRecording(
     }
 
     m_takes = std::move(takes);
+    m_midiTakes = std::move(midiTakes);
+    m_tempo.set(bpm, numerator, denominator, sampleRate);
     m_group = std::move(group);
     m_countInMessagePending = countInEnabled;
     m_recordTrack = armedTracks.front();
@@ -137,7 +161,9 @@ bool RecordingController::startRecording(
         outMessage = "Count-in / pre-roll · one bar before recording…";
     } else if (armedTracks.size() == 1) {
         const auto* track = project.findTrack(m_recordTrack);
-        if (track && track->recordsWithFx()) {
+        if (track && track->kind == TrackKind::Instrument && !track->hasLiveInput()) {
+            outMessage = "Recording MIDI for " + track->name + "…";
+        } else if (track && track->recordsWithFx()) {
             outMessage = "Recording " + track->name + " with FX…";
         } else {
             outMessage = "Recording dry input · playback FX stay editable…";
@@ -153,8 +179,10 @@ bool RecordingController::poll(
     bool isEngineRecording,
     std::int64_t engineRecordingStart,
     const TempoMap& tempo,
-    const AttachTakeCallback& attachCallback)
+    const AttachTakeCallback& attachCallback,
+    const AttachMidiTakeCallback& attachMidiCallback)
 {
+    m_tempo = tempo;
     if (isEngineRecording) {
         m_recordStartBeat = tempo.beatAt(engineRecordingStart);
     }
@@ -169,12 +197,40 @@ bool RecordingController::poll(
         }
     }
 
-    return (m_group && m_group->released.load(std::memory_order_acquire)
-        && std::all_of(m_takes.begin(), m_takes.end(), [](const auto& pair) { return pair.second->done(); }));
+    for (const auto& [id, take] : m_midiTakes) {
+        if (take->isFinished() && !m_attachedMidiTakes.contains(id)) {
+            const auto lengthSamples = take->endSample() - take->startSample();
+            if (lengthSamples > 0 && !take->notes().empty() && attachMidiCallback) {
+                std::vector<MidiNote> notes;
+                notes.reserve(take->notes().size());
+                int noteId = 1;
+                for (const auto& c : take->notes()) {
+                    const double startBeat = m_tempo.beatAt(c.on - take->startSample());
+                    const double lengthBeats = std::max(0.01, m_tempo.beatAt(c.off) - m_tempo.beatAt(c.on));
+                    notes.push_back(MidiNote{
+                        noteId++,
+                        c.key,
+                        startBeat,
+                        lengthBeats,
+                        c.velocity,
+                        false
+                    });
+                }
+                attachMidiCallback(id, take->startSample(), lengthSamples, std::move(notes));
+            }
+            m_attachedMidiTakes.insert(id);
+        }
+    }
+
+    const bool audioDone = std::all_of(m_takes.begin(), m_takes.end(), [](const auto& pair) { return pair.second->done(); });
+    const bool midiDone = std::all_of(m_midiTakes.begin(), m_midiTakes.end(), [](const auto& pair) { return pair.second->isFinished(); });
+
+    return (m_group && m_group->released.load(std::memory_order_acquire) && audioDone && midiDone);
 }
 
 RecordingController::FinalizeResult RecordingController::completeTake(
     const AttachTakeCallback& attachCallback,
+    const AttachMidiTakeCallback& attachMidiCallback,
     const UnlockCallback& unlockCallback)
 {
     FinalizeResult result;
@@ -204,13 +260,43 @@ RecordingController::FinalizeResult RecordingController::completeTake(
         }
     }
 
+    for (const auto& [id, take] : m_midiTakes) {
+        const auto lengthSamples = take->endSample() - take->startSample();
+        if (lengthSamples > 0 && !take->notes().empty()) {
+            if (!m_attachedMidiTakes.contains(id)) {
+                if (attachMidiCallback) {
+                    std::vector<MidiNote> notes;
+                    notes.reserve(take->notes().size());
+                    int noteId = 1;
+                    for (const auto& c : take->notes()) {
+                        const double startBeat = m_tempo.beatAt(c.on - take->startSample());
+                        const double lengthBeats = std::max(0.01, m_tempo.beatAt(c.off) - m_tempo.beatAt(c.on));
+                        notes.push_back(MidiNote{
+                            noteId++,
+                            c.key,
+                            startBeat,
+                            lengthBeats,
+                            c.velocity,
+                            false
+                        });
+                    }
+                    attachMidiCallback(id, take->startSample(), lengthSamples, std::move(notes));
+                }
+                m_attachedMidiTakes.insert(id);
+            }
+            ++result.completedTracks;
+        }
+    }
+
     if (result.errors.empty() && m_group && m_group->captureFailed.load(std::memory_order_relaxed)) {
         result.errors.push_back("Recording stopped because audio capture could not continue; completed samples were kept.");
     }
 
     m_group.reset();
     m_takes.clear();
+    m_midiTakes.clear();
     m_attachedTakes.clear();
+    m_attachedMidiTakes.clear();
     m_recordTrack = -1;
     m_countInMessagePending = false;
 
@@ -232,6 +318,7 @@ RecordingController::FinalizeResult RecordingController::completeTake(
 
 void RecordingController::shutdown(
     const AttachTakeCallback& attachCallback,
+    const AttachMidiTakeCallback& attachMidiCallback,
     const UnlockCallback& unlockCallback)
 {
     if (!isBusy()) return;
@@ -239,5 +326,10 @@ void RecordingController::shutdown(
         take->finish();
         take->wait();
     }
-    completeTake(attachCallback, unlockCallback);
+    for (auto& [id, take] : m_midiTakes) {
+        if (!take->isFinished()) {
+            take->finish(take->startSample());
+        }
+    }
+    completeTake(attachCallback, attachMidiCallback, unlockCallback);
 }

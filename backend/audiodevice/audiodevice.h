@@ -42,5 +42,8 @@ public:
     virtual int connectInputChannel(const std::string& source) { return connectInput(source) ? 0 : -1; }
     virtual int inputChannelCapacity() const { return 1; }
     virtual bool connectOutput(const std::string& left, const std::string& right) = 0;
+    virtual std::vector<std::string> midiInputNames() const { return {}; }
+    virtual bool connectMidiInput(const std::string& source) { (void)source; return false; }
+    virtual std::string connectedMidiInput() const { return {}; }
     virtual std::string lastError() const = 0;
 };

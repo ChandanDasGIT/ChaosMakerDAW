@@ -1,5 +1,6 @@
 #pragma once
 #include "recording/takerecorder.h"
+#include "recording/miditakerecorder.h"
 #include <atomic>
 #include <vector>
 
@@ -9,6 +10,7 @@ struct RecordingGroup {
     struct Entry {
         int trackId = -1, inputChannel = -1;
         TakeRecorder* recorder = nullptr;
+        MidiTakeRecorder* midiRecorder = nullptr;
         bool active = true;
     };
     std::vector<Entry> entries;

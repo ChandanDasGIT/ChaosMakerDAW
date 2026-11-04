@@ -202,3 +202,50 @@ TEST(recording, dry_playback_uses_track_inserts_once_and_printed_clips_bypass_th
     f.command(EngineCommand::Type::SetLoop,0,17); f.command(EngineCommand::Type::Seek,0); f.run();
     CHECK(f.engine.position()==9); for(float sample:f.left)CHECK_NEAR(sample,0.15,1e-6);
 }
+
+TEST(recording, midi_take_recording_captures_hardware_midi_events) {
+    Fixture f;
+    MidiBuffer hwMidi;
+    f.io.midiIn = &hwMidi;
+
+    MidiTakeRecorder midiRec(42);
+    RecordingGroup group;
+    group.entries.push_back({42, -1, nullptr, &midiRec, true});
+
+    auto snapshot = std::make_unique<EngineSnapshot>();
+    snapshot->multiMonitor = true;
+    auto gain = std::make_shared<StereoGain>();
+    TrackRender track;
+    track.trackId = 42;
+    track.armed = true;
+    track.chain.push_back(gain.get());
+    snapshot->tracks.push_back(track);
+    snapshot->keepProcessors.push_back(gain);
+    CHECK(f.engine.tryPublishPlayback(snapshot));
+
+    f.command(EngineCommand::Type::Seek, 100);
+    EngineCommand recordCmd;
+    recordCmd.type = EngineCommand::Type::StartRecordingGroup;
+    recordCmd.group = &group;
+    CHECK(f.engine.post(recordCmd));
+
+    // First block: note-on at offset 10 (sample 100 + 10 = 110)
+    hwMidi.add(MidiEvent{10, 0x90, 64, 110});
+    f.run();
+
+    // Second block: note-off at offset 20 (sample 100 + 128 + 20 = 248)
+    hwMidi.clear();
+    hwMidi.add(MidiEvent{20, 0x80, 64, 0});
+    f.run();
+
+    f.command(EngineCommand::Type::StopRecording);
+    f.run();
+
+    CHECK(midiRec.isFinished());
+    CHECK(midiRec.startSample() == 100);
+    CHECK(midiRec.notes().size() == 1);
+    CHECK(midiRec.notes()[0].key == 64);
+    CHECK(midiRec.notes()[0].on == 110);
+    CHECK(midiRec.notes()[0].off == 248);
+    CHECK(midiRec.notes()[0].velocity == 110);
+}

@@ -153,6 +153,21 @@ bool AudioEngine::connectOutput(const std::string& left, const std::string& righ
     return m_device && m_device->connectOutput(left, right);
 }
 
+std::vector<std::string> AudioEngine::midiInputNames() const
+{
+    return m_device ? m_device->midiInputNames() : std::vector<std::string>{};
+}
+
+bool AudioEngine::connectMidiInput(const std::string& source)
+{
+    return m_device && m_device->connectMidiInput(source);
+}
+
+std::string AudioEngine::connectedMidiInput() const
+{
+    return m_device ? m_device->connectedMidiInput() : std::string{};
+}
+
 void AudioEngine::renderBlock(const AudioIO& io) noexcept
 {
     process(io);
@@ -216,7 +231,10 @@ void AudioEngine::process(const AudioIO& io) noexcept
         case EngineCommand::Type::StartRecordingGroup:
             if(command.group && !m_recordingGroup && !m_recorder) {
                 m_recordingGroup=command.group;
-                for(auto& entry:m_recordingGroup->entries)entry.recorder->begin(m_position);
+                for(auto& entry:m_recordingGroup->entries) {
+                    if (entry.recorder) entry.recorder->begin(m_position);
+                    if (entry.midiRecorder) entry.midiRecorder->begin(m_position);
+                }
                 m_recordingStart.store(m_position,std::memory_order_relaxed);
                 if (command.a>0 && command.a<INT64_MAX/4) {
                     m_countInTarget=m_position; m_position-=command.a;
@@ -233,6 +251,23 @@ void AudioEngine::process(const AudioIO& io) noexcept
 
     EngineSnapshot* snapshot = m_snapshot.acquire();
     EngineSnapshot* playback = m_playback.acquire();
+    const auto* currentSnap = playback ? playback : snapshot;
+    if (io.midiIn && !io.midiIn->events().empty() && currentSnap) {
+        for (const auto& t : currentSnap->tracks) {
+            if (trackReceivesHwMidi(t, currentSnap)) {
+                for (const auto& ev : io.midiIn->events()) {
+                    if (auto* aud = findOrCreateAudition(t.trackId)) {
+                        if ((ev.status & 0xF0) == 0x90 && ev.data2 > 0) {
+                            aud->activeNotes++;
+                        } else if ((ev.status & 0xF0) == 0x80 || ((ev.status & 0xF0) == 0x90 && ev.data2 == 0)) {
+                            if (aud->activeNotes > 0) aud->activeNotes--;
+                            aud->tailSamples = static_cast<int>(m_sampleRate * 2.0);
+                        }
+                    }
+                }
+            }
+        }
+    }
     const double bpm = m_tempoBpm.load(std::memory_order_relaxed);
 
     io.output.clear();
@@ -360,7 +395,11 @@ void AudioEngine::finishRecording() noexcept
     if(m_recordingGroup) {
         auto* group=m_recordingGroup; m_recordingGroup=nullptr;
         for(auto& entry:group->entries) {
-            if(entry.active) { entry.recorder->releaseFromAudio(); entry.active=false; }
+            if(entry.active) {
+                if (entry.recorder) entry.recorder->releaseFromAudio();
+                if (entry.midiRecorder) entry.midiRecorder->finish(m_position);
+                entry.active=false;
+            }
         }
         group->released.store(true,std::memory_order_release);
     }
@@ -434,7 +473,27 @@ bool AudioEngine::anyAuditionActive() const noexcept
     return false;
 }
 
-void AudioEngine::populateTrackMidi(const TrackRender& track, std::int64_t position, int count, bool loopWrapped, bool includeLiveMidi) noexcept
+bool AudioEngine::trackReceivesHwMidi(const TrackRender& track, const EngineSnapshot* snapshot) noexcept
+{
+    if (!snapshot || track.chain.empty()) return false;
+    bool anyArmed = false;
+    for (const auto& t : snapshot->tracks) {
+        if (!t.chain.empty() && (t.armed || t.monitoring)) {
+            anyArmed = true;
+            break;
+        }
+    }
+    if (anyArmed) {
+        return track.armed || track.monitoring;
+    }
+    int instrumentCount = 0;
+    for (const auto& t : snapshot->tracks) {
+        if (!t.chain.empty()) instrumentCount++;
+    }
+    return instrumentCount == 1;
+}
+
+void AudioEngine::populateTrackMidi(const TrackRender& track, std::int64_t position, int count, bool loopWrapped, bool includeLiveMidi, const MidiBuffer* hwMidi, bool routeHwMidi) noexcept
 {
     m_trackMidi.clear();
     if (loopWrapped) {
@@ -457,6 +516,11 @@ void AudioEngine::populateTrackMidi(const TrackRender& track, std::int64_t posit
         for (int i = 0; i < m_liveMidiCount; ++i) {
             if (m_liveMidiBatch[i].trackId < 0 || m_liveMidiBatch[i].trackId == track.trackId) {
                 m_trackMidi.add(m_liveMidiBatch[i].event);
+            }
+        }
+        if (hwMidi && routeHwMidi) {
+            for (const auto& ev : hwMidi->events()) {
+                m_trackMidi.add(ev);
             }
         }
     }
@@ -525,7 +589,8 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
                 }
                 track.meters->input[c].capturePeak(peak);
             }
-            populateTrackMidi(track, m_position, count, blockLoopWrapped, offset == 0);
+            const bool routeHw = trackReceivesHwMidi(track, snapshot);
+            populateTrackMidi(track, m_position, count, blockLoopWrapped, offset == 0, io.midiIn, routeHw);
             const bool liveTrackActive = isAuditionActive(track.trackId);
             if ((m_playing || liveTrackActive) && !track.chain.empty()) {
                 ProcessContext context;
@@ -587,10 +652,14 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
             if(!entry.active)continue;
             const auto track=std::find_if(snapshot.tracks.begin(),snapshot.tracks.end(),[&](const auto& t){return t.trackId==entry.trackId;});
             if(track==snapshot.tracks.end() || !track->armed) {
-                entry.recorder->releaseFromAudio(); entry.active=false;
+                if (entry.recorder) entry.recorder->releaseFromAudio();
+                if (entry.midiRecorder) entry.midiRecorder->finish(m_position);
+                entry.active=false;
             } else {
                 active=true;
-                missingInput|=entry.inputChannel<0 || entry.inputChannel>=io.input.channelCount || io.input.frames<frames;
+                if (entry.recorder) {
+                    missingInput|=entry.inputChannel<0 || entry.inputChannel>=io.input.channelCount || io.input.frames<frames;
+                }
             }
         }
         if(!active || missingInput) {
@@ -641,7 +710,7 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
                     if(track.monitorChain[i])track.monitorChain[i]->process(context);
                     if(i==0 && track.meters)track.meters->preFx.capture(context.audio);
                 }
-                if(recording && m_countInTarget<0) {
+                if(recording && m_countInTarget<0 && recording->recorder) {
                     const bool captured=recording->recorder->source()==TakeRecorder::Source::DryInput
                         ? recording->recorder->capture(raw[0],count) : recording->recorder->capture(context.audio);
                     failed|=!captured;
@@ -673,7 +742,20 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
                 }
                 track.meters->input[c].capturePeak(peak);
             }
-            populateTrackMidi(track, m_position, count, blockLoopWrapped, offset == 0);
+            const bool routeHw = trackReceivesHwMidi(track, &snapshot);
+            populateTrackMidi(track, m_position, count, blockLoopWrapped, offset == 0, io.midiIn, routeHw);
+            if(recording && recording->midiRecorder && m_countInTarget < 0 && offset == 0) {
+                if (routeHw && io.midiIn) {
+                    for(const auto& ev : io.midiIn->events()) {
+                        recording->midiRecorder->capture(ev, m_position);
+                    }
+                }
+                for(int i = 0; i < m_liveMidiCount; ++i) {
+                    if (m_liveMidiBatch[i].trackId < 0 || m_liveMidiBatch[i].trackId == track.trackId) {
+                        recording->midiRecorder->capture(m_liveMidiBatch[i].event, m_position);
+                    }
+                }
+            }
             const bool liveTrackActive = isAuditionActive(track.trackId);
             if((m_playing || liveTrackActive) && !track.chain.empty()) {
                 ProcessContext context;
