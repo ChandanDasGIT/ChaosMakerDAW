@@ -17,13 +17,48 @@ Window {
 
     TrackListWrapper { id: trackModel }
 
+    property int activePianoRollTrackId: -1
+    property int activePianoRollClipId: -1
+    property string activePianoRollClipLabel: ""
+    property real activePianoRollClipLength: 4.0
+    property string bottomPanelMode: "mixer" // "mixer" or "pianoroll"
+    readonly property string pianoRollPresentation: topBar.appSettings ? topBar.appSettings.pianoRollPresentation : "dock"
+
+    function openPianoRoll(trackId, clipId, label, lengthBeats) {
+        window.activePianoRollTrackId = trackId
+        window.activePianoRollClipId = clipId
+        window.activePianoRollClipLabel = label
+        window.activePianoRollClipLength = lengthBeats
+
+        if (window.pianoRollPresentation === "window") {
+            floatingPianoRollWindow.show()
+            floatingPianoRollWindow.raise()
+            floatingPianoRollWindow.requestActivate()
+            floatingPianoRollView.centerOnMiddleC()
+        } else {
+            window.bottomPanelMode = "pianoroll"
+            window.mixerVisible = true
+            dockedPianoRoll.centerOnMiddleC()
+        }
+    }
+
     property real trackListWidth: 230
     property bool mixerVisible: true
     property real mixerHeight: 180
+    // The piano roll needs more room than the mixer, so it keeps its own dock height.
+    property real pianoRollDockHeight: 380
+    readonly property bool pianoRollDocked: window.bottomPanelMode === "pianoroll"
 
     Shortcut {
         sequence: "M"
-        onActivated: window.mixerVisible = !window.mixerVisible
+        onActivated: {
+            if (window.bottomPanelMode === "pianoroll") {
+                window.bottomPanelMode = "mixer"
+                window.mixerVisible = true
+            } else {
+                window.mixerVisible = !window.mixerVisible
+            }
+        }
     }
 
     onClosing: event => {
@@ -45,7 +80,14 @@ Window {
             id: topBar
             trackModel: trackModel
             mixerVisible: window.mixerVisible
-            onToggleMixerRequested: window.mixerVisible = !window.mixerVisible
+            onToggleMixerRequested: {
+                if (window.bottomPanelMode === "pianoroll") {
+                    window.bottomPanelMode = "mixer"
+                    window.mixerVisible = true
+                } else {
+                    window.mixerVisible = !window.mixerVisible
+                }
+            }
             Layout.fillWidth: true
             onCloseRequested: { window.closeApproved = true; window.close() }
         }
@@ -100,6 +142,9 @@ Window {
                 laneCount: trackModel.count
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                onOpenPianoRollRequested: (trackId, clipId, label, lengthBeats) => {
+                    window.openPianoRoll(trackId, clipId, label, lengthBeats)
+                }
             }
         }
 
@@ -136,24 +181,78 @@ Window {
                 onPressed: mouse => {
                     let pt = mapToItem(window.contentItem, mouse.x, mouse.y)
                     startGlobalY = pt.y
-                    startHeight = window.mixerHeight
+                    startHeight = window.pianoRollDocked ? window.pianoRollDockHeight : window.mixerHeight
                 }
                 onPositionChanged: mouse => {
                     if (pressed) {
                         let pt = mapToItem(window.contentItem, mouse.x, mouse.y)
                         let diff = startGlobalY - pt.y
-                        window.mixerHeight = Math.max(120, Math.min(480, startHeight + diff))
+                        if (window.pianoRollDocked) {
+                            const minH = dockedPianoRoll.minimumDockHeight
+                            const maxH = Math.max(minH, window.height - 220)
+                            window.pianoRollDockHeight = Math.max(minH, Math.min(maxH, startHeight + diff))
+                        } else {
+                            window.mixerHeight = Math.max(120, Math.min(480, startHeight + diff))
+                        }
                     }
                 }
             }
         }
 
-        MixerPanel {
-            trackModel: trackModel
+        Item {
+            id: bottomWorkspace
             visible: window.mixerVisible
             Layout.fillWidth: true
-            Layout.preferredHeight: window.mixerVisible ? window.mixerHeight : 0
+            Layout.preferredHeight: !window.mixerVisible ? 0
+                : (window.pianoRollDocked ? Math.max(dockedPianoRoll.minimumDockHeight, window.pianoRollDockHeight)
+                                          : window.mixerHeight)
+            clip: true
+
+            MixerPanel {
+                anchors.fill: parent
+                trackModel: trackModel
+                visible: window.bottomPanelMode === "mixer"
+            }
+
+            PianoRollView {
+                id: dockedPianoRoll
+                anchors.fill: parent
+                visible: window.bottomPanelMode === "pianoroll"
+                trackId: window.activePianoRollTrackId
+                clipId: window.activePianoRollClipId
+                clipLabel: window.activePianoRollClipLabel
+                clipLengthBeats: window.activePianoRollClipLength
+                bpm: EngineController.bpm
+                onCloseRequested: {
+                    window.bottomPanelMode = "mixer"
+                }
+            }
         }
+
         StatusStrip { Layout.fillWidth: true; Layout.preferredHeight: Theme.stripHeight }
+    }
+
+    Window {
+        id: floatingPianoRollWindow
+        objectName: "floatingPianoRollWindow"
+        width: 1040
+        height: 640
+        minimumWidth: 700
+        minimumHeight: 450
+        title: "Piano Roll · " + (window.activePianoRollClipLabel || "Clip") + " · ChaosMaker"
+        color: Theme.windowBg
+        visible: false
+
+        PianoRollView {
+            id: floatingPianoRollView
+            width: floatingPianoRollWindow.width
+            height: floatingPianoRollWindow.height
+            trackId: window.activePianoRollTrackId
+            clipId: window.activePianoRollClipId
+            clipLabel: window.activePianoRollClipLabel
+            clipLengthBeats: window.activePianoRollClipLength
+            bpm: EngineController.bpm
+            onCloseRequested: floatingPianoRollWindow.close()
+        }
     }
 }

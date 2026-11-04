@@ -109,6 +109,10 @@ ChaosMaker/
 │   │   ├── GuitarSuiteEditor.qml           // pedalboard editor, pedal slots, controls, presets
 │   │   └── GuitarSuitePanel.qml            // pedalboard container panel
 │   ├── mixer/MixerPanel.qml                // track channel strips, volume faders, pan sliders, meters
+│   ├── pianoroll/
+│   │   ├── PianoKeys.qml                   // vertical interactive piano keyboard (MIDI notes 0-127)
+│   │   ├── PianoRollView.qml               // piano roll editor: toolbar, ruler, note grid, demonstrative notes
+│   │   └── VelocityLane.qml                // collapsible bottom note velocity lane
 │   ├── plugins/
 │   │   ├── eq/Tenbandeq.qml                // 10-band graphic equalizer sliders and preset manager
 │   │   └── TrackEffectsPanel.qml           // track FX slot list and selector

@@ -26,7 +26,8 @@ QVariantMap clipMap(const TrackList::ClipInfo& clip)
     return {{"clipId", clip.clipId}, {"trackId", clip.trackId}, {"laneIndex", clip.laneIndex},
         {"startBeat", clip.startBeat}, {"lengthBeats", clip.lengthBeats},
         {"label", QString::fromStdString(clip.label)}, {"trackColour", QString::fromStdString(clip.colour)},
-        {"effectsPrinted", clip.effectsPrinted}, {"gainDb", clip.gainDb}};
+        {"effectsPrinted", clip.effectsPrinted}, {"gainDb", clip.gainDb},
+        {"isRecorded", clip.isRecorded}};
 }
 QVariantList choices(const std::vector<TrackList::TrackChoice>& entries)
 {

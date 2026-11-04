@@ -39,6 +39,11 @@ void AppSettings::setRestoreSessionOnStartup(bool enabled) noexcept {
     m_restoreSessionOnStartup = enabled;
 }
 
+void AppSettings::setPianoRollPresentation(std::string presentation) noexcept {
+    if (presentation == "window" || presentation == "dock")
+        m_pianoRollPresentation = std::move(presentation);
+}
+
 void AppSettings::setDefaultProjectDirectory(std::string path) {
     m_defaultProjectDirectory = trim(path);
 }
@@ -56,6 +61,7 @@ bool AppSettings::setAutoSaveIntervalSeconds(int seconds) noexcept {
 
 void AppSettings::resetToDefaults() noexcept {
     m_restoreSessionOnStartup = false;
+    m_pianoRollPresentation = "dock";
     m_defaultProjectDirectory.clear();
     m_autoSaveEnabled = true;
     m_autoSaveIntervalSeconds = 60;
@@ -69,6 +75,10 @@ bool AppSettings::validateAutoSaveInterval(int seconds) noexcept {
 void AppSettings::importValue(std::string_view key, std::string_view value) {
     if (key == KeyRestoreSessionOnStartup) {
         m_restoreSessionOnStartup = parseBool(value, false);
+    } else if (key == KeyPianoRollPresentation) {
+        auto p = trim(value);
+        if (p == "window" || p == "dock")
+            m_pianoRollPresentation = std::move(p);
     } else if (key == KeyDefaultProjectDir) {
         m_defaultProjectDirectory = trim(value);
     } else if (key == KeyAutoSaveEnabled) {
@@ -89,6 +99,9 @@ std::string AppSettings::exportValue(std::string_view key) const {
     if (key == KeyRestoreSessionOnStartup) {
         return m_restoreSessionOnStartup ? "true" : "false";
     }
+    if (key == KeyPianoRollPresentation) {
+        return m_pianoRollPresentation;
+    }
     if (key == KeyDefaultProjectDir) {
         return m_defaultProjectDirectory;
     }
@@ -104,6 +117,7 @@ std::string AppSettings::exportValue(std::string_view key) const {
 std::string AppSettings::serialize() const {
     std::ostringstream ss;
     ss << KeyRestoreSessionOnStartup << "=" << (m_restoreSessionOnStartup ? "true" : "false") << "\n";
+    ss << KeyPianoRollPresentation << "=" << m_pianoRollPresentation << "\n";
     ss << KeyDefaultProjectDir << "=" << m_defaultProjectDirectory << "\n";
     ss << KeyAutoSaveEnabled << "=" << (m_autoSaveEnabled ? "true" : "false") << "\n";
     ss << KeyAutoSaveInterval << "=" << m_autoSaveIntervalSeconds << "\n";

@@ -7,12 +7,16 @@ TEST(appsettings, defaults_and_mutators)
 {
     AppSettings settings;
     CHECK(!settings.restoreSessionOnStartup());
+    CHECK(settings.pianoRollPresentation() == "dock");
     CHECK(settings.defaultProjectDirectory().empty());
     CHECK(settings.autoSaveEnabled());
     CHECK(settings.autoSaveIntervalSeconds() == 60);
 
     settings.setRestoreSessionOnStartup(true);
     CHECK(settings.restoreSessionOnStartup());
+
+    settings.setPianoRollPresentation("window");
+    CHECK(settings.pianoRollPresentation() == "window");
 
     settings.setDefaultProjectDirectory("/home/user/Music/Projects");
     CHECK(settings.defaultProjectDirectory() == "/home/user/Music/Projects");
@@ -30,6 +34,7 @@ TEST(appsettings, defaults_and_mutators)
 
     settings.resetToDefaults();
     CHECK(!settings.restoreSessionOnStartup());
+    CHECK(settings.pianoRollPresentation() == "dock");
     CHECK(settings.defaultProjectDirectory().empty());
     CHECK(settings.autoSaveEnabled());
     CHECK(settings.autoSaveIntervalSeconds() == 60);
@@ -46,6 +51,10 @@ TEST(appsettings, import_export_and_migration)
     settings.importValue(AppSettings::KeyRestoreSessionOnStartup, "false");
     CHECK(!settings.restoreSessionOnStartup());
     CHECK(settings.exportValue(AppSettings::KeyRestoreSessionOnStartup) == "false");
+
+    settings.importValue(AppSettings::KeyPianoRollPresentation, "window");
+    CHECK(settings.pianoRollPresentation() == "window");
+    CHECK(settings.exportValue(AppSettings::KeyPianoRollPresentation) == "window");
 
     settings.importValue(AppSettings::KeyDefaultProjectDir, "  /my/custom/path  ");
     CHECK(settings.defaultProjectDirectory() == "/my/custom/path");

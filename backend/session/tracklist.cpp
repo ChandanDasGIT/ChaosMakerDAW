@@ -260,10 +260,11 @@ std::vector<TrackList::ClipInfo> TrackList::clips() const
         const auto& track = *m_project.tracks()[row];
         for (const auto& clip : track.audioClips) {
             const double start = m_project.tempo().beatAt(clip.start);
+            const bool blank = clip.poolId.starts_with("Clip ") && !m_mediaPaths.contains(clip.poolId) && !m_audio.contains(clip.poolId);
             result.push_back({clip.id, track.id, row, start,
                 m_project.tempo().beatAt(clip.start + clip.length) - start,
                 clip.poolId.empty() ? "Audio clip" : std::filesystem::path(clip.poolId).filename().string(),
-                track.colour, clip.effectsPrinted, clip.gainDb});
+                track.colour, clip.effectsPrinted, clip.gainDb, !blank});
         }
     }
     return result;
