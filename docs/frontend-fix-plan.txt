@@ -10,7 +10,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. 3.1, 3.2 done.
-3.3 in progress: 3.3a (Edit menu) done. Next: 3.3b (View menu), then 3.3c (recent files).
+3.3 in progress: 3.3a (Edit menu) and 3.3b (View menu) done. Next: 3.3c (recent files).
 Then 3.4 … 3.12, Phase 4, Phase 5.
 
 Decisions made by the user (keep to them):
@@ -222,7 +222,11 @@ PHASE 3 — Layout and workflow
            Select All for timeline clips. Uses the same Timeline actions as the shortcuts
            (no keyboard focus needed; the backend still decides what is allowed) and gives
            the timeline focus back. New shared common/ThemedMenuItem.qml (see 4.3).
-         - [ ] 3.3b View menu: Mixer (M) and the docked Piano Roll.
+         - [done] 3.3b View menu (window/ViewMenu.qml): Mixer (M) and Piano Roll, ticked
+           when on screen. Main.qml has one toggleMixer() (M key, button, menu) and a
+           togglePianoRoll() that reopens the last clip docked or floating (per
+           Preferences); Piano Roll is disabled until a clip was opened. Hand check:
+           both toggles in the real app, docked and floating.
          - [ ] 3.3c Recent files: backend list, persisted by the wrapper, File > Open Recent
            (asks about unsaved changes first).
 [ ] 3.4  Bottom panel: Mixer / Piano Roll tab switch instead of the "Mixer" toggle

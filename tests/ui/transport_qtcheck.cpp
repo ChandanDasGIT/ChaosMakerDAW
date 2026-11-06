@@ -1172,6 +1172,40 @@ private slots:
         chooseEditItem("editRedoItem"); QCOMPARE(tracks.clips().size(),0);
         top->setProperty("trackModel",QVariant());
     }
+    void view_menu_ticks_follow_the_panels_and_requests_toggles() {
+        auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
+        const auto restore=qScopeGuard([&] {
+            top->setProperty("mixerShown",true); top->setProperty("pianoRollShown",false);
+            top->setProperty("pianoRollAvailable",false);
+        });
+        QSignalSpy mixerToggles(top,SIGNAL(toggleMixerRequested())); QVERIFY(mixerToggles.isValid());
+        QSignalSpy pianoToggles(top,SIGNAL(togglePianoRollRequested())); QVERIFY(pianoToggles.isValid());
+        auto* button=visualItem(window->contentItem(),"viewMenuButton"); QVERIFY(button);
+        auto* menu=window->findChild<QObject*>("viewMenu"); QVERIFY(menu);
+        const auto openMenu=[&] { click(button); QTRY_VERIFY(menu->property("visible").toBool()); };
+        const auto entry=[&](const char* name) { auto* item=visualItem(window->contentItem(),name); return item; };
+
+        openMenu();
+        QVERIFY(entry("viewMixerItem")); QVERIFY(entry("viewPianoRollItem"));
+        QVERIFY(entry("viewMixerItem")->property("checked").toBool());
+        QVERIFY(!entry("viewPianoRollItem")->property("checked").toBool());
+        QVERIFY(!entry("viewPianoRollItem")->isEnabled()); // no clip opened yet
+        click(entry("viewMixerItem")); QTRY_VERIFY(!menu->property("visible").toBool());
+        QCOMPARE(mixerToggles.count(),1); QCOMPARE(pianoToggles.count(),0);
+
+        // The window decides; the tick follows its state, also right after a click.
+        top->setProperty("mixerShown",false); top->setProperty("pianoRollAvailable",true);
+        openMenu();
+        QVERIFY(!entry("viewMixerItem")->property("checked").toBool());
+        QVERIFY(entry("viewPianoRollItem")->isEnabled());
+        click(entry("viewPianoRollItem")); QTRY_VERIFY(!menu->property("visible").toBool());
+        QCOMPARE(pianoToggles.count(),1);
+        top->setProperty("pianoRollShown",true);
+        openMenu();
+        QVERIFY(entry("viewPianoRollItem")->property("checked").toBool());
+        QVERIFY(!entry("viewMixerItem")->property("checked").toBool());
+        QMetaObject::invokeMethod(menu,"close"); QTRY_VERIFY(!menu->property("visible").toBool());
+    }
     void edit_menu_cuts_copies_pastes_duplicates_and_deletes_timeline_clips() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
