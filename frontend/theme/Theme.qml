@@ -1,7 +1,8 @@
 pragma Singleton
 import QtQuick
 
-// Every colour and size of the app lives here. Use it anywhere as Theme.windowBg, Theme.accent, ...
+// Every colour and size of the app lives here, in frontend/theme/. Use it anywhere as Theme.windowBg,
+// Theme.accent, ...; area palettes are sub-objects: Theme.pianoRoll.toolButton, ...
 QtObject {
     // ---- surfaces ----
     readonly property color windowBg:      "#191919"
@@ -57,6 +58,9 @@ QtObject {
         "#ec4899", // Pink
         "#06b6d4"  // Cyan
     ]
+
+    // ---- area palettes (one file each in frontend/theme/) ----
+    readonly property PianoRollColors pianoRoll: PianoRollColors {}
 
     // ---- sizes ----
     readonly property int captionSize: 10
