@@ -1938,6 +1938,36 @@ private slots:
         QTRY_COMPARE(clock->property("text").toString(),expected);
         controller.shutdownSession();
     }
+    void restore_session_setting_has_one_owner() {
+        auto* controller=EngineController::instance();
+        const bool original=controller->restoreSessionOnStartup();
+        auto* bridge=window->findChild<QObject*>("appSettingsBridge"); QVERIFY(bridge);
+        const QString presentation=bridge->property("pianoRollPresentation").toString();
+        const auto restore=qScopeGuard([&] {
+            bridge->setProperty("pianoRollPresentation",presentation); controller->setRestoreSessionOnStartup(original);
+        });
+        // Changing another preference must not overwrite the restore setting
+        controller->setRestoreSessionOnStartup(true);
+        bridge->setProperty("pianoRollPresentation",presentation=="window" ? "dock" : "window");
+        QVERIFY(controller->restoreSessionOnStartup());
+        controller->setRestoreSessionOnStartup(false);
+        bridge->setProperty("pianoRollPresentation",presentation);
+        QVERIFY(!controller->restoreSessionOnStartup());
+        QVERIFY(!bridge->property("restoreSessionOnStartup").isValid()); // no second copy
+        // The menu tick follows the owner, also after being clicked
+        auto* settings=visualItem(window->contentItem(),"settingsButton"); QVERIFY(settings); click(settings);
+        QQuickItem* option=nullptr;
+        QTRY_VERIFY((option=visualItem(window->contentItem(),"restoreSessionSetting")));
+        QVERIFY(!option->property("checked").toBool());
+        click(option); QTRY_VERIFY(controller->restoreSessionOnStartup());
+        controller->setRestoreSessionOnStartup(false);
+        QTRY_VERIFY(!option->property("checked").toBool());
+        controller->setRestoreSessionOnStartup(true);
+        QTRY_VERIFY(option->property("checked").toBool());
+        auto* menu=window->findChild<QObject*>("settingsMenu");
+        if(menu)QMetaObject::invokeMethod(menu,"close");
+        QTest::keyClick(window,Qt::Key_Escape);
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());

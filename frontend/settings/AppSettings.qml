@@ -16,11 +16,7 @@ ToolButton {
 
     AppSettingsWrapper {
         id: appSettingsBridge
-        onRestoreSessionOnStartupChanged: {
-            if (EngineController.restoreSessionOnStartup !== appSettingsBridge.restoreSessionOnStartup) {
-                EngineController.restoreSessionOnStartup = appSettingsBridge.restoreSessionOnStartup
-            }
-        }
+        objectName: "appSettingsBridge"
     }
 
     contentItem: RowLayout {
@@ -60,7 +56,8 @@ ToolButton {
             objectName: "restoreSessionSetting"
             text: "Restore session on startup"
             checkable: true
-            checked: appSettingsBridge.restoreSessionOnStartup
+            // Owned by EngineController, which applies it at startup and when saving the session
+            checked: EngineController.restoreSessionOnStartup
             implicitHeight: 30
             leftPadding: Theme.margin
             rightPadding: Theme.margin
@@ -75,10 +72,9 @@ ToolButton {
                 color: restoreOption.highlighted ? Theme.tooltipBg : "transparent"
                 radius: 4
             }
-            onTriggered: {
-                appSettingsBridge.restoreSessionOnStartup = checked
-                EngineController.restoreSessionOnStartup = checked
-            }
+            onTriggered: EngineController.restoreSessionOnStartup = checked
+            // Keep the tick in step with changes made elsewhere (clicking breaks a plain binding)
+            Binding on checked { value: EngineController.restoreSessionOnStartup }
         }
 
         MenuSeparator {

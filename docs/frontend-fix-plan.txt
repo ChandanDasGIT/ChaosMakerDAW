@@ -146,8 +146,13 @@ PHASE 2 — Move logic out of QML (architecture rule 6)
          value/trim/cents/Hz/sync texts, tuner in-tune rule and status. Tuner labels come
          from standardtuning::targets, division names live in tempodivision.h. Exposed by
          GuitarSuiteModel; the QML keeps layout only.
-[ ] 2.6  "Restore session on startup" written in 3 places (AppSettings.qml:19-23, 78-81)
+[x] 2.6  "Restore session on startup" written in 3 places (AppSettings.qml:19-23, 78-81)
          → one owner (AppSettingsWrapper), others read it.
+         Done: the owner is EngineController (it applies the setting at startup and when
+         saving the session). The menu reads/writes only it; AppSettingsWrapper no longer
+         keeps a copy. Also fixed: AppSettingsWrapper rewrote ALL its keys on any change,
+         so e.g. changing the piano roll display could reset "restore session" to a stale
+         value; each setter now saves only its own key.
 [ ] 2.7  Make track deletion undoable (Project history only covers clip edits today).
 
 
