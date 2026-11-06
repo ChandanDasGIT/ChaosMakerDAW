@@ -16,6 +16,7 @@ QtObject {
 
     // ---- text ----
     readonly property color text:          "#ededed"
+    readonly property color textStrong:    "#ffffff"   // active/hover text on dark or red buttons
     readonly property color textMuted:     "#a8a8a8"
 
     // ---- tooltips ----
@@ -27,6 +28,8 @@ QtObject {
     readonly property color record:        "#e5484d"
     readonly property color focusRing:     "#60cdff"
     readonly property color selectionBg:   "#24426b"
+    readonly property color accentBg:      "#203a45"   // background of a lit (accent) toggle
+    readonly property color recordBg:      "#a9363c"   // armed record / remove-on-hover background
     // Mute is orange and solo yellow everywhere (red is kept for recording).
     readonly property color muteText:      "#ffc08a"
     readonly property color muteBg:        "#653f28"
@@ -47,20 +50,25 @@ QtObject {
     readonly property color controlBgHover:  "#353535"
     readonly property color controlBgActive: "#3d3d3d"
     readonly property color controlBorder:   "#404040"
+    // Small toggle chips (track card IN/MON/FX/REC/M/S, mixer M/S, pedal and EQ buttons)
+    readonly property color chip:            "#303030"
+    readonly property color chipHover:       "#383838"
+    readonly property color chipBorder:      "#424242"
+    readonly property color chipBorderHover: "#626671"
 
-    // ---- curated track color palette ----
+    // ---- popups ----
+    readonly property color popupBg:         "#25272c"
+    readonly property color popupBorder:     "#4a4d56"
+
+    // ---- track colour palette (the track colour picker) ----
     readonly property var trackColors: [
-        "#3b82f6", // Blue
-        "#10b981", // Emerald
-        "#f59e0b", // Amber
-        "#ef4444", // Crimson
-        "#8b5cf6", // Purple
-        "#ec4899", // Pink
-        "#06b6d4"  // Cyan
+        "#58b7b1", "#6fa8dc", "#b18bd9", "#de849c", "#e2a565", "#d8c16b",
+        "#86bd83", "#9babb7", "#d97c73", "#72b9ce", "#8c9bdd", "#b49a87"
     ]
 
     // ---- area palettes (one file each in frontend/theme/) ----
     readonly property PianoRollColors pianoRoll: PianoRollColors {}
+    readonly property TrackListColors trackList: TrackListColors {}
 
     // ---- sizes ----
     readonly property int captionSize: 10
