@@ -90,6 +90,7 @@ public:
     Change setTrackInputPort(int id, const std::string& port);
     Change setVolume(int id, double volume);
     Change setPan(int id, double pan);
+    Change setStripWidth(int id, double width);
     Change setEqBand(int id, int band, double gainDb);
     double masterVolume() const noexcept { return m_project.masterVolume(); }
     Change setMasterVolume(double volume);

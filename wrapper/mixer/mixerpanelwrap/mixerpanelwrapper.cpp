@@ -118,6 +118,12 @@ void MixerPanelWrapper::setPan(int trackId, double pan)
     m_trackList->setPan(trackId, panlaw::clampPan(pan));
 }
 
+void MixerPanelWrapper::setStripWidth(int trackId, double width)
+{
+    if (!m_trackList) return;
+    m_trackList->setStripWidth(trackId, mixer::clampStripWidth(width));
+}
+
 void MixerPanelWrapper::resetPan(int trackId)
 {
     if (!m_trackList) return;

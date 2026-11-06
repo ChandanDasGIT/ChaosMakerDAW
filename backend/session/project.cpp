@@ -1,5 +1,6 @@
 #include "project.h"
 #include "dsp/panlaw.h"
+#include "mixer/mixerpanel.h"
 #include "instruments/instrumentcatalog.h"
 
 #include <algorithm>
@@ -186,6 +187,17 @@ bool Project::setTrackPan(int id, float pan)
     if (!track || !std::isfinite(pan))
         return false;
     track->pan = static_cast<float>(panlaw::clampPan(pan));
+    return true;
+}
+
+static_assert(Track{}.stripWidth == mixer::defaultStripWidth, "Track strip width default must match the mixer");
+
+bool Project::setTrackStripWidth(int id, float width)
+{
+    auto* track = findTrack(id);
+    if (!track || !std::isfinite(width))
+        return false;
+    track->stripWidth = static_cast<float>(mixer::clampStripWidth(width));
     return true;
 }
 

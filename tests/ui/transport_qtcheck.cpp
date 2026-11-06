@@ -1567,6 +1567,44 @@ private slots:
             QCOMPARE(reopened.data(reopened.index(row),TrackListWrapper::NameRole),
                      tracks.data(tracks.index(row),TrackListWrapper::NameRole));
     }
+    void mixer_strip_width_is_saved_per_track_once_per_drag() {
+        TrackListWrapper tracks; const int first=tracks.addAudioTrack(), second=tracks.addVocalTrack();
+        QVERIFY(tracks.setStripWidth(second,180.0));                // e.g. loaded from a project
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
+        const auto restore=qScopeGuard([&] { mixer->setVisible(false); mixer->setProperty("trackModel",QVariant()); });
+        mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
+        QTRY_COMPARE(mixer->property("stripCount").toInt(),2);
+        auto* firstStrip=visualItem(mixer,"mixerStrip"+QString::number(first));
+        auto* secondStrip=visualItem(mixer,"mixerStrip"+QString::number(second));
+        QVERIFY(firstStrip); QVERIFY(secondStrip);
+        QCOMPARE(firstStrip->width(),108.0); QCOMPARE(secondStrip->width(),180.0);
+        // Drag the second strip wider: live during the drag, stored once on release.
+        QSignalSpy changes(&tracks,&QAbstractItemModel::dataChanged);
+        auto* handle=visualItem(mixer,"mixerResize"+QString::number(second)); QVERIFY(handle);
+        const QPoint start=handle->mapToScene(QPointF(3,30)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
+        for(int dx:{10,20,30}) QTest::mouseMove(window,start+QPoint(dx,0));
+        QCOMPARE(secondStrip->width(),210.0);
+        QCOMPARE(tracks.project().findTrack(second)->stripWidth,180.0f);  // not stored mid-drag
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,start+QPoint(30,0));
+        QCOMPARE(tracks.project().findTrack(second)->stripWidth,210.0f);
+        QCOMPARE(changes.count(),1);
+        QCOMPARE(secondStrip->width(),210.0);
+        QCOMPARE(tracks.project().findTrack(first)->stripWidth,108.0f);
+        // Model changes (project load, session restore) resize the strip.
+        QVERIFY(tracks.setStripWidth(first,120.0)); QCOMPARE(firstStrip->width(),120.0);
+        // Session state keeps the widths; old sessions restore the default.
+        QJsonObject state=tracks.sessionState();
+        TrackListWrapper restored; QString error;
+        QVERIFY2(restored.restoreSessionState(state,error),qPrintable(error));
+        QCOMPARE(restored.project().tracks()[1]->stripWidth,210.0f);
+        auto list=state["tracks"].toArray(); auto track=list[1].toObject(); track.remove("stripWidth"); list[1]=track;
+        state["tracks"]=list;
+        QVERIFY2(restored.restoreSessionState(state,error),qPrintable(error));
+        QCOMPARE(restored.project().tracks()[1]->stripWidth,108.0f);
+        track["stripWidth"]=999; list[1]=track; state["tracks"]=list;
+        QVERIFY(!restored.restoreSessionState(state,error));
+    }
     void mixer_tracks_follow_add_remove_and_project_replacement() {
         TrackListWrapper tracks;
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);

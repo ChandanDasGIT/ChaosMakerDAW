@@ -1,4 +1,5 @@
 #include "projectdocument.h"
+#include "mixer/mixerpanel.h"
 #include "recording/takerecorder.h"
 #include <nlohmann/json.hpp>
 #include <chrono>
@@ -75,6 +76,7 @@ std::string ProjectDocument::serialize(const Project& project,
         trackObj["muted"] = track->muted;
         trackObj["volume"] = track->volume;
         trackObj["pan"] = track->pan;
+        trackObj["stripWidth"] = track->stripWidth;
         trackObj["input"] = track->inputPort;
         trackObj["recordDry"] = track->recordDry;
         trackObj["eq"] = eqJson;
@@ -222,11 +224,19 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             return false;
         }
         track.pan = item.value("pan", 0.0f);
+        // Optional too: older projects keep the default mixer strip width.
+        if (item.contains("stripWidth") && !item["stripWidth"].is_number()) {
+            error = "Invalid track controls.";
+            return false;
+        }
+        track.stripWidth = item.value("stripWidth", Track{}.stripWidth);
         track.inputPort = item.value("input", "");
 
         if (!item.contains("eq") || !item["eq"].is_array() || item["eq"].size() != 10
             || track.volume < 0.0f || track.volume > 2.0f
             || !std::isfinite(track.pan) || track.pan < -1.0f || track.pan > 1.0f
+            || !std::isfinite(track.stripWidth) || track.stripWidth < mixer::minStripWidth
+            || track.stripWidth > mixer::maxStripWidth
             || !item.contains("clips") || !item["clips"].is_array()) {
             error = "Invalid track controls.";
             return false;

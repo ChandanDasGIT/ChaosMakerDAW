@@ -1,6 +1,7 @@
 #include "tracklistwrapper.h"
 #include "timeline/clipwaveform.h"
 #include "engine/snapshotbuilder.h"
+#include "mixer/mixerpanel.h"
 #include <optional>
 #include "plugins/eq/eqpresets.h"
 #include "plugins/eq/eqpresetstore.h"
@@ -113,6 +114,8 @@ QVariant TrackListWrapper::data(const QModelIndex& index, int role) const
         return track.volume;
     case PanRole:
         return track.pan;
+    case StripWidthRole:
+        return track.stripWidth;
     case EqBandsRole: {
         QVariantList bands;
         for (float gain : track.eqGainDb)
@@ -144,6 +147,7 @@ QHash<int, QByteArray> TrackListWrapper::roleNames() const
         {InputPortRole, "inputPort"},
         {VolumeRole, "volume"},
         {PanRole, "pan"},
+        {StripWidthRole, "stripWidth"},
         {ClipsRole, "clips"},
         {EqBandsRole, "eqBands"},
         {LiveInputRole, "hasLiveInput"},
@@ -183,6 +187,7 @@ bool TrackListWrapper::setData(const QModelIndex& idx, const QVariant& value, in
     case InputPortRole: return setTrackInputPort(id, value.toString());
     case VolumeRole: return setVolume(id, value.toDouble());
     case PanRole: return setPan(id, value.toDouble());
+    case StripWidthRole: return setStripWidth(id, value.toDouble());
     default: return false;
     }
 }
@@ -428,6 +433,11 @@ bool TrackListWrapper::setVolume(int id, double value)
 bool TrackListWrapper::setPan(int id, double value)
 {
     return notifyTrackChanged(id, PanRole, m_state.setPan(id, value));
+}
+
+bool TrackListWrapper::setStripWidth(int id, double value)
+{
+    return notifyTrackChanged(id, StripWidthRole, m_state.setStripWidth(id, value));
 }
 
 bool TrackListWrapper::setMasterVolume(double value)
@@ -708,7 +718,7 @@ QJsonObject TrackListWrapper::sessionState() const
         tracks.append(QJsonObject{{"name", QString::fromStdString(track->name)},
             {"colour", QString::fromStdString(track->colour)},
             {"type", QString::fromStdString(track->type)}, {"instrument", track->kind == TrackKind::Instrument},
-            {"solo", track->solo}, {"muted", track->muted}, {"volume", track->volume}, {"pan", track->pan},
+            {"solo", track->solo}, {"muted", track->muted}, {"volume", track->volume}, {"pan", track->pan}, {"stripWidth", track->stripWidth},
             {"input", QString::fromStdString(track->inputPort)}, {"recordDry", track->recordDry}, {"eq", eq}, {"clips", clips}});
     }
     const auto& tempo = m_project.tempo();
@@ -747,10 +757,14 @@ bool TrackListWrapper::restoreSessionState(const QJsonObject& state, QString& er
         track.volume = float(item["volume"].toDouble(-1));
         // Sessions saved before pan existed restore centred.
         track.pan = float(item["pan"].toDouble(0));
+        track.stripWidth = float(item["stripWidth"].toDouble(Track{}.stripWidth));
         track.inputPort = item["input"].toString().toStdString();
         const auto eq = item["eq"].toArray();
         if (track.volume < 0 || track.volume > 2 || (item.contains("pan") && !item["pan"].isDouble())
-            || !std::isfinite(track.pan) || track.pan < -1 || track.pan > 1 || eq.size() != 10 || !item["clips"].isArray()) {
+            || !std::isfinite(track.pan) || track.pan < -1 || track.pan > 1
+            || (item.contains("stripWidth") && !item["stripWidth"].isDouble())
+            || track.stripWidth < mixer::minStripWidth || track.stripWidth > mixer::maxStripWidth
+            || eq.size() != 10 || !item["clips"].isArray()) {
             error = "Invalid track controls."; return false;
         }
         for (int i = 0; i < 10; ++i) {

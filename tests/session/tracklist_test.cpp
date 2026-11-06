@@ -328,3 +328,18 @@ TEST(tracklist, set_pan_clamps_and_reports_changes)
     CHECK(!tracks.setPan(id, std::numeric_limits<double>::quiet_NaN()).accepted);
     CHECK(!tracks.setPan(id + 100, 0.5).accepted);
 }
+
+TEST(tracklist, set_strip_width_clamps_to_the_mixer_limits)
+{
+    TrackList tracks;
+    const int id = tracks.addAudioTrack();
+    CHECK(tracks.project().findTrack(id)->stripWidth == 108.0f);
+    const auto wider = tracks.setStripWidth(id, 160.0);
+    CHECK(wider.accepted && wider.changed);
+    CHECK(tracks.project().findTrack(id)->stripWidth == 160.0f);
+    CHECK(!tracks.setStripWidth(id, 160.0).changed);
+    CHECK(tracks.setStripWidth(id, 10.0).changed);
+    CHECK(tracks.project().findTrack(id)->stripWidth == 82.0f);
+    CHECK(!tracks.setStripWidth(id, std::numeric_limits<double>::infinity()).accepted);
+    CHECK(!tracks.setStripWidth(id + 50, 120.0).accepted);
+}

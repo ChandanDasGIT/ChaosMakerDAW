@@ -81,6 +81,7 @@ public:
     Q_INVOKABLE void setMasterVolume(double volume);
     Q_INVOKABLE void resetMasterVolume();
     Q_INVOKABLE void setPan(int trackId, double pan);
+    Q_INVOKABLE void setStripWidth(int trackId, double width);
     Q_INVOKABLE void resetPan(int trackId);
     // continueEdit: later steps of the same fader drag join the drag's single undo step.
     Q_INVOKABLE void setClipGain(int trackId, int clipId, double gainDb, bool continueEdit = false);
