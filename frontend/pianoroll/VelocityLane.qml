@@ -7,6 +7,9 @@ Item {
     id: root
 
     property real beatWidth: 96
+    // Meter, from the piano roll: one counted beat in quarter-note beats, and beats per bar
+    property real beatUnit: 1
+    property int beatsInBar: 4
     property real contentWidth: 1000
     property real contentX: 0 // horizontal scroll offset shared with the note grid
     property real laneHeight: 90
@@ -212,16 +215,17 @@ Item {
                 width: root.contentWidth
                 height: parent.height
 
-                // Vertical beat grid lines in velocity lane
+                // Vertical beat grid lines in velocity lane (one per counted beat; bars thicker)
                 Repeater {
-                    model: Math.ceil(root.contentWidth / root.beatWidth) + 1
+                    model: Math.ceil(root.contentWidth / (root.beatUnit * root.beatWidth)) + 1
                     delegate: Rectangle {
                         required property int index
-                        x: index * root.beatWidth
+                        readonly property bool isBar: index % root.beatsInBar === 0
+                        x: Math.round(index * root.beatUnit * root.beatWidth)
                         y: 0
-                        width: (index % 4 === 0) ? 2 : 1
+                        width: isBar ? 2 : 1
                         height: parent.height
-                        color: (index % 4 === 0) ? "#3b3f4a" : "#2f333c"
+                        color: isBar ? "#3b3f4a" : "#2f333c"
                     }
                 }
 

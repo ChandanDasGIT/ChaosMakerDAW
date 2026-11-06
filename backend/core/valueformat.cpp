@@ -1,5 +1,6 @@
 #include "valueformat.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
@@ -67,4 +68,21 @@ std::string valueformat::position(double seconds)
     const auto ms = static_cast<std::uint64_t>(milliseconds);
     return padded(ms / 3600000, 2) + ':' + padded(ms / 60000 % 60, 2)
         + ':' + padded(ms / 1000 % 60, 2) + '.' + padded(ms % 1000, 3);
+}
+
+std::string valueformat::barBeatPosition(double beat, double beatsPerBar, double beatUnit)
+{
+    if (!std::isfinite(beat) || !std::isfinite(beatsPerBar) || !std::isfinite(beatUnit)
+        || beat < 0 || beatsPerBar <= 0 || beatUnit <= 0)
+        return unavailable;
+    // A small tolerance keeps exact grid positions (e.g. 2.9999999) on the right beat.
+    constexpr double tolerance = 1e-9;
+    const double bar = std::floor(beat / beatsPerBar + tolerance);
+    if (bar >= 1e15) return unavailable;
+    const double inBar = std::max(0.0, beat - bar * beatsPerBar);
+    const double beatInBar = std::floor(inBar / beatUnit + tolerance);
+    const double fraction = std::max(0.0, inBar / beatUnit - beatInBar);
+    const auto hundredths = std::min<std::uint64_t>(99, static_cast<std::uint64_t>(std::floor(fraction * 100 + 1e-6)));
+    return std::to_string(static_cast<std::uint64_t>(bar) + 1) + '.'
+        + std::to_string(static_cast<std::uint64_t>(beatInBar) + 1) + '.' + padded(hundredths, 2);
 }

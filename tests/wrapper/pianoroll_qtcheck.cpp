@@ -139,6 +139,27 @@ TEST(qtpianoroll, clip_start_beat_is_exposed_and_notifies_on_clip_moves) {
     CHECK(roll->clipStartBeat() == 0.0);
 }
 
+TEST(qtpianoroll, meter_follows_the_project_time_signature) {
+    QObject owner;
+    TrackListWrapper tracks;
+    const int t = tracks.addInstrumentTrack();
+    const int c = tracks.addClipAtBeat(t, 0, 4);
+    auto* roll = boundRoll(tracks, t, c, &owner);
+    CHECK(roll->beatsPerBar() == 4.0 && roll->beatUnit() == 1.0);
+    CHECK(roll->positionLabel(5.25) == "2.2.25");
+
+    int meterChanges = 0;
+    QObject::connect(roll, &PianoRollWrapper::meterChanged, &owner, [&] { ++meterChanges; });
+    const double bpm = tracks.domain().project().tempo().bpm();
+    tracks.setTempo(bpm, 6, 8);
+    CHECK(meterChanges >= 1);
+    CHECK(roll->beatsPerBar() == 3.0 && roll->beatUnit() == 0.5);
+    CHECK(roll->positionLabel(3.75) == "2.2.50");
+
+    PianoRollWrapper unbound; // no project: plain 4/4
+    CHECK(unbound.beatsPerBar() == 4.0 && unbound.beatUnit() == 1.0);
+}
+
 TEST(qtpianoroll, velocity_edits_are_one_undoable_change_and_clamped) {
     QObject owner;
     TrackListWrapper tracks;

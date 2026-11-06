@@ -25,6 +25,9 @@ class PianoRollWrapper : public QObject {
     Q_PROPERTY(bool bound READ bound NOTIFY bindingChanged)
     // Project beat where the bound clip starts; note beats and the playhead are relative to it.
     Q_PROPERTY(double clipStartBeat READ clipStartBeat NOTIFY clipStartChanged)
+    // Project meter in quarter-note beats (4/4 -> 4 and 1, 6/8 -> 3 and 0.5); 4/4 when unbound.
+    Q_PROPERTY(double beatsPerBar READ beatsPerBar NOTIFY meterChanged)
+    Q_PROPERTY(double beatUnit READ beatUnit NOTIFY meterChanged)
 
 public:
     explicit PianoRollWrapper(QObject* parent = nullptr);
@@ -44,6 +47,10 @@ public:
     void setClipId(int id);
     bool bound() const;
     double clipStartBeat() const;
+    double beatsPerBar() const;
+    double beatUnit() const;
+    // Clip-relative beat as "bar.beat.hundredths" in the project meter.
+    Q_INVOKABLE QString positionLabel(double beat) const;
 
     Q_INVOKABLE int addNote(int note, double startBeat, double lengthBeats, int velocity = 100);
     Q_INVOKABLE bool removeNote(int noteId);
@@ -64,6 +71,7 @@ signals:
     void notesChanged();
     void bindingChanged();
     void clipStartChanged();
+    void meterChanged();
 
 private:
     bool commit();       // write the pattern to the bound clip; reverts on rejection

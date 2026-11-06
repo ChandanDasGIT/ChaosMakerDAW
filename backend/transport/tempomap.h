@@ -15,6 +15,8 @@ public:
     double beatAt(std::int64_t sample) const noexcept { return double(sample) * m_bpm / (60.0 * m_sampleRate); }
     std::int64_t sampleAt(double beat) const noexcept { return std::llround(beat * 60.0 * m_sampleRate / m_bpm); }
     double beatsPerBar() const noexcept { return m_numerator * 4.0 / m_denominator; }
+    // Length of one counted beat (the meter's denominator note) in quarter-note beats.
+    double beatUnit() const noexcept { return 4.0 / m_denominator; }
 
     double sampleRate() const noexcept { return m_sampleRate; }
     double bpm() const noexcept { return m_bpm; }
