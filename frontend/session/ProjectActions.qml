@@ -156,91 +156,37 @@ RowLayout {
             border.color: fileMenuButton.checked ? Theme.divider : "transparent"
         }
 
-        Menu {
+        ThemedMenu {
             id: fileMenu
             objectName: "fileMenu"
             y: parent.height + 4
             width: 190
-            padding: 4
-            // Styles the "Open Recent" submenu entry like the other items.
-            delegate: ThemedMenuItem {}
             onAboutToShow: recentProjects.refresh()
-            background: Rectangle {
-                color: Theme.panelBg
-                border.color: Theme.divider
-                radius: 6
-            }
 
-            MenuItem {
+            ThemedMenuItem {
                 id: newAction
                 objectName: "fileNewItem"
                 text: "New"
+                shortcutText: "Ctrl+N"
                 enabled: !EngineController.takeBusy && !EngineController.projectLoading
-                implicitHeight: 30
-                leftPadding: Theme.margin
-                rightPadding: Theme.margin
-                contentItem: RowLayout {
-                    Text {
-                        text: newAction.text
-                        color: !newAction.enabled ? Theme.textMuted : newAction.highlighted ? Theme.accent : Theme.text
-                        font.pixelSize: Theme.bodySize
-                        Layout.fillWidth: true
-                    }
-                    Text {
-                        text: "Ctrl+N"
-                        color: Theme.textMuted
-                        font.pixelSize: Theme.captionSize
-                        font.family: Theme.monospaceFontFamily
-                    }
-                }
-                background: Rectangle {
-                    color: newAction.highlighted ? Theme.tooltipBg : "transparent"
-                    radius: 4
-                }
                 onTriggered: actionsBridge.requestAction("New", EngineController.projectDirty)
             }
 
-            MenuItem {
+            ThemedMenuItem {
                 id: openAction
                 objectName: "fileOpenItem"
                 text: "Open..."
+                shortcutText: "Ctrl+O"
                 enabled: !EngineController.takeBusy && !EngineController.projectLoading
-                implicitHeight: 30
-                leftPadding: Theme.margin
-                rightPadding: Theme.margin
-                contentItem: RowLayout {
-                    Text {
-                        text: openAction.text
-                        color: !openAction.enabled ? Theme.textMuted : openAction.highlighted ? Theme.accent : Theme.text
-                        font.pixelSize: Theme.bodySize
-                        Layout.fillWidth: true
-                    }
-                    Text {
-                        text: "Ctrl+O"
-                        color: Theme.textMuted
-                        font.pixelSize: Theme.captionSize
-                        font.family: Theme.monospaceFontFamily
-                    }
-                }
-                background: Rectangle {
-                    color: openAction.highlighted ? Theme.tooltipBg : "transparent"
-                    radius: 4
-                }
                 onTriggered: actionsBridge.requestAction("Open", EngineController.projectDirty)
             }
 
-            Menu {
+            ThemedMenu {
                 id: recentMenu
                 objectName: "fileOpenRecentMenu"
                 title: "Open Recent"
                 enabled: !recentProjects.empty && !EngineController.takeBusy && !EngineController.projectLoading
                 width: 300
-                padding: 4
-                background: Rectangle {
-                    color: Theme.panelBg
-                    border.color: Theme.divider
-                    radius: 6
-                }
 
                 Instantiator {
                     model: recentProjects.paths
@@ -261,7 +207,7 @@ RowLayout {
                     onObjectRemoved: (index, object) => recentMenu.removeItem(object)
                 }
 
-                MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.divider } }
+                ThemedMenuSeparator {}
 
                 ThemedMenuItem {
                     objectName: "clearRecentProjects"
@@ -270,61 +216,21 @@ RowLayout {
                 }
             }
 
-            MenuItem {
+            ThemedMenuItem {
                 id: saveAction
                 objectName: "fileSaveItem"
                 text: "Save"
+                shortcutText: "Ctrl+S"
                 enabled: !EngineController.takeBusy && !EngineController.projectLoading
-                implicitHeight: 30
-                leftPadding: Theme.margin
-                rightPadding: Theme.margin
-                contentItem: RowLayout {
-                    Text {
-                        text: saveAction.text
-                        color: !saveAction.enabled ? Theme.textMuted : saveAction.highlighted ? Theme.accent : Theme.text
-                        font.pixelSize: Theme.bodySize
-                        Layout.fillWidth: true
-                    }
-                    Text {
-                        text: "Ctrl+S"
-                        color: Theme.textMuted
-                        font.pixelSize: Theme.captionSize
-                        font.family: Theme.monospaceFontFamily
-                    }
-                }
-                background: Rectangle {
-                    color: saveAction.highlighted ? Theme.tooltipBg : "transparent"
-                    radius: 4
-                }
                 onTriggered: actionsBridge.requestSave(EngineController.projectFile.toString().length > 0)
             }
 
-            MenuItem {
+            ThemedMenuItem {
                 id: saveAsAction
                 objectName: "fileSaveAsItem"
                 text: "Save As..."
+                shortcutText: "Ctrl+Shift+S"
                 enabled: !EngineController.takeBusy && !EngineController.projectLoading
-                implicitHeight: 30
-                leftPadding: Theme.margin
-                rightPadding: Theme.margin
-                contentItem: RowLayout {
-                    Text {
-                        text: saveAsAction.text
-                        color: !saveAsAction.enabled ? Theme.textMuted : saveAsAction.highlighted ? Theme.accent : Theme.text
-                        font.pixelSize: Theme.bodySize
-                        Layout.fillWidth: true
-                    }
-                    Text {
-                        text: "Ctrl+Shift+S"
-                        color: Theme.textMuted
-                        font.pixelSize: Theme.captionSize
-                        font.family: Theme.monospaceFontFamily
-                    }
-                }
-                background: Rectangle {
-                    color: saveAsAction.highlighted ? Theme.tooltipBg : "transparent"
-                    radius: 4
-                }
                 onTriggered: actionsBridge.requestSaveAs()
             }
         }

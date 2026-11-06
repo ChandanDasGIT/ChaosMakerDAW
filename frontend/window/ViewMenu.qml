@@ -40,17 +40,11 @@ ToolButton {
         border.color: root.checked ? Theme.divider : "transparent"
     }
 
-    Menu {
+    ThemedMenu {
         id: viewMenu
         objectName: "viewMenu"
         y: parent.height + 4
         width: 200
-        padding: 4
-        background: Rectangle {
-            color: Theme.panelBg
-            border.color: Theme.divider
-            radius: 6
-        }
 
         ThemedMenuItem {
             objectName: "viewMixerItem"
