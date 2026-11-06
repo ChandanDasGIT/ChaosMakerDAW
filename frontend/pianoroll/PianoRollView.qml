@@ -27,7 +27,7 @@ Item {
     // Grid settings live in the backend (PianoRollGrid via PianoRollWrapper)
     property alias snapDivision: pianoRollBackend.gridDivision
     property alias snapStyle: pianoRollBackend.gridStyle
-    property string colorMode: "Velocity"
+    property string colorMode: "Track" // "Track" (the clip's track colour) or "Velocity"
 
     // Transport used by the footer buttons and the playhead (replaceable in tests, like Timeline).
     property var transport: EngineController
@@ -189,10 +189,20 @@ Item {
     // Note fill colour. "Velocity" mode blends dim blue (soft) -> bright teal (loud);
     // other modes keep the default note colour for now.
     // "Track" mode shades the track colour the same way (darker = softer).
+    // Track mode needs a bound clip; with no track colour the notes keep the blue scale.
+    // Each colour checks the track colour itself, so none can use a stale mode while unbinding.
+    function trackTint() {
+        const colour = pianoRollBackend.trackColour
+        return colorMode === "Track" && colour.length > 0 ? colour : ""
+    }
+    readonly property bool useTrackColour: trackTint().length > 0
+    // Note outline and the brighter edge/hover tint, following the note colour mode.
+    readonly property color noteOutlineColour: { const c = trackTint(); return c.length > 0 ? Qt.lighter(c, 1.45) : "#5bc0de" }
+    readonly property color noteHighlightColour: { const c = trackTint(); return c.length > 0 ? Qt.lighter(c, 1.8) : "#a4e2f5" }
     function noteFillColor(velocity) {
         const t = Math.max(0, Math.min(1, velocity / 127.0))
-        const trackColour = pianoRollBackend.trackColour
-        const useTrack = colorMode === "Track" && trackColour.length > 0
+        const trackColour = trackTint()
+        const useTrack = trackColour.length > 0
         const lo = useTrack ? Qt.darker(trackColour, 2.4) : Qt.color("#24405e")
         const hi = useTrack ? Qt.lighter(trackColour, 1.1) : Qt.color("#38c2b4")
         return Qt.rgba(lo.r + (hi.r - lo.r) * t, lo.g + (hi.g - lo.g) * t, lo.b + (hi.b - lo.b) * t, 1)
@@ -730,8 +740,8 @@ Item {
                         width: Math.max(6, gridMouse.drawLength * root.pixelsPerBeat - 2)
                         height: root.keyHeight - 2
                         radius: 2
-                        color: "#38b2ac80"
-                        border.color: "#a4e2f5"
+                        color: Qt.alpha(root.noteFillColor(100), 0.5)
+                        border.color: root.noteHighlightColour
                         border.width: 1
                         z: 8
                     }
@@ -786,7 +796,7 @@ Item {
                             readonly property color baseFill: root.noteFillColor(shownVelocity)
                             readonly property bool showSelected: isSelected || isDragging
                             color: showSelected ? Qt.lighter(baseFill, 1.35) : (isHovered ? Qt.lighter(baseFill, 1.18) : baseFill)
-                            border.color: showSelected ? "#ffffff" : (isHovered ? "#a4e2f5" : "#5bc0de")
+                            border.color: showSelected ? "#ffffff" : (isHovered ? root.noteHighlightColour : root.noteOutlineColour)
                             border.width: isSelected ? 1.5 : 1
 
                             Rectangle {
@@ -794,7 +804,7 @@ Item {
                                 anchors.top: parent.top
                                 anchors.bottom: parent.bottom
                                 width: 3
-                                color: isSelected ? "#e6fffa" : "#a4e2f5"
+                                color: isSelected ? "#e6fffa" : root.noteHighlightColour
                             }
 
                             Text {
@@ -1217,10 +1227,10 @@ Item {
                     implicitWidth: 80
                     implicitHeight: 22
                     model: ["Velocity", "Track"]
-                    currentIndex: 0
+                    currentIndex: model.indexOf(root.colorMode)
                     onCurrentTextChanged: root.colorMode = currentText
                     ToolTip.visible: hovered
-                    ToolTip.text: "Note colour: velocity shades of blue, or the track colour"
+                    ToolTip.text: "Note colour: the track colour (shaded by velocity), or velocity shades of blue"
                 }
 
                 Item { Layout.fillWidth: true }
