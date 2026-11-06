@@ -8,6 +8,7 @@
 #include <QtQml/qqmlregistration.h>
 #include "midi/pianorollpattern.h"
 #include "midi/pianorollgrid.h"
+#include "midi/notenames.h"
 #include "wrapper/session/tracklistwrap/tracklistwrapper.h" // full type needed by Q_PROPERTY
 
 // Adapts PianoRollPattern (editing state + selection) to QML. When bound to a clip through
@@ -104,6 +105,11 @@ public:
     Q_INVOKABLE double lineOffsetInBar(int index, int linesPerBar, double spacing) const noexcept { return MusicalGrid::lineOffsetInBar(index, linesPerBar, spacing); }
     Q_INVOKABLE double linePosition(int index, int linesPerBar, double spacing, double beatsPerBar) const noexcept { return MusicalGrid::linePosition(index, linesPerBar, spacing, beatsPerBar); }
     Q_INVOKABLE bool isBarLineIndex(int index, int linesPerBar) const noexcept { return MusicalGrid::isBarLineIndex(index, linesPerBar); }
+    // Note naming (backend notenames): "C4", black keys, C rows, "C4 60" readouts.
+    Q_INVOKABLE QString noteName(int note) const { return QString::fromStdString(notenames::name(note)); }
+    Q_INVOKABLE bool isBlackKey(int note) const noexcept { return notenames::isBlackKey(note); }
+    Q_INVOKABLE bool isOctaveStart(int note) const noexcept { return notenames::isOctaveStart(note); }
+    Q_INVOKABLE QString noteReadout(int note) const { return QString::fromStdString(notenames::readout(note)); }
     // Quantize to the Grid (selected notes, or all), as one undoable edit.
     Q_INVOKABLE bool quantizeToGrid() { return quantize(m_grid.quantizeStep()); }
 

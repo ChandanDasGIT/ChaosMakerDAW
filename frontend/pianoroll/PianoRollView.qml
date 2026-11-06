@@ -28,7 +28,7 @@ Item {
     // Transport position in clip-relative beats (same origin as the notes); negative before the clip.
     readonly property real playheadBeat: root.transport.positionBeats - pianoRollBackend.clipStartBeat
     property string currentPosText: "1.1.00"
-    property string currentNoteText: "C4 60"
+    property string currentNoteText: pianoRollBackend.noteReadout(60)
 
     property int dragCreatedNoteId: -1
     property real dragStartBeat: 0.0
@@ -502,17 +502,18 @@ Item {
 
                     PianoKeys {
                         id: pianoKeys
+                        noteSource: pianoRollBackend
                         width: 90
                         height: root.contentGridHeight
                         keyHeight: root.keyHeight
                         onKeyHovered: (note, noteName) => {
-                            root.currentNoteText = noteName + " " + note
+                            root.currentNoteText = pianoRollBackend.noteReadout(note)
                         }
                         onKeyClicked: note => {
-                            root.currentNoteText = pianoKeys.noteLabel(note) + " " + note
+                            root.currentNoteText = pianoRollBackend.noteReadout(note)
                         }
                         onKeyPressed: (note, velocity) => {
-                            root.currentNoteText = pianoKeys.noteLabel(note) + " " + note
+                            root.currentNoteText = pianoRollBackend.noteReadout(note)
                             EngineController.sendLiveNoteOn(root.trackId, note, velocity)
                         }
                         onKeyReleased: note => {
@@ -624,9 +625,8 @@ Item {
                             delegate: Rectangle {
                                 required property int index
                                 readonly property int note: 127 - index
-                                readonly property int pitchClass: note % 12
-                                readonly property bool black: pitchClass === 1 || pitchClass === 3 || pitchClass === 6 || pitchClass === 8 || pitchClass === 10
-                                readonly property bool isOctaveBorder: pitchClass === 0
+                                readonly property bool black: pianoRollBackend.isBlackKey(note)
+                                readonly property bool isOctaveBorder: pianoRollBackend.isOctaveStart(note)
 
                                 width: root.totalGridWidth
                                 height: root.keyHeight
@@ -736,7 +736,7 @@ Item {
                                 anchors.right: resizeHandle.left
                                 anchors.rightMargin: 2
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: pianoKeys.noteLabel(noteCard.visualPitch)
+                                text: pianoRollBackend.noteName(noteCard.visualPitch)
                                 color: "#f0f8ff"
                                 font.pixelSize: 10
                                 elide: Text.ElideRight
@@ -801,7 +801,7 @@ Item {
                                         noteCard.visualPitch = Math.max(0, Math.min(127, pressPitch + pitchDelta))
 
                                         root.dragEndBeats = noteCard.visualBeat + noteCard.lengthBeats
-                                        root.currentNoteText = pianoKeys.noteLabel(noteCard.visualPitch) + " " + noteCard.visualPitch
+                                        root.currentNoteText = pianoRollBackend.noteReadout(noteCard.visualPitch)
                                     }
                                 }
 
@@ -933,7 +933,7 @@ Item {
                             root.currentPosText = pianoRollBackend.positionLabel(mouse.x / root.pixelsPerBeat)
 
                             const notePitch = Math.max(0, Math.min(127, 127 - Math.floor(mouse.y / root.keyHeight)))
-                            root.currentNoteText = pianoKeys.noteLabel(notePitch) + " " + notePitch
+                            root.currentNoteText = pianoRollBackend.noteReadout(notePitch)
 
                             if (pressed && (mouse.buttons & Qt.LeftButton) && isDrawing) {
                                 applyDrag(mouse.x, mouse.y)

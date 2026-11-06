@@ -15,16 +15,11 @@ Item {
     signal keyHovered(int note, string noteName)
     signal wheelScrolled(real deltaY)
 
-    readonly property var noteNames: ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-
-    function isBlackKey(pitchClass) {
-        return pitchClass === 1 || pitchClass === 3 || pitchClass === 6 || pitchClass === 8 || pitchClass === 10
-    }
+    // PianoRollWrapper: note names and black keys come from the backend (notenames)
+    property var noteSource: null
 
     function noteLabel(note) {
-        const pitchClass = note % 12
-        const octave = Math.floor(note / 12) - 1
-        return noteNames[pitchClass] + octave
+        return root.noteSource ? root.noteSource.noteName(note) : ""
     }
 
     width: 90
@@ -52,9 +47,8 @@ Item {
                 id: keyRow
                 required property int index
                 readonly property int note: 127 - index
-                readonly property int pitchClass: note % 12
-                readonly property int octave: Math.floor(note / 12) - 1
-                readonly property bool black: root.isBlackKey(pitchClass)
+                readonly property bool black: root.noteSource ? root.noteSource.isBlackKey(note) : false
+                readonly property bool isC: root.noteSource ? root.noteSource.isOctaveStart(note) : false
                 readonly property bool isActive: (keyRow.note === root.activeNote)
 
                 width: root.width
@@ -79,9 +73,9 @@ Item {
                         anchors.rightMargin: 6
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.noteLabel(keyRow.note)
-                        color: keyRow.pitchClass === 0 ? "#111317" : "#555b68"
-                        font.pixelSize: keyRow.pitchClass === 0 ? 11 : 10
-                        font.bold: keyRow.pitchClass === 0
+                        color: keyRow.isC ? "#111317" : "#555b68"
+                        font.pixelSize: keyRow.isC ? 11 : 10
+                        font.bold: keyRow.isC
                     }
                 }
 

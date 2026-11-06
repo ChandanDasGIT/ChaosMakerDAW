@@ -1864,6 +1864,26 @@ private slots:
         QTRY_VERIFY(texts().contains("1.6"));
         QCOMPARE(roll->property("gridLinesPerBar").toInt()*roll->property("gridLineBeats").toDouble(),3.0);
     }
+    void piano_roll_keys_and_notes_are_named_by_the_backend() {
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* notes=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(notes);
+        const auto restore=qScopeGuard([&] { QMetaObject::invokeMethod(notes,"clear"); roll->setVisible(false); });
+        roll->setVisible(true); QTest::qWait(30);
+        QStringList texts;
+        std::function<void(QQuickItem*)> collect=[&](QQuickItem* item) {
+            const auto text=item->property("text");
+            if(text.isValid() && item->isVisible())texts<<text.toString();
+            for(auto* child:item->childItems())collect(child);
+        };
+        int id=-1;
+        QVERIFY(QMetaObject::invokeMethod(notes,"addNote",Q_RETURN_ARG(int,id),Q_ARG(int,66),Q_ARG(double,0.0),Q_ARG(double,1.0),Q_ARG(int,100)));
+        QTest::qWait(20);
+        collect(roll);
+        QVERIFY(texts.contains("C4"));                               // white key label
+        QVERIFY(texts.contains("C#4"));                              // black key label
+        QVERIFY(texts.contains("F#4"));                              // the note block's name
+        QCOMPARE(roll->property("currentNoteText").toString().isEmpty(),false);
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());

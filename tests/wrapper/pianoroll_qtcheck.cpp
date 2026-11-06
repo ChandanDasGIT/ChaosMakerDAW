@@ -235,6 +235,15 @@ TEST(qtpianoroll, grid_settings_come_from_the_backend_and_follow_the_meter) {
     CHECK(std::abs(roll->backend().findNote(id)->startBeat - 0.5) < 1e-9);
 }
 
+TEST(qtpianoroll, note_names_come_from_the_backend) {
+    PianoRollWrapper roll;
+    CHECK(roll.noteName(60) == "C4" && roll.noteName(70) == "A#4");
+    CHECK(roll.noteReadout(64) == "E4 64");
+    CHECK(roll.isBlackKey(63) && !roll.isBlackKey(64));
+    CHECK(roll.isOctaveStart(72) && !roll.isOctaveStart(73));
+    CHECK(roll.noteName(-3).isEmpty());
+}
+
 TEST(qtpianoroll, velocity_edits_are_one_undoable_change_and_clamped) {
     QObject owner;
     TrackListWrapper tracks;
