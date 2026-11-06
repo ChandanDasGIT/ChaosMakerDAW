@@ -1,5 +1,6 @@
 #include "tracklist.h"
 #include "dsp/panlaw.h"
+#include "mixer/mixerpanel.h"
 #include "instruments/instrumentcatalog.h"
 
 #include <algorithm>
@@ -201,6 +202,13 @@ TrackList::Change TrackList::setPan(int id, double value)
     if (!track || !std::isfinite(value)) return {};
     if (track->pan == static_cast<float>(panlaw::clampPan(value))) return {true, false};
     return result(m_project.setTrackPan(id, static_cast<float>(value)));
+}
+TrackList::Change TrackList::setStripWidth(int id, double value)
+{
+    const auto* track = m_project.findTrack(id);
+    if (!track || !std::isfinite(value)) return {};
+    if (track->stripWidth == static_cast<float>(mixer::clampStripWidth(value))) return {true, false};
+    return result(m_project.setTrackStripWidth(id, static_cast<float>(value)));
 }
 TrackList::Change TrackList::setMasterVolume(double value)
 {

@@ -42,6 +42,7 @@ struct Track {
     std::string inputPort;
     float volume = 1.0f;
     float pan = 0.0f; // -1 left .. 0 centre .. +1 right (panlaw::balance)
+    float stripWidth = 108.0f; // mixer strip width in px (mixer::defaultStripWidth, clamped by mixer::clampStripWidth)
     std::array<float, 10> eqGainDb{};
     std::vector<AudioClip> audioClips;
 
@@ -65,6 +66,7 @@ public:
     bool setTrackInputPort(int id, const std::string& port);
     bool setTrackVolume(int id, float volume);
     bool setTrackPan(int id, float pan);
+    bool setTrackStripWidth(int id, float width);
     bool setTrackEqBand(int id, int band, float gainDb);
     int addAudioClip(int trackId, AudioClip clip);
     std::vector<int> addAudioClips(const std::vector<std::pair<int, AudioClip>>& clips);

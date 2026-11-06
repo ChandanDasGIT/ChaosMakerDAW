@@ -271,9 +271,13 @@ Rectangle {
                         required property bool isSolo
                         required property real volume
                         required property real pan
+                        required property real stripWidth
                         required property var clips
                         readonly property var levels: root.levels[String(trackId)] ?? ({})
-                        property real channelWidth: panelWrapper.defaultStripWidth
+                        // Saved per track (stripWidth role); a resize drag changes it live
+                        // and stores it once on release.
+                        property real channelWidth: stripWidth
+                        Binding on channelWidth { value: strip.stripWidth; when: !resizeHandle.pressed }
                         objectName: "mixerStrip" + trackId
                         width: channelWidth
                         height: stripRow.height
@@ -505,6 +509,7 @@ Rectangle {
                                         strip.channelWidth = panelWrapper.clampStripWidth(startWidth + pointerX - startX)
                                     }
                                 }
+                                onReleased: panelWrapper.setStripWidth(strip.trackId, strip.channelWidth)
                             }
                         }
                     }

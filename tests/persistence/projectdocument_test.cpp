@@ -14,6 +14,7 @@ TEST(projectdocument, round_trip_serialization_and_deserialization)
     auto& t1 = project.addTrack(TrackKind::Audio, "Rhythm", "Audio");
     t1.volume = 0.8f;
     t1.pan = -0.35f;
+    t1.stripWidth = 150.0f;
     t1.solo = true;
     t1.muted = false;
     t1.recordDry = true;
@@ -54,6 +55,7 @@ TEST(projectdocument, round_trip_serialization_and_deserialization)
     CHECK(track->recordDry == true);
     CHECK_NEAR(track->volume, 0.8f, 1e-6);
     CHECK_NEAR(track->pan, -0.35f, 1e-6);
+    CHECK_NEAR(track->stripWidth, 150.0f, 1e-6);
     CHECK(track->inputPort == "system:capture_1");
     for (int i = 0; i < 10; ++i) {
         CHECK_NEAR(track->eqGainDb[i], static_cast<float>(i - 5), 1e-6);
@@ -258,4 +260,21 @@ TEST(projectdocument, track_pan_is_optional_and_validated)
     CHECK(loaded.project.tracks()[0]->pan == 1.0f);
     CHECK(!ProjectDocument::deserialize(document(R"(,"pan":1.5)"), loaded, error, 48000.0));
     CHECK(!ProjectDocument::deserialize(document(R"(,"pan":"left")"), loaded, error, 48000.0));
+}
+
+TEST(projectdocument, mixer_strip_width_is_optional_and_validated)
+{
+    const auto document = [](const std::string& field) {
+        return R"({"format":"ChaosMakerProject","version":2,"project":{"version":1,"bpm":120.0,
+            "sampleRate":48000.0,"numerator":4,"denominator":4,"tracks":[{"name":"T1","type":"Audio",
+            "volume":1.0)" + field + R"(,"eq":[0,0,0,0,0,0,0,0,0,0],"clips":[]}]},"trackEffects":[""]})";
+    };
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(document(""), loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->stripWidth == 108.0f);        // older files: default width
+    CHECK(ProjectDocument::deserialize(document(R"(,"stripWidth":200)"), loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->stripWidth == 200.0f);
+    CHECK(!ProjectDocument::deserialize(document(R"(,"stripWidth":20)"), loaded, error, 48000.0));
+    CHECK(!ProjectDocument::deserialize(document(R"(,"stripWidth":"wide")"), loaded, error, 48000.0));
 }
