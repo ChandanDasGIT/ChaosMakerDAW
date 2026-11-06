@@ -708,6 +708,55 @@ private slots:
         list->setVisible(false); list->setProperty("trackModel",QVariant());
         mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
     }
+    void track_list_and_mixer_share_mute_solo_order_colours_and_tooltips() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        auto* list=window->findChild<QQuickItem*>("testTrackList");
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(list); QVERIFY(mixer);
+        const auto restore=qScopeGuard([&] {
+            for(auto* view:{list,mixer}) { view->setVisible(false); view->setProperty("trackModel",QVariant()); }
+        });
+        for(auto* view:{list,mixer}) { view->setProperty("trackModel",QVariant::fromValue(&tracks)); view->setVisible(true); }
+        QTest::qWait(30);
+        // Empty list: the hint names both ways to add a track; "+" opens the track picker.
+        auto* hint=visualItem(list,"emptyTrackHint"); QVERIFY(hint);
+        QVERIFY(hint->isVisible());
+        QCOMPARE(hint->property("text").toString(),QString("Click + to add a track, or double-click here for a Vocal track"));
+        auto* add=visualItem(list,"addTrackButton"); QVERIFY(add);
+        QCOMPARE(QQmlProperty::read(add,"ToolTip.text",qmlContext(add)).toString(),QString("Add track…"));
+        const int a=tracks.addAudioTrack(); QTest::qWait(30);
+        QVERIFY(!hint->isVisible());
+        const QString id=QString::number(a);
+        auto* listMute=visualItem(list,"trackMuteButton"+id); auto* listSolo=visualItem(list,"trackSoloButton"+id);
+        auto* mixMute=visualItem(mixer,"mixerMute"+id); auto* mixSolo=visualItem(mixer,"mixerSolo"+id);
+        QVERIFY(listMute); QVERIFY(listSolo); QVERIFY(mixMute); QVERIFY(mixSolo);
+        // Same order in both: M left of S.
+        QVERIFY(listMute->mapToScene(QPointF()).x()<listSolo->mapToScene(QPointF()).x());
+        QVERIFY(mixMute->mapToScene(QPointF()).x()<mixSolo->mapToScene(QPointF()).x());
+        const auto look=[](QQuickItem* button) {
+            auto* bg=qvariant_cast<QQuickItem*>(button->property("background"));
+            auto* text=qvariant_cast<QQuickItem*>(button->property("contentItem"));
+            return QList<QColor>{bg->property("color").value<QColor>(),bg->property("border.color").value<QColor>(),
+                                 text->property("color").value<QColor>()};
+        };
+        const auto tip=[](QQuickItem* button) { return QQmlProperty::read(button,"ToolTip.text",qmlContext(button)).toString(); };
+        QCOMPARE(tip(listMute),tip(mixMute)); QCOMPARE(tip(listSolo),tip(mixSolo));
+        // Mute (orange) and solo (yellow) look the same in both panels, and differ from each other.
+        click(listMute); QTRY_VERIFY(mixMute->property("active").toBool());
+        click(mixSolo); QTRY_VERIFY(listSolo->property("active").toBool());
+        QTest::qWait(10);
+        QCOMPARE(look(listMute),look(mixMute));
+        QCOMPARE(look(listSolo),look(mixSolo));
+        QCOMPARE(look(listMute).first(),QColor("#653f28"));
+        QVERIFY(look(listMute)!=look(listSolo));
+        QCOMPARE(tip(listMute),tip(mixMute)); QCOMPARE(tip(listSolo),tip(mixSolo));
+        // Selecting the track keeps its colour strip in the track colour.
+        auto* strip=visualItem(list,"trackColourAccent"+id); QVERIFY(strip);
+        const QColor colour=strip->property("color").value<QColor>();
+        tracks.selectTrack(a); QTest::qWait(10);
+        QCOMPARE(strip->property("color").value<QColor>(),colour);
+        controller->shutdownSession();
+    }
     void track_colour_picker_updates_cards_timeline_and_mixer_and_cancels_custom_edits() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks);

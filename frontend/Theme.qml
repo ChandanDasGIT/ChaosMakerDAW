@@ -26,6 +26,13 @@ QtObject {
     readonly property color record:        "#e5484d"
     readonly property color focusRing:     "#60cdff"
     readonly property color selectionBg:   "#24426b"
+    // Mute is orange and solo yellow everywhere (red is kept for recording).
+    readonly property color muteText:      "#ffc08a"
+    readonly property color muteBg:        "#653f28"
+    readonly property color muteBorder:    "#c87943"
+    readonly property color soloText:      "#ffe08a"
+    readonly property color soloBg:        "#665322"
+    readonly property color soloBorder:    "#c49d39"
 
     // ---- level meters (calibrated scale) ----
     readonly property color meterNormal:   "#22c55e"
