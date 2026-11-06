@@ -1578,6 +1578,35 @@ private slots:
         QCOMPARE(roll->property("gridLineBeats").toDouble(),gridLines); // grid lines unchanged
         click(snap); QVERIFY(roll->property("snapEnabled").toBool());
     }
+    void piano_roll_quantize_button_and_q_key_snap_note_starts() {
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* notes=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(notes);
+        auto* quantize=visualItem(roll,"pianoRollQuantize"); QVERIFY(quantize);
+        const auto restore=qScopeGuard([&] { QMetaObject::invokeMethod(notes,"clear"); roll->setVisible(false); });
+        roll->setVisible(true);
+        const auto starts=[&] {
+            QList<double> result;
+            for(const auto& n:notes->property("notes").toList())result.push_back(n.toMap().value("startBeat").toDouble());
+            return result;
+        };
+        const auto add=[&](double start) {
+            int id=-1;
+            QVERIFY(QMetaObject::invokeMethod(notes,"addNote",Q_RETURN_ARG(int,id),Q_ARG(int,60),Q_ARG(double,start),Q_ARG(double,0.5),Q_ARG(int,100)));
+        };
+        QVERIFY(!quantize->isEnabled());                            // no notes yet
+        add(0.3); add(1.13); QVERIFY(quantize->isEnabled());
+        click(quantize);                                            // default Grid is 1/16 = 0.25 beat
+        QCOMPARE(starts(),(QList<double>{0.25,1.25}));
+        // The Q key works while the piano roll has focus
+        QMetaObject::invokeMethod(notes,"clear"); add(0.6);
+        roll->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Q);
+        QCOMPARE(starts(),(QList<double>{0.5}));
+        // ...and not while it lacks focus
+        QMetaObject::invokeMethod(notes,"clear"); add(0.6);
+        auto* other=window->findChild<QQuickItem*>("otherFocus"); QVERIFY(other); other->forceActiveFocus();
+        QTest::keyClick(window,Qt::Key_Q);
+        QCOMPARE(starts(),(QList<double>{0.6}));
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());

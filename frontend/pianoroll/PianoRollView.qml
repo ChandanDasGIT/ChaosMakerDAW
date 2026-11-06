@@ -70,6 +70,17 @@ Item {
         enabled: root.keyboardActive
         onActivated: pianoRollBackend.clearSelection()
     }
+    Shortcut {
+        sequence: "Q"
+        enabled: root.keyboardActive
+        onActivated: root.quantizeNotes()
+    }
+
+    // Quantize to the Grid division (even with the magnet off); one meter beat when Grid is Off.
+    function quantizeNotes() {
+        const step = gridDivisionBeats()
+        pianoRollBackend.quantize(step > 0 ? step : root.beatUnit)
+    }
 
     // Magnet button: when off, notes move and draw freely but the grid lines stay.
     property bool snapEnabled: true
@@ -331,12 +342,16 @@ Item {
                 }
 
                 Rectangle {
+                    objectName: "pianoRollQuantize"
                     width: 24; height: 22; radius: 2
+                    enabled: pianoRollBackend.count > 0
+                    opacity: enabled ? 1 : 0.4
                     color: qHover.containsMouse ? "#373a44" : "#2f323a"
                     border.color: "#202227"
                     Text { anchors.centerIn: parent; text: "⇥Q"; color: "#d8dce4"; font.pixelSize: 10; font.bold: true }
-                    MouseArea { id: qHover; anchors.fill: parent; hoverEnabled: true }
-                    ToolTip.visible: qHover.containsMouse; ToolTip.text: "Quantize Notes (Q)"
+                    MouseArea { id: qHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.quantizeNotes() }
+                    ToolTip.visible: qHover.containsMouse
+                    ToolTip.text: "Quantize note starts to the Grid (Q) · selected notes, or all if none selected"
                 }
 
                 // Undo/redo use the project history (note edits are undoable steps there)
