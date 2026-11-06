@@ -9,9 +9,9 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
-Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. 3.1–3.6 done.
-Next: 3.7 (consistency: S/M order, mute colour, tooltips, empty-area text, selection vs colour strip).
-Then 3.8 … 3.12, Phase 4, Phase 5.
+Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. 3.1–3.7 done.
+Next: 3.8 (pan control per track: backend + wrapper + mixer strip).
+Then 3.9 … 3.12, Phase 4, Phase 5.
 
 Decisions made by the user (keep to them):
 - Mixer: track strips have NO track volume fader. Each strip's vertical fader is clip gain
@@ -255,9 +255,15 @@ PHASE 3 — Layout and workflow
          - [done] 3.6c Notes use the track colour by default (Colour box: Track, Velocity
            still available); outlines, edge stripe, hover and the draw preview follow it.
            Unbound (no track colour) keeps the blue scale.
-[ ] 3.7  Consistency: S/M order (TrackList vs Mixer), mute colour (orange vs red),
+[x] 3.7  Consistency: S/M order (TrackList vs Mixer), mute colour (orange vs red),
          "Add audio track" tooltip, empty-area "add Vocal track" text, selection
          hiding the track colour strip (TrackList.qml:130-131).
+         Done: M then S in both panels; mute orange / solo yellow everywhere (track list,
+         mixer strips, master mute) via new Theme tokens mute*/solo* (red stays for
+         recording); track list mute tooltip matches the mixer; "+" says "Add track…";
+         empty-area hint "Click + to add a track, or double-click here for a Vocal track"
+         (double-click still adds a Vocal track, kept as a feature). The colour strip was
+         already fixed (always the track colour); now covered by a test.
 [ ] 3.8  Add a pan control per track (backend + wrapper + mixer strip).
 [ ] 3.9  Save layout sizes between sessions: track list width, mixer height,
          piano roll dock height, strip widths.

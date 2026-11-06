@@ -44,7 +44,7 @@ Rectangle {
                     contentItem: Text { text: "+"; color: Theme.accent; font.pixelSize: 20; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                     background: Rectangle { radius: 4; color: parent.down ? "#383838" : "transparent" }
                     ToolTip.visible: hovered
-                    ToolTip.text: "Add audio track"
+                    ToolTip.text: "Add track…"
                     ToolTip.delay: 450
                 }
             }
@@ -73,7 +73,8 @@ Rectangle {
                     anchors.centerIn: parent
                     width: Math.max(0, parent.width - 24)
                     visible: !!root.trackModel && root.trackModel.count === 0
-                    text: "Double-click here to add a Vocal track"
+                    objectName: "emptyTrackHint"
+                    text: "Click + to add a track, or double-click here for a Vocal track"
                     color: Theme.textMuted
                     font.pixelSize: 11
                     horizontalAlignment: Text.AlignHCenter
@@ -232,25 +233,27 @@ Rectangle {
                             Layout.fillWidth: true
                             spacing: 2
                             ToolButton {
-                                id: soloButton
-                                property bool active: trackCard.isSolo
-                                text: "S"; implicitWidth: 22; implicitHeight: 24
-                                onClicked: root.trackModel.setSolo(trackCard.trackId, !active)
-                                contentItem: Text { text: "S"; color: parent.active ? "#ffe08a" : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: parent.active ? "#665322" : "#303030"; border.color: parent.active ? "#c49d39" : "#424242" }
-                                ToolTip.visible: hovered
-                                ToolTip.text: active ? "Solo enabled" : "Solo disabled"
-                                ToolTip.delay: 450
-                            }
-                            ToolButton {
                                 id: muteButton
+                                objectName: "trackMuteButton" + trackCard.trackId
                                 property bool active: trackCard.isMuted
                                 text: "M"; implicitWidth: 22; implicitHeight: 24
                                 onClicked: root.trackModel.setMuted(trackCard.trackId, !active)
-                                contentItem: Text { text: "M"; color: parent.active ? "#ffc08a" : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: parent.active ? "#653f28" : "#303030"; border.color: parent.active ? "#c87943" : "#424242" }
+                                contentItem: Text { text: "M"; color: parent.active ? Theme.muteText : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                background: Rectangle { radius: 4; color: parent.active ? Theme.muteBg : "#303030"; border.color: parent.active ? Theme.muteBorder : "#424242" }
                                 ToolTip.visible: hovered
-                                ToolTip.text: active ? "Muted" : "Mute track"
+                                ToolTip.text: active ? "Mute enabled" : "Mute disabled"
+                                ToolTip.delay: 450
+                            }
+                            ToolButton {
+                                id: soloButton
+                                objectName: "trackSoloButton" + trackCard.trackId
+                                property bool active: trackCard.isSolo
+                                text: "S"; implicitWidth: 22; implicitHeight: 24
+                                onClicked: root.trackModel.setSolo(trackCard.trackId, !active)
+                                contentItem: Text { text: "S"; color: parent.active ? Theme.soloText : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                background: Rectangle { radius: 4; color: parent.active ? Theme.soloBg : "#303030"; border.color: parent.active ? Theme.soloBorder : "#424242" }
+                                ToolTip.visible: hovered
+                                ToolTip.text: active ? "Solo enabled" : "Solo disabled"
                                 ToolTip.delay: 450
                             }
                             ToolButton {

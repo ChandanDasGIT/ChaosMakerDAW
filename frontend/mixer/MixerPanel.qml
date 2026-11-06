@@ -65,7 +65,7 @@ Rectangle {
                 Text {
                     objectName: "mixerMasterVolumeText"
                     text: panelWrapper.formatMasterVolume(panelWrapper.masterVolume)
-                    color: panelWrapper.masterMuted ? Theme.record : Theme.text
+                    color: panelWrapper.masterMuted ? Theme.muteText : Theme.text
                     font.pixelSize: Theme.captionSize
                     font.family: Theme.monospaceFontFamily
                     Layout.alignment: Qt.AlignHCenter
@@ -157,15 +157,15 @@ Rectangle {
                         onClicked: panelWrapper.setMasterMuted(!active)
                         contentItem: Text {
                             text: parent.text
-                            color: parent.active ? "#ffb0a8" : Theme.textMuted
+                            color: parent.active ? Theme.muteText : Theme.textMuted
                             font.pixelSize: 10
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
                         background: Rectangle {
-                            color: parent.active ? "#663238" : Theme.controlBg
-                            border.color: parent.active ? Theme.record : Theme.controlBorder
+                            color: parent.active ? Theme.muteBg : Theme.controlBg
+                            border.color: parent.active ? Theme.muteBorder : Theme.controlBorder
                             radius: 3
                         }
                         ToolTip.visible: hovered
@@ -414,8 +414,8 @@ Rectangle {
                                     property bool active: strip.isMuted
                                     text: "M"; implicitWidth: 30; implicitHeight: 24
                                     onClicked: root.trackModel ? root.trackModel.setMuted(strip.trackId, !active) : panelWrapper.setMuted(strip.trackId, !active)
-                                    contentItem: Text { text: parent.text; color: parent.active ? "#ffb0a8" : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                    background: Rectangle { color: parent.active ? "#663238" : "#303030"; radius: 3 }
+                                    contentItem: Text { text: parent.text; color: parent.active ? Theme.muteText : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                    background: Rectangle { color: parent.active ? Theme.muteBg : "#303030"; border.color: parent.active ? Theme.muteBorder : "#424242"; radius: 3 }
                                     ToolTip.visible: hovered
                                     ToolTip.text: panelWrapper.formatMuteTooltip(active)
                                 }
@@ -424,8 +424,8 @@ Rectangle {
                                     property bool active: strip.isSolo
                                     text: "S"; implicitWidth: 30; implicitHeight: 24
                                     onClicked: root.trackModel ? root.trackModel.setSolo(strip.trackId, !active) : panelWrapper.setSolo(strip.trackId, !active)
-                                    contentItem: Text { text: parent.text; color: parent.active ? "#ffe08a" : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                    background: Rectangle { color: parent.active ? "#665322" : "#303030"; radius: 3 }
+                                    contentItem: Text { text: parent.text; color: parent.active ? Theme.soloText : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                    background: Rectangle { color: parent.active ? Theme.soloBg : "#303030"; border.color: parent.active ? Theme.soloBorder : "#424242"; radius: 3 }
                                     ToolTip.visible: hovered
                                     ToolTip.text: panelWrapper.formatSoloTooltip(active)
                                 }
