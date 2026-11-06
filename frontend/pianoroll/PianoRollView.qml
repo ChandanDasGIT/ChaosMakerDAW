@@ -147,16 +147,26 @@ Item {
         return Math.max(0, Math.floor(beat / step) * step)
     }
 
-    // Grid line spacing: one line per snap division ("Off" -> beats only), coarsened by
+    // Project meter from the backend, in quarter-note beats (6/8 -> 3 per bar, 0.5 per beat).
+    readonly property real beatsPerBar: pianoRollBackend.beatsPerBar
+    readonly property real beatUnit: pianoRollBackend.beatUnit
+    readonly property int beatsInBar: Math.max(1, Math.round(beatsPerBar / beatUnit))
+
+    // True when position lies on a multiple of unit (both in beats).
+    function isOnGrid(position, unit) {
+        const r = position / unit
+        return Math.abs(r - Math.round(r)) < 1e-6
+    }
+
+    // Grid line spacing: one line per snap division ("Off" -> meter beats only), coarsened by
     // doubling until lines are at least 6px apart so zoomed-out grids stay readable.
     readonly property real gridLineBeats: {
         const step = getSnapBeats()
-        let beats = step > 0 ? Math.min(1.0, step) : 1.0
-        while (beats < 1.0 && beats * pixelsPerBeat < 6)
+        let beats = step > 0 ? Math.min(beatUnit, step) : beatUnit
+        while (beats < beatUnit && beats * pixelsPerBeat < 6)
             beats *= 2
-        return beats
+        return Math.min(beats, beatUnit)
     }
-    readonly property int gridSubsPerBeat: Math.max(1, Math.round(1.0 / gridLineBeats))
 
     // Note fill colour. "Velocity" mode blends dim blue (soft) -> bright teal (loud);
     // other modes keep the default note colour for now.
@@ -426,19 +436,18 @@ Item {
                         color: "#38b2ac"
                     }
 
+                    // One tick per counted beat of the project meter
                     Repeater {
-                        model: Math.ceil(root.totalGridWidth / (root.pixelsPerBeat / 4))
+                        model: Math.ceil(root.totalGridWidth / (root.beatUnit * root.pixelsPerBeat))
                         delegate: Item {
                             required property int index
-                            readonly property int bar: Math.floor(index / 16) + 1
-                            readonly property int beat: Math.floor((index % 16) / 4) + 1
-                            readonly property bool isMajorBar: (index % 16 === 0)
-                            readonly property bool isBeat: (index % 4 === 0)
+                            readonly property int bar: Math.floor(index / root.beatsInBar) + 1
+                            readonly property int beat: index % root.beatsInBar + 1
+                            readonly property bool isMajorBar: beat === 1
 
-                            visible: isBeat
-                            x: index * (root.pixelsPerBeat / 4)
+                            x: index * root.beatUnit * root.pixelsPerBeat
                             y: 0
-                            width: root.pixelsPerBeat
+                            width: root.beatUnit * root.pixelsPerBeat
                             height: parent.height
 
                             Rectangle {
@@ -454,6 +463,8 @@ Item {
                                 anchors.leftMargin: 3
                                 anchors.top: parent.top
                                 anchors.topMargin: isMajorBar ? 4 : 8
+                                // Beat labels drop out when beats are too narrow to read
+                                visible: isMajorBar || parent.width >= 24
                                 text: isMajorBar ? String(bar) : (bar + "." + beat)
                                 color: isMajorBar ? "#d8dce5" : "#7c8393"
                                 font.pixelSize: isMajorBar ? 11 : 9
@@ -644,8 +655,9 @@ Item {
                         model: Math.ceil(root.totalGridWidth / (root.gridLineBeats * root.pixelsPerBeat)) + 1
                         delegate: Rectangle {
                             required property int index
-                            readonly property bool isMajorBar: (index % (root.gridSubsPerBeat * 4) === 0)
-                            readonly property bool isBeat: (index % root.gridSubsPerBeat === 0)
+                            readonly property real position: index * root.gridLineBeats
+                            readonly property bool isMajorBar: root.isOnGrid(position, root.beatsPerBar)
+                            readonly property bool isBeat: root.isOnGrid(position, root.beatUnit)
 
                             // Whole-pixel positions & widths keep every line crisp
                             x: Math.round(index * root.gridLineBeats * root.pixelsPerBeat)
@@ -931,11 +943,7 @@ Item {
                         property real drawLength: 0.25
 
                         onPositionChanged: mouse => {
-                            const beat = mouse.x / root.pixelsPerBeat
-                            const bar = Math.floor(beat / 4) + 1
-                            const b = Math.floor(beat % 4) + 1
-                            const sub = Math.floor((beat % 1) * 100)
-                            root.currentPosText = bar + "." + b + "." + (sub < 10 ? "0" : "") + sub
+                            root.currentPosText = pianoRollBackend.positionLabel(mouse.x / root.pixelsPerBeat)
 
                             const notePitch = Math.max(0, Math.min(127, 127 - Math.floor(mouse.y / root.keyHeight)))
                             root.currentNoteText = pianoKeys.noteLabel(notePitch) + " " + notePitch
@@ -1008,6 +1016,8 @@ Item {
             visible: Layout.preferredHeight >= 20
             headerWidth: 90
             beatWidth: root.pixelsPerBeat
+            beatUnit: root.beatUnit
+            beatsInBar: root.beatsInBar
             contentWidth: root.totalGridWidth
             contentX: gridVerticalFlickable.contentX
             notes: root.notes

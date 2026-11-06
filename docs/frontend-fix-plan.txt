@@ -13,7 +13,7 @@ PHASE 1 — Broken or misleading behaviour (do first)
          frontend/pianoroll/PianoRollView.qml:26,660 — bind playheadBeat to the transport
          position, relative to the clip start.
 
-[ ] 1.2  Piano roll assumes 4/4.
+[x] 1.2  Piano roll assumes 4/4.
          PianoRollView.qml:429-436, 646, 932-935; VelocityLane.qml:222 — take beats-per-bar
          from the project time signature (as Timeline.qml does via TimelineWrapper).
 

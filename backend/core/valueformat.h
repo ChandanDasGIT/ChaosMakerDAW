@@ -13,4 +13,8 @@ std::string withUnit(double value, int decimals, std::string_view unit);
 std::string meterLevel(double db);
 // Nonnegative elapsed time, floored to milliseconds: HH:MM:SS.mmm. Hours may exceed 99.
 std::string position(double seconds);
+// Musical position "bar.beat.hundredths", 1-based bar and beat, for a beat (in quarter notes)
+// under a meter of beatsPerBar quarters with beatUnit quarters per counted beat.
+// Example in 6/8 (beatsPerBar 3, beatUnit 0.5): beat 3.75 -> "2.2.50".
+std::string barBeatPosition(double beat, double beatsPerBar, double beatUnit);
 }
