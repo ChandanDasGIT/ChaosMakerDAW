@@ -194,9 +194,20 @@ TEST(qtclipediting, per_clip_gain_updates_model_role_and_is_independent_of_track
         if (roles.contains(TrackListWrapper::ClipsRole)) ++dataChangedCount;
     });
 
+    // A gain change must not rebuild the clip list (that redraws the whole timeline), but the
+    // engine (projectChanged) and the undo buttons (historyChanged) must still hear about it.
+    int clipsChangedCount = 0, projectChangedCount = 0, historyChangedCount = 0;
+    QObject::connect(&tracks, &TrackListWrapper::clipsChanged, [&] { ++clipsChangedCount; });
+    QObject::connect(&tracks, &TrackListWrapper::projectChanged, [&] { ++projectChangedCount; });
+    QObject::connect(&tracks, &TrackListWrapper::historyChanged, [&] { ++historyChangedCount; });
+
     CHECK(tracks.setClipGain(track, clip, 3.5));
     CHECK_NEAR(tracks.clipGain(track, clip), 3.5, 1e-6);
     CHECK(dataChangedCount > 0);
+    CHECK(clipsChangedCount == 0);
+    CHECK(projectChangedCount == 1);
+    CHECK(historyChangedCount == 1);
+    CHECK(tracks.canUndo());
 
     // Verify track model role directly
     const auto rowClips = tracks.data(tracks.index(0), TrackListWrapper::ClipsRole).toList();

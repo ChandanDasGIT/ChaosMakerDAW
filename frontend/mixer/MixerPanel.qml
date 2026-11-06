@@ -326,9 +326,9 @@ Rectangle {
                                 Layout.fillWidth: true
                             }
                             Text {
-                                objectName: "mixerVolumeText" + strip.trackId
-                                text: panelWrapper.formatVolume(volumeSlider.value)
-                                color: strip.isMuted ? Theme.record : Theme.text
+                                objectName: "mixerClipGainText" + strip.trackId
+                                text: strip.hasClip ? panelWrapper.formatClipGain(clipGainSlider.value) : "—"
+                                color: strip.hasClip ? Theme.text : Theme.textMuted
                                 font.pixelSize: Theme.captionSize
                                 font.family: Theme.monospaceFontFamily
                                 Layout.alignment: Qt.AlignHCenter
@@ -337,66 +337,15 @@ Rectangle {
                                 Layout.fillHeight: true
                                 Layout.fillWidth: true
                                 spacing: 4
-                                // Main channel fader: track volume (same value as the track list slider)
+                                // Channel fader: gain of the selected clip on this track (or its first
+                                // clip). Track volume lives in the track list.
                                 Slider {
-                                    id: volumeSlider
-                                    objectName: "mixerVolume" + strip.trackId
+                                    id: clipGainSlider
+                                    objectName: "mixerClipGain" + strip.trackId
                                     Layout.fillHeight: true
                                     Layout.preferredWidth: 24
                                     Layout.alignment: Qt.AlignHCenter
                                     orientation: Qt.Vertical
-                                    from: panelWrapper.minVolume; to: panelWrapper.maxVolume; stepSize: 0.01
-                                    value: strip.volume
-                                    onMoved: root.trackModel ? root.trackModel.setVolume(strip.trackId, value) : panelWrapper.setVolume(strip.trackId, value)
-                                    TapHandler {
-                                        acceptedButtons: Qt.LeftButton
-                                        // Apply after the slider handles the mouse release.
-                                        onDoubleTapped: Qt.callLater(() => root.trackModel
-                                            ? root.trackModel.setVolume(strip.trackId, panelWrapper.defaultVolume)
-                                            : panelWrapper.resetVolume(strip.trackId))
-                                    }
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: panelWrapper.formatVolumeTooltip(value)
-                                }
-                                Binding {
-                                    target: volumeSlider
-                                    property: "value"
-                                    value: strip.volume
-                                    when: !volumeSlider.pressed
-                                }
-                                StereoLevelMeter {
-                                    objectName: "mixerInput" + strip.trackId
-                                    label: "IN"
-                                    Layout.fillHeight: true
-                                    Layout.fillWidth: true
-                                    leftDb: strip.levels.inputLeftDb ?? -120
-                                    rightDb: strip.levels.inputRightDb ?? -120
-                                    leftClipped: strip.levels.inputLeftClip ?? false
-                                    rightClipped: strip.levels.inputRightClip ?? false
-                                    onClearClipsRequested: EngineController.clearTrackClips(strip.trackId)
-                                }
-                                StereoLevelMeter {
-                                    objectName: "mixerOutput" + strip.trackId
-                                    label: "OUT"
-                                    Layout.fillHeight: true
-                                    Layout.fillWidth: true
-                                    leftDb: strip.levels.outputLeftDb ?? -120
-                                    rightDb: strip.levels.outputRightDb ?? -120
-                                    leftClipped: strip.levels.outputLeftClip ?? false
-                                    rightClipped: strip.levels.outputRightClip ?? false
-                                    onClearClipsRequested: EngineController.clearTrackClips(strip.trackId)
-                                }
-                            }
-                            // Clip gain of the selected clip on this track (or its first clip)
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 3
-                                Text { text: "CLIP"; color: Theme.textMuted; font.pixelSize: 8; font.bold: true }
-                                Slider {
-                                    id: clipGainSlider
-                                    objectName: "mixerClipGain" + strip.trackId
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 18
                                     enabled: strip.hasClip
                                     opacity: strip.hasClip ? 1.0 : 0.35
                                     from: panelWrapper.minClipGain; to: panelWrapper.maxClipGain; stepSize: panelWrapper.clipGainStep
@@ -426,13 +375,40 @@ Rectangle {
                                     value: strip.targetClipGain
                                     when: !clipGainSlider.pressed
                                 }
-                                Text {
-                                    objectName: "mixerClipGainText" + strip.trackId
-                                    text: strip.hasClip ? panelWrapper.formatClipGain(clipGainSlider.value) : "—"
-                                    color: strip.hasClip ? Theme.text : Theme.textMuted
-                                    font.pixelSize: 8
-                                    font.family: Theme.monospaceFontFamily
+                                StereoLevelMeter {
+                                    objectName: "mixerInput" + strip.trackId
+                                    label: "IN"
+                                    Layout.fillHeight: true
+                                    Layout.fillWidth: true
+                                    leftDb: strip.levels.inputLeftDb ?? -120
+                                    rightDb: strip.levels.inputRightDb ?? -120
+                                    leftClipped: strip.levels.inputLeftClip ?? false
+                                    rightClipped: strip.levels.inputRightClip ?? false
+                                    onClearClipsRequested: EngineController.clearTrackClips(strip.trackId)
                                 }
+                                StereoLevelMeter {
+                                    objectName: "mixerOutput" + strip.trackId
+                                    label: "OUT"
+                                    Layout.fillHeight: true
+                                    Layout.fillWidth: true
+                                    leftDb: strip.levels.outputLeftDb ?? -120
+                                    rightDb: strip.levels.outputRightDb ?? -120
+                                    leftClipped: strip.levels.outputLeftClip ?? false
+                                    rightClipped: strip.levels.outputRightClip ?? false
+                                    onClearClipsRequested: EngineController.clearTrackClips(strip.trackId)
+                                }
+                            }
+                            // Names the fader above it: this strip's fader is clip gain
+                            Text {
+                                objectName: "mixerClipLabel" + strip.trackId
+                                text: "CLIP"
+                                color: Theme.textMuted
+                                font.pixelSize: 8
+                                font.bold: true
+                                horizontalAlignment: Text.AlignHCenter
+                                Layout.preferredWidth: clipGainSlider.width
+                                Layout.alignment: Qt.AlignLeft
+                                Layout.leftMargin: clipGainSlider.x
                             }
                             RowLayout {
                                 Layout.alignment: Qt.AlignHCenter

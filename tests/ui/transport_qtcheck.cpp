@@ -1326,8 +1326,9 @@ private slots:
         TrackListWrapper replacement; const int guitar=replacement.addInstrumentTrackOfType("Electric Guitar");
         replacement.setVolume(guitar,0.5); replacement.setSolo(guitar,true);
         tracks.adoptDocument(replacement); QTRY_COMPARE(mixer->property("stripCount").toInt(),1);
-        auto* slider=visualItem(mixer,"mixerVolume"+QString::number(guitar)); QVERIFY(slider);
-        QCOMPARE(slider->property("value").toDouble(),0.5);
+        // Track volume is not in the mixer (it lives in the track list); the strip shows clip gain.
+        QVERIFY(!visualItem(mixer,"mixerVolume"+QString::number(guitar)));
+        QVERIFY(visualItem(mixer,"mixerClipGain"+QString::number(guitar)));
         auto* solo=visualItem(mixer,"mixerSolo"+QString::number(guitar)); QVERIFY(solo);
         QVERIFY(solo->property("active").toBool());
         QTRY_COMPARE(scroll->property("contentWidth").toDouble(),108.0);
@@ -1342,71 +1343,45 @@ private slots:
         QCoreApplication::processEvents();
         auto* mute=visualItem(mixer,"mixerMute"+QString::number(first));
         auto* solo=visualItem(mixer,"mixerSolo"+QString::number(first));
-        auto* slider=visualItem(mixer,"mixerVolume"+QString::number(first));
-        QVERIFY(mute); QVERIFY(solo); QVERIFY(slider);
+        QVERIFY(mute); QVERIFY(solo);
         QTest::qWait(30); // Allow the newly visible ColumnLayout to place its controls.
         click(mute); click(solo);
         QVERIFY(tracks.project().findTrack(first)->muted); QVERIFY(tracks.project().findTrack(first)->solo);
         QVERIFY(!tracks.project().findTrack(second)->muted); QVERIFY(!tracks.project().findTrack(second)->solo);
-        tracks.setMuted(first,false); tracks.setSolo(first,false); tracks.setVolume(first,0.75);
+        tracks.setMuted(first,false); tracks.setSolo(first,false);
         QVERIFY(!mute->property("active").toBool()); QVERIFY(!solo->property("active").toBool());
-        QCOMPARE(slider->property("value").toDouble(),0.75);
-        slider->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Up);
-        QVERIFY(std::abs(tracks.project().findTrack(first)->volume-0.76f)<1e-6);
-        QCOMPARE(tracks.project().findTrack(second)->volume,1.0f);
-        // A user movement must not detach later model-to-slider updates.
-        tracks.setVolume(first,0.5); QCOMPARE(slider->property("value").toDouble(),0.5);
-        tracks.setVolume(first,2); QCOMPARE(slider->property("value").toDouble(),2.0);
-        tracks.setVolume(first,0); QCOMPARE(slider->property("value").toDouble(),0.0);
         mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
     }
     void volume_faders_double_click_restores_unity_gain_data() {
-        QTest::addColumn<bool>("useMixer");
+        // Track volume lives only in the track list (the mixer strip shows clip gain).
         QTest::addColumn<double>("initialGain");
-        QTest::newRow("mixer silent") << true << 0.0;
-        QTest::newRow("mixer attenuated") << true << 0.35;
-        QTest::newRow("mixer boosted") << true << 1.8;
-        QTest::newRow("track silent") << false << 0.0;
-        QTest::newRow("track attenuated") << false << 0.35;
-        QTest::newRow("track boosted") << false << 1.8;
+        QTest::newRow("track silent") << 0.0;
+        QTest::newRow("track attenuated") << 0.35;
+        QTest::newRow("track boosted") << 1.8;
     }
     void volume_faders_double_click_restores_unity_gain() {
-        QFETCH(bool,useMixer); QFETCH(double,initialGain);
+        QFETCH(double,initialGain);
         TrackListWrapper tracks; const int first=tracks.addAudioTrack(),second=tracks.addVocalTrack();
         QVERIFY(tracks.setVolume(first,initialGain)); QVERIFY(tracks.setVolume(second,0.5));
-        auto* mixer=window->findChild<QQuickItem*>("testMixer");
-        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(mixer); QVERIFY(list);
-        const auto restore=qScopeGuard([&] {
-            mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
-            list->setVisible(false); list->setProperty("trackModel",QVariant());
-        });
-        mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(useMixer);
-        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(!useMixer);
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        const auto restore=qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel",QVariant()); });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
         QTest::qWait(30);
-        auto* mixerFader=visualItem(mixer,"mixerVolume"+QString::number(first));
-        auto* trackFader=visualItem(list,"trackVolume"+QString::number(first));
-        QVERIFY(mixerFader); QVERIFY(trackFader);
-        auto* fader=useMixer ? mixerFader : trackFader;
-        const QPoint resetPoint=fader->mapToScene(useMixer
-            ? QPointF(fader->width()/2,fader->height()*0.2)
-            : QPointF(fader->width()*0.2,fader->height()/2)).toPoint();
+        auto* fader=visualItem(list,"trackVolume"+QString::number(first)); QVERIFY(fader);
+        const QPoint resetPoint=fader->mapToScene(QPointF(fader->width()*0.2,fader->height()/2)).toPoint();
         QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,resetPoint,10);
         QTRY_COMPARE(tracks.project().findTrack(first)->volume,1.0f);
-        QCOMPARE(mixerFader->property("value").toDouble(),1.0);
-        QCOMPARE(trackFader->property("value").toDouble(),1.0);
+        QCOMPARE(fader->property("value").toDouble(),1.0);
         QCOMPARE(tracks.project().findTrack(second)->volume,0.5f);
         // The double-click handler must leave ordinary dragging usable.
         const QPoint start=fader->mapToScene(QPointF(fader->width()/2,fader->height()/2)).toPoint();
-        const QPoint end=fader->mapToScene(useMixer
-            ? QPointF(fader->width()/2,fader->height()*0.1)
-            : QPointF(fader->width()*0.9,fader->height()/2)).toPoint();
+        const QPoint end=fader->mapToScene(QPointF(fader->width()*0.9,fader->height()/2)).toPoint();
         QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
         QTest::mouseMove(window,end,20);
         QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,end);
         QVERIFY(tracks.project().findTrack(first)->volume>1.1f);
         QVERIFY(tracks.setVolume(first,0.5));
-        QCOMPARE(mixerFader->property("value").toDouble(),0.5);
-        QCOMPARE(trackFader->property("value").toDouble(),0.5);
+        QCOMPARE(fader->property("value").toDouble(),0.5);
     }
     void mixer_split_meters_show_independent_channels_beside_the_vertical_fader() {
         TrackListWrapper tracks; const int a=tracks.addAudioTrack(), b=tracks.addVocalTrack();
@@ -1419,7 +1394,7 @@ private slots:
         QQmlProperty::write(mixer,"levels",levels); QTest::qWait(30);
         auto* input=visualItem(mixer,"mixerInput"+QString::number(a));
         auto* output=visualItem(mixer,"mixerOutput"+QString::number(a));
-        auto* fader=visualItem(mixer,"mixerVolume"+QString::number(a));
+        auto* fader=visualItem(mixer,"mixerClipGain"+QString::number(a));
         auto* silent=visualItem(mixer,"mixerInput"+QString::number(b));
         QVERIFY(input); QVERIFY(output); QVERIFY(fader); QVERIFY(silent);
         QCOMPARE(input->property("leftDb").toDouble(),-6.0); QCOMPARE(input->property("rightDb").toDouble(),-18.0);
@@ -1773,7 +1748,7 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(dialog,"accept"));
         QTRY_COMPARE(tracks.count(),0);
     }
-    void mixer_clip_gain_control_follows_the_target_clip() {
+    void mixer_clip_gain_fader_follows_the_target_clip() {
         TrackListWrapper tracks;
         const int empty=tracks.addAudioTrack();
         const int withClip=tracks.addInstrumentTrack(); const int clip=tracks.addClipAtBeat(withClip,0,4); QVERIFY(clip>0);
@@ -1786,12 +1761,41 @@ private slots:
         QVERIFY(!none->isEnabled()); QVERIFY(gain->isEnabled());
         QVERIFY(tracks.setClipGain(withClip,clip,-6.0));
         QTRY_COMPARE(gain->property("value").toDouble(),-6.0);
-        // The main fader is track volume, independent of clip gain
-        auto* volume=visualItem(mixer,"mixerVolume"+QString::number(withClip)); QVERIFY(volume);
-        QCOMPARE(volume->property("value").toDouble(),1.0);
+        // Clip gain is the strip's vertical fader; there is no track volume fader in the mixer.
+        QCOMPARE(gain->property("orientation").toInt(),int(Qt::Vertical));
+        QVERIFY(!visualItem(mixer,"mixerVolume"+QString::number(withClip)));
         // Double-click resets clip gain to 0 dB
         QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,gain->mapToScene(QPointF(gain->width()/2,gain->height()/2)).toPoint(),10);
         QTRY_COMPARE(tracks.project().findTrack(withClip)->audioClips[0].gainDb,0.0f);
+    }
+    void mixer_clip_gain_does_not_rebuild_the_timeline() {
+        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        const int clip=tracks.addClipAtBeat(track,0,4); QVERIFY(clip>0);
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] {
+            mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+        });
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
+        QTest::qWait(30);
+        QPointer<QQuickItem> block=visualItem(timeline,"clipBlock"+QString::number(clip)); QVERIFY(block);
+        auto* fader=visualItem(mixer,"mixerClipGain"+QString::number(track)); QVERIFY(fader);
+        // Drag the clip gain fader: the clip block must be the same object afterwards (not rebuilt)
+        const QPoint start=fader->mapToScene(QPointF(fader->width()/2,fader->height()/2)).toPoint();
+        const QPoint end=fader->mapToScene(QPointF(fader->width()/2,fader->height()*0.8)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
+        QTest::mouseMove(window,end,20);
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,end);
+        QVERIFY(tracks.project().findTrack(track)->audioClips[0].gainDb<0.0f);
+        QVERIFY(block);
+        QCOMPARE(visualItem(timeline,"clipBlock"+QString::number(clip)),block.data());
+        auto* label=visualItem(mixer,"mixerClipLabel"+QString::number(track)); QVERIFY(label);
+        QCOMPARE(label->property("text").toString(),QString("CLIP"));
+        QVERIFY(label->mapToScene(QPointF(0,0)).y()>=fader->mapToScene(QPointF(0,fader->height())).y()-1); // under the fader
+        QVERIFY(std::abs(label->mapToScene(QPointF(label->width()/2,0)).x()
+                         -fader->mapToScene(QPointF(fader->width()/2,0)).x())<3); // centred on it
     }
     void master_scale_labels_sit_at_their_meter_levels() {
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
