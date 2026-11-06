@@ -57,35 +57,53 @@ Item {
 
     signal openPianoRollRequested(int trackId, int clipId, string label, real lengthBeats)
 
+    // Clip edit actions, shared by the keyboard shortcuts below and the Edit menu.
+    // The menu does not need keyboard focus on the timeline; the backend still decides
+    // whether each action is allowed (not while recording, busy, dragging or loading).
+    readonly property bool editActionsAvailable: visible && enabled && !!root.trackModel
+    readonly property bool menuCanCut: editActionsAvailable && editor.canCut
+    readonly property bool menuCanCopy: editActionsAvailable && editor.canCopy
+    readonly property bool menuCanPaste: editActionsAvailable && editor.canPaste
+    readonly property bool menuCanDuplicate: editActionsAvailable && editor.canDuplicate
+    readonly property bool menuCanDelete: editActionsAvailable && editor.canEditSelection
+    readonly property bool menuCanSelectAll: editActionsAvailable && editor.keyboardAllowed
+    function cutSelection() { editor.cutSelectedClips() }
+    function copySelection() { editor.copySelectedClips() }
+    // Paste at the playhead, on the selected track.
+    function pasteAtPlayhead() { editor.pasteClips(root.transport.positionBeats, editor.selectedTrackId) }
+    function duplicateSelection() { editor.duplicateSelectedClips() }
+    function deleteSelection() { root.trackModel.editClips(root.selectedClipIds, "delete", 0) }
+    function selectAllClips() { editor.selectAllClips() }
+
     Shortcut {
         sequence: "Delete"
         enabled: root.canEditClipSelection
         autoRepeat: false
-        onActivated: root.trackModel.editClips(root.selectedClipIds, "delete", 0)
+        onActivated: root.deleteSelection()
     }
     Shortcut {
         sequences: [StandardKey.Cut]
         enabled: root.canCut
         autoRepeat: false
-        onActivated: editor.cutSelectedClips()
+        onActivated: root.cutSelection()
     }
     Shortcut {
         sequences: [StandardKey.Copy]
         enabled: root.canCopy
         autoRepeat: false
-        onActivated: editor.copySelectedClips()
+        onActivated: root.copySelection()
     }
     Shortcut {
         sequences: [StandardKey.Paste]
         enabled: root.canPaste
         autoRepeat: false
-        onActivated: editor.pasteClips(root.transport.positionBeats, editor.selectedTrackId)
+        onActivated: root.pasteAtPlayhead()
     }
     Shortcut {
         sequence: "Ctrl+D"
         enabled: root.canDuplicate
         autoRepeat: false
-        onActivated: editor.duplicateSelectedClips()
+        onActivated: root.duplicateSelection()
     }
     Shortcut {
         sequence: "Left"
@@ -103,7 +121,7 @@ Item {
         sequences: [StandardKey.SelectAll]
         enabled: root.clipKeyboardActive
         autoRepeat: false
-        onActivated: editor.selectAllClips()
+        onActivated: root.selectAllClips()
     }
     Shortcut {
         sequence: "Escape"

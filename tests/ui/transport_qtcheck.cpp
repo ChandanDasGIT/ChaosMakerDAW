@@ -1166,17 +1166,51 @@ private slots:
         top->setProperty("trackModel",QVariant::fromValue(&tracks));
         const int track=tracks.addAudioTrack(); const int clip=tracks.addClipAtBeat(track,0,4);
         QVERIFY(tracks.removeAudioClip(track,clip));
-        // Use the real File > Undo / Redo items (a mouse click cannot hit the 1x1 test hooks).
-        auto* fileButton=visualItem(window->contentItem(),"fileMenuButton"); QVERIFY(fileButton);
-        auto* fileMenu=window->findChild<QObject*>("fileMenu"); QVERIFY(fileMenu);
-        const auto choose=[&](const char* item) {
-            click(fileButton); QTRY_VERIFY(fileMenu->property("visible").toBool());
-            auto* entry=visualItem(window->contentItem(),item); QVERIFY(entry); QVERIFY(entry->isEnabled());
-            click(entry); QTRY_VERIFY(!fileMenu->property("visible").toBool());
-        };
-        choose("fileUndoItem"); QCOMPARE(tracks.clips().size(),1);
-        choose("fileRedoItem"); QCOMPARE(tracks.clips().size(),0);
+        // Use the real Edit > Undo / Redo items (a mouse click cannot hit the 1x1 test hooks).
+        QVERIFY(!visualItem(window->contentItem(),"fileUndoItem")); // moved out of the File menu
+        chooseEditItem("editUndoItem"); QCOMPARE(tracks.clips().size(),1);
+        chooseEditItem("editRedoItem"); QCOMPARE(tracks.clips().size(),0);
         top->setProperty("trackModel",QVariant());
+    }
+    void edit_menu_cuts_copies_pastes_duplicates_and_deletes_timeline_clips() {
+        auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller.attachProject(&tracks);
+        const int track=tracks.addAudioTrack(); tracks.addClipAtBeat(track,0,4);
+        auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] {
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+            timeline->setProperty("transport",QVariant::fromValue(EngineController::instance()));
+            top->setProperty("trackModel",QVariant());
+        });
+        timeline->setProperty("transport",QVariant::fromValue(&controller));
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        top->setProperty("trackModel",QVariant::fromValue(&tracks));
+        // Nothing selected: only Select All (and nothing to paste yet).
+        auto* editButton=visualItem(window->contentItem(),"editMenuButton"); QVERIFY(editButton);
+        auto* editMenu=window->findChild<QObject*>("editMenu"); QVERIFY(editMenu);
+        click(editButton); QTRY_VERIFY(editMenu->property("visible").toBool());
+        for(const char* name:{"editCutItem","editCopyItem","editPasteItem","editDuplicateItem","editDeleteItem"}) {
+            auto* item=visualItem(window->contentItem(),name); QVERIFY2(item,name); QVERIFY2(!item->isEnabled(),name);
+        }
+        auto* selectAll=visualItem(window->contentItem(),"editSelectAllItem"); QVERIFY(selectAll); QVERIFY(selectAll->isEnabled());
+        QMetaObject::invokeMethod(editMenu,"close"); QTRY_VERIFY(!editMenu->property("visible").toBool());
+
+        chooseEditItem("editSelectAllItem"); QCOMPARE(selectedIds(timeline).size(),1);
+        QVERIFY(timeline->hasActiveFocus()); // keyboard shortcuts keep working after a menu action
+        chooseEditItem("editCopyItem"); QVERIFY(tracks.hasClipboard()); QCOMPARE(tracks.clips().size(),1);
+        controller.seekBeat(8); io->process();
+        chooseEditItem("editPasteItem"); QCOMPARE(tracks.clips().size(),2);
+        // The copy lands at the playhead (beat 8 at 120 BPM and 48 kHz = 192000 samples).
+        const auto& pasted=tracks.project().findTrack(track)->audioClips;
+        QVERIFY(std::any_of(pasted.begin(),pasted.end(),[](const auto& c) { return c.start==qint64(192000); }));
+        chooseEditItem("editDuplicateItem"); QCOMPARE(tracks.clips().size(),3);
+        chooseEditItem("editDeleteItem"); QCOMPARE(tracks.clips().size(),2);
+        chooseEditItem("editSelectAllItem"); QCOMPARE(selectedIds(timeline).size(),2);
+        chooseEditItem("editCutItem"); QCOMPARE(tracks.clips().size(),0); QCOMPARE(tracks.clipboardClipCount(),2);
+        chooseEditItem("editUndoItem"); QCOMPARE(tracks.clips().size(),2);
+        controller.shutdownSession();
     }
     void timeline_bpm_edit_updates_grid_and_preserves_recorded_audio_timing() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
@@ -2049,6 +2083,13 @@ private:
         if(root->objectName()==name)return root;
         for(auto* child:root->childItems())if(auto* result=visualItem(child,name))return result;
         return nullptr;
+    }
+    void chooseEditItem(const char* name) {
+        auto* button=visualItem(window->contentItem(),"editMenuButton"); QVERIFY(button);
+        auto* menu=window->findChild<QObject*>("editMenu"); QVERIFY(menu);
+        click(button); QTRY_VERIFY(menu->property("visible").toBool());
+        auto* entry=visualItem(window->contentItem(),name); QVERIFY2(entry,name); QVERIFY2(entry->isEnabled(),name);
+        click(entry); QTRY_VERIFY(!menu->property("visible").toBool());
     }
     void openQuickSettings() {
         auto* popup=window->findChild<QObject*>("quickSettingsPopup"); QVERIFY(popup);

@@ -82,6 +82,7 @@ Window {
         TopBar {
             id: topBar
             trackModel: trackModel
+            timeline: timeline
             mixerVisible: window.mixerVisible
             onToggleMixerRequested: {
                 if (window.bottomPanelMode === "pianoroll") {

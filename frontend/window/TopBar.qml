@@ -8,6 +8,7 @@ import "../settings"
 Rectangle {
     id: root
     property var trackModel: null
+    property var timeline: null
     property bool mixerVisible: true
     readonly property alias appSettings: appSettings
     signal closeRequested()
@@ -33,6 +34,12 @@ Rectangle {
             id: projectActions
             trackModel: root.trackModel
             onCloseRequested: root.closeRequested()
+        }
+
+        EditMenu {
+            id: editMenu
+            trackModel: root.trackModel
+            timeline: root.timeline
         }
 
         AppSettings {
