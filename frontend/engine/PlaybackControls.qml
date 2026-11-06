@@ -38,13 +38,13 @@ RowLayout {
 
     Repeater {
         model: [
-            {glyph: "|◀", hintText: "Go to start", command: "rewind"},
-            {glyph: "▶|", hintText: "Skip forward one bar", command: "forward"},
-            {glyph: "●", hintText: "Start/stop recording (R)", command: "record"},
-            {glyph: "▶", hintText: "Play (Space)", command: "play"},
-            {glyph: "Ⅱ", hintText: "Pause (Space)", command: "pause"},
-            {glyph: "■", hintText: "Stop", command: "stop"},
-            {glyph: "⟳", hintText: "Toggle repeat", command: "repeat"}
+            {glyph: Icons.goToStart, hintText: "Go to start", command: "rewind"},
+            {glyph: Icons.skipForward, hintText: "Skip forward one bar", command: "forward"},
+            {glyph: Icons.record, hintText: "Start/stop recording (R)", command: "record"},
+            {glyph: Icons.play, hintText: "Play (Space)", command: "play"},
+            {glyph: Icons.pause, hintText: "Pause (Space)", command: "pause"},
+            {glyph: Icons.stop, hintText: "Stop", command: "stop"},
+            {glyph: Icons.loop, hintText: "Toggle repeat", command: "repeat"}
         ]
         delegate: ToolButton {
             id: transportButton

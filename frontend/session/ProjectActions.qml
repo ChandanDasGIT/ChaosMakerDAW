@@ -144,7 +144,7 @@ RowLayout {
                 verticalAlignment: Text.AlignVCenter
             }
             Text {
-                text: "▾"
+                text: Icons.menuArrow
                 color: fileMenuButton.down || fileMenuButton.checked ? Theme.accent : Theme.textMuted
                 font.pixelSize: 10
                 verticalAlignment: Text.AlignVCenter

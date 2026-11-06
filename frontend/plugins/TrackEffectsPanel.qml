@@ -63,9 +63,9 @@ Popup {
                 }
                 ToolButton {
                     objectName: "closeTrackEffects"
-                    text: "×"
+                    text: Icons.close
                     onClicked: root.close()
-                    contentItem: Text { text: "×"; color: Theme.text; font.pixelSize: 22; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                    contentItem: Text { text: Icons.close; color: Theme.text; font.pixelSize: 22; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                     ToolTip.visible: hovered
                     ToolTip.text: "Close effects"
                 }
