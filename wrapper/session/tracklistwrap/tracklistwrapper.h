@@ -176,6 +176,9 @@ signals:
 
 private:
     void notifyClipEdit(int trackId);
+    // Clip gain only: refresh the track's clip data, engine and history, but not the clip list,
+    // so the timeline does not rebuild every clip block while a gain fader moves.
+    void notifyClipGainEdit(int trackId);
     void setEqPresetError(const QString& error);
     bool applyEqBands(int trackId, const std::array<float,10>& bands);
     void syncSelectionState();

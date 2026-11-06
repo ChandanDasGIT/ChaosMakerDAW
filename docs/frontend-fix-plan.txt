@@ -40,8 +40,9 @@ PHASE 1 — Broken or misleading behaviour (do first)
 [x] 1.6  Mixer channel fader controls clip gain instead of track volume.
          frontend/mixer/MixerPanel.qml:280-293, 339-353 — the main fader should be track
          volume; move clip gain somewhere else (clip inspector/context).
-         Done: track volume fader restored (as before commit 54a2d60); clip gain kept as a
-         small "CLIP" slider in the strip. Fixes volume_faders_double_click_restores_unity_gain.
+         Decision (2026-11-06, user): no track volume in the mixer. Each strip's vertical
+         fader is clip gain (selected clip on the track, else its first clip); track volume
+         lives only in the track list. Tests updated to match.
 
 [x] 1.7  Master fader dB labels are evenly spaced and don't match the real scale.
          MixerPanel.qml:116-129 — position labels with the wrapper's dB→position mapping.
@@ -72,7 +73,8 @@ PHASE 1 — Broken or misleading behaviour (do first)
          - track_colour_picker_updates_cards_timeline_and_mixer_and_cancels_custom_edits:
            APP bug from commit 54a2d60 (selected track's colour strip turned accent blue).
            Strip now always shows the track colour. Test passes.
-         - volume_faders_double_click_restores_unity_gain: APP bug, fixed by 1.6.
+         - volume_faders_double_click_restores_unity_gain: now covers the track list fader
+           only (see the 1.6 decision).
          - track_effects_switch_in_place_and_keep_edits_on_the_selected_track,
            track_names_edit_inline_commit_cancel_and_update_mixer_and_fx,
            vocal_effects_offer_eq_and_recording_controls_without_guitarsuite:

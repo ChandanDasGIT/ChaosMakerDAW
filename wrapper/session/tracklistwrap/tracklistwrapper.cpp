@@ -247,7 +247,7 @@ bool TrackListWrapper::setClipGain(int trackId, int clipId, double gainDb)
 {
     const auto change = m_state.setClipGain(trackId, clipId, gainDb);
     if (change.changed) {
-        notifyClipEdit(trackId);
+        notifyClipGainEdit(trackId);
     }
     return change.accepted;
 }
@@ -573,6 +573,12 @@ void TrackListWrapper::notifyClipEdit(int trackId) {
     if (count()>0) emit dataChanged(index(row<0 ? 0 : row), index(row<0 ? count()-1 : row), {ClipsRole});
     emit contentEndBeatsChanged();
     emit clipsChanged();
+}
+void TrackListWrapper::notifyClipGainEdit(int trackId) {
+    const int row = rowForTrackId(trackId);
+    // dataChanged is forwarded to projectChanged (engine refresh, dirty flag) in the constructor.
+    if (row >= 0) emit dataChanged(index(row), index(row), {ClipsRole});
+    emit historyChanged();
 }
 bool TrackListWrapper::undo()
 {
