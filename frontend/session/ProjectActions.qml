@@ -23,6 +23,7 @@ RowLayout {
 
     ProjectActionsWrapper {
         id: actionsBridge
+        objectName: "projectActionsBridge"
         onShowUnsavedConfirmation: unsavedDialog.open()
         onShowOpenDialog: openProjectDialog.open()
         onShowSaveDialog: saveProjectDialog.open()
@@ -41,6 +42,14 @@ RowLayout {
         onActivated: actionsBridge.requestSave(EngineController.projectFile.toString().length > 0)
     }
 
+    // Literal sequence so it always matches the "Ctrl+Shift+S" shown in the File menu
+    // (StandardKey.SaveAs is empty on some desktops).
+    Shortcut {
+        sequence: "Ctrl+Shift+S"
+        enabled: !EngineController.takeBusy && !EngineController.projectLoading
+        onActivated: actionsBridge.requestSaveAs()
+    }
+
     Shortcut {
         sequences: [StandardKey.New]
         enabled: !EngineController.takeBusy && !EngineController.projectLoading
@@ -55,6 +64,7 @@ RowLayout {
 
     FileDialog {
         id: saveProjectDialog
+        objectName: "saveProjectDialog"
         title: "Save project"
         fileMode: FileDialog.SaveFile
         nameFilters: ["ChaosMaker projects (*.chaos)"]

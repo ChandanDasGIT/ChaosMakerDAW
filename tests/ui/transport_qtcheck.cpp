@@ -1451,6 +1451,16 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(dialog,"reject")); QCOMPARE(tracks.clips().size(),1);
         QVERIFY(controller->projectDirty()); top->setProperty("trackModel",QVariant());
     }
+    void ctrl_shift_s_opens_save_as() {
+        auto* bridge=window->findChild<QObject*>("projectActionsBridge"); QVERIFY(bridge);
+        QSignalSpy saveDialog(bridge,SIGNAL(showSaveDialog())); QVERIFY(saveDialog.isValid());
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+        QTest::keyClick(window,Qt::Key_S,Qt::ControlModifier|Qt::ShiftModifier);
+        QTRY_COMPARE(saveDialog.count(),1);
+        // Close the file dialog again so later tests start clean.
+        auto* dialog=window->findChild<QObject*>("saveProjectDialog"); QVERIFY(dialog);
+        QVERIFY(QMetaObject::invokeMethod(dialog,"reject"));
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());
