@@ -382,6 +382,7 @@ void AudioEngine::deviceChanged(double sampleRate, int maxFrames)
 
 void AudioEngine::xrunOccurred() noexcept
 {
+    m_xruns.fetch_add(1, std::memory_order_relaxed);
     m_events.push(EngineEvent{EngineEvent::Type::Xrun, 0});
 }
 

@@ -48,6 +48,10 @@ public:
     void clearReleasedRecorder() { m_releasedRecorder.store(nullptr, std::memory_order_relaxed); }
     DeviceLatency latency() const;
     double sampleRate() const;
+    // Audio dropouts reported by the device since start or the last reset. The device may report
+    // them from any thread, so this is a plain atomic counter.
+    std::uint64_t xrunCount() const noexcept { return m_xruns.load(std::memory_order_relaxed); }
+    void resetXruns() noexcept { m_xruns.store(0, std::memory_order_relaxed); }
     bool setBufferSize(int frames);
     std::string lastError() const;
     std::vector<std::string> inputNames() const;
@@ -95,6 +99,7 @@ private:
     float m_metronomeVolume = 0.5f;
     RtQueue<EngineCommand, 512> m_commands;
     RtQueue<EngineEvent, 512> m_events;
+    std::atomic<std::uint64_t> m_xruns{0};
     TenBandEq m_monitorEq;
     // Fixed scratch space keeps FX independent of speaker routing and recording allocation-free.
     std::array<std::array<float, 1024>, 2> m_fxAudio{};

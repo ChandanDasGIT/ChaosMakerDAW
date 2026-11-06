@@ -1,4 +1,5 @@
 #include "enginecontroller.h"
+#include "engine/enginestatus.h"
 
 #include "core/version.h"
 #include "audiodevice/jackaudiodevice.h"
@@ -19,6 +20,7 @@
 #include <QProcess>
 #include <QQmlEngine>
 #include <algorithm>
+#include <limits>
 #include <cmath>
 #include <memory>
 #include <QSettings>
@@ -111,6 +113,7 @@ EngineController::EngineController(std::unique_ptr<AudioDevice> device, bool dis
         }
         m_trackLevels=trackLevels;
         emit trackLevelsChanged();
+        refreshAudioInfo();
     });
     m_meterTimer.start(50);
     const double rate = m_engine->sampleRate() > 1000.0 ? m_engine->sampleRate() : 48000.0;
@@ -621,28 +624,68 @@ void EngineController::updateAudioStatus()
 {
     if (!m_audioReady)
         return;
-    const DeviceLatency ioLatency = m_engine->latency();
-    const double sampleRate = m_engine->sampleRate();
-    const double blockMilliseconds = sampleRate > 0.0
-        ? 1000.0 * static_cast<double>(ioLatency.captureFrames) / sampleRate : 0.0;
-    QString bufferStatus = QStringLiteral(" · JACK block %1 frames (%2 ms)")
-                               .arg(ioLatency.captureFrames)
-                               .arg(blockMilliseconds, 0, 'f', 2);
-    if (ioLatency.captureFrames != 128)
-        bufferStatus += QStringLiteral(" (128 requested)");
+    // Rate, buffer and latency are shown by the status strip's own readouts.
+    refreshAudioInfo();
     if (!m_connectionError.isEmpty()) {
         setStatus(m_connectionError);
     } else if (m_monitorEnabled && m_inputConnected && m_outputConnected) {
         setStatus(QStringLiteral("Clean monitor · %1 → %2")
-                      .arg(m_activeInput, m_selectedOutputLeft) + bufferStatus);
+                      .arg(m_activeInput, m_selectedOutputLeft));
     } else if (m_monitorEnabled) {
-        setStatus(QStringLiteral("Monitor armed · select a connected input and output.") + bufferStatus);
+        setStatus(QStringLiteral("Monitor armed · select a connected input and output."));
     } else if (m_inputConnected && m_outputConnected) {
         setStatus(QStringLiteral("Audio I/O connected · %1 → %2")
-                      .arg(m_activeInput, m_selectedOutputLeft) + bufferStatus);
+                      .arg(m_activeInput, m_selectedOutputLeft));
     } else {
-        setStatus(QStringLiteral("JACK is running · choose an input and output port.") + bufferStatus);
+        setStatus(QStringLiteral("JACK is running · choose an input and output port."));
     }
+}
+
+void EngineController::refreshAudioInfo()
+{
+    const double rate = m_audioReady && m_engine ? m_engine->sampleRate() : 0.0;
+    const int frames = m_audioReady && m_engine ? m_engine->latency().captureFrames : 0;
+    const std::uint64_t xruns = m_engine ? m_engine->xrunCount() : 0;
+    if (rate == m_infoRate && frames == m_infoFrames && xruns == m_infoXruns) return;
+    m_infoRate = rate; m_infoFrames = frames; m_infoXruns = xruns;
+    emit audioInfoChanged();
+}
+
+QString EngineController::sampleRateText() const
+{
+    return QString::fromStdString(enginestatus::sampleRate(m_infoRate));
+}
+
+QString EngineController::bufferText() const
+{
+    return QString::fromStdString(enginestatus::buffer(m_infoFrames, m_infoRate));
+}
+
+QString EngineController::bufferTooltip() const
+{
+    const int requested = m_engine ? m_engine->latency().requestedBufferFrames : 0;
+    return QString::fromStdString(enginestatus::bufferTooltip(m_infoFrames, requested, m_infoRate));
+}
+
+int EngineController::xrunCount() const
+{
+    return static_cast<int>(std::min<std::uint64_t>(m_infoXruns, std::numeric_limits<int>::max()));
+}
+
+QString EngineController::xrunText() const
+{
+    return QString::fromStdString(enginestatus::xruns(m_infoXruns));
+}
+
+QString EngineController::xrunTooltip() const
+{
+    return QString::fromStdString(enginestatus::xrunTooltip(m_infoXruns));
+}
+
+void EngineController::resetXruns()
+{
+    if (m_engine) m_engine->resetXruns();
+    refreshAudioInfo();
 }
 
 void EngineController::setStatus(const QString& status)
