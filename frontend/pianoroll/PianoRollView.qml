@@ -237,7 +237,7 @@ Item {
         anchors.fill: parent
         spacing: 0
 
-        // 1. Top Window Menu Bar: File, Edit, Navigate, Options, View, Contents, Actions
+        // 1. Title bar: clip name and close button
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 22
@@ -249,24 +249,6 @@ Item {
                 anchors.leftMargin: 8
                 anchors.rightMargin: 8
                 spacing: 14
-
-                Repeater {
-                    model: ["File", "Edit", "Navigate", "Options", "View", "Contents", "Actions"]
-                    delegate: Text {
-                        required property string modelData
-                        text: modelData
-                        color: menuHover.containsMouse ? "#ffffff" : "#b0b6c2"
-                        font.pixelSize: 11
-                        verticalAlignment: Text.AlignVCenter
-
-                        MouseArea {
-                            id: menuHover
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                        }
-                    }
-                }
 
                 Item { Layout.fillWidth: true }
 
@@ -346,22 +328,29 @@ Item {
                     ToolTip.visible: qHover.containsMouse; ToolTip.text: "Quantize Notes (Q)"
                 }
 
+                // Undo/redo use the project history (note edits are undoable steps there)
                 Rectangle {
+                    objectName: "pianoRollUndo"
                     width: 24; height: 22; radius: 2
+                    enabled: !!root.trackModel && root.trackModel.canUndo
+                    opacity: enabled ? 1 : 0.4
                     color: undoHover.containsMouse ? "#373a44" : "#2f323a"
                     border.color: "#202227"
                     Text { anchors.centerIn: parent; text: "↶"; color: "#d8dce4"; font.pixelSize: 13 }
-                    MouseArea { id: undoHover; anchors.fill: parent; hoverEnabled: true }
-                    ToolTip.visible: undoHover.containsMouse; ToolTip.text: "Undo"
+                    MouseArea { id: undoHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.trackModel.undo() }
+                    ToolTip.visible: undoHover.containsMouse; ToolTip.text: "Undo (Ctrl+Z)"
                 }
 
                 Rectangle {
+                    objectName: "pianoRollRedo"
                     width: 24; height: 22; radius: 2
+                    enabled: !!root.trackModel && root.trackModel.canRedo
+                    opacity: enabled ? 1 : 0.4
                     color: redoHover.containsMouse ? "#373a44" : "#2f323a"
                     border.color: "#202227"
                     Text { anchors.centerIn: parent; text: "↷"; color: "#d8dce4"; font.pixelSize: 13 }
-                    MouseArea { id: redoHover; anchors.fill: parent; hoverEnabled: true }
-                    ToolTip.visible: redoHover.containsMouse; ToolTip.text: "Redo"
+                    MouseArea { id: redoHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.trackModel.redo() }
+                    ToolTip.visible: redoHover.containsMouse; ToolTip.text: "Redo (Ctrl+Shift+Z)"
                 }
 
                 Item { Layout.fillWidth: true }
