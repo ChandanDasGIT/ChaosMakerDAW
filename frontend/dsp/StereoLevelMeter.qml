@@ -10,6 +10,9 @@ ColumnLayout {
     property alias leftClipped: meter.leftClipped
     property alias rightClipped: meter.rightClipped
     signal clearClipsRequested()
+    // The bar itself, and the bar height (0..1) for a dB value: lets a scale line up with it.
+    readonly property alias barItem: bar
+    function normalizedFor(db) { return meter.normalizedFor(db) }
 
     StereoLevelMeterWrapper {
         id: meter
@@ -24,6 +27,7 @@ ColumnLayout {
         Layout.alignment: Qt.AlignHCenter
     }
     Rectangle {
+        id: bar
         Layout.fillWidth: true
         Layout.fillHeight: true
         implicitWidth: 14

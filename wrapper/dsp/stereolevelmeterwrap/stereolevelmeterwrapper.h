@@ -35,6 +35,8 @@ public:
 
     double leftNormalized() const noexcept;
     double rightNormalized() const noexcept;
+    // Bar height (0..1) for any dB value on this meter's scale, e.g. to place scale labels.
+    Q_INVOKABLE double normalizedFor(double db) const noexcept;
 
     QString leftLevelText() const;
     QString rightLevelText() const;

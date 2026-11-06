@@ -109,21 +109,23 @@ Rectangle {
                         when: !masterVolumeSlider.pressed
                     }
 
-                    ColumnLayout {
+                    // dB scale for the meter, each mark at its real height on the meter bar
+                    Item {
+                        id: masterScale
                         Layout.fillHeight: true
                         Layout.preferredWidth: 20
-                        spacing: 0
                         Repeater {
-                            model: ["0", "-6", "-12", "-24", "-48", "-∞"]
+                            model: [0, -6, -12, -24, -48, -60]
                             delegate: Text {
-                                text: modelData
+                                required property int modelData
+                                objectName: "mixerMasterScale" + modelData
+                                text: String(modelData)
                                 color: Theme.textMuted
                                 font.pixelSize: 8
                                 font.family: Theme.monospaceFontFamily
-                                Layout.fillHeight: true
+                                width: masterScale.width
                                 horizontalAlignment: Text.AlignRight
-                                verticalAlignment: Text.AlignVCenter
-                                Layout.alignment: Qt.AlignRight
+                                y: masterMeter.barItem.y + (1 - masterMeter.normalizedFor(modelData)) * masterMeter.barItem.height - height / 2
                             }
                         }
                     }

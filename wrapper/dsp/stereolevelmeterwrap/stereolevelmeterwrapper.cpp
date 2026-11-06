@@ -1,4 +1,10 @@
 #include "stereolevelmeterwrapper.h"
+#include "dsp/levelscale.h"
+
+double StereoLevelMeterWrapper::normalizedFor(double db) const noexcept
+{
+    return levelscale::normalizedLevel(db);
+}
 
 StereoLevelMeterWrapper::StereoLevelMeterWrapper(QObject* parent)
     : QObject(parent)

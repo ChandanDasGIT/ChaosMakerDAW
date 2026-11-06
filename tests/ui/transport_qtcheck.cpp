@@ -1773,6 +1773,21 @@ private slots:
         QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,gain->mapToScene(QPointF(gain->width()/2,gain->height()/2)).toPoint(),10);
         QTRY_COMPARE(tracks.project().findTrack(withClip)->audioClips[0].gainDb,0.0f);
     }
+    void master_scale_labels_sit_at_their_meter_levels() {
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
+        const auto restore=qScopeGuard([&] { mixer->setVisible(false); });
+        mixer->setVisible(true); QTest::qWait(30);
+        auto* meter=visualItem(mixer,"mixerMasterMeter"); QVERIFY(meter);
+        auto* bar=meter->property("barItem").value<QQuickItem*>(); QVERIFY(bar); QVERIFY(bar->height()>40);
+        const double top=bar->mapToScene(QPointF(0,0)).y(), height=bar->height();
+        // The meter is linear in dB from -60 (empty) to 0 (full)
+        for(const auto& [db,fraction]:std::initializer_list<std::pair<int,double>>{{0,1.0},{-6,0.9},{-12,0.8},{-24,0.6},{-48,0.2},{-60,0.0}}) {
+            auto* label=visualItem(mixer,"mixerMasterScale"+QString::number(db)); QVERIFY2(label,qPrintable(QString::number(db)));
+            const double centre=label->mapToScene(QPointF(0,label->height()/2)).y();
+            QVERIFY2(std::abs(centre-(top+(1-fraction)*height))<1.5,qPrintable(QString::number(db)));
+        }
+        QVERIFY(!visualItem(mixer,"mixerMasterScale-90"));
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());
