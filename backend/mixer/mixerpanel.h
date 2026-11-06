@@ -6,6 +6,7 @@
 #include <cmath>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace mixer {
 
@@ -22,6 +23,10 @@ inline constexpr double clipGainStep = 0.5;
 inline constexpr double minStripWidth = 82.0;
 inline constexpr double maxStripWidth = 220.0;
 inline constexpr double defaultStripWidth = 108.0;
+
+// Which clip a track strip's clip gain fader controls: the selected clip when it is on this
+// track, otherwise the track's first clip; -1 when the track has no clips.
+int chooseTargetClip(const std::vector<int>& trackClipIds, int selectedClipId) noexcept;
 
 double clampVolume(double gain) noexcept;
 double clampClipGain(double gainDb) noexcept;

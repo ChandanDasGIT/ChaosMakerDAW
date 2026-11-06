@@ -135,8 +135,9 @@ PHASE 2 — Move logic out of QML (architecture rule 6)
 [x] 2.3  Transport time formatting (PlaybackControls.qml:96-102) → backend/core/valueformat.
          Done: the clock uses the existing backend PlaybackControls::formatTime via
          PlaybackControlsWrapper.formatTime, and reads the controls' own transport.
-[ ] 2.4  Mixer target-clip selection (MixerPanel.qml:280-293) → MixerPanelWrapper
-         (or removed with 1.6).
+[x] 2.4  Mixer target-clip selection (MixerPanel.qml:280-293) → MixerPanelWrapper.
+         Done: backend mixer::chooseTargetClip (selected clip on the track, else its first
+         clip) via MixerPanelWrapper.targetClipId / clipGainOf.
 [ ] 2.5  GuitarSuiteEditor.qml: tuner string list (use standardtuning.h), beat divisions
          (use tempodivision.h), pedalType string checks, unit formatting → wrapper
          exposes descriptors/flags per pedal.

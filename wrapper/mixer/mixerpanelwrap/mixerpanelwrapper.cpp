@@ -143,3 +143,21 @@ void MixerPanelWrapper::setSolo(int trackId, bool solo)
     if (!m_trackList) return;
     m_trackList->setSolo(trackId, solo);
 }
+
+int MixerPanelWrapper::targetClipId(const QVariantList& trackClips, int selectedClipId) const
+{
+    std::vector<int> ids;
+    ids.reserve(static_cast<std::size_t>(trackClips.size()));
+    for (const auto& clip : trackClips) ids.push_back(clip.toMap().value(QStringLiteral("clipId"), -1).toInt());
+    return mixer::chooseTargetClip(ids, selectedClipId);
+}
+
+double MixerPanelWrapper::clipGainOf(const QVariantList& trackClips, int clipId) const
+{
+    for (const auto& clip : trackClips) {
+        const auto map = clip.toMap();
+        if (map.value(QStringLiteral("clipId"), -1).toInt() == clipId)
+            return map.value(QStringLiteral("gainDb"), mixer::defaultClipGainDb).toDouble();
+    }
+    return mixer::defaultClipGainDb;
+}

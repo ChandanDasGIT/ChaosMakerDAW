@@ -279,20 +279,11 @@ Rectangle {
                         color: index % 2 ? "#202020" : "#222222"
                         border.color: Theme.divider
 
-                        readonly property var targetClip: {
-                            if (!clips || clips.length === 0) return null
-                            if (root.trackModel && root.trackModel.selectedClipId >= 0) {
-                                for (let i = 0; i < clips.length; ++i) {
-                                    if (clips[i].clipId === root.trackModel.selectedClipId) {
-                                        return clips[i]
-                                    }
-                                }
-                            }
-                            return clips[0]
-                        }
-                        readonly property bool hasClip: targetClip !== null
-                        readonly property int targetClipId: hasClip ? targetClip.clipId : -1
-                        readonly property real targetClipGain: hasClip ? (targetClip.gainDb ?? 0.0) : 0.0
+                        // The clip this strip's fader controls: chosen by the backend
+                        // (selected clip on this track, else its first clip)
+                        readonly property int targetClipId: panelWrapper.targetClipId(clips ?? [], root.trackModel ? root.trackModel.selectedClipId : -1)
+                        readonly property bool hasClip: targetClipId >= 0
+                        readonly property real targetClipGain: panelWrapper.clipGainOf(clips ?? [], targetClipId)
 
                         TapHandler {
                             gesturePolicy: TapHandler.ReleaseWithinBounds
