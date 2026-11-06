@@ -97,3 +97,11 @@ TEST(mixerpanel, make_master_strip_state)
     CHECK(mutedMaster.muteTooltip == "Master mute enabled");
     CHECK(mutedMaster.volumeTooltip == "Master volume 50%; double-click for 0 dB");
 }
+
+TEST(mixerpanel, clip_gain_fader_targets_the_selected_clip_else_the_first)
+{
+    CHECK(mixer::chooseTargetClip({}, 5) == -1);                  // no clips
+    CHECK(mixer::chooseTargetClip({4, 7, 9}, -1) == 4);           // nothing selected: first
+    CHECK(mixer::chooseTargetClip({4, 7, 9}, 9) == 9);            // selected clip on this track
+    CHECK(mixer::chooseTargetClip({4, 7, 9}, 12) == 4);           // selected clip is elsewhere
+}

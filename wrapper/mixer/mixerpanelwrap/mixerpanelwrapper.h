@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QVariantList>
 #include <qqmlregistration.h>
 #include "mixer/mixerpanel.h"
 
@@ -53,6 +54,11 @@ public:
     Q_INVOKABLE QString formatVolumeTooltip(double volume) const;
     Q_INVOKABLE QString formatMasterVolume(double volume) const;
     Q_INVOKABLE QString formatMasterVolumeTooltip(double volume) const;
+    // Target clip of a strip's clip gain fader (backend mixer::chooseTargetClip). The view passes
+    // the track's "clips" role and the selected clip id so its bindings follow both.
+    Q_INVOKABLE int targetClipId(const QVariantList& trackClips, int selectedClipId) const;
+    // Gain (dB) of that clip in the same list; 0 dB when it is not there.
+    Q_INVOKABLE double clipGainOf(const QVariantList& trackClips, int clipId) const;
     Q_INVOKABLE QString formatClipGain(double gainDb) const;
     Q_INVOKABLE QString formatClipGainTooltip(double gainDb) const;
     Q_INVOKABLE QString formatMuteTooltip(bool muted) const;

@@ -1,5 +1,14 @@
 #include "mixerpanel.h"
 
+int mixer::chooseTargetClip(const std::vector<int>& trackClipIds, int selectedClipId) noexcept
+{
+    if (trackClipIds.empty()) return -1;
+    if (selectedClipId >= 0
+        && std::find(trackClipIds.begin(), trackClipIds.end(), selectedClipId) != trackClipIds.end())
+        return selectedClipId;
+    return trackClipIds.front();
+}
+
 namespace mixer {
 
 double clampVolume(double gain) noexcept

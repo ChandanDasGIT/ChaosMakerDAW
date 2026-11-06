@@ -1767,6 +1767,12 @@ private slots:
         // Double-click resets clip gain to 0 dB
         QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,gain->mapToScene(QPointF(gain->width()/2,gain->height()/2)).toPoint(),10);
         QTRY_COMPARE(tracks.project().findTrack(withClip)->audioClips[0].gainDb,0.0f);
+        // Selecting the track's second clip moves the fader to that clip
+        const int second=tracks.addClipAtBeat(withClip,8,4); QVERIFY(second>0);
+        QVERIFY(tracks.setClipGain(withClip,second,4.5));
+        QCOMPARE(gain->property("value").toDouble(),0.0);              // still the first clip
+        tracks.selectClip(withClip,second);
+        QTRY_COMPARE(gain->property("value").toDouble(),4.5);
     }
     void mixer_clip_gain_does_not_rebuild_the_timeline() {
         TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
