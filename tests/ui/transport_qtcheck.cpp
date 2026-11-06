@@ -14,6 +14,10 @@
 #include <QScopeGuard>
 #include <QAbstractItemModelTester>
 #include <QJSValue>
+#include <QDirIterator>
+#include <QFile>
+#include <QMetaProperty>
+#include <QRegularExpression>
 #include <QJsonArray>
 #include <QJsonObject>
 #include "audiodevice/audiodevice.h"
@@ -567,6 +571,71 @@ private slots:
         click(xruns);
         QTRY_COMPARE(xruns->property("text").toString(),QString("0 xruns"));
         QCOMPARE(xruns->property("color").value<QColor>(),calm);
+    }
+    void icons_live_only_in_icons_qml_and_the_icons_folder() {
+        const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
+        // Code points used as icons (arrows, technical, shapes, dingbats, braille, roman numerals,
+        // emoji, × ‹ › ✓ ✕). Typographic text such as − · — … stays allowed.
+        const auto isIconSymbol=[](char32_t c) {
+            return (c>=0x2190 && c<=0x21FF) || (c>=0x2300 && c<=0x23FF) || (c>=0x25A0 && c<=0x25FF)
+                || (c>=0x2600 && c<=0x27BF) || (c>=0x27F0 && c<=0x27FF) || (c>=0x2800 && c<=0x28FF)
+                || (c>=0x2160 && c<=0x2188) || (c>=0x1F300 && c<=0x1FAFF)
+                || c==0x00D7 || c==0x2039 || c==0x203A || c==0x2713 || c==0x2715;
+        };
+        QStringList offenders;
+        QStringList files{root+"/Main.qml"};
+        QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
+        while(it.hasNext()) files<<it.next();
+        for(const QString& path:files) {
+            if(path.endsWith("/frontend/icons/Icons.qml")) continue;
+            QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(path));
+            int line=0;
+            for(const QByteArray& bytes:file.readAll().split('\n')) {
+                ++line;
+                for(auto c:QString::fromUtf8(bytes).toUcs4())
+                    if(isIconSymbol(c)) { offenders<<QString("%1:%2").arg(path.mid(root.size()+1)).arg(line); break; }
+            }
+        }
+        QVERIFY2(offenders.isEmpty(),qPrintable("Icon symbols outside icons/Icons.qml: "+offenders.join(", ")));
+        // Icons.qml writes every value as code points ("▶"), never as a literal symbol.
+        QFile icons(root+"/frontend/icons/Icons.qml"); QVERIFY(icons.open(QIODevice::ReadOnly));
+        const QString iconsText=QString::fromUtf8(icons.readAll());
+        const QRegularExpression value(QStringLiteral("readonly property string (\\w+):\\s*\"([^\"]*)\""));
+        int count=0;
+        for(auto match=value.globalMatch(iconsText);match.hasNext();) {
+            const auto m=match.next(); ++count;
+            for(QChar c:m.captured(2)) QVERIFY2(c.unicode()<0x80,qPrintable("Write Icons."+m.captured(1)+" as \\u escapes, got: "+m.captured(2)));
+        }
+        QVERIFY(count>=20);
+        // Every icon has a value at runtime (escapes decoded, the magnet as one code point).
+        auto* singleton=engine->singletonInstance<QObject*>("TransportTests","Icons"); QVERIFY(singleton);
+        const QMetaObject* meta=singleton->metaObject();
+        int checked=0;
+        for(int i=meta->propertyOffset();i<meta->propertyCount();++i,++checked)
+            QVERIFY2(!meta->property(i).read(singleton).toString().isEmpty(),meta->property(i).name());
+        QCOMPARE(checked,count);
+        QCOMPARE(singleton->property("snap").toString(),QString::fromUcs4(U"\U0001F9F2"));
+        QCOMPARE(singleton->property("close").toString(),QString(QChar(0x00D7)));
+        // Drawn icons live in frontend/icons/ and are listed in Icons.qml.
+        QDirIterator drawn(root+"/frontend/icons",{"*.qml"},QDir::Files);
+        int drawnCount=0;
+        while(drawn.hasNext()) {
+            const QString name=QFileInfo(drawn.next()).fileName();
+            if(name==QLatin1String("Icons.qml")) continue;
+            ++drawnCount;
+            QVERIFY2(iconsText.contains(name),qPrintable(name+" is not listed in Icons.qml"));
+        }
+        QVERIFY(drawnCount>=1);
+        // And the transport bar really shows them.
+        auto* bar=window->findChild<QQuickItem*>("transport"); QVERIFY(bar);
+        QStringList glyphs;
+        std::function<void(QQuickItem*)> collect=[&](QQuickItem* item) {
+            if(item->property("glyph").isValid()) glyphs<<item->property("glyph").toString();
+            for(auto* child:item->childItems()) collect(child);
+        };
+        collect(bar);
+        for(const char* name:{"goToStart","skipForward","record","play","pause","stop","loop"})
+            QVERIFY2(glyphs.contains(singleton->property(name).toString()),name);
     }
     void layout_sizes_are_saved_and_restored_between_sessions() {
         QSettings qs;

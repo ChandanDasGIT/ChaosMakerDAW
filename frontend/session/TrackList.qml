@@ -38,10 +38,10 @@ Rectangle {
                 ToolButton {
                     id: addTrackButton
                     objectName: "addTrackButton"
-                    text: "+"
+                    text: Icons.plus
                     implicitWidth: 28; implicitHeight: 28
                     onClicked: addTrackPopup.open()
-                    contentItem: Text { text: "+"; color: Theme.accent; font.pixelSize: 20; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                    contentItem: Text { text: Icons.plus; color: Theme.accent; font.pixelSize: 20; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                     background: Rectangle { radius: 4; color: parent.down ? "#383838" : "transparent" }
                     ToolTip.visible: hovered
                     ToolTip.text: "Add track…"
@@ -310,10 +310,10 @@ Rectangle {
                             ToolButton {
                                 id: closeTrackButton
                                 objectName: "trackRemoveButton" + trackCard.trackId
-                                text: "×"
+                                text: Icons.close
                                 implicitWidth: 20; implicitHeight: 24
                                 onClicked: root.requestRemoveTrack(trackCard.trackId, trackCard.name, trackCard.clips ? trackCard.clips.length : 0)
-                                contentItem: Text { text: "×"; color: closeTrackButton.hovered ? "#ffffff" : Theme.textMuted; font.pixelSize: 17; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                contentItem: Text { text: Icons.close; color: closeTrackButton.hovered ? "#ffffff" : Theme.textMuted; font.pixelSize: 17; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                                 background: Rectangle { radius: 4; color: closeTrackButton.hovered ? "#a9363c" : "transparent"; border.color: closeTrackButton.hovered ? Theme.record : "transparent" }
                                 ToolTip.visible: hovered
                                 ToolTip.text: "Remove track"
@@ -586,9 +586,9 @@ Rectangle {
                 ToolButton {
                     visible: addTrackPopup.addTrackStage === "instrument"
                     width: visible ? 26 : 0; height: 26
-                    text: "‹"
+                    text: Icons.back
                     onClicked: addTrackPopup.addTrackStage = "kind"
-                    contentItem: Text { text: "‹"; color: Theme.text; font.pixelSize: 21; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                    contentItem: Text { text: Icons.back; color: Theme.text; font.pixelSize: 21; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                     background: Rectangle { radius: 5; color: parent.hovered ? "#383b42" : "transparent" }
                 }
                 Column {
@@ -627,7 +627,7 @@ Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                         }
                         Text {
-                            text: "›"
+                            text: Icons.submenu
                             color: Theme.textMuted
                             font.pixelSize: 18
                             anchors.right: parent.right

@@ -28,7 +28,7 @@ ComboBox {
     indicator: Text {
         x: control.width - width - 6
         y: (control.height - height) / 2
-        text: "▾"
+        text: Icons.menuArrow
         color: "#8a909d"
         font.pixelSize: 9
     }

@@ -25,9 +25,9 @@ Rectangle {
         ToolButton {
             objectName: "bpmDecrease"
             Layout.preferredWidth: 23; Layout.fillHeight: true
-            text: "−"
+            text: Icons.minus
             onClicked: editor.adjust(-1)
-            contentItem: Text { text: "−"; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+            contentItem: Text { text: Icons.minus; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
             background: Rectangle { color: parent.down ? "#414650" : parent.hovered ? "#2d3038" : "transparent"; radius: 4 }
             ToolTip.visible: hovered; ToolTip.text: "Decrease BPM by 1"
         }
@@ -60,9 +60,9 @@ Rectangle {
         ToolButton {
             objectName: "bpmIncrease"
             Layout.preferredWidth: 23; Layout.fillHeight: true
-            text: "+"
+            text: Icons.plus
             onClicked: editor.adjust(1)
-            contentItem: Text { text: "+"; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+            contentItem: Text { text: Icons.plus; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
             background: Rectangle { color: parent.down ? "#414650" : parent.hovered ? "#2d3038" : "transparent"; radius: 4 }
             ToolTip.visible: hovered; ToolTip.text: "Increase BPM by 1"
         }

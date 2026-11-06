@@ -51,7 +51,7 @@ if(DAW_BUILD_APP)
         "${CMAKE_CURRENT_LIST_DIR}/frontend/*.qml")
 
     set_source_files_properties(frontend/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
-    set_source_files_properties(frontend/Icons.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+    set_source_files_properties(frontend/icons/Icons.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
     qt_add_executable(appChaosMaker
         main.cpp
@@ -136,7 +136,7 @@ if(DAW_BUILD_APP)
     if(TARGET Qt6::Test)
         qt_add_executable(transporttests tests/ui/transport_qtcheck.cpp)
         qt_add_qml_module(transporttests URI TransportTests
-            QML_FILES frontend/Theme.qml frontend/Icons.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
+            QML_FILES frontend/Theme.qml frontend/icons/Icons.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
                       frontend/window/EditMenu.qml frontend/window/ViewMenu.qml frontend/window/PanelTabs.qml
                       frontend/window/StatusStrip.qml
                       frontend/common/ThemedMenuItem.qml
@@ -144,7 +144,7 @@ if(DAW_BUILD_APP)
                       frontend/session/ProjectActions.qml frontend/audiodevice/DeviceSettings.qml
                       frontend/settings/AppSettings.qml frontend/settings/QuickSettings.qml
                       frontend/tempo/TempoEditor.qml frontend/tempo/MeterEditor.qml
-                      frontend/settings/MetronomeIcon.qml
+                      frontend/icons/MetronomeIcon.qml
                       frontend/instruments/guitar/GuitarSuitePanel.qml
                       frontend/instruments/guitar/GuitarSuiteEditor.qml
                       frontend/plugins/TrackEffectsPanel.qml frontend/plugins/eq/Tenbandeq.qml
@@ -157,6 +157,8 @@ if(DAW_BUILD_APP)
                       tests/ui/TransportHarness.qml
             SOURCES ${WRAPPER_SOURCES})
         target_include_directories(transporttests PRIVATE "${CMAKE_CURRENT_LIST_DIR}" ${WRAPPER_DIRS})
+        # Source-tree checks (e.g. icons live only in frontend/icons/Icons.qml).
+        target_compile_definitions(transporttests PRIVATE CHAOSMAKER_SOURCE_DIR="${CMAKE_CURRENT_LIST_DIR}")
         target_link_libraries(transporttests PRIVATE Qt6::Quick Qt6::Test Qt6::Concurrent dawengine)
         add_test(NAME transport_ui COMMAND transporttests)
         set_tests_properties(transport_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;PIPEWIRE_REMOTE=codex-test-no-server;PULSE_SERVER=unix:/tmp/chaosmaker-test-no-server")

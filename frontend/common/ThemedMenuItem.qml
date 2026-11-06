@@ -15,7 +15,7 @@ MenuItem {
     contentItem: RowLayout {
         Text {
             visible: root.checkable
-            text: root.checked ? "✓" : ""
+            text: root.checked ? Icons.check : ""
             color: root.enabled ? Theme.accent : Theme.textMuted
             font.pixelSize: Theme.bodySize
             Layout.preferredWidth: 16
@@ -28,7 +28,7 @@ MenuItem {
         }
         Text {
             visible: !!root.subMenu
-            text: "›"
+            text: Icons.submenu
             color: Theme.textMuted
             font.pixelSize: Theme.bodySize
         }

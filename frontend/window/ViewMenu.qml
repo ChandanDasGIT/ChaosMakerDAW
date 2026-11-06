@@ -28,7 +28,7 @@ ToolButton {
             verticalAlignment: Text.AlignVCenter
         }
         Text {
-            text: "▾"
+            text: Icons.menuArrow
             color: root.down || root.checked ? Theme.accent : Theme.textMuted
             font.pixelSize: 10
             verticalAlignment: Text.AlignVCenter

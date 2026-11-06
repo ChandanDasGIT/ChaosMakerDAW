@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import ".."
+import "../icons"
 
 Item {
     id: root
@@ -85,7 +86,7 @@ Item {
                 Text { text: "Metronome & Snap"; color: Theme.text; font.pixelSize: 15; font.bold: true; Layout.fillWidth: true }
                 ToolButton {
                     objectName: "closeQuickSettings"
-                    text: "×"; implicitWidth: 28; implicitHeight: 24
+                    text: Icons.close; implicitWidth: 28; implicitHeight: 24
                     onClicked: quickSettingsPopup.close()
                     ToolTip.visible: hovered; ToolTip.text: "Close"
                 }

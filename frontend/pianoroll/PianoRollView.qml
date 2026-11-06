@@ -311,7 +311,7 @@ Item {
                 }
 
                 Button {
-                    text: "✕"
+                    text: Icons.close
                     flat: true
                     implicitWidth: 20
                     implicitHeight: 20
@@ -337,7 +337,7 @@ Item {
                     width: 24; height: 22; radius: 2
                     color: root.activeTool === "pointer" ? "#4a505e" : tool1Hover.containsMouse ? "#373a44" : "#2f323a"
                     border.color: root.activeTool === "pointer" ? "#60cdff" : "#202227"
-                    Text { anchors.centerIn: parent; text: "⌖"; color: "#d8dce4"; font.pixelSize: 13 }
+                    Text { anchors.centerIn: parent; text: Icons.pointer; color: "#d8dce4"; font.pixelSize: 13 }
                     MouseArea { id: tool1Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "pointer" }
                     ToolTip.visible: tool1Hover.containsMouse; ToolTip.text: "Select (Pointer) · drag on empty grid to box-select, Shift adds"
                 }
@@ -346,7 +346,7 @@ Item {
                     width: 24; height: 22; radius: 2
                     color: root.activeTool === "pencil" ? "#4a505e" : tool2Hover.containsMouse ? "#373a44" : "#2f323a"
                     border.color: root.activeTool === "pencil" ? "#60cdff" : "#202227"
-                    Text { anchors.centerIn: parent; text: "✎"; color: "#d8dce4"; font.pixelSize: 13 }
+                    Text { anchors.centerIn: parent; text: Icons.pencil; color: "#d8dce4"; font.pixelSize: 13 }
                     MouseArea { id: tool2Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "pencil" }
                     ToolTip.visible: tool2Hover.containsMouse; ToolTip.text: "Draw (Pencil)"
                 }
@@ -355,7 +355,7 @@ Item {
                     width: 24; height: 22; radius: 2
                     color: root.activeTool === "eraser" ? "#4a505e" : tool3Hover.containsMouse ? "#373a44" : "#2f323a"
                     border.color: root.activeTool === "eraser" ? "#60cdff" : "#202227"
-                    Text { anchors.centerIn: parent; text: "⌫"; color: "#d8dce4"; font.pixelSize: 13 }
+                    Text { anchors.centerIn: parent; text: Icons.eraser; color: "#d8dce4"; font.pixelSize: 13 }
                     MouseArea { id: tool3Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "eraser" }
                     ToolTip.visible: tool3Hover.containsMouse; ToolTip.text: "Erase"
                 }
@@ -367,7 +367,7 @@ Item {
                     width: 24; height: 22; radius: 2
                     color: root.snapEnabled ? "#4a505e" : snapHover.containsMouse ? "#373a44" : "#2f323a"
                     border.color: root.snapEnabled ? "#60cdff" : "#202227"
-                    Text { anchors.centerIn: parent; text: "🧲"; color: "#d8dce4"; font.pixelSize: 11 }
+                    Text { anchors.centerIn: parent; text: Icons.snap; color: "#d8dce4"; font.pixelSize: 11 }
                     MouseArea { id: snapHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.snapEnabled = !root.snapEnabled }
                     ToolTip.visible: snapHover.containsMouse
                     ToolTip.text: root.snapEnabled ? "Snap to grid: on (click to place notes freely)" : "Snap to grid: off (click to snap to the Grid setting)"
@@ -380,7 +380,7 @@ Item {
                     opacity: enabled ? 1 : 0.4
                     color: qHover.containsMouse ? "#373a44" : "#2f323a"
                     border.color: "#202227"
-                    Text { anchors.centerIn: parent; text: "⇥Q"; color: "#d8dce4"; font.pixelSize: 10; font.bold: true }
+                    Text { anchors.centerIn: parent; text: Icons.quantize + "Q"; color: "#d8dce4"; font.pixelSize: 10; font.bold: true }
                     MouseArea { id: qHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.quantizeNotes() }
                     ToolTip.visible: qHover.containsMouse
                     ToolTip.text: "Quantize note starts to the Grid (Q) · selected notes, or all if none selected"
@@ -394,7 +394,7 @@ Item {
                     opacity: enabled ? 1 : 0.4
                     color: undoHover.containsMouse ? "#373a44" : "#2f323a"
                     border.color: "#202227"
-                    Text { anchors.centerIn: parent; text: "↶"; color: "#d8dce4"; font.pixelSize: 13 }
+                    Text { anchors.centerIn: parent; text: Icons.undo; color: "#d8dce4"; font.pixelSize: 13 }
                     MouseArea { id: undoHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.trackModel.undo() }
                     ToolTip.visible: undoHover.containsMouse; ToolTip.text: "Undo (Ctrl+Z)"
                 }
@@ -406,7 +406,7 @@ Item {
                     opacity: enabled ? 1 : 0.4
                     color: redoHover.containsMouse ? "#373a44" : "#2f323a"
                     border.color: "#202227"
-                    Text { anchors.centerIn: parent; text: "↷"; color: "#d8dce4"; font.pixelSize: 13 }
+                    Text { anchors.centerIn: parent; text: Icons.redo; color: "#d8dce4"; font.pixelSize: 13 }
                     MouseArea { id: redoHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.trackModel.redo() }
                     ToolTip.visible: redoHover.containsMouse; ToolTip.text: "Redo (Ctrl+Shift+Z)"
                 }
@@ -1154,11 +1154,11 @@ Item {
                     // Same transport commands as the main transport bar
                     Repeater {
                         model: [
-                            { text: "|◀", tt: "Go to start", command: "rewind" },
-                            { text: "▶", tt: "Play (Space)", command: "play" },
-                            { text: "❚❚", tt: "Pause (Space)", command: "pause" },
-                            { text: "■", tt: "Stop", command: "stop" },
-                            { text: "▶|", tt: "Skip forward one bar", command: "forward" }
+                            { text: Icons.goToStart, tt: "Go to start", command: "rewind" },
+                            { text: Icons.play, tt: "Play (Space)", command: "play" },
+                            { text: Icons.pause, tt: "Pause (Space)", command: "pause" },
+                            { text: Icons.stop, tt: "Stop", command: "stop" },
+                            { text: Icons.skipForward, tt: "Skip forward one bar", command: "forward" }
                         ]
                         delegate: Rectangle {
                             required property var modelData
@@ -1241,24 +1241,24 @@ Item {
                     Text { text: "Zoom:"; color: "#8f95a3"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
                     ZoomButton {
                         objectName: "pianoRollZoomOut"
-                        label: "-"; tip: "Zoom out in time · Ctrl+wheel"
+                        label: Icons.minus; tip: "Zoom out in time · Ctrl+wheel"
                         onClicked: root.pixelsPerBeat = Math.max(root.minPixelsPerBeat, root.pixelsPerBeat - 16)
                     }
                     ZoomButton {
                         objectName: "pianoRollZoomIn"
-                        label: "+"; tip: "Zoom in on time · Ctrl+wheel"
+                        label: Icons.plus; tip: "Zoom in on time · Ctrl+wheel"
                         onClicked: root.pixelsPerBeat = Math.min(root.maxPixelsPerBeat, root.pixelsPerBeat + 16)
                     }
                     Item { width: 6; height: 1 }
                     Text { text: "Rows:"; color: "#8f95a3"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
                     ZoomButton {
                         objectName: "pianoRollRowsShorter"
-                        label: "-"; tip: "Shorter rows (Ctrl+Shift+wheel, or Ctrl+wheel over the keys)"
+                        label: Icons.minus; tip: "Shorter rows (Ctrl+Shift+wheel, or Ctrl+wheel over the keys)"
                         onClicked: root.zoomRowsAt(1 / 1.25, gridVerticalFlickable.height / 2)
                     }
                     ZoomButton {
                         objectName: "pianoRollRowsTaller"
-                        label: "+"; tip: "Taller rows (Ctrl+Shift+wheel, or Ctrl+wheel over the keys)"
+                        label: Icons.plus; tip: "Taller rows (Ctrl+Shift+wheel, or Ctrl+wheel over the keys)"
                         onClicked: root.zoomRowsAt(1.25, gridVerticalFlickable.height / 2)
                     }
                 }

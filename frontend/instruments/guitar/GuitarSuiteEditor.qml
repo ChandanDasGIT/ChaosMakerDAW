@@ -209,7 +209,7 @@ Item {
                                     pedalCard.Drag.drop()
                                     pedalCard.x = Qt.binding(function() { return pedalCard.index * root.cardStep })
                                 }
-                                Text { anchors.centerIn: parent; text: "⠿"; color: Theme.textMuted; font.pixelSize: 18 }
+                                Text { anchors.centerIn: parent; text: Icons.dragHandle; color: Theme.textMuted; font.pixelSize: 18 }
                                 ToolTip.visible: containsMouse
                                 ToolTip.text: "Drag to reorder"
                                 ToolTip.delay: 450
@@ -222,9 +222,9 @@ Item {
                                 background: Rectangle { radius: 4; color: pedalCard.isBypassed ? "#303030" : "#203a45"; border.color: pedalCard.isBypassed ? "#424242" : Theme.accent }
                             }
                             ToolButton {
-                                text: "×"
+                                text: Icons.close
                                 onClicked: root.effectsModel.removePedal(pedalCard.pedalId)
-                                contentItem: Text { text: "×"; color: parent.hovered ? Theme.record : Theme.textMuted; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                contentItem: Text { text: Icons.close; color: parent.hovered ? Theme.record : Theme.textMuted; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                             }
                         }
                         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.divider }

@@ -10,7 +10,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
-Next: Phase 4 (4.1 Theme tokens for hardcoded colours ...).
+Next: Phase 4 — 4.1 Theme tokens for hardcoded colours (icons part of 4.2 done).
 Then Phase 5, then Phase 6 (user requests: FX per track type, pro EQ).
 
 Decisions made by the user (keep to them):
@@ -313,6 +313,13 @@ PHASE 4 — Consistency and maintenance
          separate palette into Theme.
 [ ] 4.2  Use or delete Icons.qml (0 references) and Theme.trackColors (unused; TrackList
          has its own 12-colour palette at TrackList.qml:363) — pick one palette.
+         - [done] Icons (user's rules): all icons live in frontend/icons/. Every text icon
+           is a named property in frontend/icons/Icons.qml, written as code points
+           ("\u25B6"); drawn icons (MetronomeIcon.qml) sit beside it and are listed there.
+           One close symbol (×) everywhere; one pause symbol (Ⅱ). A UI test fails if an
+           icon symbol is written in any other QML file, if Icons.qml holds a literal
+           symbol, or if a drawn icon is not listed.
+         - [ ] Palette: Theme.trackColors vs the TrackList palette.
 [ ] 4.3  Shared components: ThemedMenuItem (copy-pasted ~12 times), ToggleChip,
          PanelButton, DarkComboBox.
 [ ] 4.4  Move the hidden 1x1 test buttons (ProjectActions.qml:324-367) into tests/ui/.

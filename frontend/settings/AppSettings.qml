@@ -31,7 +31,7 @@ ToolButton {
             verticalAlignment: Text.AlignVCenter
         }
         Text {
-            text: "▾"
+            text: Icons.menuArrow
             color: root.down || root.checked ? Theme.accent : Theme.textMuted
             font.pixelSize: 10
             verticalAlignment: Text.AlignVCenter
@@ -141,7 +141,7 @@ ToolButton {
                 }
                 Item { Layout.fillWidth: true }
                 Button {
-                    text: "✕"
+                    text: Icons.close
                     flat: true
                     implicitWidth: 28
                     implicitHeight: 28
