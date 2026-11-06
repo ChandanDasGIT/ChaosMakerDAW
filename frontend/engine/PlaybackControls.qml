@@ -57,6 +57,7 @@ RowLayout {
                                          : command === "play" ? root.playing && !root.recording
                                          : command === "repeat" ? root.repeating : false
             text: glyph
+            Accessible.name: hintText
             Layout.preferredWidth: index < 2 ? 42 : 36
             Layout.preferredHeight: 36
             contentItem: Text {

@@ -23,7 +23,7 @@ ColumnLayout {
     Text {
         text: root.label
         color: Theme.textMuted
-        font.pixelSize: 8
+        font.pixelSize: Theme.microSize
         Layout.alignment: Qt.AlignHCenter
     }
     Rectangle {

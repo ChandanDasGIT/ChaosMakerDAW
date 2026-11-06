@@ -20,17 +20,13 @@ Item {
         spacing: 10
         RowLayout {
             Layout.fillWidth: true
-            ToolButton {
+            PanelButton {
                 text: "Save preset"
                 onClicked: savePresetDialog.open()
-                contentItem: Text { text: "Save preset"; color: parent.hovered ? Theme.text : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                background: Rectangle { radius: 4; color: parent.hovered ? Theme.chipHover : Theme.chip; border.color: Theme.chipBorder }
             }
-            ToolButton {
+            PanelButton {
                 text: "Load preset"
                 onClicked: loadPresetDialog.open()
-                contentItem: Text { text: "Load preset"; color: parent.hovered ? Theme.text : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                background: Rectangle { radius: 4; color: parent.hovered ? Theme.chipHover : Theme.chip; border.color: Theme.chipBorder }
             }
 
         }
@@ -38,13 +34,13 @@ Item {
             Layout.fillWidth: true
             spacing: 8
             Text { text: "FACTORY PRESET"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true }
-            ComboBox {
+            ThemedComboBox {
                 id: factoryPresetPicker
                 objectName: "guitarFactoryPreset"
                 Layout.preferredWidth: 140
                 model: root.effectsModel.factoryPresetNames
             }
-            Button {
+            PanelButton {
                 objectName: "applyGuitarFactoryPreset"
                 text: "Apply preset"
                 onClicked: root.effectsModel.applyFactoryPreset(factoryPresetPicker.currentText)
@@ -98,12 +94,11 @@ Item {
                     showTarget: modelData.db === "preFxDb"
                 }
             }
-            ToolButton {
+            PanelButton {
                 text: "Clear clips"
                 enabled: root.monitoring
                 onClicked: { EngineController.clearMonitorClips(); root.clearClipsRequested() }
-                ToolTip.visible: hovered
-                ToolTip.text: "Reset the latched red clip indicators"
+                tooltip: "Reset the latched red clip indicators"
             }
         }
         Text {
@@ -117,12 +112,12 @@ Item {
             Layout.fillWidth: true
             spacing: 6
             Text { text: "ADD PEDAL"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 0.7 }
-            ComboBox {
+            ThemedComboBox {
                 id: pedalPicker
                 Layout.preferredWidth: 170
                 model: root.effectsModel.availablePedals()
             }
-            Button {
+            PanelButton {
                 text: "Add pedal"
                 onClicked: root.effectsModel.addPedal(pedalPicker.currentText)
             }
@@ -203,6 +198,8 @@ Item {
                                 Layout.preferredWidth: 22
                                 Layout.preferredHeight: 26
                                 cursorShape: Qt.OpenHandCursor
+                                Accessible.role: Accessible.Grip
+                                Accessible.name: "Drag to reorder pedal"
                                 drag.target: pedalCard
                                 drag.axis: Drag.XAxis
                                 onReleased: {
@@ -215,14 +212,14 @@ Item {
                                 ToolTip.delay: 450
                             }
                             Text { text: pedalCard.pedalName.toUpperCase(); color: Theme.text; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.7; Layout.fillWidth: true }
-                            ToolButton {
-                                text: pedalCard.isBypassed ? "BYP" : "ON"
+                            ToggleChip {
+                                active: !pedalCard.isBypassed
+                                text: pedalCard.isBypassed ? "BYP" : "ON"; textSize: 9
                                 onClicked: root.effectsModel.setBypassed(pedalCard.pedalId, !pedalCard.isBypassed)
-                                contentItem: Text { text: parent.text; color: pedalCard.isBypassed ? Theme.textMuted : Theme.accent; font.pixelSize: 9; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: pedalCard.isBypassed ? Theme.chip : Theme.accentBg; border.color: pedalCard.isBypassed ? Theme.chipBorder : Theme.accent }
                             }
                             ToolButton {
                                 text: Icons.close
+                                Accessible.name: "Remove pedal"
                                 onClicked: root.effectsModel.removePedal(pedalCard.pedalId)
                                 contentItem: Text { text: Icons.close; color: parent.hovered ? Theme.record : Theme.textMuted; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                             }
@@ -253,12 +250,12 @@ Item {
                                 ColumnLayout {
                                     visible: pedalCard.features.cabinetIr
                                     Layout.fillWidth: true
-                                    Button {
+                                    PanelButton {
                                         text: "Load cabinet IR…"
                                         Layout.fillWidth: true
                                         onClicked: cabinetDialog.open()
                                     }
-                                    Button {
+                                    PanelButton {
                                         text: "Clear IR"
                                         enabled: pedalCard.resourcePath.length > 0
                                         Layout.fillWidth: true
@@ -291,7 +288,7 @@ Item {
                                         color: Theme.textMuted; font.pixelSize: 11
                                         Layout.alignment: Qt.AlignHCenter
                                     }
-                                    Button {
+                                    PanelButton {
                                         text: "Auto-detect string"
                                         checkable: true
                                         checked: tunerDisplay.selection === 0
@@ -303,7 +300,7 @@ Item {
                                         Layout.fillWidth: true
                                         Repeater {
                                             model: root.effectsModel.tunerStringLabels
-                                            delegate: Button {
+                                            delegate: PanelButton {
                                                 required property int index
                                                 required property string modelData
                                                 text: modelData
@@ -407,7 +404,7 @@ Item {
                                         checked: modulationSync.synced
                                         onClicked: root.effectsModel.setParameter(pedalCard.pedalId, "sync", checked ? 1 : 0)
                                     }
-                                    ComboBox {
+                                    ThemedComboBox {
                                         objectName: pedalCard.pedalType === "pedal.phaser" ? "phaserBeatDivision" : "tremoloBeatDivision"
                                         Layout.fillWidth: true
                                         enabled: modulationSync.synced

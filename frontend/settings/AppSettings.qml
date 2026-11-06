@@ -102,9 +102,9 @@ ToolButton {
                     font.bold: true
                 }
                 Item { Layout.fillWidth: true }
-                Button {
+                ToolButton {
                     text: Icons.close
-                    flat: true
+                    Accessible.name: "Close preferences"
                     implicitWidth: 28
                     implicitHeight: 28
                     onClicked: preferencesPopup.close()

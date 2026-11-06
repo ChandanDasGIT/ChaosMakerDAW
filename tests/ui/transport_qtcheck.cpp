@@ -663,14 +663,15 @@ private slots:
         auto* trackList=qvariant_cast<QObject*>(theme->property("trackList")); QVERIFY(trackList);
         QCOMPARE(trackList->property("rowSelected").value<QColor>(),QColor("#2a343d"));
         QCOMPARE(theme->property("trackColors").toList().size(),12);   // the palette the picker offers
-        for(const char* area:{"timeline","mixer","transport","guitarSuite","settings","effects"})
+        for(const char* area:{"timeline","mixer","transport","guitarSuite","effects"})
             QVERIFY2(qvariant_cast<QObject*>(theme->property(area)),area);
     }
-    void menus_use_the_shared_themed_components() {
-        // Plan 4.3: menus, entries and separators come from frontend/common/ (ThemedMenu,
-        // ThemedMenuItem, ThemedMenuSeparator); nothing else re-styles Qt's plain ones.
+    void controls_use_the_shared_themed_components() {
+        // Plan 4.3: menus, entries, separators, text buttons and drop-downs come from
+        // frontend/common/ (ThemedMenu, ThemedMenuItem, ThemedMenuSeparator, PanelButton,
+        // ThemedComboBox, ToggleChip); nothing else re-styles Qt's plain ones.
         const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
-        const QRegularExpression plain(QStringLiteral("(^|[^\\w.])(Menu|MenuItem|MenuSeparator)\\s*\\{"));
+        const QRegularExpression plain(QStringLiteral("(^|[^\\w.])(Menu|MenuItem|MenuSeparator|Button|ComboBox)\\s*\\{"));
         QStringList offenders;
         QStringList files{root+"/Main.qml"};
         QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
@@ -685,13 +686,70 @@ private slots:
                 if(plain.match(QString::fromUtf8(bytes)).hasMatch()) offenders<<QString("%1:%2").arg(rel).arg(line);
             }
         }
-        QVERIFY2(offenders.isEmpty(),qPrintable("Plain menus outside frontend/common/: "+offenders.join(", ")));
+        QVERIFY2(offenders.isEmpty(),qPrintable("Plain menus/buttons/drop-downs outside frontend/common/: "+offenders.join(", ")));
         // A converted entry keeps its name, shortcut text and the shared look.
         auto* save=visualObject(window->contentItem(),"fileSaveItem");
         if(!save) save=window->findChild<QObject*>("fileSaveItem");
         QVERIFY(save);
         QCOMPARE(save->property("shortcutText").toString(),QString("Ctrl+S"));
         QCOMPARE(save->property("implicitHeight").toDouble(),30.0);
+    }
+    void toggle_chips_light_up_lighten_on_hover_and_fade_when_disabled() {
+        TrackListWrapper tracks; const int vocal=tracks.addVocalTrack(), synth=tracks.addInstrumentTrack();
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        const auto restore=qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel",QVariant()); });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true); QTest::qWait(30);
+        const auto bg=[](QQuickItem* chip) { return qvariant_cast<QQuickItem*>(chip->property("background"))->property("color").value<QColor>(); };
+        auto* theme=engine->singletonInstance<QObject*>("TransportTests","Theme"); QVERIFY(theme);
+        const QColor chip=theme->property("chip").value<QColor>(), chipHover=theme->property("chipHover").value<QColor>();
+        // Action chip (FX): lightens under the mouse.
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(vocal)); QVERIFY(fx); QVERIFY(fx->inherits("QQuickToolButton"));
+        QCOMPARE(bg(fx),chip);
+        QTest::mouseMove(window,fx->mapToScene(QPointF(fx->width()/2,fx->height()/2)).toPoint());
+        QTRY_COMPARE(bg(fx),chipHover);
+        // Toggle chip (M): no hover change, lit in mute colours when active.
+        auto* mute=visualItem(list,"trackMuteButton"+QString::number(vocal)); QVERIFY(mute);
+        QTest::mouseMove(window,mute->mapToScene(QPointF(mute->width()/2,mute->height()/2)).toPoint());
+        QTest::qWait(30); QCOMPARE(bg(mute),chip);
+        QVERIFY(tracks.setMuted(vocal,true)); QCOMPARE(bg(mute),theme->property("muteBg").value<QColor>());
+        // MON fades on a track without live input.
+        auto* liveMon=visualItem(list,"trackMonitorButton"+QString::number(vocal));
+        auto* noInputMon=visualItem(list,"trackMonitorButton"+QString::number(synth));
+        QVERIFY(liveMon); QVERIFY(noInputMon);
+        QCOMPARE(liveMon->opacity(),1.0);
+        QVERIFY(!noInputMon->isEnabled()); QVERIFY(noInputMon->opacity()<0.6);
+    }
+    void text_is_never_tiny_and_symbol_controls_have_accessible_names() {
+        // Plan 4.5: no text below Theme.microSize (9 px) anywhere in the QML sources.
+        const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
+        const QRegularExpression size(QStringLiteral("(pixelSize|textSize)\\s*:\\s*(\\d+)\\b"));
+        QStringList tiny;
+        QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
+        QStringList files{root+"/Main.qml"};
+        while(it.hasNext()) files<<it.next();
+        for(const QString& path:files) {
+            QFile file(path); QVERIFY(file.open(QIODevice::ReadOnly));
+            int line=0;
+            for(const QByteArray& bytes:file.readAll().split('\n')) {
+                ++line;
+                for(auto m=size.globalMatch(QString::fromUtf8(bytes));m.hasNext();)
+                    if(m.next().captured(2).toInt()<9) tiny<<QString("%1:%2").arg(path.mid(root.size()+1)).arg(line);
+            }
+        }
+        QVERIFY2(tiny.isEmpty(),qPrintable("Text below 9 px: "+tiny.join(", ")));
+        // Controls that only show a symbol or an abbreviation carry a spoken name.
+        const auto name=[](QQuickItem* item) { return QQmlProperty::read(item,"Accessible.name",qmlContext(item)).toString(); };
+        auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play);
+        QCOMPARE(name(play),QString("Play (Space)"));
+        TrackListWrapper tracks; const int id=tracks.addVocalTrack();
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        const auto restore=qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel",QVariant()); });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true); QTest::qWait(30);
+        auto* remove=visualItem(list,"trackRemoveButton"+QString::number(id)); QVERIFY(remove);
+        QCOMPARE(name(remove),QString("Remove track"));
+        auto* mute=visualItem(list,"trackMuteButton"+QString::number(id)); QVERIFY(mute);
+        QCOMPARE(name(mute),QString("Mute disabled"));
+        QVERIFY(tracks.setMuted(id,true)); QCOMPARE(name(mute),QString("Mute enabled"));
     }
     void layout_sizes_are_saved_and_restored_between_sessions() {
         QSettings qs;

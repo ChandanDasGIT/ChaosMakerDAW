@@ -10,8 +10,9 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
-Next: Phase 4 — 4.3b ToggleChip (4.3a menus done; 4.1 and 4.2 done).
-Then Phase 5, then Phase 6 (user requests: FX per track type, pro EQ).
+Phase 4 done (4.4 not needed).
+Next: Phase 5 — 5.1 (see below). Open question: track list minimum width (see 4.5).
+Then Phase 6 (user requests: FX per track type, pro EQ, guitar suite sound).
 
 Decisions made by the user (keep to them):
 - Mixer: track strips have NO track volume fader. Each strip's vertical fader is clip gain
@@ -345,7 +346,7 @@ PHASE 4 — Consistency and maintenance
            symbol, or if a drawn icon is not listed.
          - [done] Palette: Theme.trackColors now holds the 12 colours the track colour
            picker uses (the old unused 7-colour list is gone); TrackList reads it.
-[ ] 4.3  Shared components: ThemedMenuItem (copy-pasted ~12 times), ToggleChip,
+[x] 4.3  Shared components: ThemedMenuItem (copy-pasted ~12 times), ToggleChip,
          PanelButton, DarkComboBox.
          Shared components live in frontend/common/ (user's choice). Split into 4.3a menus,
          4.3b ToggleChip, 4.3c PanelButton, 4.3d ThemedComboBox (was "DarkComboBox").
@@ -355,8 +356,32 @@ PHASE 4 — Consistency and maintenance
            selected clips" was unstyled, "Delete" never greyed out, "Restore session"
            now uses the shared tick column; right-click entries 30 px (were 32). A UI
            test fails on a plain Menu/MenuItem/MenuSeparator outside frontend/common/.
-[ ] 4.4  Move the hidden 1x1 test buttons (ProjectActions.qml:324-367) into tests/ui/.
-[ ] 4.5  Raise 5–8 px fonts (7 places, e.g. "MON" at 7 px); add Accessible.name.
+         - [done] 4.3b ToggleChip: 11 chips (track card M/S/IN/MON/REC/FX, mixer M/S, pedal
+           ON/BYP, metronome CLICK/COUNT). Toggles light in their own colours; action chips
+           (IN, FX) lighten on hover; disabled chips fade (MON without live input). Mixer
+           M/S: radius 4 (was 3) and the usual 450 ms tooltip delay.
+         - [done] 4.3c PanelButton: 14 text buttons (guitar suite presets, Apply preset,
+           Add pedal, Clear clips, cabinet IR, tuner strings with checked state; EQ Reset,
+           Apply/Save/Load; "Custom colour…"). Most were Qt's light default buttons.
+         - [done] 4.3d ThemedComboBox (face, arrow, list, entries themed; colours are
+           properties): device boxes, recording mode, EQ presets, snap grid, guitar suite
+           boxes. PianoRollComboBox is now a ThemedComboBox in the piano roll palette. Field
+           colours moved to shared Theme tokens (field, fieldHover, fieldDisabled,
+           fieldBorder, textDisabled); theme/SettingsColors.qml removed.
+           The guard test now also fails on a plain Button or ComboBox outside common/
+           (the two flat × buttons became ToolButtons like the other close buttons).
+[-] 4.4  Move the hidden 1x1 test buttons (ProjectActions.qml:324-367) into tests/ui/.
+         Not needed (user, 2026-11-07): they only serve the tests.
+[x] 4.5  Raise 5–8 px fonts (7 places, e.g. "MON" at 7 px); add Accessible.name.
+         Done: new Theme.microSize (9 px) is the smallest text; MON/IN/REC chips, track
+         type, VOL, meter labels, mixer scale and CLIP raised to it. Accessible names for
+         symbol/abbreviation controls: transport buttons (main + piano roll), piano roll
+         tools and zoom buttons (role Button), every ×, BPM −/+, add track, back, pedal
+         drag handle; ToggleChip speaks its tooltip ("Mute enabled"). A UI test fails on
+         text below 9 px and spot-checks the names.
+         Found (not from this change): at the narrowest track list (180 px) the track
+         card's chip row does not fit (FX cut, remove × hidden). Raise the track list's
+         minimum width or wrap the row; ask the user.
 
 
 PHASE 5 — Performance
@@ -388,6 +413,9 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
          see the from-scratch rule). Replaces 3.11.
          Ask first: band count; which extras matter (dynamic EQ, mid/side, linear phase,
          auto-gain, spectrum match); whether it replaces the 10-band EQ or sits beside it.
+[ ] 6.3  Improve the guitar suite's sound quality (user request 2026-11-07).
+         Ask first: which pedals / amp / cabinet sound weakest, and what "better" means
+         (less harsh/fizzy distortion, more realistic amp, aliasing, cab IRs, noise).
 
 
 Suggested order: 1.1 → 1.2 → 1.4 → 1.9 → 1.8 → 1.3 → 1.5 → 1.6/1.7, then Phase 2

@@ -22,19 +22,17 @@ Item {
             Layout.fillWidth: true
             Text { text: root.trackName + " · EQUALIZER"; color: Theme.text; font.pixelSize: 14; font.bold: true; Layout.fillWidth: true }
             Text { text: eqBridge.bandDescriptors.length + " bands  ·  ±" + eqBridge.maxGain + " dB"; color: Theme.textMuted; font.pixelSize: 10 }
-            ToolButton {
+            PanelButton {
                 text: "Reset"
                 onClicked: root.trackModel.resetTrackEq(root.trackId)
-                contentItem: Text { text: "Reset"; color: parent.hovered ? Theme.text : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                background: Rectangle { radius: 4; color: parent.hovered ? Theme.chipHover : Theme.chip; border.color: Theme.chipBorder }
             }
         }
         RowLayout {
             Layout.fillWidth: true
-            ComboBox { id: eqFactory; Layout.fillWidth: true; model: root.trackModel ? root.trackModel.eqPresetNames : eqBridge.presetNames }
-            Button { text: "Apply preset"; onClicked: root.trackModel.applyEqPreset(root.trackId, eqFactory.currentIndex) }
-            Button { text: "Save custom…"; onClicked: eqSaveDialog.open() }
-            Button { text: "Load custom…"; onClicked: eqLoadDialog.open() }
+            ThemedComboBox { id: eqFactory; Layout.fillWidth: true; model: root.trackModel ? root.trackModel.eqPresetNames : eqBridge.presetNames }
+            PanelButton { text: "Apply preset"; onClicked: root.trackModel.applyEqPreset(root.trackId, eqFactory.currentIndex) }
+            PanelButton { text: "Save custom…"; onClicked: eqSaveDialog.open() }
+            PanelButton { text: "Load custom…"; onClicked: eqLoadDialog.open() }
         }
         Text {
             visible: text.length > 0

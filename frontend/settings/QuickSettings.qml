@@ -87,6 +87,7 @@ Item {
                 ToolButton {
                     objectName: "closeQuickSettings"
                     text: Icons.close; implicitWidth: 28; implicitHeight: 24
+                    Accessible.name: "Close metronome and snap settings"
                     onClicked: quickSettingsPopup.close()
                     ToolTip.visible: hovered; ToolTip.text: "Close"
                 }
@@ -97,16 +98,14 @@ Item {
                 Text { text: "METRONOME"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
                 RowLayout {
                     spacing: 5
-                    ToolButton {
+                    ToggleChip {
                         objectName: "metronomeToggle"
-                        property bool active: root.transport.metronomeEnabled
+                        active: root.transport.metronomeEnabled
+                        idleBg: Theme.transport.button; idleBorder: Theme.transport.buttonBorder; cornerRadius: 5
                         Layout.preferredWidth: 48; Layout.preferredHeight: 29
                         text: "CLICK"
                         onClicked: root.transport.metronomeEnabled = !active
-                        contentItem: Text { text: parent.text; color: parent.active ? Theme.accent : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                        background: Rectangle { radius: 5; color: parent.active ? Theme.accentBg : Theme.transport.button; border.color: parent.active ? Theme.accent : Theme.transport.buttonBorder }
-                        ToolTip.visible: hovered
-                        ToolTip.text: active ? "Disable metronome" : "Enable metronome; first beat is accented"
+                        tooltip: active ? "Disable metronome" : "Enable metronome; first beat is accented"
                         Accessible.name: "Metronome"
                     }
                     Slider {
@@ -121,17 +120,15 @@ Item {
                         Accessible.name: "Metronome volume"
                     }
                     Text { text: Math.round(root.transport.metronomeVolume * 100) + "%"; color: Theme.textMuted; font.pixelSize: 10; Layout.preferredWidth: 30 }
-                    ToolButton {
+                    ToggleChip {
                         objectName: "countInToggle"
-                        property bool active: root.transport.countInEnabled
+                        active: root.transport.countInEnabled
                         enabled: !root.transport.takeBusy
+                        idleBg: Theme.transport.button; idleBorder: Theme.transport.buttonBorder; cornerRadius: 5
                         Layout.preferredWidth: 48; Layout.preferredHeight: 29
-                        text: root.transport.countingIn ? "IN " + root.transport.countInBeatsRemaining : "COUNT"
+                        text: root.transport.countingIn ? "IN " + root.transport.countInBeatsRemaining : "COUNT"; textSize: 9
                         onClicked: root.transport.countInEnabled = !active
-                        contentItem: Text { text: parent.text; color: parent.active ? Theme.accent : Theme.textMuted; font.pixelSize: 9; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                        background: Rectangle { radius: 5; color: parent.active ? Theme.accentBg : Theme.transport.button; border.color: parent.active ? Theme.accent : Theme.transport.buttonBorder }
-                        ToolTip.visible: hovered
-                        ToolTip.text: "One-bar recording count-in/pre-roll; uses the metronome volume"
+                        tooltip: "One-bar recording count-in/pre-roll; uses the metronome volume"
                         Accessible.name: "Recording count-in"
                     }
                 }
@@ -141,7 +138,7 @@ Item {
                 spacing: 3
                 Layout.fillWidth: true
                 Text { text: "SNAP GRID"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
-                ComboBox {
+                ThemedComboBox {
                     id: snapGrid
                     objectName: "snapGridSelector"
                     Layout.fillWidth: true
