@@ -408,7 +408,7 @@ Live listening result: **pending user desktop test**. The user explicitly author
 ## Notes for the next session
 
 - QML is registered by the `GLOB_RECURSE FRONTEND_QML` in `CMakeLists.txt`; adding files triggers CMake's automatic reconfigure.
-- `Theme` is a singleton in `frontend/Theme.qml`.
+- `Theme` is a singleton in `frontend/theme/Theme.qml` (area palettes beside it).
 - Existing `StatusStrip` still reports `EngineController.version/status` and should remain at the bottom.
 - `EngineController` still only exposes engine version/status (`wrapper/engineWrap/enginecontroller.h`). `TrackListModel` owns the current UI-thread `Project`; its state is not yet passed to the mixer/audio engine.
 - `Project` and its `Track`/`AudioClip` types are explicitly UI-thread document data. Keep mutations in the UI/model layer and route future audio graph updates through the engine command/snapshot path; never allocate or mutate `Project` from the audio callback.

@@ -38,8 +38,8 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#282a30"
-        border.color: "#1d1f24"
+        color: Theme.pianoRoll.ruler
+        border.color: Theme.pianoRoll.panelBorder
         border.width: 1
 
         // Resizable Splitter Header with dotted grips (::::::::)
@@ -49,8 +49,8 @@ Item {
             anchors.right: parent.right
             anchors.top: parent.top
             height: 8
-            color: splitterMouse.pressed || splitterHover.hovered ? "#4a4f5b" : "#2f323a"
-            border.color: "#1e2026"
+            color: splitterMouse.pressed || splitterHover.hovered ? Theme.pianoRoll.laneSplitterActive : Theme.pianoRoll.laneSplitter
+            border.color: Theme.pianoRoll.laneSplitterBorder
             border.width: 1
 
             HoverHandler { id: splitterHover; cursorShape: Qt.SplitVCursor }
@@ -65,7 +65,7 @@ Item {
                         width: 2
                         height: 2
                         radius: 1
-                        color: "#6b7280"
+                        color: Theme.pianoRoll.laneScaleText
                     }
                 }
             }
@@ -81,7 +81,7 @@ Item {
                         width: 2
                         height: 2
                         radius: 1
-                        color: "#6b7280"
+                        color: Theme.pianoRoll.laneScaleText
                     }
                 }
             }
@@ -97,7 +97,7 @@ Item {
                         width: 2
                         height: 2
                         radius: 1
-                        color: "#6b7280"
+                        color: Theme.pianoRoll.laneScaleText
                     }
                 }
             }
@@ -130,8 +130,8 @@ Item {
             anchors.top: splitterBar.bottom
             anchors.bottom: parent.bottom
             width: root.headerWidth
-            color: "#32353e"
-            border.color: "#212329"
+            color: Theme.pianoRoll.menuBar
+            border.color: Theme.pianoRoll.menuBarBorder
 
             Column {
                 anchors.fill: parent
@@ -143,8 +143,8 @@ Item {
                     objectName: "velocityLaneLabel"
                     width: parent.width
                     height: 22
-                    color: "#2a2c33"
-                    border.color: "#1a1b20"
+                    color: Theme.pianoRoll.toolStrip
+                    border.color: Theme.pianoRoll.panelBorder
                     radius: 3
 
                     Text {
@@ -152,7 +152,7 @@ Item {
                         anchors.leftMargin: 6
                         anchors.rightMargin: 6
                         text: "Velocity"
-                        color: "#c2c7d0"
+                        color: Theme.pianoRoll.laneValueText
                         font.pixelSize: 11
                         verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
@@ -187,7 +187,7 @@ Item {
                         y: 0
                         width: isBar ? 2 : 1
                         height: parent.height
-                        color: isBar ? "#3b3f4a" : "#2f333c"
+                        color: isBar ? Theme.pianoRoll.laneGridBar : Theme.pianoRoll.laneGrid
                     }
                 }
 
@@ -202,7 +202,7 @@ Item {
                         readonly property bool isSelected: modelData.selected ?? false
                         readonly property int velocity: root.shownVelocity(modelData)
                         readonly property bool isHot: root.hoveredNoteId === noteId
-                        readonly property color fill: root.colorSource ? root.colorSource.noteFillColor(velocity) : "#3883a8"
+                        readonly property color fill: root.colorSource ? root.colorSource.noteFillColor(velocity) : Theme.pianoRoll.stalkFallback
 
                         // Centre the 2px stalk on the note's left edge (note blocks start at x + 1)
                         x: startBeat * root.beatWidth + 2 - width / 2
@@ -219,7 +219,7 @@ Item {
                             anchors.horizontalCenter: parent.horizontalCenter
                             width: stalkDelegate.isSelected ? 3 : 2
                             height: stalkDelegate.barHeight
-                            color: stalkDelegate.isHot ? "#60cdff"
+                            color: stalkDelegate.isHot ? Theme.accent
                                  : Qt.lighter(stalkDelegate.fill, stalkDelegate.isSelected ? 2.0 : 1.6) // lifted so quiet notes stay visible
                         }
 
@@ -231,8 +231,8 @@ Item {
                             width: 7
                             height: 7
                             radius: 3.5
-                            color: stalkDelegate.isHot || stalkDelegate.isSelected ? "#ffffff" : Qt.lighter(stalkDelegate.fill, 1.9)
-                            border.color: stalkDelegate.isSelected ? "#60cdff" : "#1e2229"
+                            color: stalkDelegate.isHot || stalkDelegate.isSelected ? Theme.pianoRoll.stalkSelected : Qt.lighter(stalkDelegate.fill, 1.9)
+                            border.color: stalkDelegate.isSelected ? Theme.accent : Theme.pianoRoll.stalkBorder
                             border.width: 1
                         }
                     }
@@ -338,13 +338,13 @@ Item {
                     width: valueText.implicitWidth + 10
                     height: 16
                     radius: 2
-                    color: "#1b1d22"
-                    border.color: "#60cdff"
+                    color: Theme.pianoRoll.readoutBox
+                    border.color: Theme.accent
                     Text {
                         id: valueText
                         anchors.centerIn: parent
                         text: velocityMouse.label
-                        color: "#e6fffa"
+                        color: Theme.pianoRoll.noteSelectedEdge
                         font.pixelSize: 10
                     }
                 }

@@ -637,6 +637,40 @@ private slots:
         for(const char* name:{"goToStart","skipForward","record","play","pause","stop","loop"})
             QVERIFY2(glyphs.contains(singleton->property(name).toString()),name);
     }
+    void colours_live_only_in_the_theme_folder() {
+        // Plan 4.1: every colour is a token in frontend/theme/ (Theme.qml and its area palettes).
+        // Areas not converted yet are listed here; the list shrinks as each area is done.
+        const QStringList notConvertedYet{
+            "frontend/session/TrackList.qml",
+            "frontend/instruments/guitar/GuitarSuiteEditor.qml", "frontend/instruments/guitar/GuitarSuitePanel.qml",
+            "frontend/timeline/Timeline.qml", "frontend/mixer/MixerPanel.qml",
+            "frontend/audiodevice/DeviceSettings.qml", "frontend/settings/QuickSettings.qml",
+            "frontend/plugins/TrackEffectsPanel.qml", "frontend/plugins/eq/Tenbandeq.qml",
+            "frontend/engine/PlaybackControls.qml", "frontend/tempo/TempoEditor.qml", "frontend/tempo/MeterEditor.qml",
+            "frontend/transportbar/TransportBar.qml", "frontend/dsp/StereoLevelMeter.qml", "frontend/dsp/LevelMeter.qml"};
+        const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
+        const QRegularExpression hex(QStringLiteral("\"#[0-9a-fA-F]{6,8}\""));
+        QStringList offenders;
+        QStringList files{root+"/Main.qml"};
+        QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
+        while(it.hasNext()) files<<it.next();
+        for(const QString& path:files) {
+            const QString rel=path.mid(root.size()+1);
+            if(rel.startsWith("frontend/theme/") || notConvertedYet.contains(rel)) continue;
+            QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
+            int line=0;
+            for(const QByteArray& bytes:file.readAll().split('\n')) {
+                ++line;
+                if(hex.match(QString::fromUtf8(bytes)).hasMatch()) offenders<<QString("%1:%2").arg(rel).arg(line);
+            }
+        }
+        QVERIFY2(offenders.isEmpty(),qPrintable("Hard-coded colours outside frontend/theme/: "+offenders.join(", ")));
+        for(const QString& rel:notConvertedYet) QVERIFY2(QFile::exists(root+"/"+rel),qPrintable(rel+" no longer exists"));
+        // The piano roll palette is reachable through Theme.
+        auto* theme=engine->singletonInstance<QObject*>("TransportTests","Theme"); QVERIFY(theme);
+        auto* pianoRoll=qvariant_cast<QObject*>(theme->property("pianoRoll")); QVERIFY(pianoRoll);
+        QCOMPARE(pianoRoll->property("toolButton").value<QColor>(),QColor("#2f323a"));
+    }
     void layout_sizes_are_saved_and_restored_between_sessions() {
         QSettings qs;
         const auto restore=qScopeGuard([&] {

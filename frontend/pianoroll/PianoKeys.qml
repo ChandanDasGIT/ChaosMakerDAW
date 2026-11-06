@@ -56,12 +56,12 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     color: {
-                        if (keyMouse.pressed && !keyRow.black) return "#bcc5d3"
-                        if (keyMouse.containsMouse && !keyRow.black) return "#ffffff"
-                        if (keyRow.isActive && !keyRow.black) return "#dbe0ea"
-                        return "#f2f4f8"
+                        if (keyMouse.pressed && !keyRow.black) return Theme.pianoRoll.whiteKeyPressed
+                        if (keyMouse.containsMouse && !keyRow.black) return Theme.pianoRoll.whiteKeyHover
+                        if (keyRow.isActive && !keyRow.black) return Theme.pianoRoll.whiteKeyActive
+                        return Theme.pianoRoll.whiteKey
                     }
-                    border.color: "#8a909d"
+                    border.color: Theme.pianoRoll.whiteKeyBorder
                     border.width: 1
 
                     // Note name on white keys (C4, D4, E4, F4, G4, A4, B4)
@@ -72,7 +72,7 @@ Item {
                         anchors.rightMargin: 6
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.noteLabel(keyRow.note)
-                        color: keyRow.isC ? "#111317" : "#555b68"
+                        color: keyRow.isC ? Theme.pianoRoll.whiteKeyLabelC : Theme.pianoRoll.whiteKeyLabel
                         font.pixelSize: keyRow.isC ? 11 : 10
                         font.bold: keyRow.isC
                     }
@@ -86,12 +86,12 @@ Item {
                     anchors.bottom: parent.bottom
                     width: 54
                     color: {
-                        if (keyMouse.pressed) return "#484d59"
-                        if (keyRow.isActive) return "#42454f" // active illuminated key like D#2 in demo
-                        if (keyMouse.containsMouse) return "#2c2f38"
-                        return "#0f1013"
+                        if (keyMouse.pressed) return Theme.pianoRoll.blackKeyPressed
+                        if (keyRow.isActive) return Theme.pianoRoll.blackKeyActive // active illuminated key like D#2 in demo
+                        if (keyMouse.containsMouse) return Theme.pianoRoll.blackKeyHover
+                        return Theme.pianoRoll.blackKey
                     }
-                    border.color: "#050608"
+                    border.color: Theme.pianoRoll.blackKeyBorder
                     border.width: 1
 
                     // Note name on black keys (C#4, D#4, F#4, G#4, A#4)
@@ -101,7 +101,7 @@ Item {
                         anchors.rightMargin: 4
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.noteLabel(keyRow.note)
-                        color: "#a6acb8"
+                        color: Theme.pianoRoll.blackKeyLabel
                         font.pixelSize: 9
                         font.bold: false
                     }
@@ -112,7 +112,7 @@ Item {
                         anchors.right: parent.right
                         anchors.top: parent.top
                         height: 1
-                        color: keyRow.isActive ? "#636875" : "#2a2d36"
+                        color: keyRow.isActive ? Theme.pianoRoll.blackKeyShineActive : Theme.pianoRoll.blackKeyShine
                     }
                 }
 

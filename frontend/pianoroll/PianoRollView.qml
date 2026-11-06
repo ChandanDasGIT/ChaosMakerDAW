@@ -48,9 +48,9 @@ Item {
         property string tip
         signal clicked()
         width: 18; height: 18; radius: 2
-        color: zoomHover.containsMouse ? "#454955" : "#353842"
-        border.color: "#202227"
-        Text { anchors.centerIn: parent; text: zoomButton.label; color: "#c8ccd6"; font.pixelSize: 12 }
+        color: zoomHover.containsMouse ? Theme.pianoRoll.smallButtonHover : Theme.pianoRoll.smallButton
+        border.color: Theme.pianoRoll.buttonBorder
+        Text { anchors.centerIn: parent; text: zoomButton.label; color: Theme.pianoRoll.buttonText; font.pixelSize: 12 }
         MouseArea {
             id: zoomHover; anchors.fill: parent; hoverEnabled: true
             onClicked: zoomButton.clicked()
@@ -197,14 +197,14 @@ Item {
     }
     readonly property bool useTrackColour: trackTint().length > 0
     // Note outline and the brighter edge/hover tint, following the note colour mode.
-    readonly property color noteOutlineColour: { const c = trackTint(); return c.length > 0 ? Qt.lighter(c, 1.45) : "#5bc0de" }
-    readonly property color noteHighlightColour: { const c = trackTint(); return c.length > 0 ? Qt.lighter(c, 1.8) : "#a4e2f5" }
+    readonly property color noteOutlineColour: { const c = trackTint(); return c.length > 0 ? Qt.lighter(c, 1.45) : Theme.pianoRoll.noteOutline }
+    readonly property color noteHighlightColour: { const c = trackTint(); return c.length > 0 ? Qt.lighter(c, 1.8) : Theme.pianoRoll.noteHighlight }
     function noteFillColor(velocity) {
         const t = Math.max(0, Math.min(1, velocity / 127.0))
         const trackColour = trackTint()
         const useTrack = trackColour.length > 0
-        const lo = useTrack ? Qt.darker(trackColour, 2.4) : Qt.color("#24405e")
-        const hi = useTrack ? Qt.lighter(trackColour, 1.1) : Qt.color("#38c2b4")
+        const lo = useTrack ? Qt.darker(trackColour, 2.4) : Theme.pianoRoll.noteSoft
+        const hi = useTrack ? Qt.lighter(trackColour, 1.1) : Theme.pianoRoll.noteLoud
         return Qt.rgba(lo.r + (hi.r - lo.r) * t, lo.g + (hi.g - lo.g) * t, lo.b + (hi.b - lo.b) * t, 1)
     }
 
@@ -282,7 +282,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#23252a"
+        color: Theme.pianoRoll.background
     }
 
     ColumnLayout {
@@ -293,8 +293,8 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 22
-            color: "#32353e"
-            border.color: "#212328"
+            color: Theme.pianoRoll.menuBar
+            border.color: Theme.pianoRoll.menuBarBorder
 
             RowLayout {
                 anchors.fill: parent
@@ -306,7 +306,7 @@ Item {
 
                 Text {
                     text: root.clipLabel
-                    color: "#8a919f"
+                    color: Theme.pianoRoll.textMuted
                     font.pixelSize: 11
                 }
 
@@ -324,8 +324,8 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 28
-            color: "#2a2c33"
-            border.color: "#1d1f24"
+            color: Theme.pianoRoll.toolStrip
+            border.color: Theme.pianoRoll.panelBorder
 
             RowLayout {
                 anchors.fill: parent
@@ -335,39 +335,39 @@ Item {
 
                 Rectangle {
                     width: 24; height: 22; radius: 2
-                    color: root.activeTool === "pointer" ? "#4a505e" : tool1Hover.containsMouse ? "#373a44" : "#2f323a"
-                    border.color: root.activeTool === "pointer" ? "#60cdff" : "#202227"
-                    Text { anchors.centerIn: parent; text: Icons.pointer; color: "#d8dce4"; font.pixelSize: 13 }
+                    color: root.activeTool === "pointer" ? Theme.pianoRoll.toolButtonActive : tool1Hover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
+                    border.color: root.activeTool === "pointer" ? Theme.accent : Theme.pianoRoll.buttonBorder
+                    Text { anchors.centerIn: parent; text: Icons.pointer; color: Theme.pianoRoll.text; font.pixelSize: 13 }
                     MouseArea { id: tool1Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "pointer" }
                     ToolTip.visible: tool1Hover.containsMouse; ToolTip.text: "Select (Pointer) · drag on empty grid to box-select, Shift adds"
                 }
 
                 Rectangle {
                     width: 24; height: 22; radius: 2
-                    color: root.activeTool === "pencil" ? "#4a505e" : tool2Hover.containsMouse ? "#373a44" : "#2f323a"
-                    border.color: root.activeTool === "pencil" ? "#60cdff" : "#202227"
-                    Text { anchors.centerIn: parent; text: Icons.pencil; color: "#d8dce4"; font.pixelSize: 13 }
+                    color: root.activeTool === "pencil" ? Theme.pianoRoll.toolButtonActive : tool2Hover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
+                    border.color: root.activeTool === "pencil" ? Theme.accent : Theme.pianoRoll.buttonBorder
+                    Text { anchors.centerIn: parent; text: Icons.pencil; color: Theme.pianoRoll.text; font.pixelSize: 13 }
                     MouseArea { id: tool2Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "pencil" }
                     ToolTip.visible: tool2Hover.containsMouse; ToolTip.text: "Draw (Pencil)"
                 }
 
                 Rectangle {
                     width: 24; height: 22; radius: 2
-                    color: root.activeTool === "eraser" ? "#4a505e" : tool3Hover.containsMouse ? "#373a44" : "#2f323a"
-                    border.color: root.activeTool === "eraser" ? "#60cdff" : "#202227"
-                    Text { anchors.centerIn: parent; text: Icons.eraser; color: "#d8dce4"; font.pixelSize: 13 }
+                    color: root.activeTool === "eraser" ? Theme.pianoRoll.toolButtonActive : tool3Hover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
+                    border.color: root.activeTool === "eraser" ? Theme.accent : Theme.pianoRoll.buttonBorder
+                    Text { anchors.centerIn: parent; text: Icons.eraser; color: Theme.pianoRoll.text; font.pixelSize: 13 }
                     MouseArea { id: tool3Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "eraser" }
                     ToolTip.visible: tool3Hover.containsMouse; ToolTip.text: "Erase"
                 }
 
-                Rectangle { width: 1; height: 18; color: "#3d414c" }
+                Rectangle { width: 1; height: 18; color: Theme.pianoRoll.separator }
 
                 Rectangle {
                     objectName: "pianoRollSnap"
                     width: 24; height: 22; radius: 2
-                    color: root.snapEnabled ? "#4a505e" : snapHover.containsMouse ? "#373a44" : "#2f323a"
-                    border.color: root.snapEnabled ? "#60cdff" : "#202227"
-                    Text { anchors.centerIn: parent; text: Icons.snap; color: "#d8dce4"; font.pixelSize: 11 }
+                    color: root.snapEnabled ? Theme.pianoRoll.toolButtonActive : snapHover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
+                    border.color: root.snapEnabled ? Theme.accent : Theme.pianoRoll.buttonBorder
+                    Text { anchors.centerIn: parent; text: Icons.snap; color: Theme.pianoRoll.text; font.pixelSize: 11 }
                     MouseArea { id: snapHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.snapEnabled = !root.snapEnabled }
                     ToolTip.visible: snapHover.containsMouse
                     ToolTip.text: root.snapEnabled ? "Snap to grid: on (click to place notes freely)" : "Snap to grid: off (click to snap to the Grid setting)"
@@ -378,9 +378,9 @@ Item {
                     width: 24; height: 22; radius: 2
                     enabled: pianoRollBackend.count > 0
                     opacity: enabled ? 1 : 0.4
-                    color: qHover.containsMouse ? "#373a44" : "#2f323a"
-                    border.color: "#202227"
-                    Text { anchors.centerIn: parent; text: Icons.quantize + "Q"; color: "#d8dce4"; font.pixelSize: 10; font.bold: true }
+                    color: qHover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
+                    border.color: Theme.pianoRoll.buttonBorder
+                    Text { anchors.centerIn: parent; text: Icons.quantize + "Q"; color: Theme.pianoRoll.text; font.pixelSize: 10; font.bold: true }
                     MouseArea { id: qHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.quantizeNotes() }
                     ToolTip.visible: qHover.containsMouse
                     ToolTip.text: "Quantize note starts to the Grid (Q) · selected notes, or all if none selected"
@@ -392,9 +392,9 @@ Item {
                     width: 24; height: 22; radius: 2
                     enabled: !!root.trackModel && root.trackModel.canUndo
                     opacity: enabled ? 1 : 0.4
-                    color: undoHover.containsMouse ? "#373a44" : "#2f323a"
-                    border.color: "#202227"
-                    Text { anchors.centerIn: parent; text: Icons.undo; color: "#d8dce4"; font.pixelSize: 13 }
+                    color: undoHover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
+                    border.color: Theme.pianoRoll.buttonBorder
+                    Text { anchors.centerIn: parent; text: Icons.undo; color: Theme.pianoRoll.text; font.pixelSize: 13 }
                     MouseArea { id: undoHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.trackModel.undo() }
                     ToolTip.visible: undoHover.containsMouse; ToolTip.text: "Undo (Ctrl+Z)"
                 }
@@ -404,9 +404,9 @@ Item {
                     width: 24; height: 22; radius: 2
                     enabled: !!root.trackModel && root.trackModel.canRedo
                     opacity: enabled ? 1 : 0.4
-                    color: redoHover.containsMouse ? "#373a44" : "#2f323a"
-                    border.color: "#202227"
-                    Text { anchors.centerIn: parent; text: Icons.redo; color: "#d8dce4"; font.pixelSize: 13 }
+                    color: redoHover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
+                    border.color: Theme.pianoRoll.buttonBorder
+                    Text { anchors.centerIn: parent; text: Icons.redo; color: Theme.pianoRoll.text; font.pixelSize: 13 }
                     MouseArea { id: redoHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.trackModel.redo() }
                     ToolTip.visible: redoHover.containsMouse; ToolTip.text: "Redo (Ctrl+Shift+Z)"
                 }
@@ -427,8 +427,8 @@ Item {
             Rectangle {
                 Layout.preferredWidth: 90
                 Layout.fillHeight: true
-                color: "#2c2e35"
-                border.color: "#1e2025"
+                color: Theme.pianoRoll.panel
+                border.color: Theme.pianoRoll.panelBorder
 
                 Row {
                     anchors.centerIn: parent
@@ -444,15 +444,15 @@ Item {
                             width: 40
                             height: 18
                             radius: 2
-                            color: "#1b1d22"
-                            border.color: "#454a56"
+                            color: Theme.pianoRoll.readoutBox
+                            border.color: Theme.pianoRoll.readoutBorder
 
                             Text {
                                 anchors.fill: parent
                                 anchors.leftMargin: 2
                                 anchors.rightMargin: 2
                                 text: modelData.text
-                                color: "#d8dce5"
+                                color: Theme.pianoRoll.text
                                 font.pixelSize: 10
                                 font.family: "monospace"
                                 horizontalAlignment: Text.AlignHCenter
@@ -482,15 +482,15 @@ Item {
                 Rectangle {
                     width: root.totalGridWidth
                     height: parent.height
-                    color: "#282a31"
-                    border.color: "#1d1f25"
+                    color: Theme.pianoRoll.ruler
+                    border.color: Theme.pianoRoll.panelBorder
 
                     Rectangle {
                         x: 0
                         y: 0
                         width: root.clipWidthPixels
                         height: 4
-                        color: "#38b2ac"
+                        color: Theme.pianoRoll.playhead
                     }
 
                     // One tick per counted beat of the project meter
@@ -510,7 +510,7 @@ Item {
                                 anchors.top: parent.top
                                 anchors.bottom: parent.bottom
                                 width: isMajorBar ? 1.5 : 1
-                                color: isMajorBar ? "#606675" : "#3e424e"
+                                color: isMajorBar ? Theme.pianoRoll.rulerTickBar : Theme.pianoRoll.rulerTick
                             }
 
                             Text {
@@ -521,7 +521,7 @@ Item {
                                 // Beat labels drop out when beats are too narrow to read
                                 visible: isMajorBar || parent.width >= 24
                                 text: pianoRollBackend.tickLabel(index, root.beatsInBar)
-                                color: isMajorBar ? "#d8dce5" : "#7c8393"
+                                color: isMajorBar ? Theme.pianoRoll.text : Theme.pianoRoll.rulerLabelMinor
                                 font.pixelSize: isMajorBar ? 11 : 9
                                 font.bold: isMajorBar
                             }
@@ -642,10 +642,10 @@ Item {
                         contentItem: Rectangle {
                             implicitWidth: 10
                             radius: 4
-                            color: vScrollBar.pressed ? "#6b7280" : (vScrollBar.hovered ? "#565b67" : "#424652")
+                            color: vScrollBar.pressed ? Theme.pianoRoll.scrollHandlePressed : (vScrollBar.hovered ? Theme.pianoRoll.scrollHandleHover : Theme.pianoRoll.scrollHandle)
                         }
                         background: Rectangle {
-                            color: "#1a1c22"
+                            color: Theme.pianoRoll.scrollTrack
                         }
                     }
 
@@ -657,10 +657,10 @@ Item {
                         contentItem: Rectangle {
                             implicitHeight: 8
                             radius: 4
-                            color: hScrollBar.pressed ? "#6b7280" : (hScrollBar.hovered ? "#565b67" : "#424652")
+                            color: hScrollBar.pressed ? Theme.pianoRoll.scrollHandlePressed : (hScrollBar.hovered ? Theme.pianoRoll.scrollHandleHover : Theme.pianoRoll.scrollHandle)
                         }
                         background: Rectangle {
-                            color: "#1a1c22"
+                            color: Theme.pianoRoll.scrollTrack
                         }
                     }
 
@@ -670,7 +670,7 @@ Item {
                         y: 0
                         width: root.clipWidthPixels
                         height: root.contentGridHeight
-                        color: "#0a283020"
+                        color: Theme.pianoRoll.clipInside
                     }
 
                     Rectangle {
@@ -678,7 +678,7 @@ Item {
                         y: 0
                         width: Math.max(0, root.totalGridWidth - root.clipWidthPixels)
                         height: root.contentGridHeight
-                        color: "#00000040"
+                        color: Theme.pianoRoll.clipOutside
                     }
 
                     // Zebra Striped Semitone Rows
@@ -693,8 +693,8 @@ Item {
 
                                 width: root.totalGridWidth
                                 height: root.keyHeight
-                                color: black ? "#1d1f24" : "#26282f"
-                                border.color: isOctaveBorder ? "#424652" : "#202227"
+                                color: black ? Theme.pianoRoll.rowBlackKey : Theme.pianoRoll.rowWhiteKey
+                                border.color: isOctaveBorder ? Theme.pianoRoll.rowOctaveBorder : Theme.pianoRoll.rowBorder
                                 border.width: 1
                             }
                         }
@@ -715,7 +715,7 @@ Item {
                             y: 0
                             width: isMajorBar ? 2 : 1
                             height: root.contentGridHeight
-                            color: isMajorBar ? "#4c515e" : (isBeat ? "#363944" : "#2b2d34")
+                            color: isMajorBar ? Theme.pianoRoll.gridBar : (isBeat ? Theme.pianoRoll.gridBeat : Theme.pianoRoll.gridSub)
                         }
                     }
 
@@ -727,7 +727,7 @@ Item {
                         y: 0
                         width: 1
                         height: root.contentGridHeight
-                        color: "#38b2ac"
+                        color: Theme.pianoRoll.playhead
                         z: 5
                     }
 
@@ -754,8 +754,8 @@ Item {
                         y: Math.min(gridMouse.bandStartY, gridMouse.bandEndY)
                         width: Math.abs(gridMouse.bandEndX - gridMouse.bandStartX)
                         height: Math.abs(gridMouse.bandEndY - gridMouse.bandStartY)
-                        color: "#2060cdff"
-                        border.color: "#60cdff"
+                        color: Theme.pianoRoll.selectionBox
+                        border.color: Theme.accent
                         border.width: 1
                         z: 9
                     }
@@ -796,7 +796,7 @@ Item {
                             readonly property color baseFill: root.noteFillColor(shownVelocity)
                             readonly property bool showSelected: isSelected || isDragging
                             color: showSelected ? Qt.lighter(baseFill, 1.35) : (isHovered ? Qt.lighter(baseFill, 1.18) : baseFill)
-                            border.color: showSelected ? "#ffffff" : (isHovered ? root.noteHighlightColour : root.noteOutlineColour)
+                            border.color: showSelected ? Theme.pianoRoll.noteSelected : (isHovered ? root.noteHighlightColour : root.noteOutlineColour)
                             border.width: isSelected ? 1.5 : 1
 
                             Rectangle {
@@ -804,7 +804,7 @@ Item {
                                 anchors.top: parent.top
                                 anchors.bottom: parent.bottom
                                 width: 3
-                                color: isSelected ? "#e6fffa" : root.noteHighlightColour
+                                color: isSelected ? Theme.pianoRoll.noteSelectedEdge : root.noteHighlightColour
                             }
 
                             Text {
@@ -815,7 +815,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 visible: root.keyHeight >= 9
                                 text: pianoRollBackend.noteName(noteCard.visualPitch)
-                                color: "#f0f8ff"
+                                color: Theme.pianoRoll.noteName
                                 font.pixelSize: 10
                                 elide: Text.ElideRight
                             }
@@ -1140,8 +1140,8 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 30
-            color: "#2c2e35"
-            border.color: "#1d1f24"
+            color: Theme.pianoRoll.panel
+            border.color: Theme.pianoRoll.panelBorder
 
             RowLayout {
                 anchors.fill: parent
@@ -1167,13 +1167,13 @@ Item {
                             width: 22
                             height: 20
                             radius: 2
-                            color: active ? "#203a45" : transHover.containsMouse ? "#454955" : "#353842"
-                            border.color: active ? "#60cdff" : "#202227"
+                            color: active ? Theme.pianoRoll.transportActive : transHover.containsMouse ? Theme.pianoRoll.smallButtonHover : Theme.pianoRoll.smallButton
+                            border.color: active ? Theme.accent : Theme.pianoRoll.buttonBorder
 
                             Text {
                                 anchors.centerIn: parent
                                 text: modelData.text
-                                color: "#c8ccd6"
+                                color: Theme.pianoRoll.buttonText
                                 font.pixelSize: 10
                             }
 
@@ -1189,9 +1189,9 @@ Item {
                     }
                 }
 
-                Rectangle { width: 1; height: 16; color: "#3e424d" }
+                Rectangle { width: 1; height: 16; color: Theme.pianoRoll.separator }
 
-                Text { text: "Grid:"; color: "#8f95a3"; font.pixelSize: 11 }
+                Text { text: "Grid:"; color: Theme.pianoRoll.label; font.pixelSize: 11 }
                 PianoRollComboBox {
                     implicitWidth: 70
                     implicitHeight: 22
@@ -1209,7 +1209,7 @@ Item {
                     onCurrentTextChanged: pianoRollBackend.gridStyle = currentText
                 }
 
-                Text { text: "Notes:"; color: "#8f95a3"; font.pixelSize: 11 }
+                Text { text: "Notes:"; color: Theme.pianoRoll.label; font.pixelSize: 11 }
                 PianoRollComboBox {
                     objectName: "pianoRollNoteLength"
                     implicitWidth: 70
@@ -1221,7 +1221,7 @@ Item {
                     ToolTip.text: "Length of newly drawn notes (Grid = the Grid division)"
                 }
 
-                Text { text: "Color:"; color: "#8f95a3"; font.pixelSize: 11 }
+                Text { text: "Color:"; color: Theme.pianoRoll.label; font.pixelSize: 11 }
                 PianoRollComboBox {
                     objectName: "pianoRollColorMode"
                     implicitWidth: 80
@@ -1238,7 +1238,7 @@ Item {
                 // Zoom: time (also Ctrl+wheel) and row height (also Ctrl+Shift+wheel)
                 Row {
                     spacing: 2
-                    Text { text: "Zoom:"; color: "#8f95a3"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
+                    Text { text: "Zoom:"; color: Theme.pianoRoll.label; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
                     ZoomButton {
                         objectName: "pianoRollZoomOut"
                         label: Icons.minus; tip: "Zoom out in time · Ctrl+wheel"
@@ -1250,7 +1250,7 @@ Item {
                         onClicked: root.pixelsPerBeat = Math.min(root.maxPixelsPerBeat, root.pixelsPerBeat + 16)
                     }
                     Item { width: 6; height: 1 }
-                    Text { text: "Rows:"; color: "#8f95a3"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
+                    Text { text: "Rows:"; color: Theme.pianoRoll.label; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
                     ZoomButton {
                         objectName: "pianoRollRowsShorter"
                         label: Icons.minus; tip: "Shorter rows (Ctrl+Shift+wheel, or Ctrl+wheel over the keys)"

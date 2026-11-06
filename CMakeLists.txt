@@ -50,7 +50,7 @@ if(DAW_BUILD_APP)
     file(GLOB_RECURSE FRONTEND_QML CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_LIST_DIR}"
         "${CMAKE_CURRENT_LIST_DIR}/frontend/*.qml")
 
-    set_source_files_properties(frontend/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+    set_source_files_properties(frontend/theme/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
     set_source_files_properties(frontend/icons/Icons.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
     qt_add_executable(appChaosMaker
@@ -136,7 +136,7 @@ if(DAW_BUILD_APP)
     if(TARGET Qt6::Test)
         qt_add_executable(transporttests tests/ui/transport_qtcheck.cpp)
         qt_add_qml_module(transporttests URI TransportTests
-            QML_FILES frontend/Theme.qml frontend/icons/Icons.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
+            QML_FILES frontend/theme/Theme.qml frontend/theme/PianoRollColors.qml frontend/icons/Icons.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
                       frontend/window/EditMenu.qml frontend/window/ViewMenu.qml frontend/window/PanelTabs.qml
                       frontend/window/StatusStrip.qml
                       frontend/common/ThemedMenuItem.qml

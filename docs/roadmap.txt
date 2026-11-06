@@ -11,7 +11,7 @@ Follow the phases in `.claude/ROADMAP.md` from top to bottom. Complete each phas
 5. `backend/core/version.cpp` — implements the backend version.
 6. `main.cpp` — starts Qt and loads the QML application.
 7. `Main.qml` — defines the main application window and its top-level layout.
-8. `frontend/Theme.qml` — centralizes shared colors, sizes, and visual settings.
+8. `frontend/theme/Theme.qml` — centralizes colors, sizes, and visual settings; area palettes (e.g. PianoRollColors.qml) sit beside it.
 9. `frontend/icons/Icons.qml` — centralizes icons by name (drawn icons sit beside it).
 10. `frontend/window/StatusStrip.qml` — displays status along the bottom of the window.
 11. `wrapper/engineWrap/enginecontroller.h` — declares the engine object exposed to QML.

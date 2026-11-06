@@ -11,8 +11,8 @@ ComboBox {
 
     background: Rectangle {
         radius: 2
-        color: control.pressed ? "#454955" : (control.hovered ? "#3c404b" : "#32353e")
-        border.color: control.visualFocus || control.popup.visible ? "#60cdff" : "#1d1f24"
+        color: control.pressed ? Theme.pianoRoll.comboPressed : (control.hovered ? Theme.pianoRoll.comboHover : Theme.pianoRoll.combo)
+        border.color: control.visualFocus || control.popup.visible ? Theme.accent : Theme.pianoRoll.panelBorder
     }
 
     contentItem: Text {
@@ -20,7 +20,7 @@ ComboBox {
         rightPadding: control.indicator.width + 4
         text: control.displayText
         font: control.font
-        color: "#d8dce4"
+        color: Theme.pianoRoll.text
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
     }
@@ -29,7 +29,7 @@ ComboBox {
         x: control.width - width - 6
         y: (control.height - height) / 2
         text: Icons.menuArrow
-        color: "#8a909d"
+        color: Theme.pianoRoll.textMuted
         font.pixelSize: 9
     }
 
@@ -43,12 +43,12 @@ ComboBox {
         contentItem: Text {
             text: itemDelegate.modelData
             font: control.font
-            color: control.currentIndex === itemDelegate.index ? "#60cdff" : "#d8dce4"
+            color: control.currentIndex === itemDelegate.index ? Theme.accent : Theme.pianoRoll.text
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
         }
         background: Rectangle {
-            color: itemDelegate.highlighted ? "#3c404b" : "transparent"
+            color: itemDelegate.highlighted ? Theme.pianoRoll.comboHover : "transparent"
         }
     }
 
@@ -67,8 +67,8 @@ ComboBox {
         }
 
         background: Rectangle {
-            color: "#26282f"
-            border.color: "#454a56"
+            color: Theme.pianoRoll.comboPopup
+            border.color: Theme.pianoRoll.readoutBorder
             radius: 2
         }
     }
