@@ -128,7 +128,10 @@ PHASE 2 — Move logic out of QML (architecture rule 6)
          TimelineWrapper. The piano roll ruler ticks, grid-line count/positions and the
          velocity lane ticks also moved (MusicalGrid tickCount, tickLabel, lineCount,
          linePosition, ...). No grid maths is left in Timeline/PianoRoll/VelocityLane QML.
-[ ] 2.2  Note names / black-key detection (PianoKeys.qml:18-28) → backend/midi.
+[x] 2.2  Note names / black-key detection (PianoKeys.qml:18-28) → backend/midi.
+         Done: backend notenames (backend/midi/notenames.h/.cpp): name ("C4"), black keys,
+         C rows, "C4 60" readout, empty for invalid notes. Used via PianoRollWrapper by the
+         keys, row shading, note labels and the cursor readout.
 [ ] 2.3  Transport time formatting (PlaybackControls.qml:96-102) → backend/core/valueformat.
 [ ] 2.4  Mixer target-clip selection (MixerPanel.qml:280-293) → MixerPanelWrapper
          (or removed with 1.6).
