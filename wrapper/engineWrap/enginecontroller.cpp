@@ -190,6 +190,11 @@ QObject* EngineController::trackEffects(int trackId)
     const auto existing=m_trackEffects.find(trackId);
     if(existing!=m_trackEffects.end())return existing->second.model;
     bindTrackEffects(trackId,new GuitarSuiteModel(this));
+    // A track coming back (undo of its removal) gets its pedalboard back.
+    if (const auto kept = m_removedTrackEffects.find(trackId); kept != m_removedTrackEffects.end()) {
+        m_trackEffects.at(trackId).model->restoreSessionData(std::string_view(kept->second));
+        m_removedTrackEffects.erase(kept);
+    }
     return m_trackEffects.at(trackId).model;
 }
 
@@ -241,6 +246,7 @@ void EngineController::clearTrackEffects()
     emit monitoredTrackChanged();
     for (auto& [id, fx] : m_trackEffects) delete fx.model;
     m_trackEffects.clear();
+    m_removedTrackEffects.clear();
     m_trackLevels.clear(); emit trackLevelsChanged();
     m_engine->publishMonitor(SnapshotBuilder::buildEmptySnapshot());
 }
@@ -268,6 +274,7 @@ void EngineController::syncTrackEffects()
     });
     for (auto it = m_trackEffects.begin(); it != m_trackEffects.end();) {
         if (!m_project->project().findTrack(it->first)) {
+            if (it->second.model) m_removedTrackEffects[it->first] = it->second.model->sessionDataStd();
             delete it->second.model;
             it = m_trackEffects.erase(it);
         } else ++it;

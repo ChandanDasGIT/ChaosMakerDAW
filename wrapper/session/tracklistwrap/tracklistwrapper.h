@@ -180,6 +180,8 @@ private:
     // Clip gain only: refresh the track's clip data, engine and history, but not the clip list,
     // so the timeline does not rebuild every clip block while a gain fader moves.
     void notifyClipGainEdit(int trackId);
+    // After a track row was added or removed (remove, undo of a removal, redo).
+    void notifyTrackCountChanged();
     void setEqPresetError(const QString& error);
     bool applyEqBands(int trackId, const std::array<float,10>& bands);
     void syncSelectionState();

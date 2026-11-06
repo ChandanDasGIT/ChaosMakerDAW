@@ -286,3 +286,23 @@ TEST(qtclipediting, clip_selection_auto_selects_parent_track_and_notifies_change
     CHECK(tracks.selectedTrackId() == t2);
     CHECK(lastNotifiedTrack == t2);
 }
+
+TEST(qtclipediting, undoing_a_track_removal_announces_the_row) {
+    TrackListWrapper tracks;
+    const int a = tracks.addAudioTrack(), b = tracks.addVocalTrack(), c = tracks.addAudioTrack();
+    tracks.addClipAtBeat(b, 0, 4);
+    int inserted = -1, removed = -1, resets = 0;
+    QObject::connect(&tracks, &QAbstractItemModel::rowsInserted, [&](const QModelIndex&, int first, int) { inserted = first; });
+    QObject::connect(&tracks, &QAbstractItemModel::rowsRemoved, [&](const QModelIndex&, int first, int) { removed = first; });
+    QObject::connect(&tracks, &QAbstractItemModel::modelReset, [&] { ++resets; });
+    CHECK(tracks.removeTrack(b)); CHECK(removed == 1);
+    CHECK(tracks.canUndo());
+    CHECK(tracks.undo());
+    CHECK(inserted == 1 && tracks.count() == 3 && tracks.trackIdAt(1) == b);
+    CHECK(tracks.clips().size() == 1);
+    removed = -1;
+    CHECK(tracks.redo());
+    CHECK(removed == 1 && tracks.count() == 2);
+    CHECK(resets == 0);                                       // only that row changed
+    CHECK(tracks.trackIdAt(0) == a && tracks.trackIdAt(1) == c);
+}

@@ -31,10 +31,44 @@ void Project::removeTrack(int id)
     const auto it = std::find_if(m_tracks.begin(), m_tracks.end(), [id](const auto& track) {
         return track->id == id;
     });
-    if (it != m_tracks.end()) {
-        m_tracks.erase(it);
-        clearHistory(); // Track deletion itself is not a clip edit.
-    }
+    if (it == m_tracks.end()) return;
+    ClipEdit edit;
+    edit.removedTrack = **it;                                    // full copy: clips, name, EQ...
+    edit.removedIndex = static_cast<std::size_t>(it - m_tracks.begin());
+    m_tracks.erase(it);
+    pushHistory(std::move(edit));
+}
+
+std::size_t Project::indexOfTrack(int id) const
+{
+    for (std::size_t i = 0; i < m_tracks.size(); ++i) if (m_tracks[i]->id == id) return i;
+    return m_tracks.size();
+}
+
+void Project::pushHistory(ClipEdit edit)
+{
+    m_history.erase(m_history.begin() + m_historyPosition, m_history.end());
+    m_history.push_back(std::move(edit));
+    if (m_history.size() > 100) m_history.erase(m_history.begin());
+    m_historyPosition = m_history.size();
+}
+
+std::optional<Project::TrackChange> Project::undoRestoresTrack() const
+{
+    if (!canUndo()) return std::nullopt;
+    const auto& edit = m_history[m_historyPosition - 1];
+    if (!edit.removedTrack) return std::nullopt;
+    return TrackChange{edit.removedTrack->id, std::min(edit.removedIndex, m_tracks.size())};
+}
+
+std::optional<Project::TrackChange> Project::redoRemovesTrack() const
+{
+    if (!canRedo()) return std::nullopt;
+    const auto& edit = m_history[m_historyPosition];
+    if (!edit.removedTrack) return std::nullopt;
+    const std::size_t index = indexOfTrack(edit.removedTrack->id);
+    if (index >= m_tracks.size()) return std::nullopt;
+    return TrackChange{edit.removedTrack->id, index};
 }
 
 void Project::moveTrack(int from, int to)
@@ -375,16 +409,20 @@ bool Project::editClipGroup(const std::vector<ClipChange>& changes) {
 
 void Project::rememberClipEdit(int trackId, std::vector<AudioClip> before)
 {
-    m_history.erase(m_history.begin() + m_historyPosition, m_history.end());
-    m_history.push_back({{{trackId, std::move(before), findTrack(trackId)->audioClips}}});
-    if (m_history.size() > 100) m_history.erase(m_history.begin());
-    m_historyPosition = m_history.size();
+    ClipEdit edit;
+    edit.tracks.push_back({trackId, std::move(before), findTrack(trackId)->audioClips});
+    pushHistory(std::move(edit));
 }
 
 int Project::undo()
 {
     if (!canUndo()) return -1;
     const auto& edit = m_history[--m_historyPosition];
+    if (edit.removedTrack) {
+        const auto index = std::min(edit.removedIndex, m_tracks.size());
+        m_tracks.insert(m_tracks.begin() + static_cast<std::ptrdiff_t>(index), std::make_unique<Track>(*edit.removedTrack));
+        return edit.removedTrack->id;
+    }
     for (const auto& track:edit.tracks) findTrack(track.trackId)->audioClips = track.before;
     return edit.tracks.front().trackId;
 }
@@ -393,6 +431,11 @@ int Project::redo()
 {
     if (!canRedo()) return -1;
     const auto& edit = m_history[m_historyPosition++];
+    if (edit.removedTrack) {
+        const auto index = indexOfTrack(edit.removedTrack->id);
+        if (index < m_tracks.size()) m_tracks.erase(m_tracks.begin() + static_cast<std::ptrdiff_t>(index));
+        return edit.removedTrack->id;
+    }
     for (const auto& track:edit.tracks) findTrack(track.trackId)->audioClips = track.after;
     return edit.tracks.front().trackId;
 }

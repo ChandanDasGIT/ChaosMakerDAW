@@ -208,6 +208,9 @@ private:
         GuitarSuiteModel* model = nullptr;
     };
     std::map<int, TrackEffects> m_trackEffects;
+    // Pedalboards (session data) of removed tracks, so undoing the removal restores them.
+    // Cleared whenever the effects are cleared (new/open/attach project).
+    std::map<int, std::string> m_removedTrackEffects;
     int m_monitoredTrack = -1;
     QString m_trackRoutingError;
     bool m_bindingEffects = false;
