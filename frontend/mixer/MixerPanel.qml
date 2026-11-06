@@ -350,9 +350,14 @@ Rectangle {
                                     opacity: strip.hasClip ? 1.0 : 0.35
                                     from: panelWrapper.minClipGain; to: panelWrapper.maxClipGain; stepSize: panelWrapper.clipGainStep
                                     value: strip.targetClipGain
+                                    // One mouse drag = one undo step: the first move starts it,
+                                    // later moves of the same drag extend it. Audio follows live.
+                                    property bool dragStepStarted: false
+                                    onPressedChanged: if (pressed) dragStepStarted = false
                                     onMoved: {
                                         if (strip.hasClip) {
-                                            panelWrapper.setClipGain(strip.trackId, strip.targetClipId, value)
+                                            panelWrapper.setClipGain(strip.trackId, strip.targetClipId, value, pressed && dragStepStarted)
+                                            dragStepStarted = pressed
                                         }
                                     }
                                     TapHandler {

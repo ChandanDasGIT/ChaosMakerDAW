@@ -114,7 +114,8 @@ public:
     bool mergeClips(int trackId, int first, int second);
     bool moveClipAtBeat(int trackId, int clipId, double start);
     bool resizeClipAtBeat(int trackId, int clipId, double length);
-    Change setClipGain(int trackId, int clipId, double gainDb);
+    // continueEdit: part of an ongoing fader drag; see Project::setClipGain.
+    Change setClipGain(int trackId, int clipId, double gainDb, bool continueEdit = false);
     // Pattern notes in clip-relative beats (0 = clip start). Only pattern (non-recorded) clips
     // hold notes. Notes outside the clip bounds are kept (hidden), so trims can be undone.
     std::vector<MidiNote> clipNotes(int trackId, int clipId) const;

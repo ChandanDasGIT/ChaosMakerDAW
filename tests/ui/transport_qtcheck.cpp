@@ -1797,6 +1797,29 @@ private slots:
         QVERIFY(std::abs(label->mapToScene(QPointF(label->width()/2,0)).x()
                          -fader->mapToScene(QPointF(fader->width()/2,0)).x())<3); // centred on it
     }
+    void mixer_clip_gain_drag_is_one_undo_step() {
+        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        const int clip=tracks.addClipAtBeat(track,0,4); QVERIFY(clip>0);
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
+        const auto restore=qScopeGuard([&] { mixer->setVisible(false); mixer->setProperty("trackModel",QVariant()); });
+        mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
+        QTest::qWait(30);
+        auto* fader=visualItem(mixer,"mixerClipGain"+QString::number(track)); QVERIFY(fader);
+        const auto gain=[&] { return tracks.project().findTrack(track)->audioClips[0].gainDb; };
+        // Drag in several steps; the gain follows live during the drag
+        const auto at=[&](double f) { return fader->mapToScene(QPointF(fader->width()/2,fader->height()*f)).toPoint(); };
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at(0.5));
+        float previous=gain();
+        int changes=0;
+        for(double f:{0.6,0.7,0.8,0.9}) {
+            QTest::mouseMove(window,at(f),10);
+            if(gain()!=previous){ ++changes; previous=gain(); }
+        }
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,at(0.9));
+        QVERIFY(changes>=3); QVERIFY(gain()<-1.0f);
+        // One undo returns to the gain from before the drag
+        QVERIFY(tracks.undo()); QCOMPARE(gain(),0.0f);
+    }
     void master_scale_labels_sit_at_their_meter_levels() {
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
         const auto restore=qScopeGuard([&] { mixer->setVisible(false); });

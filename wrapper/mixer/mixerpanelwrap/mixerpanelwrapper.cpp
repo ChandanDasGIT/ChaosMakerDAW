@@ -114,10 +114,10 @@ void MixerPanelWrapper::resetMasterVolume()
     m_trackList->resetMasterVolume();
 }
 
-void MixerPanelWrapper::setClipGain(int trackId, int clipId, double gainDb)
+void MixerPanelWrapper::setClipGain(int trackId, int clipId, double gainDb, bool continueEdit)
 {
     if (!m_trackList || clipId < 0) return;
-    m_trackList->setClipGain(trackId, clipId, mixer::clampClipGain(gainDb));
+    m_trackList->setClipGain(trackId, clipId, mixer::clampClipGain(gainDb), continueEdit);
 }
 
 void MixerPanelWrapper::resetClipGain(int trackId, int clipId)

@@ -70,7 +70,8 @@ public:
     int selectedClipId() const { return m_state.selectedClipId(); }
     Q_INVOKABLE void setSelectedClipId(int id);
     Q_INVOKABLE void selectClip(int trackId, int clipId);
-    Q_INVOKABLE bool setClipGain(int trackId, int clipId, double gainDb);
+    // continueEdit: true for every step of a fader drag after the first (one undo step per drag).
+    Q_INVOKABLE bool setClipGain(int trackId, int clipId, double gainDb, bool continueEdit = false);
     Q_INVOKABLE double clipGain(int trackId, int clipId) const;
     // Pattern notes of a clip in clip-relative beats: [{id, note, startBeat, lengthBeats, velocity}]
     Q_INVOKABLE QVariantList clipNotes(int trackId, int clipId) const;

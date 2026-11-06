@@ -508,14 +508,14 @@ bool TrackList::resizeClipAtBeat(int trackId, int clipId, double lengthBeats)
     return true;
 }
 
-TrackList::Change TrackList::setClipGain(int trackId, int clipId, double gainDb)
+TrackList::Change TrackList::setClipGain(int trackId, int clipId, double gainDb, bool continueEdit)
 {
     if (editsLocked()) return {};
     const auto* clip = findClip(trackId, clipId);
     if (!clip || !std::isfinite(gainDb)) return {};
     const float clamped = std::clamp(static_cast<float>(gainDb), -120.0f, 24.0f);
     if (clip->gainDb == clamped) return {true, false};
-    const bool ok = m_project.setClipGain(trackId, clipId, clamped);
+    const bool ok = m_project.setClipGain(trackId, clipId, clamped, continueEdit);
     return {ok, ok};
 }
 
