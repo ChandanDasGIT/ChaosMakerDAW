@@ -279,6 +279,10 @@ PHASE 3 — Layout and workflow
            ui/pianoRollDockHeight) via AppSettingsWrapper; Main.qml starts from them, clamps
            drags with the backend limits and saves once on release. A saved dock height is
            capped to the window. Hand check: drag all three splitters, restart, sizes kept.
+           Fix (2026-11-07): Main.qml read the sizes from topBar.appSettings, which is the
+           Settings button, not the wrapper, so they were undefined and the track list,
+           mixer and dock collapsed to 0. Now read through topBar.appSettings.bridge (the
+           app's one AppSettingsWrapper); a UI test checks that bridge.
          - [done] 3.9b Mixer strip widths are saved per track (Track::stripWidth, clamped by the
            mixer limits) in projects and session restore; old files use the default 108 px.
            The strip resizes live and stores the width once on release (marks the project

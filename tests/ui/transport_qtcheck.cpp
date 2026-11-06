@@ -509,6 +509,12 @@ private slots:
             QCOMPARE(settings.mixerHeight(),480.0);
             QCOMPARE(settings.clampTrackListWidth(10),180.0);
         }
+        // Main.qml reads the sizes through the top bar's settings button (topBar.appSettings.bridge).
+        auto* topBar=window->findChild<QQuickItem*>("testTopBar"); QVERIFY(topBar);
+        auto* bridge=qvariant_cast<QObject*>(qvariant_cast<QObject*>(topBar->property("appSettings"))->property("bridge"));
+        QVERIFY(qobject_cast<AppSettingsWrapper*>(bridge));
+        for(const char* size:{"trackListWidth","mixerHeight","pianoRollDockHeight"})
+            QVERIFY2(bridge->property(size).canConvert<double>() && bridge->property(size).toDouble()>0,size);
         AppSettingsWrapper next;                                    // a new session reads them back
         QCOMPARE(next.trackListWidth(),312.0); QCOMPARE(next.mixerHeight(),480.0);
         QCOMPARE(next.pianoRollDockHeight(),450.0);
