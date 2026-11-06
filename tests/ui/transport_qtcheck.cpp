@@ -1937,6 +1937,66 @@ private slots:
         QTest::mouseClick(window,Qt::LeftButton,{},at(6.0,top-3,kh/2));
         QVERIFY(selected().isEmpty());
     }
+    void piano_roll_ctrl_wheel_zooms_time_and_rows_around_the_cursor() {
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* grid=visualItem(roll,"pianoRollGrid"); QVERIFY(grid);
+        auto* taller=visualItem(roll,"pianoRollRowsTaller"); auto* shorter=visualItem(roll,"pianoRollRowsShorter");
+        QVERIFY(taller); QVERIFY(shorter);
+        const auto restore=qScopeGuard([&] {
+            roll->setProperty("pixelsPerBeat",96.0); roll->setProperty("keyHeight",18.0); roll->setVisible(false);
+        });
+        roll->setVisible(true); QTest::qWait(30);
+        auto* flick=grid->parentItem()->parentItem();
+        const double dockMin=roll->property("minimumDockHeight").toDouble();
+        const auto ppb=[&] { return roll->property("pixelsPerBeat").toDouble(); };
+        const auto kh=[&] { return roll->property("keyHeight").toDouble(); };
+        const QPointF viewportPt(300,120);
+        const auto wheelAt=[&](QPointF scenePt,int angle,Qt::KeyboardModifiers modifiers) {
+            QWheelEvent event(scenePt,window->mapToGlobal(scenePt.toPoint()),QPoint(),QPoint(0,angle),Qt::NoButton,modifiers,Qt::NoScrollPhase,false);
+            QCoreApplication::sendEvent(window,&event); QCoreApplication::processEvents();
+        };
+        const QPointF gridPt=flick->mapToScene(viewportPt);
+        // Content position under the cursor, in beats and rows.
+        const auto beatUnder=[&] { return (flick->property("contentX").toDouble()+viewportPt.x())/ppb(); };
+        const auto rowUnder=[&] { return (flick->property("contentY").toDouble()+viewportPt.y())/kh(); };
+        // Plain wheel scrolls pitch only.
+        const double y0=flick->property("contentY").toDouble();
+        wheelAt(gridPt,-120,Qt::NoModifier);
+        QVERIFY(flick->property("contentY").toDouble()>y0);
+        QCOMPARE(ppb(),96.0); QCOMPARE(kh(),18.0);
+        // Ctrl+wheel zooms time around the cursor; rows unchanged.
+        flick->setProperty("contentX",200.0);
+        const double beat=beatUnder();
+        wheelAt(gridPt,120,Qt::ControlModifier);
+        QVERIFY(ppb()>96.0); QCOMPARE(kh(),18.0);
+        QVERIFY(std::abs(beatUnder()-beat)<0.01);
+        for(int i=0;i<40;++i)wheelAt(gridPt,120,Qt::ControlModifier);
+        QCOMPARE(ppb(),roll->property("maxPixelsPerBeat").toDouble());
+        for(int i=0;i<40;++i)wheelAt(gridPt,-120,Qt::ControlModifier);
+        QCOMPARE(ppb(),roll->property("minPixelsPerBeat").toDouble());
+        // Ctrl+Shift+wheel changes the row height around the cursor; time unchanged.
+        const double timeZoom=ppb(); const double row=rowUnder();
+        wheelAt(gridPt,120,Qt::ControlModifier|Qt::ShiftModifier);
+        QVERIFY(kh()>18.0); QCOMPARE(ppb(),timeZoom);
+        QVERIFY(std::abs(rowUnder()-row)<0.01);
+        // Ctrl+wheel over the keys also changes rows; limits hold.
+        auto* keysArea=flick->parentItem(); // RowLayout: keys flickable is its first child
+        QQuickItem* keys=nullptr;
+        for(auto* child:keysArea->childItems()) if(child!=flick && child->width()>0 && child->width()<=90) keys=child;
+        QVERIFY(keys);
+        const QPointF keyPt=keys->mapToScene(QPointF(45,120));
+        const double beforeKeyStep=kh();
+        wheelAt(keyPt,120,Qt::ControlModifier);
+        QVERIFY(std::abs(kh()-beforeKeyStep*1.1)<1e-9);             // one step, applied once
+        for(int i=0;i<30;++i)wheelAt(keyPt,-120,Qt::ControlModifier);
+        QCOMPARE(kh(),roll->property("minKeyHeight").toDouble()); QCOMPARE(ppb(),timeZoom);
+        for(int i=0;i<30;++i)wheelAt(keyPt,120,Qt::ControlModifier);
+        QCOMPARE(kh(),roll->property("maxKeyHeight").toDouble());
+        // Footer row buttons; the dock's minimum height never follows the zoom.
+        click(shorter); QVERIFY(kh()<roll->property("maxKeyHeight").toDouble());
+        const double afterShorter=kh(); click(taller); QVERIFY(kh()>afterShorter);
+        QCOMPARE(roll->property("minimumDockHeight").toDouble(),dockMin);
+    }
     void piano_roll_notes_box_sets_the_length_of_drawn_notes() {
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
         auto* notes=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(notes);
