@@ -487,6 +487,32 @@ private slots:
         QVERIFY(visualItem(window->contentItem(),"pedal.tremolo.fade"));
         QVERIFY(QMetaObject::invokeMethod(board,"close")); QVERIFY(model->removePedal(id));
     }
+    void device_selectors_live_in_preferences_not_the_top_bar() {
+        auto* top=window->findChild<QQuickItem*>("testTopBar"); QVERIFY(top);
+        for(const char* name:{"bufferSizeSelector","outputDeviceSelector","midiInputSelector"})
+            QVERIFY2(!visualItem(top,name),name);
+        auto* settings=visualItem(window->contentItem(),"settingsButton"); QVERIFY(settings); click(settings);
+        QQuickItem* option=nullptr;
+        QTRY_VERIFY((option=visualItem(window->contentItem(),"preferencesSetting")));
+        click(option);
+        auto* popup=window->findChild<QObject*>("preferencesPopup"); QVERIFY(popup);
+        QTRY_VERIFY(popup->property("visible").toBool());
+        const auto closePopup=qScopeGuard([&] { QMetaObject::invokeMethod(popup,"close"); QCoreApplication::processEvents(); });
+        auto* content=popup->property("contentItem").value<QQuickItem*>(); QVERIFY(content);
+        auto* controller=EngineController::instance();
+        auto* buffer=visualItem(content,"bufferSizeSelector"); QVERIFY(buffer); QVERIFY(buffer->isVisible());
+        auto* output=visualItem(content,"outputDeviceSelector"); QVERIFY(output); QVERIFY(output->isVisible());
+        auto* midi=visualItem(content,"midiInputSelector"); QVERIFY(midi); QVERIFY(midi->isVisible());
+        QCOMPARE(buffer->property("count").toInt(),int(controller->property("bufferSizes").toStringList().size()));
+        QCOMPARE(output->property("count").toInt(),int(controller->property("outputDevices").toStringList().size()));
+        QCOMPARE(midi->property("count").toInt(),int(controller->property("midiInputPorts").toStringList().size()));
+        // Every row fits inside the dialog.
+        const QRectF box=content->mapRectToScene(QRectF(0,0,content->width(),content->height()));
+        for(auto* item:{buffer,output,midi}) {
+            const QRectF r=item->mapRectToScene(QRectF(0,0,item->width(),item->height()));
+            QVERIFY(box.contains(r));
+        }
+    }
     void startup_setting_saves_and_restores_session_stopped() {
         auto* controller=EngineController::instance();
         controller->setRestoreSessionOnStartup(false);

@@ -3,7 +3,6 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import "../session"
-import "../audiodevice"
 import "../settings"
 
 Rectangle {
@@ -68,8 +67,5 @@ Rectangle {
             }
         }
         Item { Layout.fillWidth: true }
-        DeviceSettings {
-            id: deviceSettings
-        }
     }
 }

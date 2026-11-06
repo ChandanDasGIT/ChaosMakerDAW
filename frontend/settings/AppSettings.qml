@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import ".."
+import "../audiodevice"
 
 ToolButton {
     id: root
@@ -114,8 +115,8 @@ ToolButton {
         parent: Overlay.overlay
         x: Math.round((parent.width - width) / 2)
         y: Math.round((parent.height - height) / 2)
-        width: 360
-        height: 220
+        width: 440
+        padding: 16
         modal: true
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
@@ -126,8 +127,6 @@ ToolButton {
             radius: 8
         }
         contentItem: ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 16
             spacing: 12
 
             RowLayout {
@@ -152,6 +151,18 @@ ToolButton {
                 Layout.fillWidth: true
                 implicitHeight: 1
                 color: Theme.divider
+            }
+
+            Text {
+                text: "Audio & MIDI"
+                color: Theme.text
+                font.pixelSize: Theme.bodySize
+                font.bold: true
+            }
+
+            DeviceSettings {
+                id: deviceSettings
+                Layout.fillWidth: true
             }
 
             Text {
@@ -190,8 +201,6 @@ ToolButton {
                     }
                 }
             }
-
-            Item { Layout.fillHeight: true }
         }
     }
 }
