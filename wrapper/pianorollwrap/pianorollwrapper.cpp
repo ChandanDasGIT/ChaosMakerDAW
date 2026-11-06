@@ -1,6 +1,7 @@
 #include "pianorollwrapper.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "core/valueformat.h"
 #include "transport/tempomap.h"
@@ -79,6 +80,51 @@ QString PianoRollWrapper::trackColour() const {
     return track ? QString::fromStdString(track->colour) : QString();
 }
 
+namespace {
+QStringList toQStringList(const std::vector<std::string>& names)
+{
+    QStringList result;
+    for (const auto& name : names) result.push_back(QString::fromStdString(name));
+    return result;
+}
+}
+
+QStringList PianoRollWrapper::gridDivisionOptions() { return toQStringList(PianoRollGrid::divisionNames()); }
+QStringList PianoRollWrapper::gridStyleOptions() { return toQStringList(PianoRollGrid::styleNames()); }
+QStringList PianoRollWrapper::noteLengthOptions() { return toQStringList(PianoRollGrid::noteLengthNames()); }
+
+void PianoRollWrapper::setGridDivision(const QString& name) {
+    if (name == gridDivision() || !m_grid.setDivision(name.toStdString())) return;
+    emit gridChanged();
+}
+
+void PianoRollWrapper::setGridStyle(const QString& name) {
+    if (name == gridStyle() || !m_grid.setStyle(name.toStdString())) return;
+    emit gridChanged();
+}
+
+void PianoRollWrapper::setNoteLengthMode(const QString& name) {
+    if (name == noteLengthMode() || !m_grid.setNoteLength(name.toStdString())) return;
+    emit gridChanged();
+}
+
+void PianoRollWrapper::setSnapEnabled(bool enabled) {
+    if (enabled == m_grid.snapEnabled()) return;
+    m_grid.setSnapEnabled(enabled);
+    emit gridChanged();
+}
+
+void PianoRollWrapper::setPixelsPerBeat(double pixels) {
+    if (!std::isfinite(pixels) || pixels <= 0 || pixels == m_pixelsPerBeat) return;
+    m_pixelsPerBeat = pixels;
+    emit gridChanged();
+}
+
+void PianoRollWrapper::syncGridMeter() {
+    m_grid.setMeter(beatsPerBar(), beatUnit());
+    emit gridChanged();
+}
+
 QString PianoRollWrapper::positionLabel(double beat) const {
     return QString::fromStdString(valueformat::barBeatPosition(beat, beatsPerBar(), beatUnit()));
 }
@@ -89,6 +135,7 @@ void PianoRollWrapper::bindingEdited() {
     emit bindingChanged();
     emit clipStartChanged();
     emit meterChanged();
+    syncGridMeter();
     emit trackColourChanged();
     emit notesChanged();
 }
@@ -98,6 +145,7 @@ void PianoRollWrapper::reload() {
     // Clip moves, trims, tempo/meter and track colour changes arrive here without touching the notes.
     emit clipStartChanged();
     emit meterChanged();
+    syncGridMeter();
     emit trackColourChanged();
     // Unbound while a list is set means the clip is gone (deleted / undone away): show nothing.
     auto fresh = bound() ? m_trackList->domain().clipNotes(m_trackId, m_clipId) : std::vector<MidiNote>{};

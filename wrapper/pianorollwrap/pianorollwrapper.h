@@ -4,8 +4,10 @@
 #include <QPointer>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QStringList>
 #include <QtQml/qqmlregistration.h>
 #include "midi/pianorollpattern.h"
+#include "midi/pianorollgrid.h"
 #include "wrapper/session/tracklistwrap/tracklistwrapper.h" // full type needed by Q_PROPERTY
 
 // Adapts PianoRollPattern (editing state + selection) to QML. When bound to a clip through
@@ -30,6 +32,19 @@ class PianoRollWrapper : public QObject {
     Q_PROPERTY(double beatUnit READ beatUnit NOTIFY meterChanged)
     // Colour of the bound clip's track ("#rrggbb"); empty when unbound.
     Q_PROPERTY(QString trackColour READ trackColour NOTIFY trackColourChanged)
+    // Grid and snapping (backend PianoRollGrid). Settings use the menu names below.
+    Q_PROPERTY(QString gridDivision READ gridDivision WRITE setGridDivision NOTIFY gridChanged)
+    Q_PROPERTY(QString gridStyle READ gridStyle WRITE setGridStyle NOTIFY gridChanged)
+    Q_PROPERTY(QString noteLengthMode READ noteLengthMode WRITE setNoteLengthMode NOTIFY gridChanged)
+    Q_PROPERTY(bool snapEnabled READ snapEnabled WRITE setSnapEnabled NOTIFY gridChanged)
+    // Zoom of the view, needed for grid line spacing.
+    Q_PROPERTY(double pixelsPerBeat READ pixelsPerBeat WRITE setPixelsPerBeat NOTIFY gridChanged)
+    Q_PROPERTY(double gridLineBeats READ gridLineBeats NOTIFY gridChanged)
+    Q_PROPERTY(int gridLinesPerBar READ gridLinesPerBar NOTIFY gridChanged)
+    Q_PROPERTY(double snapStep READ snapStep NOTIFY gridChanged)
+    Q_PROPERTY(QStringList gridDivisionOptions READ gridDivisionOptions CONSTANT)
+    Q_PROPERTY(QStringList gridStyleOptions READ gridStyleOptions CONSTANT)
+    Q_PROPERTY(QStringList noteLengthOptions READ noteLengthOptions CONSTANT)
 
 public:
     explicit PianoRollWrapper(QObject* parent = nullptr);
@@ -55,6 +70,33 @@ public:
     // Clip-relative beat as "bar.beat.hundredths" in the project meter.
     Q_INVOKABLE QString positionLabel(double beat) const;
 
+    const PianoRollGrid& grid() const noexcept { return m_grid; }
+    QString gridDivision() const { return QString::fromStdString(m_grid.divisionName()); }
+    void setGridDivision(const QString& name);
+    QString gridStyle() const { return QString::fromStdString(m_grid.styleName()); }
+    void setGridStyle(const QString& name);
+    QString noteLengthMode() const { return QString::fromStdString(m_grid.noteLengthName()); }
+    void setNoteLengthMode(const QString& name);
+    bool snapEnabled() const noexcept { return m_grid.snapEnabled(); }
+    void setSnapEnabled(bool enabled);
+    double pixelsPerBeat() const noexcept { return m_pixelsPerBeat; }
+    void setPixelsPerBeat(double pixels);
+    double gridLineBeats() const noexcept { return m_grid.lineBeats(m_pixelsPerBeat); }
+    int gridLinesPerBar() const noexcept { return m_grid.linesPerBar(m_pixelsPerBeat); }
+    double snapStep() const noexcept { return m_grid.snapStep(); }
+    static QStringList gridDivisionOptions();
+    static QStringList gridStyleOptions();
+    static QStringList noteLengthOptions();
+
+    // Snapping helpers for the view's drag and draw code (all in clip-relative beats).
+    Q_INVOKABLE double snapFloor(double beat) const noexcept { return m_grid.snapFloor(beat); }
+    Q_INVOKABLE double snapDelta(double deltaBeats) const noexcept { return m_grid.snapDelta(deltaBeats); }
+    Q_INVOKABLE double newNoteLength() const noexcept { return m_grid.newNoteLength(); }
+    Q_INVOKABLE double minimumNoteLength() const noexcept { return m_grid.minimumNoteLength(); }
+    Q_INVOKABLE bool isOnGrid(double position, double unit) const noexcept { return PianoRollGrid::isOnGrid(position, unit); }
+    // Quantize to the Grid (selected notes, or all), as one undoable edit.
+    Q_INVOKABLE bool quantizeToGrid() { return quantize(m_grid.quantizeStep()); }
+
     Q_INVOKABLE int addNote(int note, double startBeat, double lengthBeats, int velocity = 100);
     Q_INVOKABLE bool removeNote(int noteId);
     Q_INVOKABLE bool removeNotesAt(int note, double beat);
@@ -79,12 +121,17 @@ signals:
     void clipStartChanged();
     void meterChanged();
     void trackColourChanged();
+    void gridChanged();
 
 private:
     bool commit();       // write the pattern to the bound clip; reverts on rejection
     void bindingEdited();
 
+    void syncGridMeter();
+
     PianoRollPattern m_pattern;
+    PianoRollGrid m_grid;
+    double m_pixelsPerBeat = 96.0;
     QPointer<TrackListWrapper> m_trackList;
     QMetaObject::Connection m_clipsConnection;
     int m_trackId = -1;

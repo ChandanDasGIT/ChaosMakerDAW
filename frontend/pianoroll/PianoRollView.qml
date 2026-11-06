@@ -18,8 +18,9 @@ Item {
     property real pixelsPerBeat: 96.0
     property real keyHeight: 18.0
     property string activeTool: "pencil" // "pointer", "pencil", "eraser"
-    property string snapDivision: "1/16"
-    property string snapStyle: "straight"
+    // Grid settings live in the backend (PianoRollGrid via PianoRollWrapper)
+    property alias snapDivision: pianoRollBackend.gridDivision
+    property alias snapStyle: pianoRollBackend.gridStyle
     property string colorMode: "Velocity"
 
     // Transport used by the footer buttons and the playhead (replaceable in tests, like Timeline).
@@ -40,6 +41,7 @@ Item {
         trackList: root.trackModel
         trackId: root.trackId
         clipId: root.clipId
+        pixelsPerBeat: root.pixelsPerBeat
     }
 
     readonly property alias notes: pianoRollBackend.notes
@@ -77,56 +79,14 @@ Item {
         onActivated: root.quantizeNotes()
     }
 
-    // Quantize to the Grid division (even with the magnet off); one meter beat when Grid is Off.
-    function quantizeNotes() {
-        const step = gridDivisionBeats()
-        pianoRollBackend.quantize(step > 0 ? step : root.beatUnit)
-    }
-
-    // "Notes:" box: length of newly drawn notes. "Grid" follows the Grid division.
-    property string noteLengthMode: "Grid"
-    function newNoteLength() {
-        switch (root.noteLengthMode) {
-            case "1/16": return 0.25
-            case "1/8": return 0.5
-            case "1/4": return 1.0
-            default: {
-                const division = gridDivisionBeats()
-                return division > 0 ? division : 0.25
-            }
-        }
-    }
-
+    // Grid and snapping: thin calls into the backend grid (see backend/midi/pianorollgrid.h).
+    function quantizeNotes() { pianoRollBackend.quantizeToGrid() }
+    property alias noteLengthMode: pianoRollBackend.noteLengthMode
+    function newNoteLength() { return pianoRollBackend.newNoteLength() }
     // Magnet button: when off, notes move and draw freely but the grid lines stay.
-    property bool snapEnabled: true
-
-    // Snap step used by editing: the Grid division, or 0 when snapping is off.
-    function getSnapBeats() {
-        return root.snapEnabled ? gridDivisionBeats() : 0.0
-    }
-
-    // The Grid division in beats ("Off" -> 0), independent of the magnet button.
-    // Grid style: triplet = 2/3 of the division, dotted = 1.5x.
-    function gridDivisionBeats() {
-        const factor = root.snapStyle === "triplet" ? 2.0 / 3.0 : root.snapStyle === "dotted" ? 1.5 : 1.0
-        switch (root.snapDivision) {
-            case "1/4": return 1.0 * factor
-            case "1/8": return 0.5 * factor
-            case "1/16": return 0.25 * factor
-            case "1/32": return 0.125 * factor
-            case "1/64": return 0.0625 * factor
-            case "Off": return 0.0
-            default: return 0.25 * factor
-        }
-    }
-
-    // Snap a drag distance (in beats) to the nearest grid step. Snapping the delta rather than
-    // the absolute position keeps the note under the cursor at the point where it was grabbed.
-    function snapDelta(deltaBeats) {
-        const step = getSnapBeats()
-        if (step <= 0) return deltaBeats
-        return Math.round(deltaBeats / step) * step
-    }
+    property alias snapEnabled: pianoRollBackend.snapEnabled
+    function getSnapBeats() { return pianoRollBackend.snapStep }
+    function snapDelta(deltaBeats) { return pianoRollBackend.snapDelta(deltaBeats) }
 
     // ---- Edge auto-scroll while dragging / resizing / drawing ----
     // The active MouseArea registers itself here; it must expose applyDrag(contentX, contentY).
@@ -188,44 +148,16 @@ Item {
         }
     }
 
-    // Floor to the grid cell. The grid restarts at every bar line, so steps that do not divide
-    // the bar (triplets, dotted) still line up with bars.
-    function snapToGrid(beat) {
-        const step = getSnapBeats()
-        if (step <= 0) return Math.max(0, beat)
-        const bar = Math.floor(beat / root.beatsPerBar + 1e-9) * root.beatsPerBar
-        return Math.max(0, bar + Math.floor((beat - bar) / step + 1e-9) * step)
-    }
+    function snapToGrid(beat) { return pianoRollBackend.snapFloor(beat) }
 
     // Project meter from the backend, in quarter-note beats (6/8 -> 3 per bar, 0.5 per beat).
     readonly property real beatsPerBar: pianoRollBackend.beatsPerBar
     readonly property real beatUnit: pianoRollBackend.beatUnit
     readonly property int beatsInBar: Math.max(1, Math.round(beatsPerBar / beatUnit))
 
-    // True when position lies on a multiple of unit (both in beats).
-    function isOnGrid(position, unit) {
-        const r = position / unit
-        return Math.abs(r - Math.round(r)) < 1e-6
-    }
-
-    // Grid line spacing: one line per snap division ("Off" -> meter beats only), coarsened by
-    // doubling until lines are at least 6px apart so zoomed-out grids stay readable.
-    // Straight grids keep at least one line per meter beat; triplet/dotted grids show their
-    // own step (doubled while too dense).
-    readonly property real gridLineBeats: {
-        const step = gridDivisionBeats()
-        if (step > 0 && snapStyle !== "straight") {
-            let beats = step
-            while (beats * pixelsPerBeat < 6) beats *= 2
-            return beats
-        }
-        let beats = step > 0 ? Math.min(beatUnit, step) : beatUnit
-        while (beats < beatUnit && beats * pixelsPerBeat < 6)
-            beats *= 2
-        return Math.min(beats, beatUnit)
-    }
-    // Grid lines restart at every bar line
-    readonly property int gridLinesPerBar: Math.max(1, Math.ceil(beatsPerBar / gridLineBeats - 1e-6))
+    function isOnGrid(position, unit) { return pianoRollBackend.isOnGrid(position, unit) }
+    readonly property real gridLineBeats: pianoRollBackend.gridLineBeats
+    readonly property int gridLinesPerBar: pianoRollBackend.gridLinesPerBar
 
     // Note fill colour. "Velocity" mode blends dim blue (soft) -> bright teal (loud);
     // other modes keep the default note colour for now.
@@ -945,10 +877,8 @@ Item {
 
                                     function applyDrag(cx, cy) {
                                         const dx = cx - pressGlobalX
-                                        const step = root.getSnapBeats()
-                                        const unitStep = step > 0 ? step : 0.25
                                         const lenDelta = root.snapDelta(dx / root.pixelsPerBeat)
-                                        noteCard.visualLength = Math.max(unitStep, pressStartLength + lenDelta)
+                                        noteCard.visualLength = Math.max(pianoRollBackend.minimumNoteLength(), pressStartLength + lenDelta)
                                         root.dragEndBeats = noteCard.startBeat + noteCard.visualLength
                                     }
 
@@ -1142,18 +1072,18 @@ Item {
                 PianoRollComboBox {
                     implicitWidth: 70
                     implicitHeight: 22
-                    model: ["1/4", "1/8", "1/16", "1/32", "1/64", "Off"]
-                    currentIndex: 2
-                    onCurrentTextChanged: root.snapDivision = currentText
+                    model: pianoRollBackend.gridDivisionOptions
+                    currentIndex: model.indexOf(pianoRollBackend.gridDivision)
+                    onCurrentTextChanged: pianoRollBackend.gridDivision = currentText
                 }
 
                 PianoRollComboBox {
                     objectName: "pianoRollGridStyle"
                     implicitWidth: 80
                     implicitHeight: 22
-                    model: ["straight", "triplet", "dotted"]
-                    currentIndex: 0
-                    onCurrentTextChanged: root.snapStyle = currentText
+                    model: pianoRollBackend.gridStyleOptions
+                    currentIndex: model.indexOf(pianoRollBackend.gridStyle)
+                    onCurrentTextChanged: pianoRollBackend.gridStyle = currentText
                 }
 
                 Text { text: "Notes:"; color: "#8f95a3"; font.pixelSize: 11 }
@@ -1161,9 +1091,9 @@ Item {
                     objectName: "pianoRollNoteLength"
                     implicitWidth: 70
                     implicitHeight: 22
-                    model: ["Grid", "1/16", "1/8", "1/4"]
-                    currentIndex: 0
-                    onCurrentTextChanged: root.noteLengthMode = currentText
+                    model: pianoRollBackend.noteLengthOptions
+                    currentIndex: model.indexOf(pianoRollBackend.noteLengthMode)
+                    onCurrentTextChanged: pianoRollBackend.noteLengthMode = currentText
                     ToolTip.visible: hovered
                     ToolTip.text: "Length of newly drawn notes (Grid = the Grid division)"
                 }

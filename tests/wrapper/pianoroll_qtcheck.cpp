@@ -199,6 +199,42 @@ TEST(qtpianoroll, track_colour_follows_the_bound_track) {
     CHECK(unbound.trackColour().isEmpty());
 }
 
+TEST(qtpianoroll, grid_settings_come_from_the_backend_and_follow_the_meter) {
+    QObject owner;
+    TrackListWrapper tracks;
+    const int t = tracks.addInstrumentTrack();
+    const int c = tracks.addClipAtBeat(t, 0, 4);
+    auto* roll = boundRoll(tracks, t, c, &owner);
+    CHECK(roll->gridDivisionOptions().size() == 6 && roll->gridStyleOptions().size() == 3);
+    CHECK(roll->gridDivision() == "1/16" && roll->snapEnabled());
+    CHECK(std::abs(roll->snapFloor(1.3) - 1.25) < 1e-9);
+
+    int changes = 0;
+    QObject::connect(roll, &PianoRollWrapper::gridChanged, &owner, [&] { ++changes; });
+    roll->setGridStyle("dotted");
+    CHECK(changes == 1 && roll->gridStyle() == "dotted");
+    roll->setGridStyle("swing");                               // unknown name: ignored
+    CHECK(changes == 1 && roll->gridStyle() == "dotted");
+    roll->setSnapEnabled(false);
+    CHECK(changes == 2 && roll->snapStep() == 0.0);
+    roll->setPixelsPerBeat(16);
+    CHECK(changes == 3);
+
+    // The project meter reaches the grid: 6/8 bars are 3 quarters long
+    const double bpm = tracks.domain().project().tempo().bpm();
+    roll->setSnapEnabled(true);
+    roll->setGridStyle("straight");
+    tracks.setTempo(bpm, 6, 8);
+    CHECK(roll->grid().beatsPerBar() == 3.0 && roll->grid().beatUnit() == 0.5);
+    CHECK(roll->gridLinesPerBar() == 6);                       // 1/16 at 16 px -> eighth lines
+
+    // quantizeToGrid uses the Grid division, as one undoable edit
+    roll->setGridDivision("1/8");
+    const int id = roll->addNote(60, 0.3, 0.5);
+    CHECK(roll->quantizeToGrid());
+    CHECK(std::abs(roll->backend().findNote(id)->startBeat - 0.5) < 1e-9);
+}
+
 TEST(qtpianoroll, velocity_edits_are_one_undoable_change_and_clamped) {
     QObject owner;
     TrackListWrapper tracks;
