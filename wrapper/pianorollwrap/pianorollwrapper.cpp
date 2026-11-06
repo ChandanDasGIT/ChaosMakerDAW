@@ -73,6 +73,12 @@ double PianoRollWrapper::beatUnit() const {
     return m_trackList ? m_trackList->domain().project().tempo().beatUnit() : TempoMap{}.beatUnit();
 }
 
+QString PianoRollWrapper::trackColour() const {
+    if (!m_trackList) return {};
+    const auto* track = m_trackList->domain().project().findTrack(m_trackId);
+    return track ? QString::fromStdString(track->colour) : QString();
+}
+
 QString PianoRollWrapper::positionLabel(double beat) const {
     return QString::fromStdString(valueformat::barBeatPosition(beat, beatsPerBar(), beatUnit()));
 }
@@ -83,14 +89,16 @@ void PianoRollWrapper::bindingEdited() {
     emit bindingChanged();
     emit clipStartChanged();
     emit meterChanged();
+    emit trackColourChanged();
     emit notesChanged();
 }
 
 void PianoRollWrapper::reload() {
     if (!m_trackList) return;
-    // Clip moves, trims and tempo/meter changes arrive here without touching the notes.
+    // Clip moves, trims, tempo/meter and track colour changes arrive here without touching the notes.
     emit clipStartChanged();
     emit meterChanged();
+    emit trackColourChanged();
     // Unbound while a list is set means the clip is gone (deleted / undone away): show nothing.
     auto fresh = bound() ? m_trackList->domain().clipNotes(m_trackId, m_clipId) : std::vector<MidiNote>{};
     if (withoutSelection(m_pattern.notes()) == fresh) return; // nothing changed (e.g. our own commit)
