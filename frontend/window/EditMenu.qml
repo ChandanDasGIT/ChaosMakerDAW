@@ -45,17 +45,11 @@ ToolButton {
         border.color: root.checked ? Theme.divider : "transparent"
     }
 
-    Menu {
+    ThemedMenu {
         id: editMenu
         objectName: "editMenu"
         y: parent.height + 4
         width: 200
-        padding: 4
-        background: Rectangle {
-            color: Theme.panelBg
-            border.color: Theme.divider
-            radius: 6
-        }
 
         ThemedMenuItem {
             objectName: "editUndoItem"
@@ -72,7 +66,7 @@ ToolButton {
             onTriggered: root.trackModel.redo()
         }
 
-        MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.divider } }
+        ThemedMenuSeparator {}
 
         ThemedMenuItem {
             objectName: "editCutItem"
@@ -110,7 +104,7 @@ ToolButton {
             onTriggered: root.runOnTimeline(() => root.timeline.deleteSelection())
         }
 
-        MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.divider } }
+        ThemedMenuSeparator {}
 
         ThemedMenuItem {
             objectName: "editSelectAllItem"

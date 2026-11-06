@@ -188,12 +188,11 @@ Item {
         enabled: root.activeFocus && editor.canSplitSelection
         onActivated: root.trackModel.splitClipAtBeat(root.selectedTrackId, root.selectedClipId, root.transport.positionBeats)
     }
-    Menu {
+    ThemedMenu {
         id: clipContextMenu
         parent: root
         popupType: Popup.Item
         width: 160
-        padding: 5
         property int targetTrackId: -1
         property int targetClipId: -1
         property real targetStart: 0
@@ -201,122 +200,63 @@ Item {
         property bool targetIsRecorded: false
         property string targetLabel: ""
 
-        background: Rectangle {
-            color: Theme.panelBg
-            border.color: Theme.divider
-            radius: 6
-        }
-
-        MenuItem {
+        ThemedMenuItem {
             id: openPianoRollAction
             objectName: "openPianoRollAction"
             text: "Open Piano Roll"
             visible: !clipContextMenu.targetIsRecorded
             enabled: visible
-            implicitHeight: visible ? 32 : 0
-            leftPadding: Theme.margin
-            rightPadding: Theme.margin
-            contentItem: Text {
-                text: openPianoRollAction.text
-                color: !openPianoRollAction.enabled ? Theme.textMuted : openPianoRollAction.highlighted ? Theme.accent : Theme.text
-                font.pixelSize: Theme.bodySize
-                verticalAlignment: Text.AlignVCenter
-            }
-            background: Rectangle {
-                color: openPianoRollAction.highlighted ? Theme.tooltipBg : "transparent"
-                radius: 4
-            }
+            implicitHeight: visible ? 30 : 0
             onTriggered: {
                 root.openPianoRollRequested(clipContextMenu.targetTrackId, clipContextMenu.targetClipId,
                     clipContextMenu.targetLabel, clipContextMenu.targetLength)
             }
         }
 
-        MenuSeparator {
+        ThemedMenuSeparator {
             visible: openPianoRollAction.visible
-            contentItem: Rectangle {
-                implicitHeight: 1
-                color: Theme.divider
-            }
         }
 
-        MenuItem {
+        ThemedMenuItem {
             id: cutClipAction
             text: "Cut"
             enabled: editor.canCut
-            implicitHeight: 32
-            leftPadding: Theme.margin
-            rightPadding: Theme.margin
-            contentItem: Text { text: cutClipAction.text; color: !cutClipAction.enabled ? Theme.textMuted : cutClipAction.highlighted ? Theme.accent : Theme.text; font.pixelSize: Theme.bodySize; verticalAlignment: Text.AlignVCenter }
-            background: Rectangle { color: cutClipAction.highlighted ? Theme.tooltipBg : "transparent"; radius: 4 }
             onTriggered: editor.cutSelectedClips()
         }
-        MenuItem {
+        ThemedMenuItem {
             id: copyClipAction
             text: "Copy"
             enabled: editor.canCopy
-            implicitHeight: 32
-            leftPadding: Theme.margin
-            rightPadding: Theme.margin
-            contentItem: Text { text: copyClipAction.text; color: !copyClipAction.enabled ? Theme.textMuted : copyClipAction.highlighted ? Theme.accent : Theme.text; font.pixelSize: Theme.bodySize; verticalAlignment: Text.AlignVCenter }
-            background: Rectangle { color: copyClipAction.highlighted ? Theme.tooltipBg : "transparent"; radius: 4 }
             onTriggered: editor.copySelectedClips()
         }
-        MenuItem {
+        ThemedMenuItem {
             id: pasteClipAction
             text: "Paste"
             enabled: editor.canPaste
-            implicitHeight: 32
-            leftPadding: Theme.margin
-            rightPadding: Theme.margin
-            contentItem: Text { text: pasteClipAction.text; color: !pasteClipAction.enabled ? Theme.textMuted : pasteClipAction.highlighted ? Theme.accent : Theme.text; font.pixelSize: Theme.bodySize; verticalAlignment: Text.AlignVCenter }
-            background: Rectangle { color: pasteClipAction.highlighted ? Theme.tooltipBg : "transparent"; radius: 4 }
             onTriggered: editor.pasteClips(root.transport.positionBeats, clipContextMenu.targetTrackId >= 0 ? clipContextMenu.targetTrackId : editor.selectedTrackId)
         }
-        MenuItem {
+        ThemedMenuItem {
             id: duplicateClipAction
             text: "Duplicate"
             enabled: editor.canDuplicate
-            implicitHeight: 32
-            leftPadding: Theme.margin
-            rightPadding: Theme.margin
-            contentItem: Text { text: duplicateClipAction.text; color: !duplicateClipAction.enabled ? Theme.textMuted : duplicateClipAction.highlighted ? Theme.accent : Theme.text; font.pixelSize: Theme.bodySize; verticalAlignment: Text.AlignVCenter }
-            background: Rectangle { color: duplicateClipAction.highlighted ? Theme.tooltipBg : "transparent"; radius: 4 }
             onTriggered: editor.duplicateSelectedClips()
         }
-        MenuItem {
+        ThemedMenuItem {
             id: splitClipAction
             text: "Split at playhead"
             enabled: editor.canEditSelection && editor.canSplit(clipContextMenu.targetTrackId, clipContextMenu.targetClipId, root.transport.positionBeats)
-            implicitHeight: 32
-            leftPadding: Theme.margin
-            contentItem: Text { text: splitClipAction.text; color: !splitClipAction.enabled ? Theme.textMuted : splitClipAction.highlighted ? Theme.accent : Theme.text; font.pixelSize: Theme.bodySize; verticalAlignment: Text.AlignVCenter }
-            background: Rectangle { color: splitClipAction.highlighted ? Theme.tooltipBg : "transparent"; radius: 4 }
             onTriggered: root.trackModel.splitClipAtBeat(clipContextMenu.targetTrackId, clipContextMenu.targetClipId, root.transport.positionBeats)
         }
-        MenuItem {
+        ThemedMenuItem {
             objectName: "mergeSelectedClips"
             text: "Merge selected clips"
             enabled: root.canMergeSelection
             onTriggered: root.trackModel.mergeSelectedClips(root.selectedClipIds)
         }
-        MenuItem {
+        ThemedMenuItem {
             id: deleteClipAction
             text: root.selectedClipIds.length > 1 ? "Delete selected clips" : "Delete"
             enabled: editor.canEditSelection
-            implicitHeight: 32
-            leftPadding: Theme.margin
-            rightPadding: Theme.margin
-            contentItem: Text {
-                text: deleteClipAction.text
-                color: deleteClipAction.highlighted ? Theme.accent : Theme.text
-                font.pixelSize: Theme.bodySize
-                verticalAlignment: Text.AlignVCenter
-            }
-            background: Rectangle {
-                color: deleteClipAction.highlighted ? Theme.tooltipBg : "transparent"
-                radius: 4
-            }
             onTriggered: {
                 if (root.trackModel)
                     root.trackModel.editClips(root.selectedClipIds, "delete", 0)

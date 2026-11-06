@@ -10,7 +10,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
-Next: Phase 4 — 4.3 shared components (4.1 and 4.2 done).
+Next: Phase 4 — 4.3b ToggleChip (4.3a menus done; 4.1 and 4.2 done).
 Then Phase 5, then Phase 6 (user requests: FX per track type, pro EQ).
 
 Decisions made by the user (keep to them):
@@ -347,6 +347,14 @@ PHASE 4 — Consistency and maintenance
            picker uses (the old unused 7-colour list is gone); TrackList reads it.
 [ ] 4.3  Shared components: ThemedMenuItem (copy-pasted ~12 times), ToggleChip,
          PanelButton, DarkComboBox.
+         Shared components live in frontend/common/ (user's choice). Split into 4.3a menus,
+         4.3b ToggleChip, 4.3c PanelButton, 4.3d ThemedComboBox (was "DarkComboBox").
+         - [done] 4.3a Menus: new ThemedMenu (frame, padding, ThemedMenuItem delegate) and
+           ThemedMenuSeparator; all 6 menus, 5 separators and the 14 hand-styled entries
+           (clip right-click menu, File, Settings) use them. Fixes on the way: "Merge
+           selected clips" was unstyled, "Delete" never greyed out, "Restore session"
+           now uses the shared tick column; right-click entries 30 px (were 32). A UI
+           test fails on a plain Menu/MenuItem/MenuSeparator outside frontend/common/.
 [ ] 4.4  Move the hidden 1x1 test buttons (ProjectActions.qml:324-367) into tests/ui/.
 [ ] 4.5  Raise 5–8 px fonts (7 places, e.g. "MON" at 7 px); add Accessible.name.
 

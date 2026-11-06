@@ -43,67 +43,29 @@ ToolButton {
         border.color: root.checked ? Theme.divider : "transparent"
     }
 
-    Menu {
+    ThemedMenu {
         id: settingsMenu
         y: parent.height + 4
         width: 220
-        padding: 4
-        background: Rectangle {
-            color: Theme.panelBg
-            border.color: Theme.divider
-            radius: 6
-        }
 
-        MenuItem {
+        ThemedMenuItem {
             id: restoreOption
             objectName: "restoreSessionSetting"
             text: "Restore session on startup"
             checkable: true
             // Owned by EngineController, which applies it at startup and when saving the session
             checked: EngineController.restoreSessionOnStartup
-            implicitHeight: 30
-            leftPadding: Theme.margin
-            rightPadding: Theme.margin
-            contentItem: Text {
-                text: restoreOption.text
-                color: restoreOption.highlighted ? Theme.accent : Theme.text
-                font.pixelSize: Theme.bodySize
-                verticalAlignment: Text.AlignVCenter
-                leftPadding: restoreOption.indicator ? restoreOption.indicator.width + 4 : 0
-            }
-            background: Rectangle {
-                color: restoreOption.highlighted ? Theme.tooltipBg : "transparent"
-                radius: 4
-            }
             onTriggered: EngineController.restoreSessionOnStartup = checked
             // Keep the tick in step with changes made elsewhere (clicking breaks a plain binding)
             Binding on checked { value: EngineController.restoreSessionOnStartup }
         }
 
-        MenuSeparator {
-            contentItem: Rectangle {
-                implicitHeight: 1
-                color: Theme.divider
-            }
-        }
+        ThemedMenuSeparator {}
 
-        MenuItem {
+        ThemedMenuItem {
             id: preferencesOption
             objectName: "preferencesSetting"
             text: "Preferences…"
-            implicitHeight: 30
-            leftPadding: Theme.margin
-            rightPadding: Theme.margin
-            contentItem: Text {
-                text: preferencesOption.text
-                color: preferencesOption.highlighted ? Theme.accent : Theme.text
-                font.pixelSize: Theme.bodySize
-                verticalAlignment: Text.AlignVCenter
-            }
-            background: Rectangle {
-                color: preferencesOption.highlighted ? Theme.tooltipBg : "transparent"
-                radius: 4
-            }
             onTriggered: {
                 settingsMenu.close()
                 preferencesPopup.open()

@@ -666,6 +666,33 @@ private slots:
         for(const char* area:{"timeline","mixer","transport","guitarSuite","settings","effects"})
             QVERIFY2(qvariant_cast<QObject*>(theme->property(area)),area);
     }
+    void menus_use_the_shared_themed_components() {
+        // Plan 4.3: menus, entries and separators come from frontend/common/ (ThemedMenu,
+        // ThemedMenuItem, ThemedMenuSeparator); nothing else re-styles Qt's plain ones.
+        const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
+        const QRegularExpression plain(QStringLiteral("(^|[^\\w.])(Menu|MenuItem|MenuSeparator)\\s*\\{"));
+        QStringList offenders;
+        QStringList files{root+"/Main.qml"};
+        QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
+        while(it.hasNext()) files<<it.next();
+        for(const QString& path:files) {
+            const QString rel=path.mid(root.size()+1);
+            if(rel.startsWith("frontend/common/")) continue;
+            QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
+            int line=0;
+            for(const QByteArray& bytes:file.readAll().split('\n')) {
+                ++line;
+                if(plain.match(QString::fromUtf8(bytes)).hasMatch()) offenders<<QString("%1:%2").arg(rel).arg(line);
+            }
+        }
+        QVERIFY2(offenders.isEmpty(),qPrintable("Plain menus outside frontend/common/: "+offenders.join(", ")));
+        // A converted entry keeps its name, shortcut text and the shared look.
+        auto* save=visualObject(window->contentItem(),"fileSaveItem");
+        if(!save) save=window->findChild<QObject*>("fileSaveItem");
+        QVERIFY(save);
+        QCOMPARE(save->property("shortcutText").toString(),QString("Ctrl+S"));
+        QCOMPARE(save->property("implicitHeight").toDouble(),30.0);
+    }
     void layout_sizes_are_saved_and_restored_between_sessions() {
         QSettings qs;
         const auto restore=qScopeGuard([&] {
