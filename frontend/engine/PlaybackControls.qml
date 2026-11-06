@@ -92,14 +92,10 @@ RowLayout {
         Layout.rightMargin: 8
     }
 
+    // Transport clock, formatted by the backend (PlaybackControls::formatTime)
     Text {
-        text: {
-            const ms = Math.floor(EngineController.positionSeconds * 1000)
-            const hours = Math.floor(ms / 3600000)
-            const minutes = Math.floor(ms / 60000) % 60
-            const seconds = Math.floor(ms / 1000) % 60
-            return String(hours).padStart(2, "0") + ":" + String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0") + "." + String(ms % 1000).padStart(3, "0")
-        }
+        objectName: "transportClock"
+        text: playbackBridge.formatTime(root.transport ? root.transport.positionSeconds : 0)
         color: Theme.text
         font.pixelSize: 15
         font.family: "monospace"

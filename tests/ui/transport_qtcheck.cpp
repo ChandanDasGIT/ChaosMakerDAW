@@ -1884,6 +1884,23 @@ private slots:
         QVERIFY(texts.contains("F#4"));                              // the note block's name
         QCOMPARE(roll->property("currentNoteText").toString().isEmpty(),false);
     }
+    void transport_clock_shows_the_position_from_the_backend() {
+        auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller.attachProject(&tracks); tracks.addAudioTrack();
+        const auto restore=qScopeGuard([&] { window->setProperty("transport",QVariant::fromValue(EngineController::instance())); });
+        window->setProperty("transport",QVariant::fromValue(&controller));
+        auto* clock=visualItem(window->contentItem(),"transportClock"); QVERIFY(clock);
+        QCOMPARE(clock->property("text").toString(),QString("00:00:00.000"));
+        controller.transportAction("play"); for(int i=0;i<200;++i)io->process();
+        controller.transportAction("pause"); io->process();
+        const double seconds=controller.positionSeconds(); QVERIFY(seconds>0);
+        const qint64 ms=qint64(std::floor(seconds*1000));
+        const QString expected=QString("%1:%2:%3.%4").arg(ms/3600000,2,10,QChar('0')).arg(ms/60000%60,2,10,QChar('0'))
+            .arg(ms/1000%60,2,10,QChar('0')).arg(ms%1000,3,10,QChar('0'));
+        QTRY_COMPARE(clock->property("text").toString(),expected);
+        controller.shutdownSession();
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());
