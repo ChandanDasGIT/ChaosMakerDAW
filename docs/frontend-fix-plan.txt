@@ -40,11 +40,14 @@ PHASE 1 — Broken or misleading behaviour (do first)
 [ ] 1.7  Master fader dB labels are evenly spaced and don't match the real scale.
          MixerPanel.qml:116-129 — position labels with the wrapper's dB→position mapping.
 
-[ ] 1.8  Duplicate shortcuts that may be ambiguous (Qt may then fire neither).
+[x] 1.8  Duplicate shortcuts that may be ambiguous (Qt may then fire neither).
          - Delete / Ctrl+A / Escape: PianoRollView.qml:46-61 vs Timeline.qml:60-113
            (piano roll shortcuts are always enabled; gate them on visibility/focus)
          - Space / R: PlaybackControls.qml:23-37 vs QuickSettings.qml:69-82
          Check these in the running app first.
+         Done: Delete/Ctrl+A/Escape were really ambiguous (Qt logged it) and went to the
+         piano roll even while it was hidden; they now need the piano roll visible and
+         focused. Space/R are not ambiguous: each fires once with QuickSettings open.
 
 [x] 1.9  Buffer size / output device sent twice to the engine.
          frontend/audiodevice/DeviceSettings.qml:30-34, 64-67 — call the wrapper only;

@@ -44,6 +44,12 @@ Window {
         laneCount: trackModel ? trackModel.count : 0
         visible: false
     }
+    // Like the app's docked piano roll: always present in the window, hidden by default.
+    PianoRollView {
+        objectName: "testPianoRoll"
+        x: 0; y: 100; width: 1000; height: 500
+        visible: false
+    }
     Button {
         objectName: "otherFocus"
         y: 52

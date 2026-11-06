@@ -35,10 +35,13 @@ Window {
             floatingPianoRollWindow.raise()
             floatingPianoRollWindow.requestActivate()
             floatingPianoRollView.centerOnMiddleC()
+            floatingPianoRollView.forceActiveFocus()
         } else {
             window.bottomPanelMode = "pianoroll"
             window.mixerVisible = true
             dockedPianoRoll.centerOnMiddleC()
+            // Its editing keys (Delete, Ctrl+A, Esc) need keyboard focus.
+            dockedPianoRoll.forceActiveFocus()
         }
     }
 
