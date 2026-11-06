@@ -41,6 +41,8 @@ public:
     void updatePosition(double seconds, double beats);
 
     QString formattedTime() const;
+    // Any position as the transport clock shows it: HH:MM:SS.mmm (backend formatting).
+    Q_INVOKABLE QString formatTime(double seconds) const { return QString::fromStdString(PlaybackControls::formatTime(seconds)); }
     QString formattedBarsBeats() const;
 
     QString transportMessage() const { return m_transportMessage; }
