@@ -23,7 +23,8 @@ Item {
     property string colorMode: "Velocity"
     property bool keySnap: false
 
-    property real playheadBeat: 0.0
+    // Transport position in clip-relative beats (same origin as the notes); negative before the clip.
+    readonly property real playheadBeat: EngineController.positionBeats - pianoRollBackend.clipStartBeat
     property string currentPosText: "1.1.00"
     property string currentNoteText: "C4 60"
 
@@ -655,8 +656,10 @@ Item {
                         }
                     }
 
-                    // Cyan Playhead Line (matching demo)
+                    // Cyan playhead line; hidden while the transport is before the clip
                     Rectangle {
+                        objectName: "pianoRollPlayhead"
+                        visible: root.playheadBeat >= 0
                         x: root.playheadBeat * root.pixelsPerBeat
                         y: 0
                         width: 1

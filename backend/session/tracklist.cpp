@@ -293,6 +293,12 @@ std::vector<MidiNote> TrackList::clipNotes(int trackId, int clipId) const
     return notes;
 }
 
+double TrackList::clipStartBeat(int trackId, int clipId) const
+{
+    const auto* clip = findClip(trackId, clipId);
+    return clip ? m_project.tempo().beatAt(clip->start) : 0.0;
+}
+
 TrackList::Change TrackList::setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes)
 {
     if (editsLocked()) return {};
