@@ -38,14 +38,14 @@ GridLayout {
             leftPadding: 8
             rightPadding: 20
             text: bufferSelector.currentIndex < 0 ? "—" : bufferSelector.displayText
-            color: bufferSelector.enabled ? Theme.text : "#777b83"
+            color: bufferSelector.enabled ? Theme.text : Theme.settings.deviceTextDisabled
             font.pixelSize: 10
             verticalAlignment: Text.AlignVCenter
         }
         background: Rectangle {
             radius: 5
-            color: bufferSelector.enabled ? "#292b30" : "#222328"
-            border.color: bufferSelector.activeFocus ? Theme.accent : "#444750"
+            color: bufferSelector.enabled ? Theme.settings.deviceBox : Theme.settings.deviceBoxDisabled
+            border.color: bufferSelector.activeFocus ? Theme.accent : Theme.settings.deviceBoxBorder
         }
     }
 
@@ -72,15 +72,15 @@ GridLayout {
             rightPadding: 23
             text: outputSelector.count === 0 ? "No output devices"
                   : outputSelector.currentIndex < 0 ? "Select output device" : outputSelector.displayText
-            color: outputSelector.enabled ? Theme.text : "#777b83"
+            color: outputSelector.enabled ? Theme.text : Theme.settings.deviceTextDisabled
             font.pixelSize: 10
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideMiddle
         }
         background: Rectangle {
             radius: 5
-            color: outputSelector.enabled ? "#292b30" : "#222328"
-            border.color: outputSelector.activeFocus ? Theme.accent : "#444750"
+            color: outputSelector.enabled ? Theme.settings.deviceBox : Theme.settings.deviceBoxDisabled
+            border.color: outputSelector.activeFocus ? Theme.accent : Theme.settings.deviceBoxBorder
         }
     }
 
@@ -109,15 +109,15 @@ GridLayout {
             rightPadding: 23
             text: midiSelector.count === 0 ? "No MIDI inputs"
                   : midiSelector.currentIndex < 0 ? "Auto (MIDI in)" : midiSelector.displayText
-            color: midiSelector.enabled ? Theme.text : "#777b83"
+            color: midiSelector.enabled ? Theme.text : Theme.settings.deviceTextDisabled
             font.pixelSize: 10
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideMiddle
         }
         background: Rectangle {
             radius: 5
-            color: midiSelector.enabled ? "#292b30" : "#222328"
-            border.color: midiSelector.activeFocus ? Theme.accent : "#444750"
+            color: midiSelector.enabled ? Theme.settings.deviceBox : Theme.settings.deviceBoxDisabled
+            border.color: midiSelector.activeFocus ? Theme.accent : Theme.settings.deviceBoxBorder
         }
     }
 }

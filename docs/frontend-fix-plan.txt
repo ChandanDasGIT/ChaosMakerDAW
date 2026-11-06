@@ -10,7 +10,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
-Next: Phase 4 — 4.1c-2 remaining colours (guitar suite, settings, FX panel, EQ, meters).
+Next: Phase 4 — 4.3 shared components (4.1 and 4.2 done).
 Then Phase 5, then Phase 6 (user requests: FX per track type, pro EQ).
 
 Decisions made by the user (keep to them):
@@ -309,7 +309,7 @@ PHASE 3 — Layout and workflow
 
 PHASE 4 — Consistency and maintenance
 -------------------------------------
-[ ] 4.1  Replace the 329 hardcoded hex colours with Theme tokens; merge the piano roll's
+[x] 4.1  Replace the 329 hardcoded hex colours with Theme tokens; merge the piano roll's
          separate palette into Theme.
          Layout (user's choice): frontend/theme/ holds Theme.qml (shared colours, sizes,
          fonts) and one palette file per area, exposed as Theme.<area> (Theme.pianoRoll.x).
@@ -329,7 +329,12 @@ PHASE 4 — Consistency and maintenance
            MixerColors.qml (Theme.mixer), TransportColors.qml (Theme.transport); shared
            chip/accentBg reused, new Theme.recordActiveBg (record button while recording
            and the recording region; merged #633238 into #663238, 3/255).
-         - [ ] 4.1c-2 Guitar suite, device settings, Metronome & Snap, FX panel, EQ, meters.
+         - [done] 4.1c-2 Guitar suite, device settings, Metronome & Snap, FX panel, EQ,
+           meters: 57 colours -> GuitarSuiteColors.qml (Theme.guitarSuite),
+           SettingsColors.qml (Theme.settings), EffectsColors.qml (Theme.effects); buttons
+           reuse chip / Theme.transport; new Theme.meterClipOff; FX panel frame merged into
+           popupBg (3/255). No hex colour is left outside frontend/theme/; the guard test
+           has no exemptions any more (also catches #rgb / #argb).
 [x] 4.2  Use or delete Icons.qml (0 references) and Theme.trackColors (unused; TrackList
          has its own 12-colour palette at TrackList.qml:363) — pick one palette.
          - [done] Icons (user's rules): all icons live in frontend/icons/. Every text icon

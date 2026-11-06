@@ -45,6 +45,7 @@ QtObject {
     readonly property color meterHot:      "#f97316"
     readonly property color meterClip:     "#ef4444"
     readonly property color meterBackdrop: "#141414"
+    readonly property color meterClipOff:  "#393b42"   // clip light while not clipped
 
     // ---- controls & buttons ----
     readonly property color controlBg:       "#2a2a2a"
@@ -73,6 +74,9 @@ QtObject {
     readonly property TimelineColors timeline: TimelineColors {}
     readonly property MixerColors mixer: MixerColors {}
     readonly property TransportColors transport: TransportColors {}
+    readonly property GuitarSuiteColors guitarSuite: GuitarSuiteColors {}
+    readonly property SettingsColors settings: SettingsColors {}
+    readonly property EffectsColors effects: EffectsColors {}
 
     // ---- sizes ----
     readonly property int captionSize: 10
