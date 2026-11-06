@@ -13,6 +13,8 @@
 #include <QScopeGuard>
 #include <QAbstractItemModelTester>
 #include <QJSValue>
+#include <QJsonArray>
+#include <QJsonObject>
 #include "audiodevice/audiodevice.h"
 
 class MultiInputUiDevice final : public AudioDevice {
@@ -1590,6 +1592,48 @@ private slots:
         tracks.setMuted(first,false); tracks.setSolo(first,false);
         QVERIFY(!mute->property("active").toBool()); QVERIFY(!solo->property("active").toBool());
         mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
+    }
+    void mixer_pan_knob_sets_track_pan_resets_to_centre_and_is_saved() {
+        TrackListWrapper tracks; const int first=tracks.addAudioTrack(), second=tracks.addVocalTrack();
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
+        const auto restore=qScopeGuard([&] { mixer->setVisible(false); mixer->setProperty("trackModel",QVariant()); });
+        mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
+        QTest::qWait(30);
+        const QString id=QString::number(first);
+        auto* pan=visualItem(mixer,"mixerPan"+id); QVERIFY(pan);
+        auto* name=visualItem(mixer,"mixerName"+id); QVERIFY(name);
+        const auto readout=[&] { return pan->property("readout").toString(); };
+        QCOMPARE(pan->property("value").toDouble(),0.0); QCOMPARE(readout(),QString("C"));
+        // The knob sits in the name row: it does not take height from the fader.
+        QVERIFY(std::abs(pan->mapToScene(QPointF(0,pan->height()/2)).y()-name->mapToScene(QPointF(0,name->height()/2)).y())<4);
+        // Drag down: only this track pans left, the readout follows.
+        const QPoint centre=pan->mapToScene(QPointF(pan->width()/2,pan->height()/2)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,centre);
+        for(int dy:{10,20,40,60}) QTest::mouseMove(window,centre+QPoint(0,dy),10);
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,centre+QPoint(0,60));
+        const float panned=tracks.project().findTrack(first)->pan;
+        QVERIFY2(panned<-0.2f,qPrintable(QString::number(panned)));
+        QCOMPARE(tracks.project().findTrack(second)->pan,0.0f);
+        QVERIFY(readout().startsWith("L"));
+        // Double-click returns to centre.
+        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,centre,10);
+        QTRY_COMPARE(tracks.project().findTrack(first)->pan,0.0f);
+        QCOMPARE(readout(),QString("C"));
+        // External changes turn the knob; values are clamped.
+        QVERIFY(tracks.setPan(first,0.4)); QCOMPARE(readout(),QString("R40"));
+        QVERIFY(qAbs(pan->property("value").toDouble()-0.4)<1e-6);
+        QVERIFY(tracks.setPan(first,9.0)); QCOMPARE(tracks.project().findTrack(first)->pan,1.0f);
+        // Session state keeps pan; sessions saved before pan existed restore centred.
+        QJsonObject state=tracks.sessionState();
+        TrackListWrapper restored; QString error;
+        QVERIFY2(restored.restoreSessionState(state,error),qPrintable(error));
+        QCOMPARE(restored.project().tracks()[0]->pan,1.0f);
+        auto list=state["tracks"].toArray(); auto track=list[0].toObject(); track.remove("pan"); list[0]=track;
+        state["tracks"]=list;
+        QVERIFY2(restored.restoreSessionState(state,error),qPrintable(error));
+        QCOMPARE(restored.project().tracks()[0]->pan,0.0f);
+        track["pan"]=2.0; list[0]=track; state["tracks"]=list;
+        QVERIFY(!restored.restoreSessionState(state,error));
     }
     void volume_faders_double_click_restores_unity_gain_data() {
         // Track volume lives only in the track list (the mixer strip shows clip gain).

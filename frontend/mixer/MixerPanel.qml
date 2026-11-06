@@ -270,6 +270,7 @@ Rectangle {
                         required property bool isMuted
                         required property bool isSolo
                         required property real volume
+                        required property real pan
                         required property var clips
                         readonly property var levels: root.levels[String(trackId)] ?? ({})
                         property real channelWidth: panelWrapper.defaultStripWidth
@@ -307,14 +308,62 @@ Rectangle {
                             anchors.fill: parent
                             anchors.margins: 10
                             spacing: 6
-                            Text {
-                                objectName: "mixerName" + strip.trackId
-                                text: strip.name
-                                color: Theme.text
-                                font.pixelSize: Theme.captionSize
-                                font.bold: true
-                                elide: Text.ElideRight
+                            RowLayout {
                                 Layout.fillWidth: true
+                                spacing: 4
+                                Text {
+                                    objectName: "mixerName" + strip.trackId
+                                    text: strip.name
+                                    color: Theme.text
+                                    font.pixelSize: Theme.captionSize
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+                                // Track pan knob (in the name row so the fader keeps its height):
+                                // drag up/down, double-click to centre; value in the tooltip.
+                                Dial {
+                                    id: panKnob
+                                    objectName: "mixerPan" + strip.trackId
+                                    implicitWidth: 18; implicitHeight: 18
+                                    from: panelWrapper.minPan; to: panelWrapper.maxPan; stepSize: panelWrapper.panStep
+                                    inputMode: Dial.Vertical
+                                    value: strip.pan
+                                    readonly property string readout: panelWrapper.formatPan(value)
+                                    onMoved: panelWrapper.setPan(strip.trackId, value)
+                                    background: Rectangle {
+                                        radius: width / 2
+                                        color: panKnob.pressed ? Theme.controlBgActive : "#303030"
+                                        border.color: panKnob.readout === "C" ? "#4a4a4a" : Theme.accent
+                                    }
+                                    handle: Rectangle {
+                                        // Pointer from the centre; straight up is centre pan
+                                        x: panKnob.background.width / 2 - width / 2
+                                        y: 2
+                                        width: 2; height: panKnob.background.height / 2 - 2
+                                        radius: 1
+                                        color: panKnob.readout === "C" ? Theme.text : Theme.accent
+                                        transform: Rotation {
+                                            origin.x: 1; origin.y: panKnob.background.height / 2 - 2
+                                            angle: panKnob.angle
+                                        }
+                                    }
+                                    TapHandler {
+                                        acceptedButtons: Qt.LeftButton
+                                        // Apply after the dial handles the mouse release.
+                                        onDoubleTapped: Qt.callLater(() => panelWrapper.resetPan(strip.trackId))
+                                    }
+                                    ToolTip.visible: hovered || pressed
+                                    ToolTip.text: panelWrapper.formatPanTooltip(value)
+                                    ToolTip.delay: pressed ? 0 : 450
+                                    Accessible.name: "Pan " + readout
+                                }
+                                Binding {
+                                    target: panKnob
+                                    property: "value"
+                                    value: strip.pan
+                                    when: !panKnob.pressed
+                                }
                             }
                             Text {
                                 objectName: "mixerClipGainText" + strip.trackId

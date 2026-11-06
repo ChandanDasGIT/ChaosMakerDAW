@@ -312,3 +312,19 @@ TEST(tracklist, removing_a_track_can_be_undone_and_redone)
     const int d = tracks.addAudioTrack();
     CHECK(d != b);
 }
+
+TEST(tracklist, set_pan_clamps_and_reports_changes)
+{
+    TrackList tracks;
+    const int id = tracks.addAudioTrack();
+    CHECK(tracks.project().findTrack(id)->pan == 0.0f);
+    const auto changed = tracks.setPan(id, -0.4);
+    CHECK(changed.accepted && changed.changed);
+    CHECK_NEAR(tracks.project().findTrack(id)->pan, -0.4f, 1e-6);
+    const auto same = tracks.setPan(id, -0.4);
+    CHECK(same.accepted && !same.changed);
+    CHECK(tracks.setPan(id, 3.0).changed);
+    CHECK(tracks.project().findTrack(id)->pan == 1.0f);
+    CHECK(!tracks.setPan(id, std::numeric_limits<double>::quiet_NaN()).accepted);
+    CHECK(!tracks.setPan(id + 100, 0.5).accepted);
+}

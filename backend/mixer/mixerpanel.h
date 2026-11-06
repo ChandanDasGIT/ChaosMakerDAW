@@ -2,6 +2,7 @@
 
 #include "core/valueformat.h"
 #include "dsp/levelscale.h"
+#include "dsp/panlaw.h"
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -14,6 +15,8 @@ inline constexpr double minVolumeGain = 0.0;
 inline constexpr double maxVolumeGain = 2.0;
 inline constexpr double defaultVolumeGain = 1.0;
 inline constexpr double volumeStep = 0.01;
+
+inline constexpr double panStep = 0.01;
 
 inline constexpr double minClipGainDb = -24.0;
 inline constexpr double maxClipGainDb = 24.0;
@@ -40,6 +43,9 @@ std::string formatVolumeTooltip(double gain);
 std::string formatMasterVolumeTooltip(double gain);
 std::string formatClipGainDb(double gainDb);
 std::string formatClipGainTooltip(double gainDb);
+// Pan readout: "C", "L30", "R100" (whole percent; values that round to 0 are "C").
+std::string formatPan(double pan);
+std::string formatPanTooltip(double pan);
 std::string formatMuteTooltip(bool muted);
 std::string formatMasterMuteTooltip(bool muted);
 std::string formatSoloTooltip(bool solo);

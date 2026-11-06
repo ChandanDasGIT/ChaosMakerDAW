@@ -83,6 +83,25 @@ std::string formatClipGainTooltip(double gainDb)
     return "Clip gain " + val + "; double-click for 0 dB";
 }
 
+namespace {
+int panPercent(double pan) { return static_cast<int>(std::lround(panlaw::clampPan(pan) * 100.0)); }
+}
+
+std::string formatPan(double pan)
+{
+    const int percent = panPercent(pan);
+    if (percent == 0) return "C";
+    return (percent < 0 ? "L" : "R") + std::to_string(std::abs(percent));
+}
+
+std::string formatPanTooltip(double pan)
+{
+    const int percent = panPercent(pan);
+    if (percent == 0) return "Pan centre; double-click to centre";
+    return "Pan " + std::to_string(std::abs(percent)) + "% " + (percent < 0 ? "left" : "right")
+        + "; double-click to centre";
+}
+
 std::string formatMuteTooltip(bool muted)
 {
     return muted ? "Mute enabled" : "Mute disabled";

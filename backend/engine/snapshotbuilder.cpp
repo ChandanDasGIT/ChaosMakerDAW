@@ -1,4 +1,5 @@
 #include "engine/snapshotbuilder.h"
+#include "dsp/panlaw.h"
 
 SnapshotBuilder::Context SnapshotBuilder::Context::fromProject(const Project& project)
 {
@@ -13,6 +14,7 @@ SnapshotBuilder::Context SnapshotBuilder::Context::fromProject(const Project& pr
         info.kind = track->kind;
         info.type = track->type;
         info.volume = track->volume;
+        info.pan = track->pan;
         info.solo = track->solo;
         info.muted = track->muted;
         info.recordArmed = track->recordArmed;
@@ -143,6 +145,9 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
         TrackRender render;
         render.trackId = track.id;
         render.gain = track.volume;
+        const auto pan = panlaw::balance(track.pan);
+        render.panLeft = pan.left;
+        render.panRight = pan.right;
         render.muted = track.muted;
         render.soloed = track.solo;
 

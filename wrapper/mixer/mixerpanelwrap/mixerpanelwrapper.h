@@ -21,6 +21,10 @@ class MixerPanelWrapper : public QObject {
     Q_PROPERTY(double maxClipGain READ maxClipGain CONSTANT)
     Q_PROPERTY(double defaultClipGain READ defaultClipGain CONSTANT)
     Q_PROPERTY(double clipGainStep READ clipGainStep CONSTANT)
+    Q_PROPERTY(double minPan READ minPan CONSTANT)
+    Q_PROPERTY(double maxPan READ maxPan CONSTANT)
+    Q_PROPERTY(double defaultPan READ defaultPan CONSTANT)
+    Q_PROPERTY(double panStep READ panStep CONSTANT)
     Q_PROPERTY(double minStripWidth READ minStripWidth CONSTANT)
     Q_PROPERTY(double maxStripWidth READ maxStripWidth CONSTANT)
     Q_PROPERTY(double defaultStripWidth READ defaultStripWidth CONSTANT)
@@ -43,6 +47,11 @@ public:
     double defaultClipGain() const noexcept { return mixer::defaultClipGainDb; }
     double clipGainStep() const noexcept { return mixer::clipGainStep; }
 
+    double minPan() const noexcept { return panlaw::minPan; }
+    double maxPan() const noexcept { return panlaw::maxPan; }
+    double defaultPan() const noexcept { return panlaw::centre; }
+    double panStep() const noexcept { return mixer::panStep; }
+
     double minStripWidth() const noexcept { return mixer::minStripWidth; }
     double maxStripWidth() const noexcept { return mixer::maxStripWidth; }
     double defaultStripWidth() const noexcept { return mixer::defaultStripWidth; }
@@ -61,6 +70,8 @@ public:
     Q_INVOKABLE double clipGainOf(const QVariantList& trackClips, int clipId) const;
     Q_INVOKABLE QString formatClipGain(double gainDb) const;
     Q_INVOKABLE QString formatClipGainTooltip(double gainDb) const;
+    Q_INVOKABLE QString formatPan(double pan) const;
+    Q_INVOKABLE QString formatPanTooltip(double pan) const;
     Q_INVOKABLE QString formatMuteTooltip(bool muted) const;
     Q_INVOKABLE QString formatMasterMuteTooltip(bool muted) const;
     Q_INVOKABLE QString formatSoloTooltip(bool solo) const;
@@ -69,6 +80,8 @@ public:
     Q_INVOKABLE void resetVolume(int trackId);
     Q_INVOKABLE void setMasterVolume(double volume);
     Q_INVOKABLE void resetMasterVolume();
+    Q_INVOKABLE void setPan(int trackId, double pan);
+    Q_INVOKABLE void resetPan(int trackId);
     // continueEdit: later steps of the same fader drag join the drag's single undo step.
     Q_INVOKABLE void setClipGain(int trackId, int clipId, double gainDb, bool continueEdit = false);
     Q_INVOKABLE void resetClipGain(int trackId, int clipId);

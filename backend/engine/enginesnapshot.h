@@ -33,6 +33,7 @@ struct TrackRender {
     std::shared_ptr<TrackMeters> meters;
     int trackId = 0;
     float gain = 1.0f;
+    float panLeft = 1.0f, panRight = 1.0f;                // pan law per channel, times gain
     bool muted = false, soloed = false;
     std::vector<ClipRender> clips;                        // sorted by start
     std::vector<NoteRender> notes;                        // sorted by on

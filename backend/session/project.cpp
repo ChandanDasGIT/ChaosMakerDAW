@@ -1,4 +1,5 @@
 #include "project.h"
+#include "dsp/panlaw.h"
 #include "instruments/instrumentcatalog.h"
 
 #include <algorithm>
@@ -176,6 +177,15 @@ bool Project::setTrackVolume(int id, float volume)
     if (!track || !std::isfinite(volume))
         return false;
     track->volume = std::clamp(volume, 0.0f, 2.0f);
+    return true;
+}
+
+bool Project::setTrackPan(int id, float pan)
+{
+    auto* track = findTrack(id);
+    if (!track || !std::isfinite(pan))
+        return false;
+    track->pan = static_cast<float>(panlaw::clampPan(pan));
     return true;
 }
 

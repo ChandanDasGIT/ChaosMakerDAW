@@ -105,3 +105,16 @@ TEST(mixerpanel, clip_gain_fader_targets_the_selected_clip_else_the_first)
     CHECK(mixer::chooseTargetClip({4, 7, 9}, 9) == 9);            // selected clip on this track
     CHECK(mixer::chooseTargetClip({4, 7, 9}, 12) == 4);           // selected clip is elsewhere
 }
+
+TEST(mixerpanel, pan_readout_and_tooltip)
+{
+    CHECK(mixer::formatPan(0.0) == "C");
+    CHECK(mixer::formatPan(0.004) == "C");                       // rounds to centre
+    CHECK(mixer::formatPan(-0.3) == "L30");
+    CHECK(mixer::formatPan(1.0) == "R100");
+    CHECK(mixer::formatPan(7.0) == "R100");                      // clamped
+    CHECK(mixer::formatPan(std::numeric_limits<double>::quiet_NaN()) == "C");
+    CHECK(mixer::formatPanTooltip(0.0) == "Pan centre; double-click to centre");
+    CHECK(mixer::formatPanTooltip(-0.25) == "Pan 25% left; double-click to centre");
+    CHECK(mixer::formatPanTooltip(0.5) == "Pan 50% right; double-click to centre");
+}

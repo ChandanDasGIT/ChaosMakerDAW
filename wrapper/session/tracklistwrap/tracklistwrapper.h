@@ -52,7 +52,8 @@ public:
         LiveInputRole,
         RecordDryRole,
         RecordsWithFxRole,
-        ColourRole
+        ColourRole,
+        PanRole
     };
     Q_ENUM(Role)
 
@@ -131,6 +132,8 @@ public:
     Q_INVOKABLE bool loadEqPreset(int trackId, const QUrl& file);
     Q_INVOKABLE bool setTrackInputPort(int trackId, const QString& port);
     Q_INVOKABLE bool setVolume(int trackId, double volume);
+    // -1 left .. 0 centre .. +1 right; clamped by the backend.
+    Q_INVOKABLE bool setPan(int trackId, double pan);
     double masterVolume() const { return m_state.masterVolume(); }
     Q_INVOKABLE bool setMasterVolume(double volume);
     Q_INVOKABLE void resetMasterVolume();

@@ -41,6 +41,7 @@ struct Track {
     bool recordDry = false;
     std::string inputPort;
     float volume = 1.0f;
+    float pan = 0.0f; // -1 left .. 0 centre .. +1 right (panlaw::balance)
     std::array<float, 10> eqGainDb{};
     std::vector<AudioClip> audioClips;
 
@@ -63,6 +64,7 @@ public:
     bool setTrackRecordArmed(int id, bool enabled);
     bool setTrackInputPort(int id, const std::string& port);
     bool setTrackVolume(int id, float volume);
+    bool setTrackPan(int id, float pan);
     bool setTrackEqBand(int id, int band, float gainDb);
     int addAudioClip(int trackId, AudioClip clip);
     std::vector<int> addAudioClips(const std::vector<std::pair<int, AudioClip>>& clips);
