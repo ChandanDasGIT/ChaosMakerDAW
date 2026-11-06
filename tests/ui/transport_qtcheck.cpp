@@ -642,11 +642,9 @@ private slots:
         // Areas not converted yet are listed here; the list shrinks as each area is done.
         const QStringList notConvertedYet{
             "frontend/instruments/guitar/GuitarSuiteEditor.qml", "frontend/instruments/guitar/GuitarSuitePanel.qml",
-            "frontend/timeline/Timeline.qml", "frontend/mixer/MixerPanel.qml",
             "frontend/audiodevice/DeviceSettings.qml", "frontend/settings/QuickSettings.qml",
             "frontend/plugins/TrackEffectsPanel.qml", "frontend/plugins/eq/Tenbandeq.qml",
-            "frontend/engine/PlaybackControls.qml", "frontend/tempo/TempoEditor.qml", "frontend/tempo/MeterEditor.qml",
-            "frontend/transportbar/TransportBar.qml", "frontend/dsp/StereoLevelMeter.qml", "frontend/dsp/LevelMeter.qml"};
+            "frontend/dsp/StereoLevelMeter.qml", "frontend/dsp/LevelMeter.qml"};
         const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
         const QRegularExpression hex(QStringLiteral("\"#[0-9a-fA-F]{6,8}\""));
         QStringList offenders;
@@ -672,6 +670,8 @@ private slots:
         auto* trackList=qvariant_cast<QObject*>(theme->property("trackList")); QVERIFY(trackList);
         QCOMPARE(trackList->property("rowSelected").value<QColor>(),QColor("#2a343d"));
         QCOMPARE(theme->property("trackColors").toList().size(),12);   // the palette the picker offers
+        for(const char* area:{"timeline","mixer","transport"})
+            QVERIFY2(qvariant_cast<QObject*>(theme->property(area)),area);
     }
     void layout_sizes_are_saved_and_restored_between_sessions() {
         QSettings qs;

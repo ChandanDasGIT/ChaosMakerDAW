@@ -373,7 +373,7 @@ Item {
         flickableDirection: Flickable.HorizontalFlick
         interactive: false
 
-        Rectangle { x: 0; y: 0; width: root.contentWidth; height: root.rulerHeight; color: "#252525" }
+        Rectangle { x: 0; y: 0; width: root.contentWidth; height: root.rulerHeight; color: Theme.timeline.ruler }
         Repeater {
             model: root.visibleBarCount
             delegate: Item {
@@ -381,7 +381,7 @@ Item {
                 y: 0
                 width: root.barWidth
                 height: scroll.contentHeight
-                Rectangle { width: 1; height: parent.height; color: "#4a4a4a" }
+                Rectangle { width: 1; height: parent.height; color: Theme.timeline.rulerBarLine }
                 Text {
                     x: 8; y: 11
                     text: editor.barLabel(root.firstVisibleBar + index * root.barLabelStride)
@@ -399,8 +399,8 @@ Item {
                 y: root.rulerHeight + index * root.laneHeight
                 width: root.contentWidth
                 height: root.laneHeight
-                color: isSelected ? "#232932" : (index % 2 ? "#1c1c1c" : "#202020")
-                border.color: isSelected ? "#3a4454" : "#303030"
+                color: isSelected ? Theme.timeline.laneSelected : (index % 2 ? Theme.timeline.laneAlt : Theme.timeline.lane)
+                border.color: isSelected ? Theme.timeline.laneSelectedBorder : Theme.timeline.laneBorder
             }
         }
 
@@ -426,7 +426,7 @@ Item {
                 y: root.rulerHeight
                 width: 1
                 height: scroll.contentHeight - root.rulerHeight
-                color: editor.isBarLine(beatNumber * root.gridStepBeats, editor.beatsPerBar) ? "#454545" : "#303030"
+                color: editor.isBarLine(beatNumber * root.gridStepBeats, editor.beatsPerBar) ? Theme.timeline.gridBar : Theme.timeline.gridBeat
                 z: 1
             }
         }
@@ -460,7 +460,7 @@ Item {
                 Text {
                     anchors.left: parent.left; anchors.leftMargin: 10
                     anchors.top: parent.top; anchors.topMargin: 8
-                    text: label + (clipItem.effectsPrinted ? "" : " · Dry"); color: "#f0f0f0"; font.pixelSize: 11
+                    text: label + (clipItem.effectsPrinted ? "" : " · Dry"); color: Theme.timeline.clipLabel; font.pixelSize: 11
                     elide: Text.ElideRight
                     width: Math.max(0, parent.width - 20)
                 }
@@ -479,7 +479,7 @@ Item {
                     onPaint: {
                         const ctx = getContext("2d")
                         ctx.clearRect(0, 0, width, height)
-                        ctx.strokeStyle = "#d6edf0"
+                        ctx.strokeStyle = Theme.timeline.waveform
                         ctx.lineWidth = 1
                         ctx.beginPath()
                         for (let i = 0; i < peaks.length; ++i) {
@@ -615,7 +615,7 @@ Item {
                 }
                 Rectangle {
                     anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
-                    width: 8; radius: 3; color: leftTrim.containsMouse ? Theme.accent : "#ffffff24"
+                    width: 8; radius: 3; color: leftTrim.containsMouse ? Theme.accent : Theme.timeline.trimHandle
                     MouseArea {
                         id: leftTrim
                         objectName: "clipLeftTrim" + clipItem.clipId
@@ -646,7 +646,7 @@ Item {
                     anchors.bottom: parent.bottom
                     anchors.right: parent.right
                     width: 8
-                    color: resizeArea.containsMouse ? Theme.accent : "#ffffff24"
+                    color: resizeArea.containsMouse ? Theme.accent : Theme.timeline.trimHandle
                     radius: 3
                     MouseArea {
                         id: resizeArea
@@ -721,7 +721,7 @@ Item {
             width: Math.abs(root.selectionEndX-root.selectionStartX)
             height: Math.max(1,Math.abs(root.selectionEndY-root.selectionStartY))
             visible: root.clipSelectionDrag && root.selecting && width>2
-            color: "#3860cdff"; border.color: Theme.accent; z: 2
+            color: Theme.timeline.selectionBox; border.color: Theme.accent; z: 2
         }
         Rectangle {
             objectName: "timelineTimeRange"
@@ -729,7 +729,7 @@ Item {
             width: Math.max(0,root.rangeEndBeat-root.rangeStartBeat)*root.beatWidth
             height: scroll.contentHeight-root.rulerHeight
             visible: width>0
-            color: "#2858b7b1"; border.color: Theme.accent; z: 2
+            color: Theme.timeline.timeRange; border.color: Theme.accent; z: 2
         }
 
         Repeater {
@@ -742,7 +742,7 @@ Item {
             y: root.rulerHeight + (root.trackModel ? root.trackModel.indexOfTrack(modelData) : 0) * root.laneHeight + 8
             width: Math.max(2, root.playhead - x)
             height: root.laneHeight - 18
-            color: "#663238"; border.color: Theme.record; radius: 4; z: 3
+            color: Theme.recordActiveBg; border.color: Theme.record; radius: 4; z: 3
             Text { anchors.left: parent.left; anchors.leftMargin: 8; anchors.top: parent.top; anchors.topMargin: 8; text: "Recording…"; color: Theme.text }
           }
         }

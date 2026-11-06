@@ -30,6 +30,7 @@ QtObject {
     readonly property color selectionBg:   "#24426b"
     readonly property color accentBg:      "#203a45"   // background of a lit (accent) toggle
     readonly property color recordBg:      "#a9363c"   // armed record / remove-on-hover background
+    readonly property color recordActiveBg:"#663238"   // record button while recording, recording region
     // Mute is orange and solo yellow everywhere (red is kept for recording).
     readonly property color muteText:      "#ffc08a"
     readonly property color muteBg:        "#653f28"
@@ -69,6 +70,9 @@ QtObject {
     // ---- area palettes (one file each in frontend/theme/) ----
     readonly property PianoRollColors pianoRoll: PianoRollColors {}
     readonly property TrackListColors trackList: TrackListColors {}
+    readonly property TimelineColors timeline: TimelineColors {}
+    readonly property MixerColors mixer: MixerColors {}
+    readonly property TransportColors transport: TransportColors {}
 
     // ---- sizes ----
     readonly property int captionSize: 10
