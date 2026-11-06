@@ -47,11 +47,12 @@ Window {
 
     // Layout sizes start from the saved preferences (AppSettings); a splitter drag changes them
     // live and saves once on release.
-    property real trackListWidth: topBar.appSettings.trackListWidth
+    readonly property var layoutSettings: topBar.appSettings.bridge // AppSettingsWrapper
+    property real trackListWidth: layoutSettings.trackListWidth
     property bool mixerVisible: true
-    property real mixerHeight: topBar.appSettings.mixerHeight
+    property real mixerHeight: layoutSettings.mixerHeight
     // The piano roll needs more room than the mixer, so it keeps its own dock height.
-    property real pianoRollDockHeight: topBar.appSettings.pianoRollDockHeight
+    property real pianoRollDockHeight: layoutSettings.pianoRollDockHeight
     readonly property bool pianoRollDocked: window.bottomPanelMode === "pianoroll"
 
     // Which bottom panel / piano roll is on screen (view state only).
@@ -151,10 +152,10 @@ Window {
                         if (pressed) {
                             let pt = mapToItem(window.contentItem, mouse.x, mouse.y)
                             let diff = pt.x - startGlobalX
-                            window.trackListWidth = topBar.appSettings.clampTrackListWidth(startWidth + diff)
+                            window.trackListWidth = window.layoutSettings.clampTrackListWidth(startWidth + diff)
                         }
                     }
-                    onReleased: topBar.appSettings.trackListWidth = window.trackListWidth
+                    onReleased: window.layoutSettings.trackListWidth = window.trackListWidth
                 }
             }
             Timeline {
@@ -217,13 +218,13 @@ Window {
                             const maxH = Math.max(minH, window.height - 220)
                             window.pianoRollDockHeight = Math.max(minH, Math.min(maxH, startHeight + diff))
                         } else {
-                            window.mixerHeight = topBar.appSettings.clampMixerHeight(startHeight + diff)
+                            window.mixerHeight = window.layoutSettings.clampMixerHeight(startHeight + diff)
                         }
                     }
                 }
                 onReleased: {
-                    if (window.pianoRollDocked) topBar.appSettings.pianoRollDockHeight = window.pianoRollDockHeight
-                    else topBar.appSettings.mixerHeight = window.mixerHeight
+                    if (window.pianoRollDocked) window.layoutSettings.pianoRollDockHeight = window.pianoRollDockHeight
+                    else window.layoutSettings.mixerHeight = window.mixerHeight
                 }
             }
         }

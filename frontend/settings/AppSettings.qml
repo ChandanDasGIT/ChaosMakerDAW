@@ -14,6 +14,8 @@ ToolButton {
     onClicked: settingsMenu.visible ? settingsMenu.close() : settingsMenu.open()
 
     readonly property alias pianoRollPresentation: appSettingsBridge.pianoRollPresentation
+    // The app's one AppSettingsWrapper, for settings the window uses directly (layout sizes).
+    readonly property alias bridge: appSettingsBridge
 
     AppSettingsWrapper {
         id: appSettingsBridge
