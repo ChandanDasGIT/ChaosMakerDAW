@@ -1,0 +1,76 @@
+import QtQuick
+import QtQuick.Controls
+
+// Time signature input: numerator / denominator. Invalid input falls back to the current value.
+Rectangle {
+    id: root
+    property int numerator: 4
+    property int denominator: 4
+    signal numeratorEdited(int value)
+    signal denominatorEdited(int value)
+    implicitWidth: 87
+    implicitHeight: 29
+    radius: 6
+    color: "#191a1e"
+    border.color: "#3a3d45"
+
+    Row {
+        anchors.centerIn: parent
+        spacing: 3
+        TextField {
+            id: numeratorField
+            objectName: "meterNumerator"
+            width: 32; height: 23
+            text: String(root.numerator)
+            color: Theme.text
+            font.pixelSize: 12; font.bold: true
+            horizontalAlignment: TextInput.AlignHCenter
+            verticalAlignment: TextInput.AlignVCenter
+            selectByMouse: true
+            inputMethodHints: Qt.ImhDigitsOnly
+            validator: IntValidator { bottom: 1; top: 2147483647 }
+            Accessible.name: "Time signature numerator"
+            background: Rectangle {
+                radius: 5
+                color: numeratorField.activeFocus ? "#282b32" : "transparent"
+                border.color: numeratorField.activeFocus ? Theme.accent : "transparent"
+            }
+            onEditingFinished: {
+                if (acceptableInput && Number(text) > 0)
+                    root.numeratorEdited(Number(text))
+                else
+                    text = String(root.numerator)
+            }
+        }
+        Text { text: "/"; anchors.verticalCenter: parent.verticalCenter; color: "#7e838d"; font.pixelSize: 13 }
+        TextField {
+            id: denominatorField
+            objectName: "meterDenominator"
+            width: 32; height: 23
+            text: String(root.denominator)
+            color: Theme.text
+            font.pixelSize: 12; font.bold: true
+            horizontalAlignment: TextInput.AlignHCenter
+            verticalAlignment: TextInput.AlignVCenter
+            selectByMouse: true
+            inputMethodHints: Qt.ImhDigitsOnly
+            validator: IntValidator { bottom: 1; top: 2147483647 }
+            Accessible.name: "Time signature denominator"
+            background: Rectangle {
+                radius: 5
+                color: denominatorField.activeFocus ? "#282b32" : "transparent"
+                border.color: denominatorField.activeFocus ? Theme.accent : "transparent"
+            }
+            onEditingFinished: {
+                if (acceptableInput && Number(text) > 0)
+                    root.denominatorEdited(Number(text))
+                else
+                    text = String(root.denominator)
+            }
+        }
+    }
+
+    // Typed text breaks the binding; put the project value back when it changes.
+    onNumeratorChanged: numeratorField.text = String(root.numerator)
+    onDenominatorChanged: denominatorField.text = String(root.denominator)
+}

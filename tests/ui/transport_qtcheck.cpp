@@ -73,7 +73,12 @@ private slots:
         auto* controller=EngineController::instance(); controller->setMeter(4,4);
         auto* button=visualItem(window->contentItem(),"quickSettingsButton"); QVERIFY(button); QVERIFY(button->isVisible());
         auto* popup=window->findChild<QObject*>("quickSettingsPopup"); QVERIFY(popup);
-        QVERIFY(!popup->property("visible").toBool()); QVERIFY(!field->isVisible());
+        QVERIFY(!popup->property("visible").toBool());
+        // BPM and time signature sit on the transport bar itself, not in the popup.
+        QVERIFY(field->isVisible());
+        auto* numerator=visualItem(window->contentItem(),"meterNumerator");
+        auto* denominator=visualItem(window->contentItem(),"meterDenominator");
+        QVERIFY(numerator); QVERIFY(denominator); QVERIFY(numerator->isVisible()); QVERIFY(denominator->isVisible());
         QVERIFY(button->property("checkable").toBool()); QVERIFY(!button->property("checked").toBool());
         click(button); QTRY_VERIFY(popup->property("visible").toBool()); QTest::qWait(20);
         QVERIFY(button->property("checked").toBool());
@@ -84,18 +89,20 @@ private slots:
             QVERIFY(std::abs(center.y()-window->height()/2.0)<1);
         };
         verifyCenter();
+        // The popup holds metronome, count-in and snap grid only.
+        QVERIFY(visualItem(content,"metronomeToggle"));
+        QVERIFY(visualItem(content,"metronomeVolume"));
+        QVERIFY(visualItem(content,"countInToggle"));
+        QVERIFY(visualItem(content,"snapGridSelector"));
+        QVERIFY(!visualItem(content,"bpmField")); QVERIFY(!visualItem(content,"meterNumerator"));
         click(button); QTRY_VERIFY(!popup->property("visible").toBool());
         QVERIFY(!button->property("checked").toBool());
         click(button); QTRY_VERIFY(popup->property("visible").toBool()); QVERIFY(button->property("checked").toBool());
         const QSize original=window->size(); window->resize(1000,800); QTest::qWait(30); verifyCenter();
         window->resize(original); QTest::qWait(30); verifyCenter();
-        QVERIFY(field->isVisible());
-        auto* numerator=visualItem(window->contentItem(),"meterNumerator");
-        auto* denominator=visualItem(window->contentItem(),"meterDenominator");
-        QVERIFY(numerator); QVERIFY(denominator);
-        QVERIFY(visualItem(window->contentItem(),"metronomeToggle"));
-        QVERIFY(visualItem(window->contentItem(),"metronomeVolume"));
-        QVERIFY(visualItem(window->contentItem(),"countInToggle"));
+        auto* close=visualItem(window->contentItem(),"closeQuickSettings"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!popup->property("visible").toBool()); QVERIFY(!button->property("checked").toBool());
+        // Inline meter and BPM editing, with the popup closed.
         click(numerator); QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
         QTest::keyClick(window,Qt::Key_3); QTest::keyClick(window,Qt::Key_Return);
         QCOMPARE(controller->numerator(),3);
@@ -103,18 +110,36 @@ private slots:
         QTest::keyClick(window,Qt::Key_8); QTest::keyClick(window,Qt::Key_Return);
         QCOMPARE(controller->denominator(),8);
         click(field); QTest::qWait(10); QTest::keyClick(window,Qt::Key_9); QTest::keyClick(window,Qt::Key_5);
-        auto* close=visualItem(window->contentItem(),"closeQuickSettings"); QVERIFY(close); click(close);
-        QTRY_VERIFY(!popup->property("visible").toBool()); QCOMPARE(controller->bpm(),95.0);
-        QVERIFY(!button->property("checked").toBool());
-        click(button); QTRY_VERIFY(popup->property("visible").toBool()); QCOMPARE(field->property("text").toString(),QString("95"));
+        auto* other=window->findChild<QQuickItem*>("otherFocus"); QVERIFY(other); click(other);
+        QCOMPARE(controller->bpm(),95.0); QCOMPARE(field->property("text").toString(),QString("95"));
+        // Escape and an outside click both close the popup.
+        click(button); QTRY_VERIFY(popup->property("visible").toBool());
         QTest::keyClick(window,Qt::Key_Escape); QTRY_VERIFY(!popup->property("visible").toBool());
         QVERIFY(!button->property("checked").toBool());
         click(button); QTRY_VERIFY(popup->property("visible").toBool());
-        auto* other=window->findChild<QQuickItem*>("otherFocus"); QVERIFY(other); click(other);
-        QTRY_VERIFY(!popup->property("visible").toBool()); QVERIFY(!field->isVisible());
+        click(other);
+        QTRY_VERIFY(!popup->property("visible").toBool());
         QVERIFY(!button->property("checked").toBool());
         QVERIFY(other->hasActiveFocus());
         controller->setMeter(4,4);
+    }
+    void transport_bars_beats_readout_follows_position_and_meter() {
+        auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller.attachProject(&tracks); tracks.addAudioTrack();
+        const auto restore=qScopeGuard([&] { window->setProperty("transport",QVariant::fromValue(EngineController::instance())); });
+        window->setProperty("transport",QVariant::fromValue(&controller));
+        auto* readout=visualItem(window->contentItem(),"transportBarsBeats"); QVERIFY(readout); QVERIFY(readout->isVisible());
+        controller.setMeter(4,4); controller.seekBeat(0); io->process();
+        QTRY_COMPARE(readout->property("text").toString(),QString("1.1.00"));
+        controller.seekBeat(5.5); io->process();
+        QTRY_COMPARE(readout->property("text").toString(),QString("2.2.50"));
+        // 6/8 counts eighth-note beats: 2.75 quarter notes is beat 6 and a half of bar 1.
+        controller.setMeter(6,8); controller.seekBeat(2.75); io->process();
+        QTRY_COMPARE(readout->property("text").toString(),QString("1.6.50"));
+        controller.seekBeat(3.0); io->process();
+        QTRY_COMPARE(readout->property("text").toString(),QString("2.1.00"));
+        controller.shutdownSession();
     }
     void recording_count_in_uses_one_bar_and_can_be_cancelled() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
@@ -2007,7 +2032,6 @@ private:
         QTRY_VERIFY(popup->property("visible").toBool()); QTest::qWait(20);
     }
     void click(QQuickItem* item) {
-        if(item==field || item->objectName()=="bpmIncrease" || item->objectName()=="bpmDecrease")openQuickSettings();
         QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,item->mapToScene(QPointF(item->width()/2,item->height()/2)).toPoint());
     }
     std::unique_ptr<QQmlApplicationEngine> engine;

@@ -1,5 +1,7 @@
 #include "engine/playbackcontrols.h"
 
+#include "core/valueformat.h"
+
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -256,13 +258,7 @@ std::string PlaybackControls::formatBarsBeats(double beats, int numerator, int d
     if (numerator <= 0) numerator = 4;
     if (denominator <= 0) denominator = 4;
 
-    double barLength = numerator * 4.0 / denominator;
-    int bar = static_cast<int>(std::floor(beats / barLength)) + 1;
-    double remBeats = beats - (bar - 1) * barLength;
-    int beatInBar = static_cast<int>(std::floor(remBeats)) + 1;
-    int tick = static_cast<int>(std::floor((remBeats - std::floor(remBeats)) * 100.0));
-
-    std::ostringstream ss;
-    ss << bar << "." << beatInBar << "." << std::setfill('0') << std::setw(2) << tick;
-    return ss.str();
+    // Beats are quarter notes; the readout counts beats in the meter's own unit (6/8 -> eighths).
+    const double beatUnit = 4.0 / denominator;
+    return valueformat::barBeatPosition(beats, numerator * beatUnit, beatUnit);
 }
