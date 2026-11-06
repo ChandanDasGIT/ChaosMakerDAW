@@ -1446,7 +1446,10 @@ private slots:
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks); const int track=tracks.addAudioTrack(); tracks.addClipAtBeat(track,0,4);
         auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top); top->setProperty("trackModel",QVariant::fromValue(&tracks));
-        auto* button=visualItem(window->contentItem(),"projectNew"); QVERIFY(button); click(button);
+        // Use the real File > New path (a mouse click cannot reliably hit the 1x1 test hook).
+        auto* fileButton=visualItem(window->contentItem(),"fileMenuButton"); QVERIFY(fileButton); click(fileButton);
+        auto* fileMenu=window->findChild<QObject*>("fileMenu"); QVERIFY(fileMenu); QTRY_VERIFY(fileMenu->property("visible").toBool());
+        auto* newItem=visualItem(window->contentItem(),"fileNewItem"); QVERIFY(newItem); click(newItem);
         auto* dialog=window->findChild<QObject*>("unsavedProjectChanges"); QVERIFY(dialog); QTRY_VERIFY(dialog->property("visible").toBool());
         QVERIFY(QMetaObject::invokeMethod(dialog,"reject")); QCOMPARE(tracks.clips().size(),1);
         QVERIFY(controller->projectDirty()); top->setProperty("trackModel",QVariant());

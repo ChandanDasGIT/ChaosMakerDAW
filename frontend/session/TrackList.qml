@@ -129,7 +129,8 @@ Rectangle {
                         objectName: "trackColourAccent" + trackCard.trackId
                         anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
                         width: isSelected ? 5 : 3
-                        color: isSelected ? Theme.accent : trackCard.trackColour
+                        // Always the track colour; selection shows through the border/background
+                        color: trackCard.trackColour
                     }
 
                     MouseArea {

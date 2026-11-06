@@ -64,17 +64,30 @@ PHASE 1 — Broken or misleading behaviour (do first)
          Done: buffer goes through the wrapper only; output goes to EngineController only
          (the QML wrapper has no device list, so its output path never worked).
 
-[ ] 1.10 Pre-existing failing UI tests (all fail at f059241, before this plan started):
-         - new_project_prompts_before_discarding_unsaved_clips ("save changes?" dialog
-           never becomes visible)
-         - track_colour_picker_updates_cards_timeline_and_mixer_and_cancels_custom_edits
-         - track_effects_switch_in_place_and_keep_edits_on_the_selected_track
-         - track_names_edit_inline_commit_cancel_and_update_mixer_and_fx
-         - vocal_effects_offer_eq_and_recording_controls_without_guitarsuite
-         - [fixed by 1.6] volume_faders_double_click_restores_unity_gain
-         - mixer_split_meters_show_independent_channels_beside_the_vertical_fader passes in
-           the full run but fails when run alone (meter levels read -120): order-dependent
-         Find out for each whether the app or the test is wrong.
+[x] 1.10 Pre-existing failing UI tests (all failed at f059241, before this plan started).
+         Investigated each:
+         - new_project_prompts_before_discarding_unsaved_clips: TEST bug. The app prompts
+           correctly; the test's mouse click could not hit the 1x1 hidden test hook. Now
+           drives the real File > New menu.
+         - track_colour_picker_updates_cards_timeline_and_mixer_and_cancels_custom_edits:
+           APP bug from commit 54a2d60 (selected track's colour strip turned accent blue).
+           Strip now always shows the track colour. Test passes.
+         - volume_faders_double_click_restores_unity_gain: APP bug, fixed by 1.6.
+         - track_effects_switch_in_place_and_keep_edits_on_the_selected_track,
+           track_names_edit_inline_commit_cancel_and_update_mixer_and_fx,
+           vocal_effects_offer_eq_and_recording_controls_without_guitarsuite:
+           pass on their own; fail only when run after the colour-picker test. Bisected to
+           its "Custom colour..." ColorDialog step: afterwards no item has keyboard focus
+           and typed/clicked input is lost. Not fixed (restoring focus and waiting did not
+           help) -> 1.11.
+         - mixer_split_meters_show_independent_channels_beside_the_vertical_fader: passes in
+           the full run, fails alone (meter levels read -120): order-dependent -> 1.11.
+
+[ ] 1.11 Leftover test-order problems from 1.10:
+         - After the custom ColorDialog closes, later UI tests lose keyboard/mouse input.
+           Check in the real app (on a desktop without a native colour dialog, e.g.
+           GNOME) whether typing still works after picking a custom track colour.
+         - mixer_split_meters_... fails when run alone.
 
 
 PHASE 2 — Move logic out of QML (architecture rule 6)
