@@ -10,7 +10,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. 3.1–3.8 done.
-Next: 3.9 (save layout sizes between sessions).
+Next: 3.9b (save mixer strip widths per track).
 Then 3.10 … 3.12, Phase 4, Phase 5.
 
 Decisions made by the user (keep to them):
@@ -273,6 +273,12 @@ PHASE 3 — Layout and workflow
          not in the undo history. Hand check: pan a track while playing and listen.
 [ ] 3.9  Save layout sizes between sessions: track list width, mixer height,
          piano roll dock height, strip widths.
+         Split into: 3.9a panel sizes (app settings), 3.9b mixer strip widths (per track).
+         - [done] 3.9a Track list width, mixer height and piano roll dock height live in
+           backend AppSettings (limits/defaults there, keys ui/trackListWidth, ui/mixerHeight,
+           ui/pianoRollDockHeight) via AppSettingsWrapper; Main.qml starts from them, clamps
+           drags with the backend limits and saves once on release. A saved dock height is
+           capped to the window. Hand check: drag all three splitters, restart, sizes kept.
 [ ] 3.10 Guitar pedal cards: 2–3 column dial grid instead of one dial per row.
 [ ] 3.11 EQ: per-band double-click reset, value tooltips, response curve,
          apply presets on selection.

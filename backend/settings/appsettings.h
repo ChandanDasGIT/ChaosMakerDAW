@@ -11,6 +11,16 @@ public:
     static constexpr const char* KeyAutoSaveEnabled = "autosave/enabled";
     static constexpr const char* KeyAutoSaveInterval = "autosave/intervalSeconds";
     static constexpr const char* KeyPianoRollPresentation = "ui/pianoRollPresentation";
+    static constexpr const char* KeyTrackListWidth = "ui/trackListWidth";
+    static constexpr const char* KeyMixerHeight = "ui/mixerHeight";
+    static constexpr const char* KeyPianoRollDockHeight = "ui/pianoRollDockHeight";
+
+    // Main window layout (pixels). Setters clamp into these ranges; non-finite values are ignored.
+    struct SizeLimits { double min, max, fallback; };
+    static constexpr SizeLimits TrackListWidthLimits{180.0, 460.0, 230.0};
+    static constexpr SizeLimits MixerHeightLimits{120.0, 480.0, 180.0};
+    // The view also keeps the docked piano roll above its own minimum and below the window.
+    static constexpr SizeLimits PianoRollDockHeightLimits{200.0, 2000.0, 380.0};
 
     AppSettings();
     ~AppSettings();
@@ -22,6 +32,16 @@ public:
     // Piano roll presentation ("dock" or "window")
     const std::string& pianoRollPresentation() const noexcept { return m_pianoRollPresentation; }
     void setPianoRollPresentation(std::string presentation) noexcept;
+
+    // Layout sizes, kept between sessions
+    double trackListWidth() const noexcept { return m_trackListWidth; }
+    void setTrackListWidth(double width) noexcept;
+    double mixerHeight() const noexcept { return m_mixerHeight; }
+    void setMixerHeight(double height) noexcept;
+    double pianoRollDockHeight() const noexcept { return m_pianoRollDockHeight; }
+    void setPianoRollDockHeight(double height) noexcept;
+    // Clamp into limits; non-finite values give the fallback.
+    static double clampSize(double value, SizeLimits limits) noexcept;
 
     // Default project directory
     const std::string& defaultProjectDirectory() const noexcept { return m_defaultProjectDirectory; }
@@ -54,6 +74,9 @@ public:
 private:
     bool m_restoreSessionOnStartup = false;
     std::string m_pianoRollPresentation = "dock";
+    double m_trackListWidth = TrackListWidthLimits.fallback;
+    double m_mixerHeight = MixerHeightLimits.fallback;
+    double m_pianoRollDockHeight = PianoRollDockHeightLimits.fallback;
     std::string m_defaultProjectDirectory;
     bool m_autoSaveEnabled = true;
     int m_autoSaveIntervalSeconds = 60;

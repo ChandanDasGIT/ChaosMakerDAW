@@ -24,6 +24,10 @@ void AppSettingsWrapper::loadFromPlatform()
         m_settings.importValue(AppSettings::KeyPianoRollPresentation,
                                qs.value(QStringLiteral("ui/pianoRollPresentation")).toString().toStdString());
     }
+    for (const char* key : {AppSettings::KeyTrackListWidth, AppSettings::KeyMixerHeight, AppSettings::KeyPianoRollDockHeight}) {
+        const QString name = QString::fromLatin1(key);
+        if (qs.contains(name)) m_settings.importValue(key, qs.value(name).toString().toStdString());
+    }
     if (qs.contains(QStringLiteral("paths/defaultProjectDirectory"))) {
         m_settings.importValue(AppSettings::KeyDefaultProjectDir,
                                qs.value(QStringLiteral("paths/defaultProjectDirectory")).toString().toStdString());
@@ -53,6 +57,8 @@ void AppSettingsWrapper::saveToPlatform()
     qs.setValue(QStringLiteral("paths/defaultProjectDirectory"), QString::fromStdString(m_settings.defaultProjectDirectory()));
     qs.setValue(QStringLiteral("autosave/enabled"), m_settings.autoSaveEnabled());
     qs.setValue(QStringLiteral("autosave/intervalSeconds"), m_settings.autoSaveIntervalSeconds());
+    for (const char* key : {AppSettings::KeyTrackListWidth, AppSettings::KeyMixerHeight, AppSettings::KeyPianoRollDockHeight})
+        qs.setValue(QString::fromLatin1(key), QString::fromStdString(m_settings.exportValue(key)));
     qs.sync();
 }
 
@@ -108,6 +114,35 @@ void AppSettingsWrapper::setAutoSaveIntervalSeconds(int seconds)
     }
 }
 
+void AppSettingsWrapper::saveLayoutSize(const char* key, double before, double after)
+{
+    if (before == after) return;
+    saveValue(QString::fromLatin1(key), QString::fromStdString(m_settings.exportValue(key)));
+    emit layoutSizesChanged();
+    emit preferenceSaved(QString::fromLatin1(key));
+}
+
+void AppSettingsWrapper::setTrackListWidth(double width)
+{
+    const double before = m_settings.trackListWidth();
+    m_settings.setTrackListWidth(width);
+    saveLayoutSize(AppSettings::KeyTrackListWidth, before, m_settings.trackListWidth());
+}
+
+void AppSettingsWrapper::setMixerHeight(double height)
+{
+    const double before = m_settings.mixerHeight();
+    m_settings.setMixerHeight(height);
+    saveLayoutSize(AppSettings::KeyMixerHeight, before, m_settings.mixerHeight());
+}
+
+void AppSettingsWrapper::setPianoRollDockHeight(double height)
+{
+    const double before = m_settings.pianoRollDockHeight();
+    m_settings.setPianoRollDockHeight(height);
+    saveLayoutSize(AppSettings::KeyPianoRollDockHeight, before, m_settings.pianoRollDockHeight());
+}
+
 void AppSettingsWrapper::sync()
 {
     saveToPlatform();
@@ -120,4 +155,5 @@ void AppSettingsWrapper::resetToDefaults()
     emit pianoRollPresentationChanged();
     emit defaultProjectDirectoryChanged();
     emit autoSaveChanged();
+    emit layoutSizesChanged();
 }

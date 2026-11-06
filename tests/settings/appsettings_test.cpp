@@ -2,6 +2,7 @@
 #include "settings/appsettings.h"
 
 #include <cstdio>
+#include <limits>
 
 TEST(appsettings, defaults_and_mutators)
 {
@@ -110,4 +111,38 @@ TEST(appsettings, file_save_and_load)
     AppSettings nonExistent;
     CHECK(!nonExistent.loadFromFile("/path/does/not/exist/at/all.ini"));
     CHECK(!nonExistent.lastError().empty());
+}
+
+TEST(appsettings, layout_sizes_default_clamp_and_round_trip)
+{
+    AppSettings settings;
+    CHECK(settings.trackListWidth() == 230.0);
+    CHECK(settings.mixerHeight() == 180.0);
+    CHECK(settings.pianoRollDockHeight() == 380.0);
+
+    settings.setTrackListWidth(300.4);
+    settings.setMixerHeight(5000.0);                              // clamped to the maximum
+    settings.setPianoRollDockHeight(10.0);                        // clamped to the minimum
+    CHECK(settings.trackListWidth() == 300.4);
+    CHECK(settings.mixerHeight() == AppSettings::MixerHeightLimits.max);
+    CHECK(settings.pianoRollDockHeight() == AppSettings::PianoRollDockHeightLimits.min);
+    settings.setTrackListWidth(std::numeric_limits<double>::quiet_NaN());
+    CHECK(settings.trackListWidth() == 300.4);                    // non-finite ignored
+
+    // Stored as whole pixels and read back; bad text keeps the current value.
+    CHECK(settings.exportValue(AppSettings::KeyTrackListWidth) == "300");
+    AppSettings loaded;
+    CHECK(loaded.deserialize(settings.serialize()));
+    CHECK(loaded.trackListWidth() == 300.0);
+    CHECK(loaded.mixerHeight() == 480.0);
+    CHECK(loaded.pianoRollDockHeight() == 200.0);
+    loaded.importValue(AppSettings::KeyMixerHeight, "tall");
+    loaded.importValue(AppSettings::KeyTrackListWidth, "250px");
+    CHECK(loaded.mixerHeight() == 480.0);
+    CHECK(loaded.trackListWidth() == 300.0);
+    loaded.importValue(AppSettings::KeyTrackListWidth, " 999 ");
+    CHECK(loaded.trackListWidth() == AppSettings::TrackListWidthLimits.max);
+
+    loaded.resetToDefaults();
+    CHECK(loaded.trackListWidth() == 230.0 && loaded.mixerHeight() == 180.0 && loaded.pianoRollDockHeight() == 380.0);
 }
