@@ -136,64 +136,24 @@ Item {
                 anchors.margins: 4
                 spacing: 4
 
-                // Add CC / lane (+)
+                // Lane name (velocity is the only lane for now; CC lanes are not implemented)
                 Rectangle {
-                    width: 16
-                    height: 16
-                    color: plusHover.containsMouse ? "#454a56" : "#2a2c33"
-                    border.color: "#1e2025"
-                    radius: 2
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "+"
-                        color: "#a0a6b2"
-                        font.pixelSize: 11
-                        font.bold: true
-                    }
-
-                    MouseArea {
-                        id: plusHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                    }
-                }
-
-                // [ Velocity ▾ ] selector button
-                Rectangle {
+                    objectName: "velocityLaneLabel"
                     width: parent.width
                     height: 22
-                    color: velBtnHover.containsMouse ? "#454a56" : "#2a2c33"
+                    color: "#2a2c33"
                     border.color: "#1a1b20"
                     radius: 3
 
-                    RowLayout {
+                    Text {
                         anchors.fill: parent
                         anchors.leftMargin: 6
                         anchors.rightMargin: 6
-                        spacing: 2
-
-                        Text {
-                            text: "Velocity"
-                            color: "#c2c7d0"
-                            font.pixelSize: 11
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                        }
-
-                        Text {
-                            text: "▾"
-                            color: "#8a909d"
-                            font.pixelSize: 9
-                        }
-                    }
-
-                    MouseArea {
-                        id: velBtnHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
+                        text: "Velocity"
+                        color: "#c2c7d0"
+                        font.pixelSize: 11
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
                     }
                 }
             }
