@@ -1634,6 +1634,23 @@ private slots:
         click(button("stop")); io->process(); QVERIFY(!controller.playing());
         controller.shutdownSession();
     }
+    void piano_roll_shows_no_placeholder_controls() {
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        const auto restore=qScopeGuard([&] { roll->setVisible(false); });
+        roll->setVisible(true);
+        QStringList texts;
+        std::function<void(QQuickItem*)> collect=[&](QQuickItem* item) {
+            const auto text=item->property("text");
+            if(text.isValid() && item->isVisible())texts<<text.toString();
+            for(auto* child:item->childItems())collect(child);
+        };
+        auto* laneLabel=visualItem(roll,"velocityLaneLabel"); QVERIFY(laneLabel);
+        collect(laneLabel);
+        QCOMPARE(texts,QStringList{"Velocity"});                    // plain label, no "▾" or "+"
+        texts.clear(); collect(roll);
+        for(const auto& fake:{"Track 1","All channels","Key snap","Pitch","Channel","File","Navigate","Contents"})
+            QVERIFY2(!texts.contains(QString::fromLatin1(fake)),fake);
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());

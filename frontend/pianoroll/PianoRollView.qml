@@ -21,7 +21,6 @@ Item {
     property string snapDivision: "1/16"
     property string snapStyle: "straight"
     property string colorMode: "Velocity"
-    property bool keySnap: false
 
     // Transport used by the footer buttons and the playhead (replaceable in tests, like Timeline).
     property var transport: EngineController
@@ -1133,63 +1132,7 @@ Item {
                     currentIndex: 0
                 }
 
-                CheckBox {
-                    id: keySnapCheck
-                    text: "Key snap"
-                    checked: root.keySnap
-                    onToggled: root.keySnap = checked
-                    spacing: 4
-                    indicator: Rectangle {
-                        x: keySnapCheck.leftPadding
-                        y: (keySnapCheck.height - height) / 2
-                        implicitWidth: 13
-                        implicitHeight: 13
-                        radius: 2
-                        color: keySnapCheck.checked ? "#2d7088" : (keySnapCheck.hovered ? "#3c404b" : "#32353e")
-                        border.color: keySnapCheck.checked ? "#60cdff" : "#1d1f24"
-
-                        Text {
-                            anchors.centerIn: parent
-                            visible: keySnapCheck.checked
-                            text: "✓"
-                            color: "#e6fffa"
-                            font.pixelSize: 10
-                            font.bold: true
-                        }
-                    }
-                    contentItem: Text {
-                        text: keySnapCheck.text
-                        color: "#c2c7d2"
-                        font.pixelSize: 11
-                        leftPadding: keySnapCheck.indicator.width + keySnapCheck.spacing
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                }
-
-                Text { text: "Color:"; color: "#8f95a3"; font.pixelSize: 11 }
-                PianoRollComboBox {
-                    implicitWidth: 90
-                    implicitHeight: 22
-                    model: ["Velocity", "Pitch", "Channel", "Track"]
-                    currentIndex: 0
-                    onCurrentTextChanged: root.colorMode = currentText
-                }
-
                 Item { Layout.fillWidth: true }
-
-                PianoRollComboBox {
-                    implicitWidth: 80
-                    implicitHeight: 22
-                    model: ["Track 1", "Track 2", "Track 3"]
-                    currentIndex: 0
-                }
-
-                PianoRollComboBox {
-                    implicitWidth: 95
-                    implicitHeight: 22
-                    model: ["All channels", "Channel 1", "Channel 2"]
-                    currentIndex: 0
-                }
 
                 Row {
                     spacing: 2

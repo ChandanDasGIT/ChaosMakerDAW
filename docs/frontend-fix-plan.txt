@@ -21,10 +21,11 @@ PHASE 1 — Broken or misleading behaviour (do first)
          - [done] Menu bar File/Edit/Navigate/Options/View/Contents/Actions (PianoRollView.qml:233-247)
          - [done] Snap toggle, Quantize (+ Q key), Undo/Redo (PianoRollView.qml:310-344)
          - [done] Footer transport buttons wired, zoom-tool button removed (PianoRollView.qml:1028-1063)
-         - "Notes:" combo, snap style (triplet/dotted/swing), Key snap,
-           Pitch/Channel/Track colour modes, hardcoded "Track 1/2/3" and channel combos
-           (PianoRollView.qml:1076-1148)
-         - Velocity lane "+" and "Velocity ▾" (VelocityLane.qml:137-195)
+         - [done, removed] Key snap, Pitch/Channel colour modes, hardcoded "Track 1/2/3" and
+           channel combos, velocity lane "+" and "▾" (come back when the features exist)
+         - "Notes:" combo → length of newly drawn notes
+         - Grid style → triplet and dotted grids (drop "swing" for now)
+         - Colour box → Velocity / Track colour
 
 [x] 1.4  Save As shortcut is shown but missing.
          frontend/session/ProjectActions.qml:244 — add a StandardKey.SaveAs Shortcut.
