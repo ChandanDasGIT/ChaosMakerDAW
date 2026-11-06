@@ -17,6 +17,7 @@ std::string ProjectActions::actionToString(ActionType action)
     case ActionType::New: return "New";
     case ActionType::Open: return "Open";
     case ActionType::Close: return "Close";
+    case ActionType::OpenFile: return "OpenFile";
     case ActionType::None: default: return "";
     }
 }
@@ -41,6 +42,8 @@ ProjectActions::Request ProjectActions::resolveDirect(ActionType action)
         return Request::ShowOpenDialog;
     case ActionType::Close:
         return Request::ExecuteClose;
+    case ActionType::OpenFile:
+        return Request::ExecuteOpenFile;
     case ActionType::None:
     default:
         return Request::None;
@@ -64,6 +67,13 @@ ProjectActions::Request ProjectActions::requestAction(ActionType action, bool is
 ProjectActions::Request ProjectActions::requestAction(const std::string& actionName, bool isDirty)
 {
     return requestAction(parseAction(actionName), isDirty);
+}
+
+ProjectActions::Request ProjectActions::requestOpenFile(const std::string& path, bool isDirty)
+{
+    if (path.empty()) return Request::None;
+    m_openFilePath = path;
+    return requestAction(ActionType::OpenFile, isDirty);
 }
 
 ProjectActions::Request ProjectActions::requestSave(bool hasExistingFile, bool resume)

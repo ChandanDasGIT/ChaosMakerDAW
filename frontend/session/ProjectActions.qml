@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import ".."
+import "../common"
 
 RowLayout {
     id: root
@@ -21,6 +22,11 @@ RowLayout {
         }
     }
 
+    RecentProjectsWrapper {
+        id: recentProjects
+        objectName: "recentProjects"
+    }
+
     ProjectActionsWrapper {
         id: actionsBridge
         objectName: "projectActionsBridge"
@@ -29,6 +35,8 @@ RowLayout {
         onShowSaveDialog: saveProjectDialog.open()
         onExecuteNew: EngineController.newProject()
         onExecuteClose: root.closeRequested()
+        // A recent project that cannot be opened (moved or deleted) leaves the list.
+        onExecuteOpenFile: file => { if (!EngineController.openProject(file)) recentProjects.refresh() }
         onDirectSaveRequested: {
             if (EngineController.saveProject() && actionsBridge.resumeAfterSave) {
                 actionsBridge.onSaveCompleted()
@@ -154,6 +162,9 @@ RowLayout {
             y: parent.height + 4
             width: 190
             padding: 4
+            // Styles the "Open Recent" submenu entry like the other items.
+            delegate: ThemedMenuItem {}
+            onAboutToShow: recentProjects.refresh()
             background: Rectangle {
                 color: Theme.panelBg
                 border.color: Theme.divider
@@ -216,6 +227,47 @@ RowLayout {
                     radius: 4
                 }
                 onTriggered: actionsBridge.requestAction("Open", EngineController.projectDirty)
+            }
+
+            Menu {
+                id: recentMenu
+                objectName: "fileOpenRecentMenu"
+                title: "Open Recent"
+                enabled: !recentProjects.empty && !EngineController.takeBusy && !EngineController.projectLoading
+                width: 300
+                padding: 4
+                background: Rectangle {
+                    color: Theme.panelBg
+                    border.color: Theme.divider
+                    radius: 6
+                }
+
+                Instantiator {
+                    model: recentProjects.paths
+                    delegate: ThemedMenuItem {
+                        required property int index
+                        required property string modelData
+                        objectName: "recentProject_" + index
+                        text: recentProjects.labels[index] || ""
+                        ToolTip.visible: hovered
+                        ToolTip.text: modelData
+                        ToolTip.delay: 450
+                        onTriggered: {
+                            fileMenu.close()
+                            actionsBridge.requestOpenFile(modelData, EngineController.projectDirty)
+                        }
+                    }
+                    onObjectAdded: (index, object) => recentMenu.insertItem(index, object)
+                    onObjectRemoved: (index, object) => recentMenu.removeItem(object)
+                }
+
+                MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.divider } }
+
+                ThemedMenuItem {
+                    objectName: "clearRecentProjects"
+                    text: "Clear Recent"
+                    onTriggered: recentProjects.clear()
+                }
             }
 
             MenuItem {
