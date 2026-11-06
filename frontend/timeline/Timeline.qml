@@ -339,14 +339,19 @@ Item {
     }
 
     Rectangle { anchors.fill: parent; color: Theme.windowBg }
+    // Same wheel rules as the rest of the app: wheel = scroll the tracks, Shift = scroll
+    // in time, Ctrl = zoom at the cursor. Vertical steps match the track list.
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         blocking: true
         target: null
         onWheel: event => {
-            const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y
-            if (event.modifiers & Qt.ShiftModifier) root.scrollHorizontally(-delta)
-            else root.zoomAtCursor(Math.pow(1.12, delta / 120), point.position.x)
+            const pixels = event.pixelDelta.y !== 0
+            const delta = pixels ? event.pixelDelta.y : event.angleDelta.y
+            if (event.modifiers & Qt.ControlModifier)
+                root.zoomAtCursor(Math.pow(1.12, (pixels ? event.angleDelta.y : delta) / 120), point.position.x)
+            else if (event.modifiers & Qt.ShiftModifier) root.scrollHorizontally(-delta)
+            else root.scrollVertically(-(pixels ? delta : delta * 0.75))
         }
     }
     WheelHandler {
