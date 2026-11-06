@@ -113,8 +113,16 @@ PHASE 2 — Move logic out of QML (architecture rule 6)
          length, quantize step, grid line spacing and the menu option lists; the meter
          comes from the project. PianoRollWrapper exposes it; the QML only calls it.
          Position formatting moved earlier (1.2). Note colours stay in QML (presentation).
-[ ] 2.1b Use one grid model for the timeline and the piano roll (the timeline keeps its
+[x] 2.1b Use one grid model for the timeline and the piano roll (the timeline keeps its
          own snap modes in backend Timeline today).
+         Done: shared backend MusicalGrid (backend/transport/musicalgrid.h/.cpp): meter +
+         step, snap nearest/floor/ceil restarting at each bar, drag-delta snap, line
+         spacing, on-grid checks. Used by Timeline::snap/isBarLine, PianoRollGrid and
+         PianoRollPattern::quantize. Each editor keeps its own menu (timeline: Bars/Beats/
+         fractions of a beat; piano roll: note values + triplet/dotted). No behaviour change.
+[ ] 2.1c Timeline grid-line drawing (Timeline.qml beatGridStride/visibleBeatCount maths)
+         still lives in QML; move it to MusicalGrid::lineSpacing. This changes how lines
+         thin out when zooming, so check it visually.
 [ ] 2.2  Note names / black-key detection (PianoKeys.qml:18-28) → backend/midi.
 [ ] 2.3  Transport time formatting (PlaybackControls.qml:96-102) → backend/core/valueformat.
 [ ] 2.4  Mixer target-clip selection (MixerPanel.qml:280-293) → MixerPanelWrapper

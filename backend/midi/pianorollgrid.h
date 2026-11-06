@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include "transport/musicalgrid.h"
 
 // Piano roll grid and snapping rules. Beats are quarter notes; positions are clip-relative.
 // The grid restarts at every bar line, so triplet/dotted steps that do not divide the bar still
@@ -57,6 +58,9 @@ public:
     static bool isOnGrid(double position, double unit) noexcept;
 
 private:
+    // The shared grid maths (also used by the timeline), set up for the current settings.
+    MusicalGrid musicalGrid(double step) const noexcept;
+
     Division m_division = Division::Sixteenth;
     Style m_style = Style::Straight;
     NoteLength m_noteLength = NoteLength::Grid;

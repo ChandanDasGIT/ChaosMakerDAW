@@ -1,5 +1,6 @@
 #include "timeline.h"
 #include "core/valueformat.h"
+#include "transport/musicalgrid.h"
 
 #include <algorithm>
 #include <cmath>
@@ -22,14 +23,14 @@ double Timeline::snapStep() const
 }
 double Timeline::snap(double beat, std::string_view direction) const
 {
-    if (!std::isfinite(beat)) return 0;
-    const double step = snapStep();
-    if (step <= 0) return std::max(0.0, beat);
-    const double units = beat / step;
-    if (!std::isfinite(units)) return 0;
-    const double rounded = direction == "floor" ? std::floor(units + 1e-9)
-        : direction == "ceil" ? std::ceil(units - 1e-9) : std::round(units);
-    return std::max(0.0, rounded * step);
+    // Shared grid maths (MusicalGrid). Timeline steps always divide the bar, so the per-bar
+    // grid gives the same positions as a plain grid from beat 0.
+    MusicalGrid grid;
+    grid.setMeter(beatsPerBar(), beatUnit());
+    grid.setStep(snapStep());
+    const auto rounding = direction == "floor" ? MusicalGrid::Rounding::Floor
+        : direction == "ceil" ? MusicalGrid::Rounding::Ceil : MusicalGrid::Rounding::Nearest;
+    return grid.snap(beat, rounding);
 }
 double Timeline::contentEndBars() const { return m_tracks ? m_tracks->project().contentEndBeats() / beatsPerBar() : 0; }
 double Timeline::clipEndBeat(int id, int clipId) const
@@ -43,9 +44,7 @@ bool Timeline::isBarLine(double beat) const
 }
 bool Timeline::isBarLine(double beat, double beatsPerBar)
 {
-    if (!std::isfinite(beatsPerBar) || beatsPerBar <= 0) return false;
-    const double bar = beat / beatsPerBar;
-    return std::isfinite(bar) && std::abs(bar - std::round(bar)) < 1e-7;
+    return MusicalGrid::isOnGrid(beat, beatsPerBar, 1e-7);
 }
 std::string Timeline::barLabel(double bar) const { return valueformat::number(bar + 1); }
 bool Timeline::hasOverlap(int id, double start, double length) const

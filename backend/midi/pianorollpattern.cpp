@@ -1,4 +1,5 @@
 #include "midi/pianorollpattern.h"
+#include "transport/musicalgrid.h"
 #include <algorithm>
 #include <cmath>
 
@@ -82,25 +83,16 @@ void PianoRollPattern::clearSelection() {
 
 bool PianoRollPattern::quantize(double stepBeats, double barLengthBeats) {
     if (!std::isfinite(stepBeats) || stepBeats <= 0) return false;
-    const bool perBar = std::isfinite(barLengthBeats) && barLengthBeats > 0;
+    MusicalGrid grid;
+    // barLength 0 = one grid from beat 0; otherwise the grid restarts at every bar line.
+    grid.setMeter(std::isfinite(barLengthBeats) && barLengthBeats > 0 ? barLengthBeats : 0.0, 1.0);
+    grid.setStep(stepBeats);
     const bool onlySelected = selectedCount() > 0;
-    constexpr double tolerance = 1e-9;
     bool moved = false;
     for (auto& n : m_notes) {
         if ((onlySelected && !n.selected) || n.startBeat < 0) continue;
-        double snapped;
-        if (perBar) {
-            // Grid lines within the bar, plus the next bar line; take the nearer one.
-            const double bar = std::floor(n.startBeat / barLengthBeats + tolerance) * barLengthBeats;
-            const double offset = n.startBeat - bar;
-            const double lower = std::floor(offset / stepBeats + tolerance) * stepBeats;
-            const double upper = std::min(lower + stepBeats, barLengthBeats);
-            snapped = bar + (offset - lower < upper - offset ? lower : upper); // ties round up
-        } else {
-            snapped = std::round(n.startBeat / stepBeats) * stepBeats;
-        }
-        snapped = std::max(0.0, snapped);
-        if (std::abs(snapped - n.startBeat) > tolerance) { n.startBeat = snapped; moved = true; }
+        const double snapped = grid.snap(n.startBeat, MusicalGrid::Rounding::Nearest);
+        if (std::abs(snapped - n.startBeat) > 1e-9) { n.startBeat = snapped; moved = true; }
     }
     return moved;
 }
