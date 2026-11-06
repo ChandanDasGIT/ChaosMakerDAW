@@ -46,9 +46,15 @@ PHASE 1 — Broken or misleading behaviour (do first)
          - Space / R: PlaybackControls.qml:23-37 vs QuickSettings.qml:69-82
          Check these in the running app first.
 
-[ ] 1.9  Buffer size / output device sent twice to the engine.
+[x] 1.9  Buffer size / output device sent twice to the engine.
          frontend/audiodevice/DeviceSettings.qml:30-34, 64-67 — call the wrapper only;
          its request* signal already reaches EngineController.
+         Done: buffer goes through the wrapper only; output goes to EngineController only
+         (the QML wrapper has no device list, so its output path never worked).
+
+[ ] 1.10 UI test new_project_prompts_before_discarding_unsaved_clips fails, also on the
+         committed code before 1.4 (found 2026-11-06). The "save changes?" dialog never
+         becomes visible. Find out whether the prompt is broken or the test is.
 
 
 PHASE 2 — Move logic out of QML (architecture rule 6)

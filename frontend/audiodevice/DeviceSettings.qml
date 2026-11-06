@@ -7,10 +7,11 @@ RowLayout {
     id: root
     spacing: 12
 
+    // Buffer changes go through the wrapper (it validates the size and forwards it once).
+    // Output changes go straight to EngineController, which owns the real device list.
     DeviceSettingsWrapper {
         id: deviceBridge
         onRequestBufferSizeChange: frames => EngineController.setBufferSize(frames)
-        onRequestOutputDeviceChange: (index, name) => EngineController.setOutputDevice(index)
     }
 
     Text {
@@ -27,11 +28,7 @@ RowLayout {
         model: EngineController.bufferSizes
         enabled: EngineController.selectedBufferSize > 0
         currentIndex: model.indexOf(String(EngineController.selectedBufferSize))
-        onActivated: index => {
-            const size = Number(currentText)
-            deviceBridge.setBufferSize(size)
-            EngineController.setBufferSize(size)
-        }
+        onActivated: index => deviceBridge.setBufferSize(Number(currentText))
         contentItem: Text {
             leftPadding: 8
             rightPadding: 20
@@ -61,10 +58,7 @@ RowLayout {
         model: EngineController.outputDevices
         enabled: count > 0
         currentIndex: EngineController.selectedOutputIndex
-        onActivated: index => {
-            deviceBridge.setOutputDevice(index)
-            EngineController.setOutputDevice(index)
-        }
+        onActivated: index => EngineController.setOutputDevice(index)
         contentItem: Text {
             leftPadding: 9
             rightPadding: 23
