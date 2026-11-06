@@ -87,7 +87,13 @@ PHASE 1 — Broken or misleading behaviour (do first)
          - After the custom ColorDialog closes, later UI tests lose keyboard/mouse input.
            Check in the real app (on a desktop without a native colour dialog, e.g.
            GNOME) whether typing still works after picking a custom track colour.
-         - mixer_split_meters_... fails when run alone.
+           For now that test runs last in transport_qtcheck.cpp so it cannot break others.
+         - mixer_split_meters_... fails when run alone (passes in the full run).
+         - Also failing before this plan (at f059241), not investigated yet:
+           UI undo_redo_buttons_restore_deleted_clips (clips().size() 0, expected 1) and
+           wrapper presets_qtcheck.cpp:52 (updates==before+1).
+         Full-suite status after Phase 1: backend 237/237, wrapper 1 failed check
+         (pre-existing), UI 91 passed / 1 failed (pre-existing).
 
 
 PHASE 2 — Move logic out of QML (architecture rule 6)
