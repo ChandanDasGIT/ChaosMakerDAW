@@ -19,10 +19,12 @@ public:
     void selectAll(bool select = true);
     void clearSelection();
     bool deleteSelected();
-    // Move note starts to the nearest multiple of stepBeats (lengths unchanged). Acts on the
-    // selected notes, or on all notes when none are selected. Notes with a negative start
-    // (hidden by a left-trimmed clip) are left alone. Returns false if nothing moved.
-    bool quantize(double stepBeats);
+    // Move note starts to the nearest grid line (lengths unchanged). Acts on the selected
+    // notes, or on all notes when none are selected. Notes with a negative start (hidden by a
+    // left-trimmed clip) are left alone. Returns false if nothing moved.
+    // With barLengthBeats > 0 the grid restarts at every bar line (so triplet or dotted steps
+    // that do not divide the bar still land on bar lines); 0 means one grid from beat 0.
+    bool quantize(double stepBeats, double barLengthBeats = 0.0);
 
     void clear();
     // Replace all notes (e.g. when loading a clip). Start positions are kept as-is, even
