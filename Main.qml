@@ -52,16 +52,38 @@ Window {
     property real pianoRollDockHeight: 380
     readonly property bool pianoRollDocked: window.bottomPanelMode === "pianoroll"
 
+    // Which bottom panel / piano roll is on screen (view state only).
+    readonly property bool mixerShown: window.mixerVisible && window.bottomPanelMode === "mixer"
+    readonly property bool pianoRollShown: (window.mixerVisible && window.bottomPanelMode === "pianoroll")
+                                           || floatingPianoRollWindow.visible
+    readonly property bool pianoRollAvailable: window.activePianoRollClipId >= 0
+
+    // Mixer toggle (M key, View menu, top-bar button): from the docked piano roll it
+    // switches back to the mixer, otherwise it shows/hides the bottom panel.
+    function toggleMixer() {
+        if (window.bottomPanelMode === "pianoroll") {
+            window.bottomPanelMode = "mixer"
+            window.mixerVisible = true
+        } else {
+            window.mixerVisible = !window.mixerVisible
+        }
+    }
+
+    // Show the last opened piano roll clip again (docked or floating, as set in
+    // Preferences), or hide the piano roll that is showing.
+    function togglePianoRoll() {
+        if (window.pianoRollShown) {
+            if (floatingPianoRollWindow.visible) floatingPianoRollWindow.close()
+            if (window.bottomPanelMode === "pianoroll") window.bottomPanelMode = "mixer"
+        } else if (window.pianoRollAvailable) {
+            window.openPianoRoll(window.activePianoRollTrackId, window.activePianoRollClipId,
+                                 window.activePianoRollClipLabel, window.activePianoRollClipLength)
+        }
+    }
+
     Shortcut {
         sequence: "M"
-        onActivated: {
-            if (window.bottomPanelMode === "pianoroll") {
-                window.bottomPanelMode = "mixer"
-                window.mixerVisible = true
-            } else {
-                window.mixerVisible = !window.mixerVisible
-            }
-        }
+        onActivated: window.toggleMixer()
     }
 
     onClosing: event => {
@@ -84,14 +106,11 @@ Window {
             trackModel: trackModel
             timeline: timeline
             mixerVisible: window.mixerVisible
-            onToggleMixerRequested: {
-                if (window.bottomPanelMode === "pianoroll") {
-                    window.bottomPanelMode = "mixer"
-                    window.mixerVisible = true
-                } else {
-                    window.mixerVisible = !window.mixerVisible
-                }
-            }
+            mixerShown: window.mixerShown
+            pianoRollShown: window.pianoRollShown
+            pianoRollAvailable: window.pianoRollAvailable
+            onToggleMixerRequested: window.toggleMixer()
+            onTogglePianoRollRequested: window.togglePianoRoll()
             Layout.fillWidth: true
             onCloseRequested: { window.closeApproved = true; window.close() }
         }

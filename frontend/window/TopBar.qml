@@ -10,9 +10,13 @@ Rectangle {
     property var trackModel: null
     property var timeline: null
     property bool mixerVisible: true
+    property bool mixerShown: true
+    property bool pianoRollShown: false
+    property bool pianoRollAvailable: false
     readonly property alias appSettings: appSettings
     signal closeRequested()
     signal toggleMixerRequested()
+    signal togglePianoRollRequested()
 
     function requestProjectAction(action) {
         projectActions.requestAction(action)
@@ -40,6 +44,15 @@ Rectangle {
             id: editMenu
             trackModel: root.trackModel
             timeline: root.timeline
+        }
+
+        ViewMenu {
+            id: viewMenu
+            mixerShown: root.mixerShown
+            pianoRollShown: root.pianoRollShown
+            pianoRollAvailable: root.pianoRollAvailable
+            onToggleMixerRequested: root.toggleMixerRequested()
+            onTogglePianoRollRequested: root.togglePianoRollRequested()
         }
 
         AppSettings {
