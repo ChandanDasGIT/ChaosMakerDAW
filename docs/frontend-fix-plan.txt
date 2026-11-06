@@ -43,8 +43,11 @@ PHASE 1 — Broken or misleading behaviour (do first)
          Done: track volume fader restored (as before commit 54a2d60); clip gain kept as a
          small "CLIP" slider in the strip. Fixes volume_faders_double_click_restores_unity_gain.
 
-[ ] 1.7  Master fader dB labels are evenly spaced and don't match the real scale.
+[x] 1.7  Master fader dB labels are evenly spaced and don't match the real scale.
          MixerPanel.qml:116-129 — position labels with the wrapper's dB→position mapping.
+         Done: the labels belong to the master meter (linear in dB, -60..0). Each label now
+         sits at its real height via StereoLevelMeterWrapper.normalizedFor (backend
+         levelscale::normalizedLevel); the bottom reads -60, not -∞.
 
 [x] 1.8  Duplicate shortcuts that may be ambiguous (Qt may then fire neither).
          - Delete / Ctrl+A / Escape: PianoRollView.qml:46-61 vs Timeline.qml:60-113
@@ -69,6 +72,8 @@ PHASE 1 — Broken or misleading behaviour (do first)
          - track_names_edit_inline_commit_cancel_and_update_mixer_and_fx
          - vocal_effects_offer_eq_and_recording_controls_without_guitarsuite
          - [fixed by 1.6] volume_faders_double_click_restores_unity_gain
+         - mixer_split_meters_show_independent_channels_beside_the_vertical_fader passes in
+           the full run but fails when run alone (meter levels read -120): order-dependent
          Find out for each whether the app or the test is wrong.
 
 
