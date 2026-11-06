@@ -106,9 +106,15 @@ PHASE 1 — Broken or misleading behaviour (do first)
 
 PHASE 2 — Move logic out of QML (architecture rule 6)
 -----------------------------------------------------
-[ ] 2.1  Piano roll snap/grid math, position formatting and note colours
-         (PianoRollView.qml:63-169) → backend + PianoRollWrapper. Combine with the
-         timeline's snap system (TimelineWrapper) so there is one snap model.
+[x] 2.1  Piano roll snap/grid math, position formatting and note colours
+         (PianoRollView.qml:63-169) → backend + PianoRollWrapper.
+         Done: new backend PianoRollGrid (backend/midi/pianorollgrid.h/.cpp) owns division,
+         triplet/dotted style, snap on/off, snap floor/delta, new-note and minimum note
+         length, quantize step, grid line spacing and the menu option lists; the meter
+         comes from the project. PianoRollWrapper exposes it; the QML only calls it.
+         Position formatting moved earlier (1.2). Note colours stay in QML (presentation).
+[ ] 2.1b Use one grid model for the timeline and the piano roll (the timeline keeps its
+         own snap modes in backend Timeline today).
 [ ] 2.2  Note names / black-key detection (PianoKeys.qml:18-28) → backend/midi.
 [ ] 2.3  Transport time formatting (PlaybackControls.qml:96-102) → backend/core/valueformat.
 [ ] 2.4  Mixer target-clip selection (MixerPanel.qml:280-293) → MixerPanelWrapper
