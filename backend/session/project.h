@@ -70,7 +70,9 @@ public:
     bool canMergeAudioClips(int trackId, int first, int second, double sourceRate) const;
     bool mergeAudioClips(int trackId, int first, int second, double sourceRate);
     bool moveAudioClip(int trackId, int clipId, std::int64_t start);
-    bool setClipGain(int trackId, int clipId, float gainDb);
+    // continueEdit: fold this change into the previous undo step when that step was a gain
+    // edit of the same clip (one fader drag = one undo step). Otherwise a new step is added.
+    bool setClipGain(int trackId, int clipId, float gainDb, bool continueEdit = false);
     // Replace a clip's pattern notes (origin-relative beats) as one undoable edit.
     bool setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes);
     struct ClipChange { int trackId; AudioClip clip; bool remove = false; int destinationTrackId = -1; };
@@ -93,7 +95,8 @@ public:
 
 private:
     struct TrackClipEdit { int trackId; std::vector<AudioClip> before, after; };
-    struct ClipEdit { std::vector<TrackClipEdit> tracks; };
+    // gainClipId: set when the step is a clip gain change, so a fader drag can extend it.
+    struct ClipEdit { std::vector<TrackClipEdit> tracks; int gainClipId = -1; };
     void rememberClipEdit(int trackId, std::vector<AudioClip> before);
     std::vector<ClipEdit> m_history;
     std::size_t m_historyPosition = 0;

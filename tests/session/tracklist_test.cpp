@@ -228,3 +228,45 @@ TEST(tracklist, master_volume_and_mute)
     CHECK(tracks.setMasterMuted(false).changed);
     CHECK(!tracks.masterMuted());
 }
+
+TEST(tracklist, a_clip_gain_drag_is_one_undo_step)
+{
+    TrackList tracks;
+    const int t = tracks.addAudioTrack();
+    const int a = tracks.addClipAtBeat(t, 0, 4);
+    const int b = tracks.addClipAtBeat(t, 8, 4);
+    CHECK(a > 0 && b > 0);
+
+    // One drag: first step starts the undo step, later steps extend it
+    CHECK(tracks.setClipGain(t, a, -1.0).changed);
+    for (double g : {-2.0, -3.0, -6.0}) CHECK(tracks.setClipGain(t, a, g, true).changed);
+    CHECK_NEAR(tracks.findClip(t, a)->gainDb, -6.0, 1e-6);
+    CHECK(tracks.undo());                                     // one undo undoes the whole drag
+    CHECK_NEAR(tracks.findClip(t, a)->gainDb, 0.0, 1e-6);
+    CHECK(tracks.redo());
+    CHECK_NEAR(tracks.findClip(t, a)->gainDb, -6.0, 1e-6);
+
+    // A new drag (continueEdit=false) is its own step
+    CHECK(tracks.setClipGain(t, a, -9.0).changed);
+    CHECK(tracks.setClipGain(t, a, -12.0, true).changed);
+    CHECK(tracks.undo());
+    CHECK_NEAR(tracks.findClip(t, a)->gainDb, -6.0, 1e-6);
+
+    // "Continuing" on a different clip never joins another clip's step
+    CHECK(tracks.setClipGain(t, b, 3.0, true).changed);
+    CHECK(tracks.undo());
+    CHECK_NEAR(tracks.findClip(t, b)->gainDb, 0.0, 1e-6);
+    CHECK_NEAR(tracks.findClip(t, a)->gainDb, -6.0, 1e-6);
+
+    // After an undo, continuing does not rewrite the undone step: it adds a new one
+    CHECK(tracks.setClipGain(t, a, -20.0, true).changed);
+    CHECK(tracks.undo());
+    CHECK_NEAR(tracks.findClip(t, a)->gainDb, -6.0, 1e-6);
+
+    // A different kind of edit in between ends the merging
+    CHECK(tracks.setClipGain(t, a, -1.0).changed);
+    CHECK(tracks.moveClipAtBeat(t, b, 16.0));
+    CHECK(tracks.setClipGain(t, a, -2.0, true).changed);
+    CHECK(tracks.undo());                                     // undoes only the -2 step
+    CHECK_NEAR(tracks.findClip(t, a)->gainDb, -1.0, 1e-6);
+}

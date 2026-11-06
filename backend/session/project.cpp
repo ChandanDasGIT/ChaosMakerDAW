@@ -301,7 +301,7 @@ bool Project::moveAudioClip(int trackId, int clipId, std::int64_t start) {
     rememberClipEdit(trackId, std::move(before)); return true;
 }
 
-bool Project::setClipGain(int trackId, int clipId, float gainDb) {
+bool Project::setClipGain(int trackId, int clipId, float gainDb, bool continueEdit) {
     auto* track = findTrack(trackId);
     if (!track || !std::isfinite(gainDb)) return false;
     const float clampedGain = std::clamp(gainDb, -120.0f, 24.0f);
@@ -309,9 +309,17 @@ bool Project::setClipGain(int trackId, int clipId, float gainDb) {
                            [clipId](const auto& c) { return c.id == clipId; });
     if (it == track->audioClips.end()) return false;
     if (it->gainDb == clampedGain) return true;
+    const bool extendLast = continueEdit && m_historyPosition > 0 && m_historyPosition == m_history.size()
+        && m_history.back().gainClipId == clipId && m_history.back().tracks.size() == 1
+        && m_history.back().tracks.front().trackId == trackId;
     auto before = track->audioClips;
     it->gainDb = clampedGain;
-    rememberClipEdit(trackId, std::move(before));
+    if (extendLast) {
+        m_history.back().tracks.front().after = track->audioClips; // keep the original "before"
+    } else {
+        rememberClipEdit(trackId, std::move(before));
+        m_history.back().gainClipId = clipId;
+    }
     return true;
 }
 

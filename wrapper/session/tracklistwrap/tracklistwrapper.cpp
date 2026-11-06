@@ -243,9 +243,9 @@ void TrackListWrapper::selectClip(int trackId, int clipId)
     syncSelectionState();
 }
 
-bool TrackListWrapper::setClipGain(int trackId, int clipId, double gainDb)
+bool TrackListWrapper::setClipGain(int trackId, int clipId, double gainDb, bool continueEdit)
 {
-    const auto change = m_state.setClipGain(trackId, clipId, gainDb);
+    const auto change = m_state.setClipGain(trackId, clipId, gainDb, continueEdit);
     if (change.changed) {
         notifyClipGainEdit(trackId);
     }
