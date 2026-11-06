@@ -2052,7 +2052,7 @@ private slots:
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
         auto* mode=visualItem(roll,"pianoRollColorMode"); QVERIFY(mode);
         const auto restore=qScopeGuard([&] {
-            mode->setProperty("currentIndex",0); roll->setVisible(false);
+            mode->setProperty("currentIndex",1); roll->setVisible(false);
             roll->setProperty("trackModel",QVariant::fromValue<QObject*>(nullptr));
             roll->setProperty("trackId",-1); roll->setProperty("clipId",-1);
         });
@@ -2068,11 +2068,25 @@ private slots:
         const auto near=[](QColor a,QColor b) {
             return std::abs(a.redF()-b.redF())<0.02 && std::abs(a.greenF()-b.greenF())<0.02 && std::abs(a.blueF()-b.blueF())<0.02;
         };
-        QVERIFY(!near(fill(127),track127));                          // Velocity mode: blue/teal scale
-        mode->setProperty("currentIndex",1);
+        // Track colour is the default: loud note = track colour, soft notes darker, and the
+        // outline follows the track too.
         QCOMPARE(roll->property("colorMode").toString(),QString("Track"));
-        QVERIFY(near(fill(127),track127));                           // loud note = track colour
-        QVERIFY(fill(10).lightnessF()<fill(127).lightnessF());       // soft notes are darker
+        QCOMPARE(mode->property("currentText").toString(),QString("Track"));
+        QVERIFY(near(fill(127),track127));
+        QVERIFY(fill(10).lightnessF()<fill(127).lightnessF());
+        QVERIFY(near(roll->property("noteOutlineColour").value<QColor>(),QColor("#d97c73").lighter(145)));
+        // Velocity mode: blue/teal scale and the cyan outline.
+        mode->setProperty("currentIndex",0);
+        QCOMPARE(roll->property("colorMode").toString(),QString("Velocity"));
+        QVERIFY(!near(fill(127),track127));
+        QVERIFY(near(roll->property("noteOutlineColour").value<QColor>(),QColor("#5bc0de")));
+        // Back to Track; an unbound piano roll (no track colour) keeps the blue scale.
+        mode->setProperty("currentIndex",1);
+        QVERIFY(near(fill(127),track127));
+        roll->setProperty("trackModel",QVariant::fromValue<QObject*>(nullptr));
+        roll->setProperty("trackId",-1); roll->setProperty("clipId",-1);
+        QVERIFY(!roll->property("useTrackColour").toBool());
+        QVERIFY(near(roll->property("noteOutlineColour").value<QColor>(),QColor("#5bc0de")));
     }
     void removing_a_track_with_clips_asks_first() {
         TrackListWrapper tracks;
