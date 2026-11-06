@@ -1550,6 +1550,34 @@ private slots:
         click(redo); QTRY_COMPARE(notes->property("count").toInt(),1);
         QVERIFY(!redo->isEnabled());
     }
+    void piano_roll_snap_button_switches_snapping_but_keeps_the_grid() {
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* notes=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(notes);
+        auto* grid=visualItem(roll,"pianoRollGrid"); QVERIFY(grid);
+        auto* snap=visualItem(roll,"pianoRollSnap"); QVERIFY(snap);
+        const auto restore=qScopeGuard([&] {
+            QMetaObject::invokeMethod(notes,"clear"); roll->setProperty("snapEnabled",true); roll->setVisible(false);
+        });
+        roll->setVisible(true); QTest::qWait(30); // let the grid scroll to middle C
+        const double ppb=roll->property("pixelsPerBeat").toDouble();
+        const double gridLines=roll->property("gridLineBeats").toDouble();
+        // Draw with the pencil at beat 1.3 (between 1/16 grid lines), on a visible row.
+        const auto drawAt=[&](double beat) {
+            auto* flick=grid->parentItem()->parentItem(); // contentItem -> Flickable
+            const double y=flick->property("contentY").toDouble()+40;
+            QTest::mouseClick(window,Qt::LeftButton,{},grid->mapToScene(QPointF(beat*ppb,y)).toPoint());
+            const auto list=notes->property("notes").toList();
+            return list.isEmpty() ? -1.0 : list.last().toMap().value("startBeat").toDouble();
+        };
+        QVERIFY(roll->property("snapEnabled").toBool());
+        QCOMPARE(drawAt(1.3),1.25);                                 // snapped to 1/16
+        QMetaObject::invokeMethod(notes,"clear");
+        click(snap); QVERIFY(!roll->property("snapEnabled").toBool());
+        const double free=drawAt(1.3);
+        QVERIFY(std::abs(free-1.3)<1.0/ppb);                        // placed where clicked
+        QCOMPARE(roll->property("gridLineBeats").toDouble(),gridLines); // grid lines unchanged
+        click(snap); QVERIFY(roll->property("snapEnabled").toBool());
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());

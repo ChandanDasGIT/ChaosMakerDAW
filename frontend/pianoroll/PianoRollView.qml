@@ -71,7 +71,16 @@ Item {
         onActivated: pianoRollBackend.clearSelection()
     }
 
+    // Magnet button: when off, notes move and draw freely but the grid lines stay.
+    property bool snapEnabled: true
+
+    // Snap step used by editing: the Grid division, or 0 when snapping is off.
     function getSnapBeats() {
+        return root.snapEnabled ? gridDivisionBeats() : 0.0
+    }
+
+    // The Grid division in beats ("Off" -> 0), independent of the magnet button.
+    function gridDivisionBeats() {
         switch (root.snapDivision) {
             case "1/4": return 1.0
             case "1/8": return 0.5
@@ -171,7 +180,7 @@ Item {
     // Grid line spacing: one line per snap division ("Off" -> meter beats only), coarsened by
     // doubling until lines are at least 6px apart so zoomed-out grids stay readable.
     readonly property real gridLineBeats: {
-        const step = getSnapBeats()
+        const step = gridDivisionBeats()
         let beats = step > 0 ? Math.min(beatUnit, step) : beatUnit
         while (beats < beatUnit && beats * pixelsPerBeat < 6)
             beats *= 2
@@ -311,12 +320,14 @@ Item {
                 Rectangle { width: 1; height: 18; color: "#3d414c" }
 
                 Rectangle {
+                    objectName: "pianoRollSnap"
                     width: 24; height: 22; radius: 2
-                    color: snapHover.containsMouse ? "#373a44" : "#2f323a"
-                    border.color: "#202227"
+                    color: root.snapEnabled ? "#4a505e" : snapHover.containsMouse ? "#373a44" : "#2f323a"
+                    border.color: root.snapEnabled ? "#60cdff" : "#202227"
                     Text { anchors.centerIn: parent; text: "🧲"; color: "#d8dce4"; font.pixelSize: 11 }
-                    MouseArea { id: snapHover; anchors.fill: parent; hoverEnabled: true }
-                    ToolTip.visible: snapHover.containsMouse; ToolTip.text: "Toggle Snap"
+                    MouseArea { id: snapHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.snapEnabled = !root.snapEnabled }
+                    ToolTip.visible: snapHover.containsMouse
+                    ToolTip.text: root.snapEnabled ? "Snap to grid: on (click to place notes freely)" : "Snap to grid: off (click to snap to the Grid setting)"
                 }
 
                 Rectangle {
@@ -928,6 +939,7 @@ Item {
                     // Interactive Grid Clicking
                     MouseArea {
                         id: gridMouse
+                        objectName: "pianoRollGrid"
                         // Pencil-drag must not turn into a Flickable scroll
                         preventStealing: true
                         anchors.fill: parent
