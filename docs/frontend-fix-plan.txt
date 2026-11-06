@@ -7,6 +7,42 @@ keep the 3-tier split (backend = pure C++, wrapper = Qt bridge, frontend = QML v
 Status legend:  [ ] todo   [~] in progress   [x] done
 
 
+RESUME HERE (last updated 2026-11-06)
+-------------------------------------
+Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed.
+Next: Phase 3, starting with 3.1 (BPM, time signature and a bars.beats position inline
+on the transport bar). Then 3.2 … 3.12, Phase 4, Phase 5.
+
+Decisions made by the user (keep to them):
+- Mixer: track strips have NO track volume fader. Each strip's vertical fader is clip gain
+  (selected clip on the track, else its first clip), labelled "CLIP". Track volume lives
+  only in the track list.
+- Do not edit EducationPurpose/architecture.txt; the user updates it at the end of the
+  project.
+- Work one step at a time: explain the plan, do one item, test it, report, then wait.
+  Commit when the user says so.
+- The delete-track confirmation dialog is kept (deletion is undoable now); ask before
+  removing it.
+
+Test status after Phase 2 (all green):
+- build/backendtests   -> 259 tests, 0 failed checks
+- build/wrappertests   -> 57 tests, 0 failed checks   (run with QT_QPA_PLATFORM=offscreen)
+- build/transporttests -> 96 passed, 0 failed (UI)    (env below)
+UI test env: QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
+             PIPEWIRE_REMOTE=codex-test-no-server PULSE_SERVER=unix:/tmp/chaosmaker-test-no-server
+Build: cmake --build --preset default   Run the app: pw-jack build/appChaosMaker
+Single UI test: build/transporttests <test_function_name>
+
+Open notes:
+- piano-roll-demo.png shows as deleted in the working tree; that was there before this
+  plan started and has not been committed. Ask the user what to do with it.
+- Two backend formatters produce the transport clock text (PlaybackControls::formatTime
+  and valueformat::position); they differ only for negative times. Not merged yet.
+- Hand checks still worth doing in the real app: clip gain drag + Ctrl+Z, delete a track
+  with a pedalboard + Ctrl+Z, piano roll in 3/4 and 6/8, buffer size change with JACK,
+  pedal cards/tuner look unchanged, custom track colour then typing still works.
+
+
 PHASE 1 — Broken or misleading behaviour (do first)
 ---------------------------------------------------
 [x] 1.1  Piano roll playhead never moves.
