@@ -58,6 +58,13 @@ QtObject {
     readonly property color chipBorder:      "#424242"
     readonly property color chipBorderHover: "#626671"
 
+    // ---- fields (drop-down boxes) ----
+    readonly property color field:           "#292b30"
+    readonly property color fieldHover:      "#30333a"
+    readonly property color fieldDisabled:   "#222328"
+    readonly property color fieldBorder:     "#444750"   // accent when focused
+    readonly property color textDisabled:    "#777b83"
+
     // ---- popups ----
     readonly property color popupBg:         "#25272c"
     readonly property color popupBorder:     "#4a4d56"
@@ -75,10 +82,10 @@ QtObject {
     readonly property MixerColors mixer: MixerColors {}
     readonly property TransportColors transport: TransportColors {}
     readonly property GuitarSuiteColors guitarSuite: GuitarSuiteColors {}
-    readonly property SettingsColors settings: SettingsColors {}
     readonly property EffectsColors effects: EffectsColors {}
 
     // ---- sizes ----
+    readonly property int microSize:   9    // the smallest text allowed (tiny labels, chips)
     readonly property int captionSize: 10
     readonly property int smallSize:   11
     readonly property int bodySize:    13

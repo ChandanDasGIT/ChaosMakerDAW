@@ -121,7 +121,7 @@ Rectangle {
                                 objectName: "mixerMasterScale" + modelData
                                 text: String(modelData)
                                 color: Theme.textMuted
-                                font.pixelSize: 8
+                                font.pixelSize: Theme.microSize
                                 font.family: Theme.monospaceFontFamily
                                 width: masterScale.width
                                 horizontalAlignment: Text.AlignRight
@@ -452,7 +452,7 @@ Rectangle {
                                 objectName: "mixerClipLabel" + strip.trackId
                                 text: "CLIP"
                                 color: Theme.textMuted
-                                font.pixelSize: 8
+                                font.pixelSize: Theme.microSize
                                 font.bold: true
                                 horizontalAlignment: Text.AlignHCenter
                                 Layout.preferredWidth: clipGainSlider.width
@@ -462,25 +462,21 @@ Rectangle {
                             RowLayout {
                                 Layout.alignment: Qt.AlignHCenter
                                 spacing: 4
-                                ToolButton {
+                                ToggleChip {
                                     objectName: "mixerMute" + strip.trackId
-                                    property bool active: strip.isMuted
+                                    active: strip.isMuted
+                                    activeBg: Theme.muteBg; activeBorder: Theme.muteBorder; activeText: Theme.muteText
                                     text: "M"; implicitWidth: 30; implicitHeight: 24
                                     onClicked: root.trackModel ? root.trackModel.setMuted(strip.trackId, !active) : panelWrapper.setMuted(strip.trackId, !active)
-                                    contentItem: Text { text: parent.text; color: parent.active ? Theme.muteText : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                    background: Rectangle { color: parent.active ? Theme.muteBg : Theme.chip; border.color: parent.active ? Theme.muteBorder : Theme.chipBorder; radius: 3 }
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: panelWrapper.formatMuteTooltip(active)
+                                    tooltip: panelWrapper.formatMuteTooltip(active)
                                 }
-                                ToolButton {
+                                ToggleChip {
                                     objectName: "mixerSolo" + strip.trackId
-                                    property bool active: strip.isSolo
+                                    active: strip.isSolo
+                                    activeBg: Theme.soloBg; activeBorder: Theme.soloBorder; activeText: Theme.soloText
                                     text: "S"; implicitWidth: 30; implicitHeight: 24
                                     onClicked: root.trackModel ? root.trackModel.setSolo(strip.trackId, !active) : panelWrapper.setSolo(strip.trackId, !active)
-                                    contentItem: Text { text: parent.text; color: parent.active ? Theme.soloText : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                    background: Rectangle { color: parent.active ? Theme.soloBg : Theme.chip; border.color: parent.active ? Theme.soloBorder : Theme.chipBorder; radius: 3 }
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: panelWrapper.formatSoloTooltip(active)
+                                    tooltip: panelWrapper.formatSoloTooltip(active)
                                 }
                             }
                         }

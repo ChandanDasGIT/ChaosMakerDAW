@@ -39,6 +39,7 @@ Rectangle {
                     id: addTrackButton
                     objectName: "addTrackButton"
                     text: Icons.plus
+                    Accessible.name: "Add track"
                     implicitWidth: 28; implicitHeight: 28
                     onClicked: addTrackPopup.open()
                     contentItem: Text { text: Icons.plus; color: Theme.accent; font.pixelSize: 20; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
@@ -226,91 +227,76 @@ Rectangle {
                                     }
                                 }
                             }
-                            Text { text: trackCard.trackType.toUpperCase(); color: Theme.textMuted; font.pixelSize: 8; font.letterSpacing: 0.7 }
+                            Text { text: trackCard.trackType.toUpperCase(); color: Theme.textMuted; font.pixelSize: Theme.microSize; font.letterSpacing: 0.7 }
                         }
 
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 2
-                            ToolButton {
+                            ToggleChip {
                                 id: muteButton
                                 objectName: "trackMuteButton" + trackCard.trackId
-                                property bool active: trackCard.isMuted
+                                active: trackCard.isMuted
+                                activeBg: Theme.muteBg; activeBorder: Theme.muteBorder; activeText: Theme.muteText
                                 text: "M"; implicitWidth: 22; implicitHeight: 24
                                 onClicked: root.trackModel.setMuted(trackCard.trackId, !active)
-                                contentItem: Text { text: "M"; color: parent.active ? Theme.muteText : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: parent.active ? Theme.muteBg : Theme.chip; border.color: parent.active ? Theme.muteBorder : Theme.chipBorder }
-                                ToolTip.visible: hovered
-                                ToolTip.text: active ? "Mute enabled" : "Mute disabled"
-                                ToolTip.delay: 450
+                                tooltip: active ? "Mute enabled" : "Mute disabled"
                             }
-                            ToolButton {
+                            ToggleChip {
                                 id: soloButton
                                 objectName: "trackSoloButton" + trackCard.trackId
-                                property bool active: trackCard.isSolo
+                                active: trackCard.isSolo
+                                activeBg: Theme.soloBg; activeBorder: Theme.soloBorder; activeText: Theme.soloText
                                 text: "S"; implicitWidth: 22; implicitHeight: 24
                                 onClicked: root.trackModel.setSolo(trackCard.trackId, !active)
-                                contentItem: Text { text: "S"; color: parent.active ? Theme.soloText : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: parent.active ? Theme.soloBg : Theme.chip; border.color: parent.active ? Theme.soloBorder : Theme.chipBorder }
-                                ToolTip.visible: hovered
-                                ToolTip.text: active ? "Solo enabled" : "Solo disabled"
-                                ToolTip.delay: 450
+                                tooltip: active ? "Solo enabled" : "Solo disabled"
                             }
-                            ToolButton {
+                            ToggleChip {
                                 id: inputButton
                                 objectName: "trackInputButton" + trackCard.trackId
-                                text: "IN"
+                                // Lit (accent text and border) once an input is chosen; still lightens on hover.
+                                active: trackCard.inputPort.length > 0
+                                activeBg: hovered ? Theme.chipHover : Theme.chip
+                                hoverHighlight: true
+                                text: "IN"; textSize: Theme.microSize
                                 implicitWidth: 26; implicitHeight: 24
                                 onClicked: inputPopup.open()
-                                contentItem: Text { text: "IN"; color: trackCard.inputPort.length > 0 ? Theme.accent : Theme.textMuted; font.pixelSize: 8; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: inputButton.hovered ? Theme.chipHover : Theme.chip; border.color: trackCard.inputPort.length > 0 ? Theme.accent : (inputButton.hovered ? Theme.chipBorderHover : Theme.chipBorder) }
-                                ToolTip.visible: hovered
-                                ToolTip.text: trackCard.inputPort.length > 0 ? trackCard.inputPort : "Choose this track's input"
-                                ToolTip.delay: 450
+                                tooltip: trackCard.inputPort.length > 0 ? trackCard.inputPort : "Choose this track's input"
                             }
-                            ToolButton {
+                            ToggleChip {
                                 objectName: "trackMonitorButton" + trackCard.trackId
-                                property bool active: trackCard.monitorEnabled
+                                active: trackCard.monitorEnabled
                                 enabled: trackCard.hasLiveInput
                                 implicitWidth: 26; implicitHeight: 24
-                                text: "MON"
+                                text: "MON"; textSize: Theme.microSize
                                 onClicked: root.trackModel.setMonitorEnabled(trackCard.trackId, !active)
-                                contentItem: Text { text: parent.text; color: parent.active ? Theme.accent : Theme.textMuted; font.pixelSize: 7; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: parent.active ? Theme.accentBg : Theme.chip; border.color: parent.active ? Theme.accent : Theme.chipBorder }
-                                ToolTip.visible: hovered
-                                ToolTip.text: active ? "Disable live input monitoring" : "Monitor this track's input without arming recording"
-                                ToolTip.delay: 450
+                                tooltip: active ? "Disable live input monitoring" : "Monitor this track's input without arming recording"
                             }
-                            ToolButton {
+                            ToggleChip {
                                 id: recordButton
                                 objectName: "trackRecordButton" + trackCard.trackId
-                                property bool active: trackCard.isRecordArmed
+                                active: trackCard.isRecordArmed
+                                activeBg: Theme.recordBg; activeBorder: Theme.record; activeText: Theme.textStrong
                                 implicitWidth: 50; implicitHeight: 24
-                                text: active ? "REC ON" : "REC OFF"
+                                text: active ? "REC ON" : "REC OFF"; textSize: Theme.microSize
                                 onClicked: root.trackModel.setRecordArmed(trackCard.trackId, !active)
-                                contentItem: Text { text: parent.text; color: parent.active ? Theme.textStrong : Theme.textMuted; font.pixelSize: 8; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: parent.active ? Theme.recordBg : Theme.chip; border.color: parent.active ? Theme.record : Theme.chipBorder }
-                                ToolTip.visible: hovered
-                                ToolTip.text: active ? "Recording armed" : "Arm track for recording"
-                                ToolTip.delay: 450
+                                tooltip: active ? "Recording armed" : "Arm track for recording"
                             }
-                            ToolButton {
+                            ToggleChip {
                                 id: fxButton
                                 objectName: "trackFxButton" + trackCard.trackId
-                                text: "FX"
+                                hoverHighlight: true
+                                text: "FX"; textSize: 9
                                 implicitWidth: 28; implicitHeight: 24
                                 onClicked: fxPopup.open()
-                                contentItem: Text { text: "FX"; color: fxButton.hovered ? Theme.text : Theme.textMuted; font.pixelSize: 9; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: fxButton.hovered ? Theme.chipHover : Theme.chip; border.color: fxButton.hovered ? Theme.chipBorderHover : Theme.chipBorder }
-                                ToolTip.visible: hovered
-                                ToolTip.text: "Browse track effects"
-                                ToolTip.delay: 450
+                                tooltip: "Browse track effects"
                             }
                             Item { Layout.fillWidth: true }
                             ToolButton {
                                 id: closeTrackButton
                                 objectName: "trackRemoveButton" + trackCard.trackId
                                 text: Icons.close
+                                Accessible.name: "Remove track"
                                 implicitWidth: 20; implicitHeight: 24
                                 onClicked: root.requestRemoveTrack(trackCard.trackId, trackCard.name, trackCard.clips ? trackCard.clips.length : 0)
                                 contentItem: Text { text: Icons.close; color: closeTrackButton.hovered ? Theme.textStrong : Theme.textMuted; font.pixelSize: 17; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
@@ -324,7 +310,7 @@ Rectangle {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 5
-                            Text { text: "VOL"; color: Theme.textMuted; font.pixelSize: 8; font.bold: true; Layout.preferredWidth: 24 }
+                            Text { text: "VOL"; color: Theme.textMuted; font.pixelSize: Theme.microSize; font.bold: true; Layout.preferredWidth: 24 }
                             Slider {
                                 id: volumeSlider
                                 objectName: "trackVolume" + trackCard.trackId
@@ -384,7 +370,7 @@ Rectangle {
                                     }
                                 }
                             }
-                            Button {
+                            PanelButton {
                                 objectName: "customTrackColour" + trackCard.trackId
                                 text: "Custom colour…"
                                 onClicked: {
@@ -586,6 +572,7 @@ Rectangle {
                     visible: addTrackPopup.addTrackStage === "instrument"
                     width: visible ? 26 : 0; height: 26
                     text: Icons.back
+                    Accessible.name: "Back to track types"
                     onClicked: addTrackPopup.addTrackStage = "kind"
                     contentItem: Text { text: Icons.back; color: Theme.text; font.pixelSize: 21; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                     background: Rectangle { radius: 5; color: parent.hovered ? Theme.trackList.backHover : "transparent" }

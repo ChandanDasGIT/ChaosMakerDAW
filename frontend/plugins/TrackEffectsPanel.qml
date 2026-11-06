@@ -51,7 +51,7 @@ Popup {
                     Text { text: root.trackName + " · Effects"; color: Theme.text; font.pixelSize: 17; font.bold: true }
                     Text { text: panelBridge.recordModeDescription; color: Theme.textMuted; font.pixelSize: 11 }
                 }
-                ComboBox {
+                ThemedComboBox {
                     objectName: "trackRecordingMode"
                     visible: root.hasLiveInput
                     model: ["Print FX", "Dry · editable FX"]
@@ -64,6 +64,7 @@ Popup {
                 ToolButton {
                     objectName: "closeTrackEffects"
                     text: Icons.close
+                    Accessible.name: "Close effects"
                     onClicked: root.close()
                     contentItem: Text { text: Icons.close; color: Theme.text; font.pixelSize: 22; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                     ToolTip.visible: hovered

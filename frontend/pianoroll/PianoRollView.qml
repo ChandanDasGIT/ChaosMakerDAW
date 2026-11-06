@@ -51,6 +51,8 @@ Item {
         color: zoomHover.containsMouse ? Theme.pianoRoll.smallButtonHover : Theme.pianoRoll.smallButton
         border.color: Theme.pianoRoll.buttonBorder
         Text { anchors.centerIn: parent; text: zoomButton.label; color: Theme.pianoRoll.buttonText; font.pixelSize: 12 }
+        Accessible.role: Accessible.Button
+        Accessible.name: zoomButton.tip
         MouseArea {
             id: zoomHover; anchors.fill: parent; hoverEnabled: true
             onClicked: zoomButton.clicked()
@@ -310,9 +312,9 @@ Item {
                     font.pixelSize: 11
                 }
 
-                Button {
+                ToolButton {
                     text: Icons.close
-                    flat: true
+                    Accessible.name: "Close piano roll"
                     implicitWidth: 20
                     implicitHeight: 20
                     onClicked: root.closeRequested()
@@ -338,6 +340,7 @@ Item {
                     color: root.activeTool === "pointer" ? Theme.pianoRoll.toolButtonActive : tool1Hover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: root.activeTool === "pointer" ? Theme.accent : Theme.pianoRoll.buttonBorder
                     Text { anchors.centerIn: parent; text: Icons.pointer; color: Theme.pianoRoll.text; font.pixelSize: 13 }
+                    Accessible.role: Accessible.Button; Accessible.name: "Select tool"
                     MouseArea { id: tool1Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "pointer" }
                     ToolTip.visible: tool1Hover.containsMouse; ToolTip.text: "Select (Pointer) · drag on empty grid to box-select, Shift adds"
                 }
@@ -347,6 +350,7 @@ Item {
                     color: root.activeTool === "pencil" ? Theme.pianoRoll.toolButtonActive : tool2Hover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: root.activeTool === "pencil" ? Theme.accent : Theme.pianoRoll.buttonBorder
                     Text { anchors.centerIn: parent; text: Icons.pencil; color: Theme.pianoRoll.text; font.pixelSize: 13 }
+                    Accessible.role: Accessible.Button; Accessible.name: "Draw tool"
                     MouseArea { id: tool2Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "pencil" }
                     ToolTip.visible: tool2Hover.containsMouse; ToolTip.text: "Draw (Pencil)"
                 }
@@ -356,6 +360,7 @@ Item {
                     color: root.activeTool === "eraser" ? Theme.pianoRoll.toolButtonActive : tool3Hover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: root.activeTool === "eraser" ? Theme.accent : Theme.pianoRoll.buttonBorder
                     Text { anchors.centerIn: parent; text: Icons.eraser; color: Theme.pianoRoll.text; font.pixelSize: 13 }
+                    Accessible.role: Accessible.Button; Accessible.name: "Erase tool"
                     MouseArea { id: tool3Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "eraser" }
                     ToolTip.visible: tool3Hover.containsMouse; ToolTip.text: "Erase"
                 }
@@ -368,6 +373,7 @@ Item {
                     color: root.snapEnabled ? Theme.pianoRoll.toolButtonActive : snapHover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: root.snapEnabled ? Theme.accent : Theme.pianoRoll.buttonBorder
                     Text { anchors.centerIn: parent; text: Icons.snap; color: Theme.pianoRoll.text; font.pixelSize: 11 }
+                    Accessible.role: Accessible.Button; Accessible.name: "Snap to grid"
                     MouseArea { id: snapHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.snapEnabled = !root.snapEnabled }
                     ToolTip.visible: snapHover.containsMouse
                     ToolTip.text: root.snapEnabled ? "Snap to grid: on (click to place notes freely)" : "Snap to grid: off (click to snap to the Grid setting)"
@@ -381,6 +387,7 @@ Item {
                     color: qHover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: Theme.pianoRoll.buttonBorder
                     Text { anchors.centerIn: parent; text: Icons.quantize + "Q"; color: Theme.pianoRoll.text; font.pixelSize: 10; font.bold: true }
+                    Accessible.role: Accessible.Button; Accessible.name: "Quantize"
                     MouseArea { id: qHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.quantizeNotes() }
                     ToolTip.visible: qHover.containsMouse
                     ToolTip.text: "Quantize note starts to the Grid (Q) · selected notes, or all if none selected"
@@ -395,6 +402,7 @@ Item {
                     color: undoHover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: Theme.pianoRoll.buttonBorder
                     Text { anchors.centerIn: parent; text: Icons.undo; color: Theme.pianoRoll.text; font.pixelSize: 13 }
+                    Accessible.role: Accessible.Button; Accessible.name: "Undo"
                     MouseArea { id: undoHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.trackModel.undo() }
                     ToolTip.visible: undoHover.containsMouse; ToolTip.text: "Undo (Ctrl+Z)"
                 }
@@ -407,6 +415,7 @@ Item {
                     color: redoHover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: Theme.pianoRoll.buttonBorder
                     Text { anchors.centerIn: parent; text: Icons.redo; color: Theme.pianoRoll.text; font.pixelSize: 13 }
+                    Accessible.role: Accessible.Button; Accessible.name: "Redo"
                     MouseArea { id: redoHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.trackModel.redo() }
                     ToolTip.visible: redoHover.containsMouse; ToolTip.text: "Redo (Ctrl+Shift+Z)"
                 }
@@ -1164,6 +1173,8 @@ Item {
                             required property var modelData
                             readonly property bool active: modelData.command === "play" && !!root.transport && root.transport.playing
                             objectName: "pianoRollTransport_" + modelData.command
+                            Accessible.role: Accessible.Button
+                            Accessible.name: modelData.tt
                             width: 22
                             height: 20
                             radius: 2

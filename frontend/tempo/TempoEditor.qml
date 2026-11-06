@@ -26,6 +26,7 @@ Rectangle {
             objectName: "bpmDecrease"
             Layout.preferredWidth: 23; Layout.fillHeight: true
             text: Icons.minus
+            Accessible.name: "Decrease BPM"
             onClicked: editor.adjust(-1)
             contentItem: Text { text: Icons.minus; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
             background: Rectangle { color: parent.down ? Theme.transport.stepPressed : parent.hovered ? Theme.transport.stepHover : "transparent"; radius: 4 }
@@ -61,6 +62,7 @@ Rectangle {
             objectName: "bpmIncrease"
             Layout.preferredWidth: 23; Layout.fillHeight: true
             text: Icons.plus
+            Accessible.name: "Increase BPM"
             onClicked: editor.adjust(1)
             contentItem: Text { text: Icons.plus; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
             background: Rectangle { color: parent.down ? Theme.transport.stepPressed : parent.hovered ? Theme.transport.stepHover : "transparent"; radius: 4 }
