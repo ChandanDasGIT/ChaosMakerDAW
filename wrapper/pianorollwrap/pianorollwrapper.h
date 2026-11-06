@@ -94,6 +94,16 @@ public:
     Q_INVOKABLE double newNoteLength() const noexcept { return m_grid.newNoteLength(); }
     Q_INVOKABLE double minimumNoteLength() const noexcept { return m_grid.minimumNoteLength(); }
     Q_INVOKABLE bool isOnGrid(double position, double unit) const noexcept { return PianoRollGrid::isOnGrid(position, unit); }
+    // Ruler ticks and grid lines (shared MusicalGrid rules). The view passes its notifying
+    // properties as arguments so its bindings follow meter and zoom changes.
+    Q_INVOKABLE int countedBeatsPerBar(double beatsPerBar, double beatUnit) const noexcept { return MusicalGrid::countedBeatsPerBar(beatsPerBar, beatUnit); }
+    Q_INVOKABLE int tickCount(double lengthBeats, double beatUnit, bool includeEnd) const noexcept { return MusicalGrid::tickCount(lengthBeats, beatUnit, includeEnd); }
+    Q_INVOKABLE bool isBarTick(int index, int perBar) const noexcept { return MusicalGrid::isBarTick(index, perBar); }
+    Q_INVOKABLE QString tickLabel(int index, int perBar) const { return QString::fromStdString(MusicalGrid::tickLabel(index, perBar)); }
+    Q_INVOKABLE int lineCount(double lengthBeats, double beatsPerBar, int linesPerBar) const noexcept { return MusicalGrid::lineCount(lengthBeats, beatsPerBar, linesPerBar); }
+    Q_INVOKABLE double lineOffsetInBar(int index, int linesPerBar, double spacing) const noexcept { return MusicalGrid::lineOffsetInBar(index, linesPerBar, spacing); }
+    Q_INVOKABLE double linePosition(int index, int linesPerBar, double spacing, double beatsPerBar) const noexcept { return MusicalGrid::linePosition(index, linesPerBar, spacing, beatsPerBar); }
+    Q_INVOKABLE bool isBarLineIndex(int index, int linesPerBar) const noexcept { return MusicalGrid::isBarLineIndex(index, linesPerBar); }
     // Quantize to the Grid (selected notes, or all), as one undoable edit.
     Q_INVOKABLE bool quantizeToGrid() { return quantize(m_grid.quantizeStep()); }
 

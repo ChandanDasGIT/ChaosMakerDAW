@@ -120,9 +120,14 @@ PHASE 2 — Move logic out of QML (architecture rule 6)
          spacing, on-grid checks. Used by Timeline::snap/isBarLine, PianoRollGrid and
          PianoRollPattern::quantize. Each editor keeps its own menu (timeline: Bars/Beats/
          fractions of a beat; piano roll: note values + triplet/dotted). No behaviour change.
-[ ] 2.1c Timeline grid-line drawing (Timeline.qml beatGridStride/visibleBeatCount maths)
+[x] 2.1c Timeline grid-line drawing (Timeline.qml beatGridStride/visibleBeatCount maths)
          still lives in QML; move it to MusicalGrid::lineSpacing. This changes how lines
          thin out when zooming, so check it visually.
+         Done without a visual change: the timeline's own stride/first/count rules moved
+         as-is into MusicalGrid (lineStride, firstVisibleLine, visibleLineCount) via
+         TimelineWrapper. The piano roll ruler ticks, grid-line count/positions and the
+         velocity lane ticks also moved (MusicalGrid tickCount, tickLabel, lineCount,
+         linePosition, ...). No grid maths is left in Timeline/PianoRoll/VelocityLane QML.
 [ ] 2.2  Note names / black-key detection (PianoKeys.qml:18-28) → backend/midi.
 [ ] 2.3  Transport time formatting (PlaybackControls.qml:96-102) → backend/core/valueformat.
 [ ] 2.4  Mixer target-clip selection (MixerPanel.qml:280-293) → MixerPanelWrapper
