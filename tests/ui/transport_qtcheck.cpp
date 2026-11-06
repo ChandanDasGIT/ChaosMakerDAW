@@ -425,6 +425,60 @@ private slots:
             if(parameter.toMap()["id"].toString()=="lowfreq")updated=parameter.toMap()["value"].toDouble()>300;
         QVERIFY(updated);QVERIFY(QMetaObject::invokeMethod(board,"close"));QVERIFY(model->removePedal(id));
     }
+    void pedal_parameters_are_compact_slider_rows_that_reset_on_double_click() {
+        auto* model=qobject_cast<GuitarSuiteModel*>(EngineController::instance()->guitarSuite());QVERIFY(model);
+        QVERIFY(model->addPedal("Parametric EQ"));const int row=model->count()-1;
+        const int id=model->data(model->index(row),GuitarSuiteModel::PedalIdRole).toInt();
+        auto* board=window->findChild<QObject*>("guitarSuitePanel");QVERIFY(board);
+        const auto restore=qScopeGuard([&] { QMetaObject::invokeMethod(board,"close"); model->removePedal(id); });
+        QVERIFY(QMetaObject::invokeMethod(board,"open"));QTRY_VERIFY(board->property("visible").toBool());
+        QTest::qWait(200);
+        const auto parameter=[&](const QString& key) {
+            for(const auto& p:model->data(model->index(row),GuitarSuiteModel::ParametersRole).toList())
+                if(p.toMap()["id"].toString()==key) return p.toMap();
+            return QVariantMap();
+        };
+        QPointer<QQuickItem> slider=visualItem(window->contentItem(),"pedal.parametriceq.lowfreq");QVERIFY(slider);
+        auto* readout=visualItem(window->contentItem(),"pedal.parametriceq.lowfreq.value");QVERIFY(readout);
+        auto* next=visualItem(window->contentItem(),"pedal.parametriceq.lowgain");QVERIFY(next);
+        QVERIFY(slider->inherits("QQuickSlider"));
+        // A row is compact: the next parameter starts well within a dial's old 84 px row.
+        const double gap=next->mapToScene(QPointF()).y()-slider->mapToScene(QPointF()).y();
+        QVERIFY2(gap>0 && gap<40,qPrintable(QString::number(gap)));
+        QVERIFY(slider->width()>slider->height()*3);                  // horizontal
+        const QVariantMap info=parameter("lowfreq");
+        QVERIFY(info.contains("default"));
+        const double def=info["default"].toDouble();
+        // Drag towards the right end: the parameter follows and the readout shows it.
+        const QPoint mid=slider->mapToScene(QPointF(slider->width()*0.5,slider->height()/2)).toPoint();
+        const QPoint right=slider->mapToScene(QPointF(slider->width()*0.9,slider->height()/2)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,mid);
+        QTest::mouseMove(window,right,20);
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,right);
+        const double dragged=parameter("lowfreq")["value"].toDouble();
+        QVERIFY(dragged!=def);
+        QTRY_VERIFY(slider);
+        QCOMPARE(slider->property("value").toDouble(),dragged);
+        QCOMPARE(readout->property("text").toString(),model->formatValue(dragged,info["unit"].toString()));
+        // The plain wheel scrolls the card (given more rows than fit); it never changes a value.
+        QQuickItem* card=slider->parentItem();
+        while(card && !card->inherits("QQuickFlickable")) card=card->parentItem();
+        QVERIFY(card);
+        const auto restoreHeight=card->property("contentHeight");
+        card->setProperty("contentHeight",card->height()*3);
+        QCOMPARE(card->property("contentY").toDouble(),0.0);
+        QWheelEvent wheel(QPointF(mid),window->mapToGlobal(mid),QPoint(),QPoint(0,-120),Qt::NoButton,Qt::NoModifier,Qt::NoScrollPhase,false);
+        QCoreApplication::sendEvent(window,&wheel); QCoreApplication::processEvents();
+        QTRY_VERIFY(card->property("contentY").toDouble()>0);
+        QCOMPARE(parameter("lowfreq")["value"].toDouble(),dragged);
+        card->setProperty("contentY",0.0); card->setProperty("contentHeight",restoreHeight);
+        QTest::qWait(50);
+        // Double-click returns to the pedal's default.
+        const QPoint at=slider->mapToScene(QPointF(slider->width()*0.2,slider->height()/2)).toPoint();
+        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,at,10);
+        QTRY_VERIFY(std::abs(parameter("lowfreq")["value"].toDouble()-def)<1e-4);
+        QTRY_VERIFY(slider && std::abs(slider->property("value").toDouble()-def)<1e-4);
+    }
     void factory_preset_picker_applies_djent_and_jazz() {
         auto* model=qobject_cast<GuitarSuiteModel*>(EngineController::instance()->guitarSuite());QVERIFY(model);
         auto* board=window->findChild<QObject*>("guitarSuitePanel");QVERIFY(board);

@@ -9,6 +9,9 @@ Item {
     property string trackName: ""
     property bool monitoring: true
     property var levels: EngineController.monitorLevels
+    // Pedal card size: wide enough for a name | slider | value row per parameter.
+    readonly property real cardWidth: 276
+    readonly property real cardStep: cardWidth + 12
     signal clearClipsRequested()
     ColumnLayout {
         enabled: root.effectsModel && !root.effectsModel.busy
@@ -135,7 +138,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            contentWidth: Math.max(width, pedalCards.count * 254)
+            contentWidth: Math.max(width, pedalCards.count * root.cardStep)
             contentHeight: height
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
@@ -167,7 +170,8 @@ Item {
                         controlDescriptors = parameters.map(function(parameter) {
                             return {id: parameter.id, name: parameter.name,
                                     min: parameter.min, max: parameter.max,
-                                    value: parameter.value, unit: parameter.unit}
+                                    value: parameter.value, unit: parameter.unit,
+                                    defaultValue: parameter["default"]}
                         })
                     }
                     function parameterValue(id, fallback) {
@@ -175,9 +179,9 @@ Item {
                             if (parameter.id === id) return parameter.value
                         return fallback
                     }
-                    x: index * 254
+                    x: index * root.cardStep
                     y: 4
-                    width: 242
+                    width: root.cardWidth
                     height: pedalScroll.height - 12
                     radius: 7
                     color: "#2c2e34"
@@ -203,7 +207,7 @@ Item {
                                 drag.axis: Drag.XAxis
                                 onReleased: {
                                     pedalCard.Drag.drop()
-                                    pedalCard.x = Qt.binding(function() { return pedalCard.index * 254 })
+                                    pedalCard.x = Qt.binding(function() { return pedalCard.index * root.cardStep })
                                 }
                                 Text { anchors.centerIn: parent; text: "⠿"; color: Theme.textMuted; font.pixelSize: 18 }
                                 ToolTip.visible: containsMouse
@@ -226,6 +230,10 @@ Item {
                         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.divider }
                         ScrollView {
                             id: controlScroll
+                            // Mouse drags belong to the sliders: without this the card's
+                            // Flickable steals the press and a double-click never resets a
+                            // value. The wheel and the scroll bar still scroll the card.
+                            Component.onCompleted: contentItem.acceptedButtons = Qt.NoButton
                             ScrollBar.vertical.policy: contentHeight > availableHeight + 1 ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
                             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                             Layout.fillWidth: true
@@ -233,7 +241,9 @@ Item {
                             contentWidth: availableWidth
                             clip: true
                             ColumnLayout {
+                                // Leave room for the scroll bar so it never covers values.
                                 width: controlScroll.availableWidth
+                                       - (controlScroll.ScrollBar.vertical.policy === ScrollBar.AlwaysOn ? controlScroll.ScrollBar.vertical.width + 4 : 0)
                                 Text {
                                     visible: pedalCard.features.pitchDelayNote
                                     text: "Shifted voices have a short processing delay. Best with clear single notes."
@@ -417,32 +427,87 @@ Item {
                                     model: pedalCard.controlDescriptors.filter(function(parameter) {
                                             return root.effectsModel.isDial(pedalCard.pedalType, parameter.id)
                                         })
-                                    delegate: ColumnLayout {
+                                    // One row per parameter: name | slider | value. The plain
+                                    // wheel scrolls the card (sliders ignore it); double-click
+                                    // resets to the pedal's default.
+                                    delegate: RowLayout {
+                                        id: controlRow
                                         required property var modelData
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 84
-                                        spacing: 2
+                                        Layout.preferredHeight: 26
+                                        spacing: 4
                                         readonly property bool syncedOff: root.effectsModel.disabledWhenSynced(pedalCard.pedalType, modelData.id) && modulationSync.synced
-                                        Text { text: modelData.name + (parent.syncedOff ? " (manual)" : ""); color: Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
-                                        Dial {
-                                            objectName: pedalCard.pedalType + "." + modelData.id
-                                            Layout.alignment: Qt.AlignHCenter
-                                            implicitWidth: 52
-                                            implicitHeight: 52
-                                            enabled: !parent.syncedOff
-                                            opacity: enabled ? 1 : 0.35
-                                            stepSize: root.effectsModel.dialStep(pedalCard.pedalType, modelData.id)
-                                            from: modelData.min
-                                            to: modelData.max
-                                            value: pedalCard.parameterValue(modelData.id, modelData.value)
-                                            onMoved: root.effectsModel.setParameter(pedalCard.pedalId, modelData.id, value)
+                                        readonly property real modelValue: Number(pedalCard.parameterValue(modelData.id, modelData.value))
+                                        opacity: syncedOff ? 0.4 : 1
+                                        Text {
+                                            text: controlRow.modelData.name + (controlRow.syncedOff ? " (manual)" : "")
+                                            color: Theme.textMuted
+                                            font.pixelSize: 10
+                                            elide: Text.ElideRight
+                                            Layout.preferredWidth: 78
+                                        }
+                                        Slider {
+                                            id: parameterSlider
+                                            objectName: pedalCard.pedalType + "." + controlRow.modelData.id
+                                            Layout.fillWidth: true
+                                            implicitHeight: 22
+                                            padding: 0
+                                            enabled: !controlRow.syncedOff
+                                            stepSize: root.effectsModel.dialStep(pedalCard.pedalType, controlRow.modelData.id)
+                                            from: controlRow.modelData.min
+                                            to: controlRow.modelData.max
+                                            value: controlRow.modelValue
+                                            onMoved: root.effectsModel.setParameter(pedalCard.pedalId, controlRow.modelData.id, value)
+                                            background: Item {
+                                                x: parameterSlider.leftPadding
+                                                width: parameterSlider.availableWidth
+                                                height: parameterSlider.height
+                                                Rectangle {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    width: parent.width; height: 4; radius: 2
+                                                    color: "#3a3d45"
+                                                }
+                                                Rectangle {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    width: parameterSlider.visualPosition * parent.width; height: 4; radius: 2
+                                                    color: Theme.accent
+                                                }
+                                            }
+                                            handle: Rectangle {
+                                                x: parameterSlider.leftPadding + parameterSlider.visualPosition * (parameterSlider.availableWidth - width)
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                width: 12; height: 12; radius: 6
+                                                color: parameterSlider.pressed ? "#ffffff" : Theme.text
+                                                border.color: parameterSlider.activeFocus ? Theme.accent : "#1e2025"
+                                            }
+                                            TapHandler {
+                                                acceptedButtons: Qt.LeftButton
+                                                enabled: controlRow.modelData.defaultValue !== undefined
+                                                // Apply after the slider handles the mouse release.
+                                                onDoubleTapped: Qt.callLater(() => root.effectsModel.setParameter(
+                                                    pedalCard.pedalId, controlRow.modelData.id, controlRow.modelData.defaultValue))
+                                            }
+                                            ToolTip.visible: hovered || pressed
+                                            ToolTip.delay: pressed ? 0 : 450
+                                            ToolTip.text: controlRow.modelData.name + " " + root.effectsModel.formatValue(value, controlRow.modelData.unit)
+                                                          + " · double-click for default"
+                                        }
+                                        // Follow model changes (presets, other views) except mid-drag.
+                                        Binding {
+                                            target: parameterSlider
+                                            property: "value"
+                                            value: controlRow.modelValue
+                                            when: !parameterSlider.pressed
                                         }
                                         Text {
-                                            text: root.effectsModel.formatValue(Number(pedalCard.parameterValue(modelData.id, modelData.value)), modelData.unit)
+                                            objectName: pedalCard.pedalType + "." + controlRow.modelData.id + ".value"
+                                            text: root.effectsModel.formatValue(parameterSlider.value, controlRow.modelData.unit)
                                             color: Theme.text
-                                            font.pixelSize: 9
-                                            horizontalAlignment: Text.AlignHCenter
-                                            Layout.fillWidth: true
+                                            font.pixelSize: 10
+                                            font.family: Theme.monospaceFontFamily
+                                            horizontalAlignment: Text.AlignRight
+                                            elide: Text.ElideLeft
+                                            Layout.preferredWidth: 60
                                         }
                                     }
                                 }
