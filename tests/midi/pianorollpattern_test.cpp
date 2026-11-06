@@ -88,3 +88,24 @@ TEST(pianorollpattern, quantize_leaves_notes_hidden_by_a_left_trim)
     CHECK(pattern.notes()[0].startBeat == -0.4);
     CHECK(pattern.notes()[1].startBeat == 0.0);
 }
+
+TEST(pianorollpattern, quantize_per_bar_keeps_odd_steps_on_bar_lines)
+{
+    // Dotted 1/16 (0.375) in 4/4: lines at 0, 0.375 ... 3.75, then the next bar at 4
+    PianoRollPattern dotted;
+    const int a = dotted.addNote(60, 3.95, 0.5);   // nearer the bar line than 3.75
+    const int b = dotted.addNote(62, 3.8, 0.5);    // nearer 3.75
+    const int c = dotted.addNote(64, 4.4, 0.5);    // second bar restarts the grid: 4.375
+    CHECK(dotted.quantize(0.375, 4.0));
+    CHECK(std::abs(dotted.findNote(a)->startBeat - 4.0) < 1e-9);
+    CHECK(std::abs(dotted.findNote(b)->startBeat - 3.75) < 1e-9);
+    CHECK(std::abs(dotted.findNote(c)->startBeat - 4.375) < 1e-9);
+
+    // Quarter-note triplets (2/3) in 3/4: 2.9 goes to the bar line at 3, not 3.333
+    PianoRollPattern triplet;
+    const int d = triplet.addNote(60, 2.9, 0.5);
+    const int e = triplet.addNote(62, 1.2, 0.5);
+    CHECK(triplet.quantize(2.0 / 3.0, 3.0));
+    CHECK(std::abs(triplet.findNote(d)->startBeat - 3.0) < 1e-9);
+    CHECK(std::abs(triplet.findNote(e)->startBeat - 4.0 / 3.0) < 1e-9);
+}

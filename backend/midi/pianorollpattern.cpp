@@ -80,14 +80,27 @@ void PianoRollPattern::clearSelection() {
     }
 }
 
-bool PianoRollPattern::quantize(double stepBeats) {
+bool PianoRollPattern::quantize(double stepBeats, double barLengthBeats) {
     if (!std::isfinite(stepBeats) || stepBeats <= 0) return false;
+    const bool perBar = std::isfinite(barLengthBeats) && barLengthBeats > 0;
     const bool onlySelected = selectedCount() > 0;
+    constexpr double tolerance = 1e-9;
     bool moved = false;
     for (auto& n : m_notes) {
         if ((onlySelected && !n.selected) || n.startBeat < 0) continue;
-        const double snapped = std::max(0.0, std::round(n.startBeat / stepBeats) * stepBeats);
-        if (snapped != n.startBeat) { n.startBeat = snapped; moved = true; }
+        double snapped;
+        if (perBar) {
+            // Grid lines within the bar, plus the next bar line; take the nearer one.
+            const double bar = std::floor(n.startBeat / barLengthBeats + tolerance) * barLengthBeats;
+            const double offset = n.startBeat - bar;
+            const double lower = std::floor(offset / stepBeats + tolerance) * stepBeats;
+            const double upper = std::min(lower + stepBeats, barLengthBeats);
+            snapped = bar + (offset - lower < upper - offset ? lower : upper); // ties round up
+        } else {
+            snapped = std::round(n.startBeat / stepBeats) * stepBeats;
+        }
+        snapped = std::max(0.0, snapped);
+        if (std::abs(snapped - n.startBeat) > tolerance) { n.startBeat = snapped; moved = true; }
     }
     return moved;
 }

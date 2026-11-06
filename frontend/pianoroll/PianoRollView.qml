@@ -106,15 +106,17 @@ Item {
     }
 
     // The Grid division in beats ("Off" -> 0), independent of the magnet button.
+    // Grid style: triplet = 2/3 of the division, dotted = 1.5x.
     function gridDivisionBeats() {
+        const factor = root.snapStyle === "triplet" ? 2.0 / 3.0 : root.snapStyle === "dotted" ? 1.5 : 1.0
         switch (root.snapDivision) {
-            case "1/4": return 1.0
-            case "1/8": return 0.5
-            case "1/16": return 0.25
-            case "1/32": return 0.125
-            case "1/64": return 0.0625
+            case "1/4": return 1.0 * factor
+            case "1/8": return 0.5 * factor
+            case "1/16": return 0.25 * factor
+            case "1/32": return 0.125 * factor
+            case "1/64": return 0.0625 * factor
             case "Off": return 0.0
-            default: return 0.25
+            default: return 0.25 * factor
         }
     }
 
@@ -186,10 +188,13 @@ Item {
         }
     }
 
+    // Floor to the grid cell. The grid restarts at every bar line, so steps that do not divide
+    // the bar (triplets, dotted) still line up with bars.
     function snapToGrid(beat) {
         const step = getSnapBeats()
         if (step <= 0) return Math.max(0, beat)
-        return Math.max(0, Math.floor(beat / step) * step)
+        const bar = Math.floor(beat / root.beatsPerBar + 1e-9) * root.beatsPerBar
+        return Math.max(0, bar + Math.floor((beat - bar) / step + 1e-9) * step)
     }
 
     // Project meter from the backend, in quarter-note beats (6/8 -> 3 per bar, 0.5 per beat).
@@ -205,13 +210,22 @@ Item {
 
     // Grid line spacing: one line per snap division ("Off" -> meter beats only), coarsened by
     // doubling until lines are at least 6px apart so zoomed-out grids stay readable.
+    // Straight grids keep at least one line per meter beat; triplet/dotted grids show their
+    // own step (doubled while too dense).
     readonly property real gridLineBeats: {
         const step = gridDivisionBeats()
+        if (step > 0 && snapStyle !== "straight") {
+            let beats = step
+            while (beats * pixelsPerBeat < 6) beats *= 2
+            return beats
+        }
         let beats = step > 0 ? Math.min(beatUnit, step) : beatUnit
         while (beats < beatUnit && beats * pixelsPerBeat < 6)
             beats *= 2
         return Math.min(beats, beatUnit)
     }
+    // Grid lines restart at every bar line
+    readonly property int gridLinesPerBar: Math.max(1, Math.ceil(beatsPerBar / gridLineBeats - 1e-6))
 
     // Note fill colour. "Velocity" mode blends dim blue (soft) -> bright teal (loud);
     // other modes keep the default note colour for now.
@@ -692,15 +706,17 @@ Item {
 
                     // Vertical Bar / Beat / Subdivision Grid Lines (follow the Grid setting)
                     Repeater {
-                        model: Math.ceil(root.totalGridWidth / (root.gridLineBeats * root.pixelsPerBeat)) + 1
+                        model: Math.ceil(root.totalGridWidth / (root.beatsPerBar * root.pixelsPerBeat)) * root.gridLinesPerBar + 1
                         delegate: Rectangle {
                             required property int index
-                            readonly property real position: index * root.gridLineBeats
-                            readonly property bool isMajorBar: root.isOnGrid(position, root.beatsPerBar)
-                            readonly property bool isBeat: root.isOnGrid(position, root.beatUnit)
+                            readonly property int lineInBar: index % root.gridLinesPerBar
+                            readonly property real offsetInBar: lineInBar * root.gridLineBeats
+                            readonly property real position: Math.floor(index / root.gridLinesPerBar) * root.beatsPerBar + offsetInBar
+                            readonly property bool isMajorBar: lineInBar === 0
+                            readonly property bool isBeat: root.isOnGrid(offsetInBar, root.beatUnit)
 
                             // Whole-pixel positions & widths keep every line crisp
-                            x: Math.round(index * root.gridLineBeats * root.pixelsPerBeat)
+                            x: Math.round(position * root.pixelsPerBeat)
                             y: 0
                             width: isMajorBar ? 2 : 1
                             height: root.contentGridHeight
@@ -1131,9 +1147,10 @@ Item {
                 }
 
                 PianoRollComboBox {
+                    objectName: "pianoRollGridStyle"
                     implicitWidth: 80
                     implicitHeight: 22
-                    model: ["straight", "triplet", "dotted", "swing"]
+                    model: ["straight", "triplet", "dotted"]
                     currentIndex: 0
                     onCurrentTextChanged: root.snapStyle = currentText
                 }

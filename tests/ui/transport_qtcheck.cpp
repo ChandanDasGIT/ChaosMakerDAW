@@ -1674,6 +1674,31 @@ private slots:
         lengthBox->setProperty("currentIndex",2);                   // "1/8"
         QCOMPARE(drawAt(4.1),0.5);
     }
+    void piano_roll_triplet_and_dotted_grids_snap_per_bar() {
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* notes=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(notes);
+        auto* grid=visualItem(roll,"pianoRollGrid"); QVERIFY(grid);
+        auto* style=visualItem(roll,"pianoRollGridStyle"); QVERIFY(style);
+        const auto restore=qScopeGuard([&] {
+            QMetaObject::invokeMethod(notes,"clear"); style->setProperty("currentIndex",0); roll->setVisible(false);
+        });
+        roll->setVisible(true); QTest::qWait(30);
+        QCOMPARE(style->property("count").toInt(),3);               // straight, triplet, dotted (no swing)
+        const double ppb=roll->property("pixelsPerBeat").toDouble();
+        const auto drawAt=[&](double beat) {
+            auto* flick=grid->parentItem()->parentItem();
+            const double y=flick->property("contentY").toDouble()+40;
+            QTest::mouseClick(window,Qt::LeftButton,{},grid->mapToScene(QPointF(beat*ppb,y)).toPoint());
+            return notes->property("notes").toList().last().toMap().value("startBeat").toDouble();
+        };
+        style->setProperty("currentIndex",1);                       // triplet 1/16 = 1/6 beat
+        QCOMPARE(roll->property("snapStyle").toString(),QString("triplet"));
+        QVERIFY(std::abs(drawAt(0.4)-1.0/3.0)<1e-6);
+        QVERIFY(std::abs(roll->property("gridLineBeats").toDouble()-1.0/6.0)<1e-6);
+        style->setProperty("currentIndex",2);                       // dotted 1/16 = 0.375 beat
+        QVERIFY(std::abs(drawAt(3.9)-3.75)<1e-6);
+        QVERIFY(std::abs(drawAt(4.2)-4.0)<1e-6);                    // grid restarts at bar 2 (past the 3.75 note)
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());

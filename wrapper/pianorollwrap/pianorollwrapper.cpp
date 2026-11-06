@@ -181,7 +181,7 @@ bool PianoRollWrapper::deleteSelected() {
 }
 
 bool PianoRollWrapper::quantize(double stepBeats) {
-    if (!m_pattern.quantize(stepBeats)) return false;
+    if (!m_pattern.quantize(stepBeats, beatsPerBar())) return false;
     const bool ok = commit();
     emit notesChanged();
     return ok;

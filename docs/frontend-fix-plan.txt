@@ -24,7 +24,7 @@ PHASE 1 — Broken or misleading behaviour (do first)
          - [done, removed] Key snap, Pitch/Channel colour modes, hardcoded "Track 1/2/3" and
            channel combos, velocity lane "+" and "▾" (come back when the features exist)
          - [done] "Notes:" combo → length of newly drawn notes
-         - Grid style → triplet and dotted grids (drop "swing" for now)
+         - [done] Grid style → triplet and dotted grids, per bar ("swing" dropped for now)
          - Colour box → Velocity / Track colour
 
 [x] 1.4  Save As shortcut is shown but missing.
