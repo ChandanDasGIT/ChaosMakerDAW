@@ -100,4 +100,20 @@ RowLayout {
         font.pixelSize: 15
         font.family: "monospace"
     }
+
+    // Musical position (bars.beats.hundredths) in the transport's meter, formatted by the backend
+    Text {
+        objectName: "transportBarsBeats"
+        Layout.leftMargin: 10
+        text: root.transport ? playbackBridge.formatBarsBeats(root.transport.positionBeats,
+                                                              root.transport.numerator,
+                                                              root.transport.denominator)
+                             : playbackBridge.formatBarsBeats(0, 4, 4)
+        color: Theme.accent
+        font.pixelSize: 15
+        font.family: "monospace"
+        ToolTip.visible: barsBeatsHover.hovered
+        ToolTip.text: "Position in bars.beats"
+        HoverHandler { id: barsBeatsHover }
+    }
 }

@@ -9,9 +9,9 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
-Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed.
-Next: Phase 3, starting with 3.1 (BPM, time signature and a bars.beats position inline
-on the transport bar). Then 3.2 … 3.12, Phase 4, Phase 5.
+Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. 3.1 done.
+Next: 3.2 (move buffer/output/MIDI selectors out of the top bar into Preferences).
+Then 3.3 … 3.12, Phase 4, Phase 5.
 
 Decisions made by the user (keep to them):
 - Mixer: track strips have NO track volume fader. Each strip's vertical fader is clip gain
@@ -23,6 +23,9 @@ Decisions made by the user (keep to them):
   Commit when the user says so.
 - The delete-track confirmation dialog is kept (deletion is undoable now); ask before
   removing it.
+- The metronome/count-in/snap popup is opened by a metronome ICON button, no text label.
+- piano-roll-demo.png (a Reaper reference screenshot) is not needed; its deletion goes
+  into the next commit.
 
 Test status after Phase 2 (all green):
 - build/backendtests   -> 259 tests, 0 failed checks
@@ -34,8 +37,6 @@ Build: cmake --build --preset default   Run the app: pw-jack build/appChaosMaker
 Single UI test: build/transporttests <test_function_name>
 
 Open notes:
-- piano-roll-demo.png shows as deleted in the working tree; that was there before this
-  plan started and has not been committed. Ask the user what to do with it.
 - Two backend formatters produce the transport clock text (PlaybackControls::formatTime
   and valueformat::position); they differ only for negative times. Not merged yet.
 - Hand checks still worth doing in the real app: clip gain drag + Ctrl+Z, delete a track
@@ -200,9 +201,15 @@ PHASE 2 — Move logic out of QML (architecture rule 6)
 
 PHASE 3 — Layout and workflow
 -----------------------------
-[ ] 3.1  Transport bar: show BPM, time signature and a bars.beats position inline
+[x] 3.1  Transport bar: show BPM, time signature and a bars.beats position inline
          (TransportBar.qml); keep QuickSettings for metronome/count-in/snap, and give it
          a clearer name.
+         Done: BPM (TempoEditor) and time signature (new tempo/MeterEditor.qml) sit on the
+         bar; a bars.beats readout follows the clock (PlaybackControlsWrapper.formatBarsBeats).
+         Backend PlaybackControls::formatBarsBeats now uses valueformat::barBeatPosition, so
+         6/8 counts eighth-note beats (it counted quarter notes before). The popup keeps
+         metronome/count-in/snap, is titled "Metronome & Snap" and opens from a drawn
+         metronome icon (settings/MetronomeIcon.qml; blue while the metronome is on).
 [ ] 3.2  Top bar: move buffer/output/MIDI selectors (TopBar.qml:71, DeviceSettings.qml)
          into Preferences so the bar fits at the 980 px minimum width.
 [ ] 3.3  Menus: add Edit (Undo/Redo, Cut/Copy/Paste) and View; add recent files.

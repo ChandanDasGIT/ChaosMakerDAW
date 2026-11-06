@@ -140,7 +140,8 @@ if(DAW_BUILD_APP)
                       frontend/engine/PlaybackControls.qml
                       frontend/session/ProjectActions.qml frontend/audiodevice/DeviceSettings.qml
                       frontend/settings/AppSettings.qml frontend/settings/QuickSettings.qml
-                      frontend/tempo/TempoEditor.qml
+                      frontend/tempo/TempoEditor.qml frontend/tempo/MeterEditor.qml
+                      frontend/settings/MetronomeIcon.qml
                       frontend/instruments/guitar/GuitarSuitePanel.qml
                       frontend/instruments/guitar/GuitarSuiteEditor.qml
                       frontend/plugins/TrackEffectsPanel.qml frontend/plugins/eq/Tenbandeq.qml

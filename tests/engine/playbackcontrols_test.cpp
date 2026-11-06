@@ -1,6 +1,8 @@
 #include "testkit.h"
 #include "engine/playbackcontrols.h"
 
+#include <cmath>
+
 TEST(playbackcontrols, state_transitions)
 {
     PlaybackControls ctrl;
@@ -54,6 +56,15 @@ TEST(playbackcontrols, formatting)
     CHECK(PlaybackControls::formatBarsBeats(0.0, 4, 4) == "1.1.00");
     CHECK(PlaybackControls::formatBarsBeats(4.0, 4, 4) == "2.1.00");
     CHECK(PlaybackControls::formatBarsBeats(5.5, 4, 4) == "2.2.50");
+    CHECK(PlaybackControls::formatBarsBeats(3.0, 3, 4) == "2.1.00");
+    // 6/8: a bar is three quarter notes, counted as six eighth-note beats.
+    CHECK(PlaybackControls::formatBarsBeats(0.5, 6, 8) == "1.2.00");
+    CHECK(PlaybackControls::formatBarsBeats(2.75, 6, 8) == "1.6.50");
+    CHECK(PlaybackControls::formatBarsBeats(3.0, 6, 8) == "2.1.00");
+    // Before the start (count-in pre-roll) and invalid input read as the start.
+    CHECK(PlaybackControls::formatBarsBeats(-2.0, 4, 4) == "1.1.00");
+    CHECK(PlaybackControls::formatBarsBeats(std::nan(""), 4, 4) == "1.1.00");
+    CHECK(PlaybackControls::formatBarsBeats(1.0, 0, 0) == "1.2.00");
 }
 
 TEST(playbackcontrols, repeat_range_and_loop_calculation)

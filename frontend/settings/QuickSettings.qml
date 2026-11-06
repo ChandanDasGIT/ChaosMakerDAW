@@ -2,22 +2,15 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import ".."
-import "../tempo"
 
 Item {
     id: root
 
     property var transport: EngineController
-    property int timeSignature: 4
-    property int timeSignatureDenominator: 4
-    property real bpm: 120
     property int snapMode: 1
     readonly property var focusedItem: Window.window ? Window.window.activeFocusItem : null
     readonly property bool editingText: focusedItem instanceof TextInput || focusedItem instanceof TextEdit
 
-    signal numeratorEdited(int value)
-    signal denominatorEdited(int value)
-    signal bpmEdited(real value)
     signal snapModeEdited(int value)
     signal transportAction(string action)
 
@@ -32,17 +25,16 @@ Item {
         id: quickSettingsButton
         objectName: "quickSettingsButton"
         anchors.fill: parent
-        text: "QuickSettings"
         checkable: true
         checked: quickSettingsPopup.visible
         onClicked: checked ? quickSettingsPopup.open() : quickSettingsPopup.close()
-        contentItem: Text {
-            text: parent.text
-            color: quickSettingsPopup.visible ? Theme.accent : Theme.text
-            font.pixelSize: 12
-            font.bold: true
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
+        Accessible.name: "Metronome and snap settings"
+        contentItem: Item {
+            MetronomeIcon {
+                anchors.centerIn: parent
+                width: 18; height: 18
+                color: quickSettingsPopup.visible || root.transport.metronomeEnabled ? Theme.accent : Theme.text
+            }
         }
         background: Rectangle {
             radius: 6
@@ -50,7 +42,7 @@ Item {
             border.color: quickSettingsPopup.visible ? Theme.accent : "#41444c"
         }
         ToolTip.visible: hovered
-        ToolTip.text: "Metronome, count-in, BPM, time signature and snap grid"
+        ToolTip.text: "Metronome, count-in and snap grid"
     }
 
     Popup {
@@ -90,12 +82,12 @@ Item {
 
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: "QuickSettings"; color: Theme.text; font.pixelSize: 15; font.bold: true; Layout.fillWidth: true }
+                Text { text: "Metronome & Snap"; color: Theme.text; font.pixelSize: 15; font.bold: true; Layout.fillWidth: true }
                 ToolButton {
                     objectName: "closeQuickSettings"
                     text: "×"; implicitWidth: 28; implicitHeight: 24
                     onClicked: quickSettingsPopup.close()
-                    ToolTip.visible: hovered; ToolTip.text: "Close QuickSettings"
+                    ToolTip.visible: hovered; ToolTip.text: "Close"
                 }
             }
 
@@ -145,84 +137,6 @@ Item {
             }
 
             ColumnLayout {
-                enabled: !root.transport.countingIn
-                spacing: 3
-                Text { text: "TIME SIGNATURE"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
-                Rectangle {
-                    Layout.preferredWidth: 87
-                    Layout.preferredHeight: 29
-                    radius: 6
-                    color: "#191a1e"
-                    border.color: "#3a3d45"
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 3
-                        TextField {
-                            id: numeratorField
-                            objectName: "meterNumerator"
-                            width: 32; height: 23
-                            text: String(root.timeSignature)
-                            color: Theme.text
-                            font.pixelSize: 12; font.bold: true
-                            horizontalAlignment: TextInput.AlignHCenter
-                            verticalAlignment: TextInput.AlignVCenter
-                            selectByMouse: true
-                            inputMethodHints: Qt.ImhDigitsOnly
-                            validator: IntValidator { bottom: 1; top: 2147483647 }
-                            background: Rectangle {
-                                radius: 5
-                                color: numeratorField.activeFocus ? "#282b32" : "transparent"
-                                border.color: numeratorField.activeFocus ? Theme.accent : "transparent"
-                            }
-                            onEditingFinished: {
-                                if (acceptableInput && Number(text) > 0)
-                                    root.numeratorEdited(Number(text))
-                                else
-                                    text = String(root.timeSignature)
-                            }
-                        }
-                        Text { text: "/"; anchors.verticalCenter: parent.verticalCenter; color: "#7e838d"; font.pixelSize: 13 }
-                        TextField {
-                            id: denominatorField
-                            objectName: "meterDenominator"
-                            width: 32; height: 23
-                            text: String(root.timeSignatureDenominator)
-                            color: Theme.text
-                            font.pixelSize: 12; font.bold: true
-                            horizontalAlignment: TextInput.AlignHCenter
-                            verticalAlignment: TextInput.AlignVCenter
-                            selectByMouse: true
-                            inputMethodHints: Qt.ImhDigitsOnly
-                            validator: IntValidator { bottom: 1; top: 2147483647 }
-                            background: Rectangle {
-                                radius: 5
-                                color: denominatorField.activeFocus ? "#282b32" : "transparent"
-                                border.color: denominatorField.activeFocus ? Theme.accent : "transparent"
-                            }
-                            onEditingFinished: {
-                                if (acceptableInput && Number(text) > 0)
-                                    root.denominatorEdited(Number(text))
-                                else
-                                    text = String(root.timeSignatureDenominator)
-                            }
-                        }
-                    }
-                }
-            }
-
-            ColumnLayout {
-                spacing: 3
-                enabled: !root.transport.countingIn
-                Text { text: "BPM"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
-                TempoEditor {
-                    Layout.preferredWidth: 124
-                    Layout.preferredHeight: 29
-                    value: root.bpm
-                    onValueEdited: value => root.bpmEdited(value)
-                }
-            }
-
-            ColumnLayout {
                 spacing: 3
                 Layout.fillWidth: true
                 Text { text: "SNAP GRID"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
@@ -242,10 +156,5 @@ Item {
     Connections {
         target: root.transport
         function onMetronomeChanged() { clickVolume.value = root.transport.metronomeVolume }
-    }
-    Connections {
-        target: root
-        function onTimeSignatureChanged() { numeratorField.text = String(root.timeSignature) }
-        function onTimeSignatureDenominatorChanged() { denominatorField.text = String(root.timeSignatureDenominator) }
     }
 }

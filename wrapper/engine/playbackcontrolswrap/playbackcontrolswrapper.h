@@ -44,6 +44,8 @@ public:
     // Any position as the transport clock shows it: HH:MM:SS.mmm (backend formatting).
     Q_INVOKABLE QString formatTime(double seconds) const { return QString::fromStdString(PlaybackControls::formatTime(seconds)); }
     QString formattedBarsBeats() const;
+    // Any beat position as bars.beats.hundredths in the given meter (backend formatting).
+    Q_INVOKABLE QString formatBarsBeats(double beats, int numerator, int denominator) const { return QString::fromStdString(PlaybackControls::formatBarsBeats(beats, numerator, denominator)); }
 
     QString transportMessage() const { return m_transportMessage; }
     void setTransportMessage(const QString& msg);
