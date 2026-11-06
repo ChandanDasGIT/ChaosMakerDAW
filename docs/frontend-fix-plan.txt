@@ -37,9 +37,11 @@ PHASE 1 — Broken or misleading behaviour (do first)
          clears the whole (clip-only) undo history. Undoable track deletion is a larger
          backend change (model rows, engine effect chains, inputs) -> see 2.7.
 
-[ ] 1.6  Mixer channel fader controls clip gain instead of track volume.
+[x] 1.6  Mixer channel fader controls clip gain instead of track volume.
          frontend/mixer/MixerPanel.qml:280-293, 339-353 — the main fader should be track
          volume; move clip gain somewhere else (clip inspector/context).
+         Done: track volume fader restored (as before commit 54a2d60); clip gain kept as a
+         small "CLIP" slider in the strip. Fixes volume_faders_double_click_restores_unity_gain.
 
 [ ] 1.7  Master fader dB labels are evenly spaced and don't match the real scale.
          MixerPanel.qml:116-129 — position labels with the wrapper's dB→position mapping.
@@ -66,7 +68,7 @@ PHASE 1 — Broken or misleading behaviour (do first)
          - track_effects_switch_in_place_and_keep_edits_on_the_selected_track
          - track_names_edit_inline_commit_cancel_and_update_mixer_and_fx
          - vocal_effects_offer_eq_and_recording_controls_without_guitarsuite
-         - volume_faders_double_click_restores_unity_gain (looks for a "mixerFader")
+         - [fixed by 1.6] volume_faders_double_click_restores_unity_gain
          Find out for each whether the app or the test is wrong.
 
 

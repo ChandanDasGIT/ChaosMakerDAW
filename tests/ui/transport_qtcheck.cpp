@@ -1753,6 +1753,26 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(dialog,"accept"));
         QTRY_COMPARE(tracks.count(),0);
     }
+    void mixer_clip_gain_control_follows_the_target_clip() {
+        TrackListWrapper tracks;
+        const int empty=tracks.addAudioTrack();
+        const int withClip=tracks.addInstrumentTrack(); const int clip=tracks.addClipAtBeat(withClip,0,4); QVERIFY(clip>0);
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
+        const auto restore=qScopeGuard([&] { mixer->setVisible(false); mixer->setProperty("trackModel",QVariant()); });
+        mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
+        QTest::qWait(30);
+        auto* none=visualItem(mixer,"mixerClipGain"+QString::number(empty)); QVERIFY(none);
+        auto* gain=visualItem(mixer,"mixerClipGain"+QString::number(withClip)); QVERIFY(gain);
+        QVERIFY(!none->isEnabled()); QVERIFY(gain->isEnabled());
+        QVERIFY(tracks.setClipGain(withClip,clip,-6.0));
+        QTRY_COMPARE(gain->property("value").toDouble(),-6.0);
+        // The main fader is track volume, independent of clip gain
+        auto* volume=visualItem(mixer,"mixerVolume"+QString::number(withClip)); QVERIFY(volume);
+        QCOMPARE(volume->property("value").toDouble(),1.0);
+        // Double-click resets clip gain to 0 dB
+        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,gain->mapToScene(QPointF(gain->width()/2,gain->height()/2)).toPoint(),10);
+        QTRY_COMPARE(tracks.project().findTrack(withClip)->audioClips[0].gainDb,0.0f);
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());
