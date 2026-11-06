@@ -9,7 +9,8 @@ class AppSettingsWrapper : public QObject {
     Q_OBJECT
     QML_ELEMENT
 
-    Q_PROPERTY(bool restoreSessionOnStartup READ restoreSessionOnStartup WRITE setRestoreSessionOnStartup NOTIFY restoreSessionOnStartupChanged)
+    // "Restore session on startup" is owned by EngineController (it applies the setting);
+    // this wrapper does not keep a second copy of it.
     Q_PROPERTY(QString pianoRollPresentation READ pianoRollPresentation WRITE setPianoRollPresentation NOTIFY pianoRollPresentationChanged)
     Q_PROPERTY(QString defaultProjectDirectory READ defaultProjectDirectory WRITE setDefaultProjectDirectory NOTIFY defaultProjectDirectoryChanged)
     Q_PROPERTY(bool autoSaveEnabled READ autoSaveEnabled WRITE setAutoSaveEnabled NOTIFY autoSaveChanged)
@@ -21,9 +22,6 @@ public:
 
     AppSettings& settings() noexcept { return m_settings; }
     const AppSettings& settings() const noexcept { return m_settings; }
-
-    bool restoreSessionOnStartup() const noexcept { return m_settings.restoreSessionOnStartup(); }
-    void setRestoreSessionOnStartup(bool enabled);
 
     QString pianoRollPresentation() const;
     void setPianoRollPresentation(const QString& presentation);
@@ -41,7 +39,6 @@ public:
     Q_INVOKABLE void resetToDefaults();
 
 signals:
-    void restoreSessionOnStartupChanged();
     void pianoRollPresentationChanged();
     void defaultProjectDirectoryChanged();
     void autoSaveChanged();
@@ -49,7 +46,8 @@ signals:
 
 private:
     void loadFromPlatform();
-    void saveToPlatform();
+    void saveToPlatform();                                   // every key this wrapper owns
+    static void saveValue(const QString& key, const QVariant& value); // one key only
 
     AppSettings m_ownedSettings;
     AppSettings& m_settings;
