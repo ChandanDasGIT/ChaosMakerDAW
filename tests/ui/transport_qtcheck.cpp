@@ -1,5 +1,6 @@
 #include <QtTest>
 #include "wrapper/engineWrap/enginecontroller.h"
+#include "wrapper/settings/appsettingswrap/appsettingswrapper.h"
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
 #include <QQmlApplicationEngine>
 #include <QQmlProperty>
@@ -488,6 +489,35 @@ private slots:
         QVERIFY(visualItem(window->contentItem(),"pedal.tremolo.hold"));
         QVERIFY(visualItem(window->contentItem(),"pedal.tremolo.fade"));
         QVERIFY(QMetaObject::invokeMethod(board,"close")); QVERIFY(model->removePedal(id));
+    }
+    void layout_sizes_are_saved_and_restored_between_sessions() {
+        QSettings qs;
+        const auto restore=qScopeGuard([&] {
+            for(const char* key:{AppSettings::KeyTrackListWidth,AppSettings::KeyMixerHeight,AppSettings::KeyPianoRollDockHeight})
+                qs.remove(QString::fromLatin1(key));
+        });
+        {
+            AppSettingsWrapper settings;
+            QCOMPARE(settings.trackListWidth(),230.0); QCOMPARE(settings.mixerHeight(),180.0);
+            QCOMPARE(settings.pianoRollDockHeight(),380.0);
+            QSignalSpy changed(&settings,&AppSettingsWrapper::layoutSizesChanged);
+            settings.setProperty("trackListWidth",312.0);
+            settings.setProperty("mixerHeight",900.0);              // clamped by the backend
+            settings.setProperty("pianoRollDockHeight",450.0);
+            settings.setProperty("pianoRollDockHeight",450.0);      // unchanged: not saved again
+            QCOMPARE(changed.count(),3);
+            QCOMPARE(settings.mixerHeight(),480.0);
+            QCOMPARE(settings.clampTrackListWidth(10),180.0);
+        }
+        AppSettingsWrapper next;                                    // a new session reads them back
+        QCOMPARE(next.trackListWidth(),312.0); QCOMPARE(next.mixerHeight(),480.0);
+        QCOMPARE(next.pianoRollDockHeight(),450.0);
+        qs.setValue(QString::fromLatin1(AppSettings::KeyMixerHeight),"huge"); qs.sync();
+        AppSettingsWrapper corrupted;                               // bad stored text: default
+        QCOMPARE(corrupted.mixerHeight(),180.0);
+        corrupted.resetToDefaults();
+        AppSettingsWrapper reset;
+        QCOMPARE(reset.trackListWidth(),230.0); QCOMPARE(reset.pianoRollDockHeight(),380.0);
     }
     void device_selectors_live_in_preferences_not_the_top_bar() {
         auto* top=window->findChild<QQuickItem*>("testTopBar"); QVERIFY(top);

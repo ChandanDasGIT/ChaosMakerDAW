@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 
@@ -30,6 +31,26 @@ bool parseBool(std::string_view val, bool defaultVal = false) {
     return defaultVal;
 }
 
+// Whole pixels are enough; written without a trailing ".000000".
+std::string formatSize(double value) {
+    std::ostringstream ss;
+    ss << std::lround(value);
+    return ss.str();
+}
+
+bool parseDouble(std::string_view val, double& out) {
+    try {
+        std::size_t used = 0;
+        const std::string s = trim(val);
+        const double parsed = std::stod(s, &used);
+        if (used != s.size() || !std::isfinite(parsed)) return false;
+        out = parsed;
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
 } // namespace
 
 AppSettings::AppSettings() = default;
@@ -42,6 +63,23 @@ void AppSettings::setRestoreSessionOnStartup(bool enabled) noexcept {
 void AppSettings::setPianoRollPresentation(std::string presentation) noexcept {
     if (presentation == "window" || presentation == "dock")
         m_pianoRollPresentation = std::move(presentation);
+}
+
+double AppSettings::clampSize(double value, SizeLimits limits) noexcept {
+    if (!std::isfinite(value)) return limits.fallback;
+    return std::clamp(value, limits.min, limits.max);
+}
+
+void AppSettings::setTrackListWidth(double width) noexcept {
+    if (std::isfinite(width)) m_trackListWidth = clampSize(width, TrackListWidthLimits);
+}
+
+void AppSettings::setMixerHeight(double height) noexcept {
+    if (std::isfinite(height)) m_mixerHeight = clampSize(height, MixerHeightLimits);
+}
+
+void AppSettings::setPianoRollDockHeight(double height) noexcept {
+    if (std::isfinite(height)) m_pianoRollDockHeight = clampSize(height, PianoRollDockHeightLimits);
 }
 
 void AppSettings::setDefaultProjectDirectory(std::string path) {
@@ -62,6 +100,9 @@ bool AppSettings::setAutoSaveIntervalSeconds(int seconds) noexcept {
 void AppSettings::resetToDefaults() noexcept {
     m_restoreSessionOnStartup = false;
     m_pianoRollPresentation = "dock";
+    m_trackListWidth = TrackListWidthLimits.fallback;
+    m_mixerHeight = MixerHeightLimits.fallback;
+    m_pianoRollDockHeight = PianoRollDockHeightLimits.fallback;
     m_defaultProjectDirectory.clear();
     m_autoSaveEnabled = true;
     m_autoSaveIntervalSeconds = 60;
@@ -79,6 +120,12 @@ void AppSettings::importValue(std::string_view key, std::string_view value) {
         auto p = trim(value);
         if (p == "window" || p == "dock")
             m_pianoRollPresentation = std::move(p);
+    } else if (key == KeyTrackListWidth || key == KeyMixerHeight || key == KeyPianoRollDockHeight) {
+        double size = 0;
+        if (!parseDouble(value, size)) return; // invalid text keeps the current size
+        if (key == KeyTrackListWidth) setTrackListWidth(size);
+        else if (key == KeyMixerHeight) setMixerHeight(size);
+        else setPianoRollDockHeight(size);
     } else if (key == KeyDefaultProjectDir) {
         m_defaultProjectDirectory = trim(value);
     } else if (key == KeyAutoSaveEnabled) {
@@ -102,6 +149,9 @@ std::string AppSettings::exportValue(std::string_view key) const {
     if (key == KeyPianoRollPresentation) {
         return m_pianoRollPresentation;
     }
+    if (key == KeyTrackListWidth) return formatSize(m_trackListWidth);
+    if (key == KeyMixerHeight) return formatSize(m_mixerHeight);
+    if (key == KeyPianoRollDockHeight) return formatSize(m_pianoRollDockHeight);
     if (key == KeyDefaultProjectDir) {
         return m_defaultProjectDirectory;
     }
@@ -118,6 +168,9 @@ std::string AppSettings::serialize() const {
     std::ostringstream ss;
     ss << KeyRestoreSessionOnStartup << "=" << (m_restoreSessionOnStartup ? "true" : "false") << "\n";
     ss << KeyPianoRollPresentation << "=" << m_pianoRollPresentation << "\n";
+    ss << KeyTrackListWidth << "=" << formatSize(m_trackListWidth) << "\n";
+    ss << KeyMixerHeight << "=" << formatSize(m_mixerHeight) << "\n";
+    ss << KeyPianoRollDockHeight << "=" << formatSize(m_pianoRollDockHeight) << "\n";
     ss << KeyDefaultProjectDir << "=" << m_defaultProjectDirectory << "\n";
     ss << KeyAutoSaveEnabled << "=" << (m_autoSaveEnabled ? "true" : "false") << "\n";
     ss << KeyAutoSaveInterval << "=" << m_autoSaveIntervalSeconds << "\n";

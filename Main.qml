@@ -45,11 +45,13 @@ Window {
         }
     }
 
-    property real trackListWidth: 230
+    // Layout sizes start from the saved preferences (AppSettings); a splitter drag changes them
+    // live and saves once on release.
+    property real trackListWidth: topBar.appSettings.trackListWidth
     property bool mixerVisible: true
-    property real mixerHeight: 180
+    property real mixerHeight: topBar.appSettings.mixerHeight
     // The piano roll needs more room than the mixer, so it keeps its own dock height.
-    property real pianoRollDockHeight: 380
+    property real pianoRollDockHeight: topBar.appSettings.pianoRollDockHeight
     readonly property bool pianoRollDocked: window.bottomPanelMode === "pianoroll"
 
     // Which bottom panel / piano roll is on screen (view state only).
@@ -149,9 +151,10 @@ Window {
                         if (pressed) {
                             let pt = mapToItem(window.contentItem, mouse.x, mouse.y)
                             let diff = pt.x - startGlobalX
-                            window.trackListWidth = Math.max(180, Math.min(460, startWidth + diff))
+                            window.trackListWidth = topBar.appSettings.clampTrackListWidth(startWidth + diff)
                         }
                     }
+                    onReleased: topBar.appSettings.trackListWidth = window.trackListWidth
                 }
             }
             Timeline {
@@ -214,9 +217,13 @@ Window {
                             const maxH = Math.max(minH, window.height - 220)
                             window.pianoRollDockHeight = Math.max(minH, Math.min(maxH, startHeight + diff))
                         } else {
-                            window.mixerHeight = Math.max(120, Math.min(480, startHeight + diff))
+                            window.mixerHeight = topBar.appSettings.clampMixerHeight(startHeight + diff)
                         }
                     }
+                }
+                onReleased: {
+                    if (window.pianoRollDocked) topBar.appSettings.pianoRollDockHeight = window.pianoRollDockHeight
+                    else topBar.appSettings.mixerHeight = window.mixerHeight
                 }
             }
         }
@@ -226,7 +233,9 @@ Window {
             visible: window.mixerVisible
             Layout.fillWidth: true
             Layout.preferredHeight: !window.mixerVisible ? 0
-                : (window.pianoRollDocked ? Math.max(dockedPianoRoll.minimumDockHeight, window.pianoRollDockHeight)
+                // (a saved dock height never pushes the timeline off a smaller window)
+                : (window.pianoRollDocked ? Math.max(dockedPianoRoll.minimumDockHeight,
+                                                     Math.min(window.height - 220, window.pianoRollDockHeight))
                                           : window.mixerHeight)
             clip: true
 
