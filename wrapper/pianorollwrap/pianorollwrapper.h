@@ -23,6 +23,8 @@ class PianoRollWrapper : public QObject {
     Q_PROPERTY(int trackId READ trackId WRITE setTrackId NOTIFY bindingChanged)
     Q_PROPERTY(int clipId READ clipId WRITE setClipId NOTIFY bindingChanged)
     Q_PROPERTY(bool bound READ bound NOTIFY bindingChanged)
+    // Project beat where the bound clip starts; note beats and the playhead are relative to it.
+    Q_PROPERTY(double clipStartBeat READ clipStartBeat NOTIFY clipStartChanged)
 
 public:
     explicit PianoRollWrapper(QObject* parent = nullptr);
@@ -41,6 +43,7 @@ public:
     int clipId() const noexcept { return m_clipId; }
     void setClipId(int id);
     bool bound() const;
+    double clipStartBeat() const;
 
     Q_INVOKABLE int addNote(int note, double startBeat, double lengthBeats, int velocity = 100);
     Q_INVOKABLE bool removeNote(int noteId);
@@ -60,6 +63,7 @@ public:
 signals:
     void notesChanged();
     void bindingChanged();
+    void clipStartChanged();
 
 private:
     bool commit();       // write the pattern to the bound clip; reverts on rejection

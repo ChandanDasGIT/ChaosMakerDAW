@@ -121,6 +121,24 @@ TEST(qtpianoroll, rejected_edits_revert_and_switching_or_removing_clips_reloads)
     CHECK(local.count() == 1);
 }
 
+TEST(qtpianoroll, clip_start_beat_is_exposed_and_notifies_on_clip_moves) {
+    QObject owner;
+    TrackListWrapper tracks;
+    const int t = tracks.addInstrumentTrack();
+    const int c = tracks.addClipAtBeat(t, 4, 4);
+    auto* roll = boundRoll(tracks, t, c, &owner);
+    CHECK(std::abs(roll->clipStartBeat() - 4.0) < 1e-6);
+
+    int startChanges = 0;
+    QObject::connect(roll, &PianoRollWrapper::clipStartChanged, &owner, [&] { ++startChanges; });
+    CHECK(tracks.moveClipAtBeat(t, c, 8.0)); // notes unchanged, start moved
+    CHECK(startChanges >= 1);
+    CHECK(std::abs(roll->clipStartBeat() - 8.0) < 1e-6);
+
+    CHECK(tracks.removeAudioClip(t, c)); // unbound: no start
+    CHECK(roll->clipStartBeat() == 0.0);
+}
+
 TEST(qtpianoroll, velocity_edits_are_one_undoable_change_and_clamped) {
     QObject owner;
     TrackListWrapper tracks;

@@ -93,6 +93,27 @@ TEST(clipnotes, move_keeps_notes_and_left_trim_keeps_them_fixed_in_time)
     CHECK(near(starts(tracks.clipNotes(t, c)), {0.5, 2.0}));
 }
 
+TEST(clipnotes, clip_start_beat_follows_moves_trims_and_tempo)
+{
+    TrackList tracks;
+    const int t = tracks.addInstrumentTrack();
+    const int c = tracks.addClipAtBeat(t, 2, 4);
+    CHECK(std::abs(tracks.clipStartBeat(t, c) - 2.0) < 1e-6);
+
+    CHECK(tracks.moveClipAtBeat(t, c, 6.0));
+    CHECK(std::abs(tracks.clipStartBeat(t, c) - 6.0) < 1e-6);
+
+    CHECK(tracks.editClips({c}, "trimStart", 1.0));
+    CHECK(std::abs(tracks.clipStartBeat(t, c) - 7.0) < 1e-6);
+
+    // The clip stays at the same time, so doubling the tempo doubles its start beat.
+    const double bpm = tracks.project().tempo().bpm();
+    CHECK(tracks.setTempo(bpm * 2, 4, 4));
+    CHECK(std::abs(tracks.clipStartBeat(t, c) - 14.0) < 1e-6);
+
+    CHECK(tracks.clipStartBeat(t, 9999) == 0.0);
+}
+
 TEST(clipnotes, split_partitions_notes_and_merge_restores_them)
 {
     TrackList tracks;

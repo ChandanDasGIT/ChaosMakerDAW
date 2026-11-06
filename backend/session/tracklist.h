@@ -118,6 +118,8 @@ public:
     // Pattern notes in clip-relative beats (0 = clip start). Only pattern (non-recorded) clips
     // hold notes. Notes outside the clip bounds are kept (hidden), so trims can be undone.
     std::vector<MidiNote> clipNotes(int trackId, int clipId) const;
+    // Project beat at which the clip starts (the origin of clipNotes()); 0 if the clip is missing.
+    double clipStartBeat(int trackId, int clipId) const;
     Change setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes);
     bool isPatternClip(const AudioClip& clip) const;
     bool removeAudioClip(int trackId, int clipId);

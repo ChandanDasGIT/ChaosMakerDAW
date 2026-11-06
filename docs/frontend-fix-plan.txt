@@ -9,7 +9,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 
 PHASE 1 — Broken or misleading behaviour (do first)
 ---------------------------------------------------
-[ ] 1.1  Piano roll playhead never moves.
+[x] 1.1  Piano roll playhead never moves.
          frontend/pianoroll/PianoRollView.qml:26,660 — bind playheadBeat to the transport
          position, relative to the clip start.
 
