@@ -23,8 +23,10 @@ Item {
     property string colorMode: "Velocity"
     property bool keySnap: false
 
+    // Transport used by the footer buttons and the playhead (replaceable in tests, like Timeline).
+    property var transport: EngineController
     // Transport position in clip-relative beats (same origin as the notes); negative before the clip.
-    readonly property real playheadBeat: EngineController.positionBeats - pianoRollBackend.clipStartBeat
+    readonly property real playheadBeat: root.transport.positionBeats - pianoRollBackend.clipStartBeat
     property string currentPosText: "1.1.00"
     property string currentNoteText: "C4 60"
 
@@ -1066,22 +1068,24 @@ Item {
 
                 Row {
                     spacing: 3
+                    // Same transport commands as the main transport bar
                     Repeater {
                         model: [
-                            { text: "|◀", tt: "Rewind" },
-                            { text: "▶", tt: "Play" },
-                            { text: "❚❚", tt: "Pause" },
-                            { text: "■", tt: "Stop" },
-                            { text: "▶|", tt: "Fast Forward" },
-                            { text: "🔍", tt: "Zoom Tool" }
+                            { text: "|◀", tt: "Go to start", command: "rewind" },
+                            { text: "▶", tt: "Play (Space)", command: "play" },
+                            { text: "❚❚", tt: "Pause (Space)", command: "pause" },
+                            { text: "■", tt: "Stop", command: "stop" },
+                            { text: "▶|", tt: "Skip forward one bar", command: "forward" }
                         ]
                         delegate: Rectangle {
                             required property var modelData
+                            readonly property bool active: modelData.command === "play" && !!root.transport && root.transport.playing
+                            objectName: "pianoRollTransport_" + modelData.command
                             width: 22
                             height: 20
                             radius: 2
-                            color: transHover.containsMouse ? "#454955" : "#353842"
-                            border.color: "#202227"
+                            color: active ? "#203a45" : transHover.containsMouse ? "#454955" : "#353842"
+                            border.color: active ? "#60cdff" : "#202227"
 
                             Text {
                                 anchors.centerIn: parent
@@ -1094,6 +1098,7 @@ Item {
                                 id: transHover
                                 anchors.fill: parent
                                 hoverEnabled: true
+                                onClicked: root.transport.transportAction(modelData.command)
                                 ToolTip.visible: containsMouse
                                 ToolTip.text: modelData.tt
                             }

@@ -1607,6 +1607,33 @@ private slots:
         QTest::keyClick(window,Qt::Key_Q);
         QCOMPARE(starts(),(QList<double>{0.6}));
     }
+    void piano_roll_footer_buttons_drive_the_transport() {
+        auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller.attachProject(&tracks); tracks.addAudioTrack();
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        const auto restore=qScopeGuard([&] {
+            roll->setVisible(false); roll->setProperty("transport",QVariant::fromValue(EngineController::instance()));
+        });
+        roll->setProperty("transport",QVariant::fromValue(&controller)); roll->setVisible(true);
+        const auto button=[&](const char* command) {
+            return visualItem(roll,QStringLiteral("pianoRollTransport_")+command);
+        };
+        for(auto* command:{"rewind","play","pause","stop","forward"})QVERIFY(button(command));
+        QVERIFY(!visualItem(roll,"pianoRollTransport_zoom"));      // dead zoom-tool button removed
+        click(button("play")); io->process();
+        QVERIFY(controller.playing());
+        for(int i=0;i<20;++i)io->process();
+        click(button("pause")); io->process();
+        QVERIFY(!controller.playing()); QVERIFY(controller.positionSeconds()>0);
+        click(button("rewind")); io->process();
+        QTRY_COMPARE(controller.positionSeconds(),0.0);
+        click(button("forward")); io->process();
+        QTRY_VERIFY(controller.positionBeats()>0);
+        click(button("play")); io->process(); QVERIFY(controller.playing());
+        click(button("stop")); io->process(); QVERIFY(!controller.playing());
+        controller.shutdownSession();
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());
