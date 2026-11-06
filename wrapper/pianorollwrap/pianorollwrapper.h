@@ -28,6 +28,8 @@ class PianoRollWrapper : public QObject {
     // Project meter in quarter-note beats (4/4 -> 4 and 1, 6/8 -> 3 and 0.5); 4/4 when unbound.
     Q_PROPERTY(double beatsPerBar READ beatsPerBar NOTIFY meterChanged)
     Q_PROPERTY(double beatUnit READ beatUnit NOTIFY meterChanged)
+    // Colour of the bound clip's track ("#rrggbb"); empty when unbound.
+    Q_PROPERTY(QString trackColour READ trackColour NOTIFY trackColourChanged)
 
 public:
     explicit PianoRollWrapper(QObject* parent = nullptr);
@@ -49,6 +51,7 @@ public:
     double clipStartBeat() const;
     double beatsPerBar() const;
     double beatUnit() const;
+    QString trackColour() const;
     // Clip-relative beat as "bar.beat.hundredths" in the project meter.
     Q_INVOKABLE QString positionLabel(double beat) const;
 
@@ -75,6 +78,7 @@ signals:
     void bindingChanged();
     void clipStartChanged();
     void meterChanged();
+    void trackColourChanged();
 
 private:
     bool commit();       // write the pattern to the bound clip; reverts on rejection

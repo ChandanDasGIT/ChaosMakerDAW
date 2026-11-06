@@ -229,12 +229,13 @@ Item {
 
     // Note fill colour. "Velocity" mode blends dim blue (soft) -> bright teal (loud);
     // other modes keep the default note colour for now.
+    // "Track" mode shades the track colour the same way (darker = softer).
     function noteFillColor(velocity) {
-        if (colorMode !== "Velocity")
-            return "#2d7088"
         const t = Math.max(0, Math.min(1, velocity / 127.0))
-        const lo = Qt.color("#24405e")
-        const hi = Qt.color("#38c2b4")
+        const trackColour = pianoRollBackend.trackColour
+        const useTrack = colorMode === "Track" && trackColour.length > 0
+        const lo = useTrack ? Qt.darker(trackColour, 2.4) : Qt.color("#24405e")
+        const hi = useTrack ? Qt.lighter(trackColour, 1.1) : Qt.color("#38c2b4")
         return Qt.rgba(lo.r + (hi.r - lo.r) * t, lo.g + (hi.g - lo.g) * t, lo.b + (hi.b - lo.b) * t, 1)
     }
 
@@ -1165,6 +1166,18 @@ Item {
                     onCurrentTextChanged: root.noteLengthMode = currentText
                     ToolTip.visible: hovered
                     ToolTip.text: "Length of newly drawn notes (Grid = the Grid division)"
+                }
+
+                Text { text: "Color:"; color: "#8f95a3"; font.pixelSize: 11 }
+                PianoRollComboBox {
+                    objectName: "pianoRollColorMode"
+                    implicitWidth: 80
+                    implicitHeight: 22
+                    model: ["Velocity", "Track"]
+                    currentIndex: 0
+                    onCurrentTextChanged: root.colorMode = currentText
+                    ToolTip.visible: hovered
+                    ToolTip.text: "Note colour: velocity shades of blue, or the track colour"
                 }
 
                 Item { Layout.fillWidth: true }

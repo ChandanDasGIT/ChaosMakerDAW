@@ -183,6 +183,22 @@ TEST(qtpianoroll, quantize_is_one_undoable_edit) {
     CHECK(roll->backend().findNote(b)->startBeat == 1.13);
 }
 
+TEST(qtpianoroll, track_colour_follows_the_bound_track) {
+    QObject owner;
+    TrackListWrapper tracks;
+    const int t = tracks.addInstrumentTrack();
+    const int c = tracks.addClipAtBeat(t, 0, 4);
+    auto* roll = boundRoll(tracks, t, c, &owner);
+    CHECK(roll->trackColour() == QString::fromStdString(tracks.domain().project().findTrack(t)->colour));
+    int changes = 0;
+    QObject::connect(roll, &PianoRollWrapper::trackColourChanged, &owner, [&] { ++changes; });
+    CHECK(tracks.setTrackColour(t, "#d97c73"));
+    CHECK(changes >= 1);
+    CHECK(roll->trackColour() == "#d97c73");
+    PianoRollWrapper unbound;
+    CHECK(unbound.trackColour().isEmpty());
+}
+
 TEST(qtpianoroll, velocity_edits_are_one_undoable_change_and_clamped) {
     QObject owner;
     TrackListWrapper tracks;

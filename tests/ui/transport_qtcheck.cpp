@@ -1699,6 +1699,35 @@ private slots:
         QVERIFY(std::abs(drawAt(3.9)-3.75)<1e-6);
         QVERIFY(std::abs(drawAt(4.2)-4.0)<1e-6);                    // grid restarts at bar 2 (past the 3.75 note)
     }
+    void piano_roll_colour_box_switches_between_velocity_and_track_colour() {
+        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        const int clip=tracks.addClipAtBeat(track,0,4); QVERIFY(clip>0);
+        QVERIFY(tracks.setTrackColour(track,"#d97c73"));
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* mode=visualItem(roll,"pianoRollColorMode"); QVERIFY(mode);
+        const auto restore=qScopeGuard([&] {
+            mode->setProperty("currentIndex",0); roll->setVisible(false);
+            roll->setProperty("trackModel",QVariant::fromValue<QObject*>(nullptr));
+            roll->setProperty("trackId",-1); roll->setProperty("clipId",-1);
+        });
+        roll->setProperty("trackModel",QVariant::fromValue(&tracks));
+        roll->setProperty("trackId",track); roll->setProperty("clipId",clip); roll->setVisible(true);
+        QCOMPARE(mode->property("count").toInt(),2);                // Velocity, Track
+        const auto fill=[&](int velocity) {
+            QVariant colour;
+            QMetaObject::invokeMethod(roll,"noteFillColor",Q_RETURN_ARG(QVariant,colour),Q_ARG(QVariant,velocity));
+            return colour.value<QColor>();
+        };
+        const QColor track127=QColor("#d97c73").lighter(110);
+        const auto near=[](QColor a,QColor b) {
+            return std::abs(a.redF()-b.redF())<0.02 && std::abs(a.greenF()-b.greenF())<0.02 && std::abs(a.blueF()-b.blueF())<0.02;
+        };
+        QVERIFY(!near(fill(127),track127));                          // Velocity mode: blue/teal scale
+        mode->setProperty("currentIndex",1);
+        QCOMPARE(roll->property("colorMode").toString(),QString("Track"));
+        QVERIFY(near(fill(127),track127));                           // loud note = track colour
+        QVERIFY(fill(10).lightnessF()<fill(127).lightnessF());       // soft notes are darker
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());
