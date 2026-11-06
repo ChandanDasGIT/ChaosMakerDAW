@@ -17,6 +17,10 @@ public:
 
     void selectNote(int noteId, bool addToSelection = false);
     void selectAll(bool select = true);
+    // Rubber-band selection: select every note whose pitch is in [lowNote, highNote] and
+    // whose span overlaps [startBeat, endBeat) (bounds may come in either order). Other
+    // notes are deselected unless addToSelection. Returns how many notes the box touched.
+    int selectInRange(int lowNote, int highNote, double startBeat, double endBeat, bool addToSelection = false);
     void clearSelection();
     bool deleteSelected();
     // Move note starts to the nearest grid line (lengths unchanged). Acts on the selected

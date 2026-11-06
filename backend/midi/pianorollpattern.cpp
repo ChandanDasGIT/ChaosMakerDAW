@@ -2,6 +2,7 @@
 #include "transport/musicalgrid.h"
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 int PianoRollPattern::addNote(int note, double startBeat, double lengthBeats, int velocity) {
     MidiNote n;
@@ -73,6 +74,19 @@ void PianoRollPattern::selectAll(bool select) {
     for (auto& n : m_notes) {
         n.selected = select;
     }
+}
+
+int PianoRollPattern::selectInRange(int lowNote, int highNote, double startBeat, double endBeat, bool addToSelection) {
+    if (lowNote > highNote) std::swap(lowNote, highNote);
+    if (startBeat > endBeat) std::swap(startBeat, endBeat);
+    int touched = 0;
+    for (auto& n : m_notes) {
+        const bool inside = n.note >= lowNote && n.note <= highNote
+            && n.startBeat < endBeat && n.startBeat + n.lengthBeats > startBeat;
+        if (inside) ++touched;
+        n.selected = inside || (addToSelection && n.selected);
+    }
+    return touched;
 }
 
 void PianoRollPattern::clearSelection() {

@@ -109,3 +109,34 @@ TEST(pianorollpattern, quantize_per_bar_keeps_odd_steps_on_bar_lines)
     CHECK(std::abs(triplet.findNote(d)->startBeat - 3.0) < 1e-9);
     CHECK(std::abs(triplet.findNote(e)->startBeat - 4.0 / 3.0) < 1e-9);
 }
+
+TEST(pianorollpattern, select_in_range_picks_notes_the_box_touches)
+{
+    PianoRollPattern pattern;
+    const int low = pattern.addNote(60, 0.0, 1.0);     // starts before the box, ends inside
+    const int tail = pattern.addNote(62, 1.0, 0.5);    // inside
+    const int before = pattern.addNote(63, 0.0, 0.25); // ends exactly at the box start: outside
+    const int edge = pattern.addNote(64, 2.0, 1.0);    // starts exactly at the box end: outside
+    const int high = pattern.addNote(70, 0.5, 0.5);    // pitch above the box
+    const int other = pattern.addNote(55, 3.0, 1.0);
+
+    // Bounds in any order; pitch range is inclusive.
+    CHECK(pattern.selectInRange(64, 60, 2.0, 0.25) == 2);
+    CHECK(pattern.findNote(low)->selected);
+    CHECK(pattern.findNote(tail)->selected);
+    CHECK(!pattern.findNote(edge)->selected);
+    CHECK(!pattern.findNote(before)->selected);
+    CHECK(!pattern.findNote(high)->selected);
+
+    // A new box replaces the selection; with addToSelection it is added.
+    CHECK(pattern.selectInRange(55, 55, 3.5, 3.6) == 1);
+    CHECK(pattern.selectedCount() == 1 && pattern.findNote(other)->selected);
+    CHECK(pattern.selectInRange(70, 70, 0.0, 4.0, true) == 1);
+    CHECK(pattern.selectedCount() == 2 && pattern.findNote(high)->selected);
+
+    // An empty box clears the selection (or keeps it when adding).
+    CHECK(pattern.selectInRange(100, 120, 0.0, 4.0, true) == 0);
+    CHECK(pattern.selectedCount() == 2);
+    CHECK(pattern.selectInRange(100, 120, 0.0, 4.0) == 0);
+    CHECK(pattern.selectedCount() == 0);
+}

@@ -10,7 +10,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. 3.1–3.5 done.
-Next: 3.6 (piano roll editing: rubber-band selection, vertical zoom, Ctrl+wheel zoom, track-coloured notes).
+Next: 3.6b (piano roll vertical zoom + Ctrl+wheel zoom), then 3.6c (track-coloured notes).
 Then 3.7 … 3.12, Phase 4, Phase 5.
 
 Decisions made by the user (keep to them):
@@ -243,6 +243,11 @@ PHASE 3 — Layout and workflow
          Ctrl = zoom (Timeline.qml:327-331 currently zooms on a plain wheel).
 [ ] 3.6  Piano roll editing: rubber-band selection with the pointer tool, vertical zoom,
          Ctrl+wheel zoom, notes tinted by track colour.
+         Split into: 3.6a rubber band, 3.6b vertical + Ctrl+wheel zoom, 3.6c track-coloured notes.
+         - [done] 3.6a Pointer drag on empty grid draws a box; release selects the notes it
+           touches (backend PianoRollPattern::selectInRange via selectNotesInRange), Shift/Ctrl
+           adds, a plain click clears. Box auto-scrolls at the edges. Hand check: box-select
+           while scrolled, Shift+box, then drag/delete the selection.
 [ ] 3.7  Consistency: S/M order (TrackList vs Mixer), mute colour (orange vs red),
          "Add audio track" tooltip, empty-area "add Vocal track" text, selection
          hiding the track colour strip (TrackList.qml:130-131).

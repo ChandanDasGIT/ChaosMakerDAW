@@ -261,6 +261,13 @@ void PianoRollWrapper::selectAll() {
     emit notesChanged();
 }
 
+int PianoRollWrapper::selectNotesInRange(int lowNote, int highNote, double startBeat, double endBeat,
+                                         bool addToSelection) {
+    const int touched = m_pattern.selectInRange(lowNote, highNote, startBeat, endBeat, addToSelection);
+    emit notesChanged();
+    return touched;
+}
+
 void PianoRollWrapper::clearSelection() {
     m_pattern.clearSelection();
     emit notesChanged();
