@@ -137,6 +137,7 @@ if(DAW_BUILD_APP)
         qt_add_executable(transporttests tests/ui/transport_qtcheck.cpp)
         qt_add_qml_module(transporttests URI TransportTests
             QML_FILES frontend/Theme.qml frontend/Icons.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
+                      frontend/window/EditMenu.qml frontend/common/ThemedMenuItem.qml
                       frontend/engine/PlaybackControls.qml
                       frontend/session/ProjectActions.qml frontend/audiodevice/DeviceSettings.qml
                       frontend/settings/AppSettings.qml frontend/settings/QuickSettings.qml
