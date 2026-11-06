@@ -13,7 +13,8 @@ Item {
     signal keyPressed(int note, int velocity)
     signal keyReleased(int note)
     signal keyHovered(int note, string noteName)
-    signal wheelScrolled(real deltaY)
+    // Raw wheel deltas, modifiers and the y position (in this item) so the view can scroll or zoom.
+    signal wheelScrolled(real pixelY, real angleY, int modifiers, real keyY)
 
     // PianoRollWrapper: note names and black keys come from the backend (notenames)
     property var noteSource: null
@@ -30,10 +31,7 @@ Item {
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         target: null
-        onWheel: event => {
-            const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y
-            root.wheelScrolled(delta)
-        }
+        onWheel: event => root.wheelScrolled(event.pixelDelta.y, event.angleDelta.y, event.modifiers, point.position.y)
     }
 
     Column {
@@ -68,7 +66,8 @@ Item {
 
                     // Note name on white keys (C4, D4, E4, F4, G4, A4, B4)
                     Text {
-                        visible: !keyRow.black
+                        // Short rows: only C labels (none below 9 px) so labels never overlap
+                        visible: !keyRow.black && root.keyHeight >= (keyRow.isC ? 9 : 12)
                         anchors.right: parent.right
                         anchors.rightMargin: 6
                         anchors.verticalCenter: parent.verticalCenter
@@ -97,6 +96,7 @@ Item {
 
                     // Note name on black keys (C#4, D#4, F#4, G#4, A#4)
                     Text {
+                        visible: root.keyHeight >= 12
                         anchors.right: parent.right
                         anchors.rightMargin: 4
                         anchors.verticalCenter: parent.verticalCenter

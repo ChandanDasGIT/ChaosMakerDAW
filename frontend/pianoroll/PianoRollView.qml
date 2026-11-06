@@ -16,7 +16,13 @@ Item {
     property real clipLengthBeats: 4.0
     property real bpm: 120.0
     property real pixelsPerBeat: 96.0
-    property real keyHeight: 18.0
+    property real keyHeight: defaultKeyHeight
+    // Zoom limits: time (Ctrl+wheel, -/+) and row height (Ctrl+Shift+wheel, Ctrl+wheel on the keys)
+    readonly property real minPixelsPerBeat: 40
+    readonly property real maxPixelsPerBeat: 240
+    readonly property real defaultKeyHeight: 18
+    readonly property real minKeyHeight: 8
+    readonly property real maxKeyHeight: 36
     property string activeTool: "pencil" // "pointer", "pencil", "eraser"
     // Grid settings live in the backend (PianoRollGrid via PianoRollWrapper)
     property alias snapDivision: pianoRollBackend.gridDivision
@@ -34,6 +40,25 @@ Item {
     property real dragStartBeat: 0.0
 
     signal closeRequested()
+
+    // Small square footer button (the zoom controls)
+    component ZoomButton: Rectangle {
+        id: zoomButton
+        property string label
+        property string tip
+        signal clicked()
+        width: 18; height: 18; radius: 2
+        color: zoomHover.containsMouse ? "#454955" : "#353842"
+        border.color: "#202227"
+        Text { anchors.centerIn: parent; text: zoomButton.label; color: "#c8ccd6"; font.pixelSize: 12 }
+        MouseArea {
+            id: zoomHover; anchors.fill: parent; hoverEnabled: true
+            onClicked: zoomButton.clicked()
+            ToolTip.visible: containsMouse
+            ToolTip.text: zoomButton.tip
+            ToolTip.delay: 450
+        }
+    }
 
     PianoRollWrapper {
         id: pianoRollBackend
@@ -189,9 +214,42 @@ Item {
     // Fixed chrome: menu bar (22) + tool strip (28) + ruler (34) + footer (30).
     readonly property real chromeHeight: 22 + 28 + 34 + 30
     // The note grid always keeps at least this many pixels; the velocity lane shrinks first.
-    readonly property real minimumGridHeight: 6 * keyHeight
+    // (fixed, so zooming the rows never resizes the dock)
+    readonly property real minimumGridHeight: 6 * defaultKeyHeight
     readonly property real minimumVelocityHeight: 45
     readonly property real minimumDockHeight: chromeHeight + minimumGridHeight + minimumVelocityHeight
+
+    // Zoom time, keeping the beat under viewportX (px from the grid's left edge) in place.
+    function zoomTimeAt(factor, viewportX) {
+        const f = gridVerticalFlickable
+        const beat = (f.contentX + viewportX) / pixelsPerBeat
+        pixelsPerBeat = Math.max(minPixelsPerBeat, Math.min(maxPixelsPerBeat, pixelsPerBeat * factor))
+        f.contentX = Math.max(0, Math.min(Math.max(0, f.contentWidth - f.width), beat * pixelsPerBeat - viewportX))
+    }
+
+    // Zoom the row height, keeping the pitch under viewportY (px from the grid's top) in place.
+    function zoomRowsAt(factor, viewportY) {
+        const f = gridVerticalFlickable
+        const row = (f.contentY + viewportY) / keyHeight
+        keyHeight = Math.max(minKeyHeight, Math.min(maxKeyHeight, keyHeight * factor))
+        f.contentY = Math.max(0, Math.min(Math.max(0, f.contentHeight - f.height), row * keyHeight - viewportY))
+    }
+
+    // Wheel over the grid or the keys: plain = pitch scroll, Shift = time scroll,
+    // Ctrl = time zoom (rows over the keys), Ctrl+Shift = row zoom. viewportPt is in
+    // gridVerticalFlickable coordinates.
+    function handleWheel(pixelY, angleY, modifiers, viewportPt, overKeys) {
+        const delta = pixelY !== 0 ? pixelY : angleY
+        if (modifiers & Qt.ControlModifier) {
+            const steps = (angleY !== 0 ? angleY : pixelY) / 120
+            if (overKeys || (modifiers & Qt.ShiftModifier)) zoomRowsAt(Math.pow(1.1, steps), viewportPt.y)
+            else zoomTimeAt(Math.pow(1.12, steps), viewportPt.x)
+        } else if (modifiers & Qt.ShiftModifier) {
+            gridVerticalFlickable.scrollHorizontal(delta)
+        } else {
+            gridVerticalFlickable.scrollVertical(delta)
+        }
+    }
 
     function centerOnMiddleC() {
         if (!gridVerticalFlickable) return
@@ -492,12 +550,11 @@ Item {
                     }
 
                     WheelHandler {
+                        id: keysWheel
                         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                         target: null
-                        onWheel: event => {
-                            const deltaY = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y
-                            gridVerticalFlickable.scrollVertical(deltaY)
-                        }
+                        onWheel: event => root.handleWheel(event.pixelDelta.y, event.angleDelta.y, event.modifiers,
+                            Qt.point(0, keysWheel.parent.mapToItem(gridVerticalFlickable, keysWheel.point.position).y), true)
                     }
 
                     PianoKeys {
@@ -519,8 +576,9 @@ Item {
                         onKeyReleased: note => {
                             EngineController.sendLiveNoteOff(root.trackId, note)
                         }
-                        onWheelScrolled: delta => {
-                            gridVerticalFlickable.scrollVertical(delta)
+                        onWheelScrolled: (pixelY, angleY, modifiers, keyY) => {
+                            root.handleWheel(pixelY, angleY, modifiers,
+                                             Qt.point(0, keyY - gridVerticalFlickable.contentY), true)
                         }
                     }
                 }
@@ -549,16 +607,11 @@ Item {
                     }
 
                     WheelHandler {
+                        id: gridWheel
                         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                         target: null
-                        onWheel: event => {
-                            const deltaY = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y
-                            if (event.modifiers & Qt.ShiftModifier) {
-                                gridVerticalFlickable.scrollHorizontal(deltaY)
-                            } else {
-                                gridVerticalFlickable.scrollVertical(deltaY)
-                            }
-                        }
+                        onWheel: event => root.handleWheel(event.pixelDelta.y, event.angleDelta.y, event.modifiers,
+                            gridWheel.parent.mapToItem(gridVerticalFlickable, gridWheel.point.position), false)
                     }
 
                     WheelHandler {
@@ -750,6 +803,7 @@ Item {
                                 anchors.right: resizeHandle.left
                                 anchors.rightMargin: 2
                                 anchors.verticalCenter: parent.verticalCenter
+                                visible: root.keyHeight >= 9
                                 text: pianoRollBackend.noteName(noteCard.visualPitch)
                                 color: "#f0f8ff"
                                 font.pixelSize: 10
@@ -1171,27 +1225,31 @@ Item {
 
                 Item { Layout.fillWidth: true }
 
+                // Zoom: time (also Ctrl+wheel) and row height (also Ctrl+Shift+wheel)
                 Row {
                     spacing: 2
-                    Rectangle {
-                        width: 18; height: 18; radius: 2
-                        color: zoutHover.containsMouse ? "#454955" : "#353842"
-                        border.color: "#202227"
-                        Text { anchors.centerIn: parent; text: "-"; color: "#c8ccd6"; font.pixelSize: 12 }
-                        MouseArea {
-                            id: zoutHover; anchors.fill: parent; hoverEnabled: true
-                            onClicked: root.pixelsPerBeat = Math.max(40, root.pixelsPerBeat - 16)
-                        }
+                    Text { text: "Zoom:"; color: "#8f95a3"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
+                    ZoomButton {
+                        objectName: "pianoRollZoomOut"
+                        label: "-"; tip: "Zoom out in time · Ctrl+wheel"
+                        onClicked: root.pixelsPerBeat = Math.max(root.minPixelsPerBeat, root.pixelsPerBeat - 16)
                     }
-                    Rectangle {
-                        width: 18; height: 18; radius: 2
-                        color: zinHover.containsMouse ? "#454955" : "#353842"
-                        border.color: "#202227"
-                        Text { anchors.centerIn: parent; text: "+"; color: "#c8ccd6"; font.pixelSize: 12 }
-                        MouseArea {
-                            id: zinHover; anchors.fill: parent; hoverEnabled: true
-                            onClicked: root.pixelsPerBeat = Math.min(240, root.pixelsPerBeat + 16)
-                        }
+                    ZoomButton {
+                        objectName: "pianoRollZoomIn"
+                        label: "+"; tip: "Zoom in on time · Ctrl+wheel"
+                        onClicked: root.pixelsPerBeat = Math.min(root.maxPixelsPerBeat, root.pixelsPerBeat + 16)
+                    }
+                    Item { width: 6; height: 1 }
+                    Text { text: "Rows:"; color: "#8f95a3"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
+                    ZoomButton {
+                        objectName: "pianoRollRowsShorter"
+                        label: "-"; tip: "Shorter rows (Ctrl+Shift+wheel, or Ctrl+wheel over the keys)"
+                        onClicked: root.zoomRowsAt(1 / 1.25, gridVerticalFlickable.height / 2)
+                    }
+                    ZoomButton {
+                        objectName: "pianoRollRowsTaller"
+                        label: "+"; tip: "Taller rows (Ctrl+Shift+wheel, or Ctrl+wheel over the keys)"
+                        onClicked: root.zoomRowsAt(1.25, gridVerticalFlickable.height / 2)
                     }
                 }
             }
