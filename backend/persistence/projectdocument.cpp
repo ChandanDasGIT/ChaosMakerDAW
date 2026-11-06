@@ -74,6 +74,7 @@ std::string ProjectDocument::serialize(const Project& project,
         trackObj["solo"] = track->solo;
         trackObj["muted"] = track->muted;
         trackObj["volume"] = track->volume;
+        trackObj["pan"] = track->pan;
         trackObj["input"] = track->inputPort;
         trackObj["recordDry"] = track->recordDry;
         trackObj["eq"] = eqJson;
@@ -215,10 +216,17 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
         track.solo = item.value("solo", false);
         track.muted = item.value("muted", false);
         track.volume = item.value("volume", -1.0f);
+        // Optional: projects saved before pan existed load centred.
+        if (item.contains("pan") && !item["pan"].is_number()) {
+            error = "Invalid track controls.";
+            return false;
+        }
+        track.pan = item.value("pan", 0.0f);
         track.inputPort = item.value("input", "");
 
         if (!item.contains("eq") || !item["eq"].is_array() || item["eq"].size() != 10
             || track.volume < 0.0f || track.volume > 2.0f
+            || !std::isfinite(track.pan) || track.pan < -1.0f || track.pan > 1.0f
             || !item.contains("clips") || !item["clips"].is_array()) {
             error = "Invalid track controls.";
             return false;

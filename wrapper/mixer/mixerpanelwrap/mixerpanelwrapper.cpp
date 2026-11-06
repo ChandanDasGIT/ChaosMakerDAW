@@ -75,6 +75,16 @@ QString MixerPanelWrapper::formatClipGainTooltip(double gainDb) const
     return QString::fromStdString(mixer::formatClipGainTooltip(gainDb));
 }
 
+QString MixerPanelWrapper::formatPan(double pan) const
+{
+    return QString::fromStdString(mixer::formatPan(pan));
+}
+
+QString MixerPanelWrapper::formatPanTooltip(double pan) const
+{
+    return QString::fromStdString(mixer::formatPanTooltip(pan));
+}
+
 QString MixerPanelWrapper::formatMuteTooltip(bool muted) const
 {
     return QString::fromStdString(mixer::formatMuteTooltip(muted));
@@ -100,6 +110,18 @@ void MixerPanelWrapper::resetVolume(int trackId)
 {
     if (!m_trackList) return;
     m_trackList->setVolume(trackId, mixer::defaultVolumeGain);
+}
+
+void MixerPanelWrapper::setPan(int trackId, double pan)
+{
+    if (!m_trackList) return;
+    m_trackList->setPan(trackId, panlaw::clampPan(pan));
+}
+
+void MixerPanelWrapper::resetPan(int trackId)
+{
+    if (!m_trackList) return;
+    m_trackList->setPan(trackId, panlaw::centre);
 }
 
 void MixerPanelWrapper::setMasterVolume(double volume)

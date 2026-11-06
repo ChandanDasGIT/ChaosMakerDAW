@@ -72,3 +72,26 @@ TEST(trackmeters, live_and_playback_sum_on_the_correct_track_and_clips_clear_ind
     CHECK(engine.post({EngineCommand::Type::Stop})); arm(engine,false); process(engine,io);
     CHECK(meters->output[0].takePeak()==0);
 }
+
+TEST(trackmeters, track_pan_scales_each_output_channel_on_top_of_the_fader) {
+    AudioEngine engine(nullptr); engine.deviceChanged(48000,128);
+    auto meters=std::make_shared<TrackMeters>();
+    auto audio=std::make_shared<AudioData>();
+    audio->frames=4096; audio->channels={std::vector<float>(4096,0.2f),std::vector<float>(4096,0.4f)};
+    auto publish=[&](float left,float right) {
+        auto snapshot=std::make_unique<EngineSnapshot>(); TrackRender track;
+        track.meters=meters; track.gain=0.5f; track.panLeft=left; track.panRight=right;
+        track.clips.push_back({audio.get(),0,4096});
+        snapshot->tracks={track}; snapshot->keepAudio={audio};
+        engine.publishPlayback(std::move(snapshot));
+    };
+    std::vector<float> left(512),right(512); float* out[]{left.data(),right.data()};
+    AudioIO io{{nullptr,0,0},{out,2,512},nullptr,512};
+    publish(1.0f,0.25f); CHECK(engine.post({EngineCommand::Type::Play})); process(engine,io);
+    for(int i=0;i<512;++i) { CHECK_NEAR(left[i],0.1,1e-6); CHECK_NEAR(right[i],0.05,1e-6); }
+    CHECK_NEAR(meters->output[0].takePeak(),0.1,1e-6); CHECK_NEAR(meters->output[1].takePeak(),0.05,1e-6);
+    CHECK_NEAR(meters->input[1].takePeak(),0.4,1e-6);            // input meter is before the pan
+    std::fill(left.begin(),left.end(),0.0f); std::fill(right.begin(),right.end(),0.0f);
+    publish(0.0f,1.0f); process(engine,io);                     // hard right
+    for(int i=0;i<512;++i) { CHECK(left[i]==0.0f); CHECK_NEAR(right[i],0.2,1e-6); }
+}

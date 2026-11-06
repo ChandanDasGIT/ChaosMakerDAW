@@ -44,6 +44,7 @@ public:
             TrackKind kind = TrackKind::Audio;
             std::string type;
             float volume = 1.0f;
+            float pan = 0.0f;
             bool solo = false;
             bool muted = false;
             bool recordArmed = false;

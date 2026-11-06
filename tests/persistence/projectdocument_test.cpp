@@ -13,6 +13,7 @@ TEST(projectdocument, round_trip_serialization_and_deserialization)
 
     auto& t1 = project.addTrack(TrackKind::Audio, "Rhythm", "Audio");
     t1.volume = 0.8f;
+    t1.pan = -0.35f;
     t1.solo = true;
     t1.muted = false;
     t1.recordDry = true;
@@ -52,6 +53,7 @@ TEST(projectdocument, round_trip_serialization_and_deserialization)
     CHECK(track->muted == false);
     CHECK(track->recordDry == true);
     CHECK_NEAR(track->volume, 0.8f, 1e-6);
+    CHECK_NEAR(track->pan, -0.35f, 1e-6);
     CHECK(track->inputPort == "system:capture_1");
     for (int i = 0; i < 10; ++i) {
         CHECK_NEAR(track->eqGainDb[i], static_cast<float>(i - 5), 1e-6);
@@ -238,4 +240,22 @@ TEST(projectdocument, clip_notes_are_optional_and_validated)
         CHECK(!ProjectDocument::deserialize(sessionWithClip(bad), loaded, error, 48000.0));
         CHECK(error == "Invalid clip notes.");
     }
+}
+
+TEST(projectdocument, track_pan_is_optional_and_validated)
+{
+    const auto document = [](const std::string& panField) {
+        return R"({"format":"ChaosMakerProject","version":2,"project":{"version":1,"bpm":120.0,
+            "sampleRate":48000.0,"numerator":4,"denominator":4,"tracks":[{"name":"T1","type":"Audio",
+            "volume":1.0)" + panField + R"(,"eq":[0,0,0,0,0,0,0,0,0,0],"clips":[]}]},"trackEffects":[""]})";
+    };
+    ProjectFileContent loaded;
+    std::string error;
+    // Saved before pan existed: loads centred.
+    CHECK(ProjectDocument::deserialize(document(""), loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->pan == 0.0f);
+    CHECK(ProjectDocument::deserialize(document(R"(,"pan":1.0)"), loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->pan == 1.0f);
+    CHECK(!ProjectDocument::deserialize(document(R"(,"pan":1.5)"), loaded, error, 48000.0));
+    CHECK(!ProjectDocument::deserialize(document(R"(,"pan":"left")"), loaded, error, 48000.0));
 }

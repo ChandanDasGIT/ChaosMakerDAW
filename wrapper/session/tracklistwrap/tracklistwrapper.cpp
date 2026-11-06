@@ -111,6 +111,8 @@ QVariant TrackListWrapper::data(const QModelIndex& index, int role) const
         return QString::fromStdString(track.inputPort);
     case VolumeRole:
         return track.volume;
+    case PanRole:
+        return track.pan;
     case EqBandsRole: {
         QVariantList bands;
         for (float gain : track.eqGainDb)
@@ -141,6 +143,7 @@ QHash<int, QByteArray> TrackListWrapper::roleNames() const
         {MonitorEnabledRole, "monitorEnabled"},
         {InputPortRole, "inputPort"},
         {VolumeRole, "volume"},
+        {PanRole, "pan"},
         {ClipsRole, "clips"},
         {EqBandsRole, "eqBands"},
         {LiveInputRole, "hasLiveInput"},
@@ -179,6 +182,7 @@ bool TrackListWrapper::setData(const QModelIndex& idx, const QVariant& value, in
     case RecordArmedRole: return setRecordArmed(id, value.toBool());
     case InputPortRole: return setTrackInputPort(id, value.toString());
     case VolumeRole: return setVolume(id, value.toDouble());
+    case PanRole: return setPan(id, value.toDouble());
     default: return false;
     }
 }
@@ -419,6 +423,11 @@ bool TrackListWrapper::setVolume(int id, double value)
     notifyTrackChanged(id, VolumeRole, change);
     if (change.changed && cleanMonitorArmed()) emit cleanMonitorGainChanged(cleanMonitorGain());
     return change.accepted;
+}
+
+bool TrackListWrapper::setPan(int id, double value)
+{
+    return notifyTrackChanged(id, PanRole, m_state.setPan(id, value));
 }
 
 bool TrackListWrapper::setMasterVolume(double value)
@@ -699,7 +708,7 @@ QJsonObject TrackListWrapper::sessionState() const
         tracks.append(QJsonObject{{"name", QString::fromStdString(track->name)},
             {"colour", QString::fromStdString(track->colour)},
             {"type", QString::fromStdString(track->type)}, {"instrument", track->kind == TrackKind::Instrument},
-            {"solo", track->solo}, {"muted", track->muted}, {"volume", track->volume},
+            {"solo", track->solo}, {"muted", track->muted}, {"volume", track->volume}, {"pan", track->pan},
             {"input", QString::fromStdString(track->inputPort)}, {"recordDry", track->recordDry}, {"eq", eq}, {"clips", clips}});
     }
     const auto& tempo = m_project.tempo();
@@ -736,9 +745,12 @@ bool TrackListWrapper::restoreSessionState(const QJsonObject& state, QString& er
         }
         track.solo = item["solo"].toBool(); track.muted = item["muted"].toBool();
         track.volume = float(item["volume"].toDouble(-1));
+        // Sessions saved before pan existed restore centred.
+        track.pan = float(item["pan"].toDouble(0));
         track.inputPort = item["input"].toString().toStdString();
         const auto eq = item["eq"].toArray();
-        if (track.volume < 0 || track.volume > 2 || eq.size() != 10 || !item["clips"].isArray()) {
+        if (track.volume < 0 || track.volume > 2 || (item.contains("pan") && !item["pan"].isDouble())
+            || !std::isfinite(track.pan) || track.pan < -1 || track.pan > 1 || eq.size() != 10 || !item["clips"].isArray()) {
             error = "Invalid track controls."; return false;
         }
         for (int i = 0; i < 10; ++i) {

@@ -58,6 +58,7 @@ TEST(snapshotbuilder, build_playback_snapshot_basic)
 
     auto& t2 = project.addTrack(TrackKind::Audio, "Track 2");
     t2.volume = 1.0f;
+    t2.pan = -0.5f;
     t2.solo = true;
     t2.muted = false;
 
@@ -100,6 +101,7 @@ TEST(snapshotbuilder, build_playback_snapshot_basic)
     const auto& r1 = snapshot->tracks[0];
     CHECK(r1.trackId == t1.id);
     CHECK_NEAR(r1.gain, 0.75f, 1e-6);
+    CHECK(r1.panLeft == 1.0f && r1.panRight == 1.0f);           // centre: unchanged
     CHECK(r1.muted == true);
     CHECK(r1.soloed == false);
     CHECK(r1.clips.size() == 2);
@@ -112,6 +114,8 @@ TEST(snapshotbuilder, build_playback_snapshot_basic)
     const auto& r2 = snapshot->tracks[1];
     CHECK(r2.trackId == t2.id);
     CHECK(r2.soloed == true);
+    CHECK(r2.panLeft == 1.0f);                                   // panned left: right side down
+    CHECK_NEAR(r2.panRight, std::sqrt(0.5), 1e-6);
     CHECK(r2.clips.empty());
 
     CHECK(snapshot->keepAudio.size() == 2);

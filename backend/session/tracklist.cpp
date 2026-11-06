@@ -1,4 +1,5 @@
 #include "tracklist.h"
+#include "dsp/panlaw.h"
 #include "instruments/instrumentcatalog.h"
 
 #include <algorithm>
@@ -194,6 +195,13 @@ TrackList::Change TrackList::setSolo(int id, bool value) { return result(m_proje
 TrackList::Change TrackList::setMuted(int id, bool value) { return result(m_project.setTrackMuted(id, value)); }
 TrackList::Change TrackList::setRecordArmed(int id, bool value) { return result(m_project.setTrackRecordArmed(id, value)); }
 TrackList::Change TrackList::setVolume(int id, double value) { return result(m_project.setTrackVolume(id, static_cast<float>(value))); }
+TrackList::Change TrackList::setPan(int id, double value)
+{
+    const auto* track = m_project.findTrack(id);
+    if (!track || !std::isfinite(value)) return {};
+    if (track->pan == static_cast<float>(panlaw::clampPan(value))) return {true, false};
+    return result(m_project.setTrackPan(id, static_cast<float>(value)));
+}
 TrackList::Change TrackList::setMasterVolume(double value)
 {
     if (!std::isfinite(value)) return {};

@@ -608,8 +608,9 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
             }
             for(int c=0;c<2;++c) {
               float peak=0;
+              const float gain=track.gain*(c==0 ? track.panLeft : track.panRight);
               for(int i=0;i<count;++i) {
-                const float sample=audible ? (channels[c][i]+m_printedAudio[c][i])*track.gain : 0.0f;
+                const float sample=audible ? (channels[c][i]+m_printedAudio[c][i])*gain : 0.0f;
                 if(track.meters) {
                     float measured=sample+(live ? m_liveAudio[c][i] : 0.0f);
                     if(std::isfinite(measured)) peak=std::max(peak,std::abs(measured));
@@ -773,9 +774,10 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
             }
             for(int c=0;c<2;++c) {
                 float peak=0;
+                const float gain=track.gain*(c==0 ? track.panLeft : track.panRight);
                 for(int i=0;i<count;++i) {
                     float value=0;
-                    if(audible)value=(dry[c][i]+m_printedAudio[c][i]+(live && track.monitoring && m_cleanMonitorEnabled ? liveAudio[c][i] : 0))*track.gain;
+                    if(audible)value=(dry[c][i]+m_printedAudio[c][i]+(live && track.monitoring && m_cleanMonitorEnabled ? liveAudio[c][i] : 0))*gain;
                     liveAudio[c][i]=value;
                     if(std::isfinite(value))peak=std::max(peak,std::abs(value));
                 }
