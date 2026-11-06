@@ -414,6 +414,37 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(board,"close"));
         while(model->count())QVERIFY(model->removePedal(model->data(model->index(0),GuitarSuiteModel::PedalIdRole).toInt()));
     }
+    void pedal_cards_show_the_sections_the_backend_rules_choose() {
+        auto* model=qobject_cast<GuitarSuiteModel*>(EngineController::instance()->guitarSuite()); QVERIFY(model);
+        const int before=model->count();
+        for(const char* pedal:{"Tuner","Octaver","Tremolo"})QVERIFY(model->addPedal(pedal));
+        auto* board=window->findChild<QObject*>("guitarSuitePanel"); QVERIFY(board);
+        const auto restore=qScopeGuard([&] {
+            QMetaObject::invokeMethod(board,"close");
+            while(model->count()>before)model->removePedal(model->data(model->index(model->count()-1),GuitarSuiteModel::PedalIdRole).toInt());
+        });
+        QVERIFY(QMetaObject::invokeMethod(board,"open")); QTRY_VERIFY(board->property("visible").toBool());
+        QTest::qWait(200);
+        QStringList texts;
+        std::function<void(QQuickItem*)> collect=[&](QQuickItem* item) {
+            const auto text=item->property("text");
+            if(text.isValid() && item->isVisible())texts<<text.toString();
+            for(auto* child:item->childItems())collect(child);
+        };
+        collect(board->property("contentItem").value<QQuickItem*>());
+        // Tuner card: string buttons, reference text and status from the backend; no dials
+        for(const char* label:{"6 · E2","5 · A2","1 · E4","Standard tuning · A4 = 440 Hz","Play one open string"})
+            QVERIFY2(texts.contains(QString::fromUtf8(label)),label);
+        QVERIFY(!visualItem(window->contentItem(),"pedal.tuner.string"));
+        // Octaver card: the pitch delay note
+        QVERIFY(texts.contains("Shifted voices have a short processing delay. Best with clear single notes."));
+        // Tremolo card: Rate is a dial, sync/division/sustain are not; free-rate hint shown
+        QVERIFY(visualItem(window->contentItem(),"pedal.tremolo.rate"));
+        QVERIFY(!visualItem(window->contentItem(),"pedal.tremolo.sync"));
+        QVERIFY(!visualItem(window->contentItem(),"pedal.tremolo.division"));
+        QVERIFY(texts.contains("Free rate · adjust Rate below"));
+        QVERIFY(texts.contains("1/4 · Quarter note") || texts.contains("1/2 · Half note")); // division box
+    }
     void tremolo_sustain_checkbox_updates_parameter() {
         auto* model=qobject_cast<GuitarSuiteModel*>(EngineController::instance()->guitarSuite()); QVERIFY(model);
         QVERIFY(model->addPedal("Tremolo")); const int row=model->count()-1;

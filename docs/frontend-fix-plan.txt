@@ -138,9 +138,14 @@ PHASE 2 — Move logic out of QML (architecture rule 6)
 [x] 2.4  Mixer target-clip selection (MixerPanel.qml:280-293) → MixerPanelWrapper.
          Done: backend mixer::chooseTargetClip (selected clip on the track, else its first
          clip) via MixerPanelWrapper.targetClipId / clipGainOf.
-[ ] 2.5  GuitarSuiteEditor.qml: tuner string list (use standardtuning.h), beat divisions
+[x] 2.5  GuitarSuiteEditor.qml: tuner string list (use standardtuning.h), beat divisions
          (use tempodivision.h), pedalType string checks, unit formatting → wrapper
          exposes descriptors/flags per pedal.
+         Done: backend pedaleditorrules (backend/instruments/guitar/pedaleditorrules.h/.cpp):
+         per-pedal features, which parameters are dials, sync-disabled Rate, semitone step,
+         value/trim/cents/Hz/sync texts, tuner in-tune rule and status. Tuner labels come
+         from standardtuning::targets, division names live in tempodivision.h. Exposed by
+         GuitarSuiteModel; the QML keeps layout only.
 [ ] 2.6  "Restore session on startup" written in 3 places (AppSettings.qml:19-23, 78-81)
          → one owner (AppSettingsWrapper), others read it.
 [ ] 2.7  Make track deletion undoable (Project history only covers clip edits today).

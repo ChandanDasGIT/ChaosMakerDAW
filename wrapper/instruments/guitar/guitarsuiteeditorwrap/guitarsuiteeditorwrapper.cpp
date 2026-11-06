@@ -1,4 +1,5 @@
 #include "guitarsuiteeditorwrapper.h"
+#include "instruments/guitar/pedaleditorrules.h"
 
 #include "instruments/guitar/audiofile/impulsewav.h"
 #include "instruments/guitar/plugins/cabinet/cabinet.h"
@@ -483,3 +484,34 @@ bool GuitarSuiteEditorWrapper::restoreSessionData(std::string_view bytes)
 {
     return restoreSessionData(QByteArray::fromRawData(bytes.data(), static_cast<qsizetype>(bytes.size())));
 }
+
+namespace {
+QStringList toQStringList(const std::vector<std::string>& values)
+{
+    QStringList list;
+    for (const auto& value : values) list.push_back(QString::fromStdString(value));
+    return list;
+}
+}
+
+QStringList GuitarSuiteEditorWrapper::beatDivisionNames() { return toQStringList(pedaleditor::beatDivisionNames()); }
+QStringList GuitarSuiteEditorWrapper::tunerStringLabels() { return toQStringList(pedaleditor::tunerStringLabels()); }
+QString GuitarSuiteEditorWrapper::tunerReferenceText() { return QString::fromStdString(pedaleditor::tunerReferenceText()); }
+
+QVariantMap GuitarSuiteEditorWrapper::pedalFeatures(const QString& pedalType) const
+{
+    const auto f = pedaleditor::features(pedalType.toStdString());
+    return {{QStringLiteral("pitchDelayNote"), f.pitchDelayNote}, {QStringLiteral("cabinetIr"), f.cabinetIr},
+            {QStringLiteral("tuner"), f.tuner}, {QStringLiteral("sustainToggle"), f.sustainToggle},
+            {QStringLiteral("tempoSync"), f.tempoSync}};
+}
+bool GuitarSuiteEditorWrapper::isDial(const QString& type, const QString& id) const { return pedaleditor::isDial(type.toStdString(), id.toStdString()); }
+bool GuitarSuiteEditorWrapper::disabledWhenSynced(const QString& type, const QString& id) const { return pedaleditor::disabledWhenSynced(type.toStdString(), id.toStdString()); }
+double GuitarSuiteEditorWrapper::dialStep(const QString& type, const QString& id) const { return pedaleditor::dialStep(type.toStdString(), id.toStdString()); }
+QString GuitarSuiteEditorWrapper::formatValue(double value, const QString& unit) const { return QString::fromStdString(pedaleditor::formatValue(value, unit.toStdString())); }
+QString GuitarSuiteEditorWrapper::syncText(bool synced, double bpm) const { return QString::fromStdString(pedaleditor::syncText(synced, bpm)); }
+bool GuitarSuiteEditorWrapper::inTune(double cents) const { return pedaleditor::inTune(cents); }
+QString GuitarSuiteEditorWrapper::tunerStatus(bool hasPitch, bool bypassed, double cents) const { return QString::fromStdString(pedaleditor::tunerStatus(hasPitch, bypassed, cents)); }
+QString GuitarSuiteEditorWrapper::formatCents(double cents) const { return QString::fromStdString(pedaleditor::formatCents(cents)); }
+QString GuitarSuiteEditorWrapper::formatTunerFrequency(double hz, double targetHz) const { return QString::fromStdString(pedaleditor::formatTunerFrequency(hz, targetHz)); }
+QString GuitarSuiteEditorWrapper::formatTrim(double db) const { return QString::fromStdString(pedaleditor::formatTrim(db)); }
