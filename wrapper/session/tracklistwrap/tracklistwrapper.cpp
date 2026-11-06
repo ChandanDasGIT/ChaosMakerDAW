@@ -323,11 +323,16 @@ bool TrackListWrapper::removeTrack(int id)
     if (!m_state.canRemoveTrack(id)) return false;
     const int row = rowForTrackId(id);
     beginRemoveRows({}, row, row); m_state.removeTrack(id); endRemoveRows();
+    notifyTrackCountChanged();
+    return true;
+}
+
+void TrackListWrapper::notifyTrackCountChanged()
+{
     syncSelectionState();
     emit countChanged(); emit contentEndBeatsChanged(); emit clipsChanged();
     emit cleanMonitorChanged(cleanMonitorArmed()); emit cleanMonitorInputChanged();
     emit cleanMonitorGainChanged(cleanMonitorGain()); emit cleanMonitorEqChanged();
-    return true;
 }
 
 int TrackListWrapper::trackIdAt(int row) const { return m_state.trackIdAt(row); }
@@ -582,11 +587,28 @@ void TrackListWrapper::notifyClipGainEdit(int trackId) {
 }
 bool TrackListWrapper::undo()
 {
+    // Undoing a track removal puts a row back: announce it so views add just that row.
+    if (const auto restore = m_state.undoRestoresTrack()) {
+        const int row = static_cast<int>(restore->index);
+        beginInsertRows({}, row, row);
+        const bool ok = m_state.undo();
+        endInsertRows();
+        notifyTrackCountChanged();
+        return ok;
+    }
     if (!m_state.undo()) return false;
     notifyClipEdit(-1); return true;
 }
 bool TrackListWrapper::redo()
 {
+    if (const auto removal = m_state.redoRemovesTrack()) {
+        const int row = static_cast<int>(removal->index);
+        beginRemoveRows({}, row, row);
+        const bool ok = m_state.redo();
+        endRemoveRows();
+        notifyTrackCountChanged();
+        return ok;
+    }
     if (!m_state.redo()) return false;
     notifyClipEdit(-1); return true;
 }

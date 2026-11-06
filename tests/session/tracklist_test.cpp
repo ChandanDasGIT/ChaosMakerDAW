@@ -270,3 +270,45 @@ TEST(tracklist, a_clip_gain_drag_is_one_undo_step)
     CHECK(tracks.undo());                                     // undoes only the -2 step
     CHECK_NEAR(tracks.findClip(t, a)->gainDb, -1.0, 1e-6);
 }
+
+TEST(tracklist, removing_a_track_can_be_undone_and_redone)
+{
+    TrackList tracks;
+    const int a = tracks.addAudioTrack();
+    const int b = tracks.addInstrumentTrack();
+    const int c = tracks.addAudioTrack();
+    const int clip = tracks.addClipAtBeat(b, 0, 4);
+    CHECK(tracks.setClipGain(b, clip, -6.0).changed);            // an older edit on that track
+    CHECK(tracks.setTrackColour(b, "#d97c73").changed);
+    CHECK(tracks.setEqBand(b, 3, 4.5).changed);
+    tracks.selectTrack(b);
+
+    CHECK(tracks.removeTrack(b));
+    CHECK(tracks.count() == 2 && !tracks.project().findTrack(b));
+    CHECK(tracks.selectedTrackId() == c);                         // neighbour took the row
+    CHECK(tracks.canUndo());                                      // history is kept now
+    const auto restore = tracks.undoRestoresTrack();
+    CHECK(restore && restore->trackId == b && restore->index == 1);
+
+    CHECK(tracks.undo());                                         // track back: same id, row, content
+    CHECK(tracks.count() == 3 && tracks.trackIdAt(1) == b);
+    const auto* back = tracks.project().findTrack(b);
+    CHECK(back && back->audioClips.size() == 1);
+    CHECK_NEAR(back->audioClips[0].gainDb, -6.0, 1e-6);
+    CHECK(back->colour == "#d97c73");
+    CHECK_NEAR(back->eqGainDb[3], 4.5, 1e-6);
+    CHECK(tracks.undo());                                         // the older clip edit still undoes
+    CHECK_NEAR(tracks.findClip(b, clip)->gainDb, 0.0, 1e-6);
+
+    CHECK(tracks.redo());                                         // gain again
+    const auto removal = tracks.redoRemovesTrack();
+    CHECK(removal && removal->trackId == b && removal->index == 1);
+    tracks.selectTrack(b);
+    CHECK(tracks.redo());                                         // removed again
+    CHECK(tracks.count() == 2 && !tracks.project().findTrack(b) && tracks.selectedTrackId() == c);
+    CHECK(tracks.trackIdAt(0) == a);
+
+    // A new track never reuses the removed id, so undo cannot collide with it
+    const int d = tracks.addAudioTrack();
+    CHECK(d != b);
+}

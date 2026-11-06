@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "session/project.h"
 #include "core/audiodata.h"
 
@@ -136,12 +138,17 @@ public:
     bool canRedo() const { return !editsLocked() && m_project.canRedo(); }
     bool undo();
     bool redo();
+    // The next undo/redo adds or removes a whole track (for models that announce row changes).
+    std::optional<Project::TrackChange> undoRestoresTrack() const { return canUndo() ? m_project.undoRestoresTrack() : std::nullopt; }
+    std::optional<Project::TrackChange> redoRemovesTrack() const { return canRedo() ? m_project.redoRemovesTrack() : std::nullopt; }
     bool setTempo(double bpm, int numerator, int denominator);
     void setSampleRate(double rate);
     bool attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool printed);
     bool attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes);
 
 private:
+    // After a track is removed: if it was selected, select the track that took its row.
+    void selectNeighbourOfRemoved(int id, int removedRow);
     double offsetBeats(const AudioClip& clip) const;
     Project m_project;
     AudioMap m_audio;

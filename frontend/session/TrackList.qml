@@ -515,8 +515,8 @@ Rectangle {
         }
     }
 
-    // Deleting a track cannot be undone and clears the undo history, so ask first when the
-    // track holds clips. Empty tracks are removed straight away.
+    // Deleting a track with clips asks first (it can be undone with Ctrl+Z, which restores the
+    // track, its clips and its pedalboard). Empty tracks are removed straight away.
     function requestRemoveTrack(trackId, name, clipCount) {
         if (!root.trackModel) return
         if (clipCount <= 0) { root.trackModel.removeTrack(trackId); return }
@@ -544,7 +544,7 @@ Rectangle {
         contentItem: Text {
             text: "Delete \u201c" + removeTrackDialog.trackName + "\u201d and its " + removeTrackDialog.clipCount
                   + (removeTrackDialog.clipCount === 1 ? " clip" : " clips")
-                  + "?\nThis can't be undone, and it clears the undo history."
+                  + "?\nYou can bring it back with Undo (Ctrl+Z)."
             color: Theme.text
             wrapMode: Text.WordWrap
             padding: 16

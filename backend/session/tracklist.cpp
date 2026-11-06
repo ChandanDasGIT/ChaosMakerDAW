@@ -158,15 +158,14 @@ bool TrackList::removeTrack(int id)
     if (!canRemoveTrack(id)) return false;
     const int removedRow = indexOfTrack(id);
     m_project.removeTrack(id);
-    if (m_selectedTrackId == id) {
-        if (count() > 0) {
-            const int nextRow = std::min(removedRow, count() - 1);
-            m_selectedTrackId = trackIdAt(nextRow);
-        } else {
-            m_selectedTrackId = -1;
-        }
-    }
+    selectNeighbourOfRemoved(id, removedRow);
     return true;
+}
+
+void TrackList::selectNeighbourOfRemoved(int id, int removedRow)
+{
+    if (m_selectedTrackId != id) return;
+    m_selectedTrackId = count() > 0 ? trackIdAt(std::min(removedRow, count() - 1)) : -1;
 }
 bool TrackList::canMoveTrack(int id, int row) const { return indexOfTrack(id) >= 0 && row >= 0 && row < count(); }
 bool TrackList::moveTrack(int id, int row)
@@ -677,7 +676,10 @@ bool TrackList::undo() {
 
 bool TrackList::redo() {
     if (!canRedo()) return false;
-    m_project.redo();  return true;
+    const auto removal = m_project.redoRemovesTrack();
+    m_project.redo();
+    if (removal) selectNeighbourOfRemoved(removal->trackId, static_cast<int>(removal->index));
+    return true;
 }
 
 bool TrackList::setTempo(double bpm, int numerator, int denominator)

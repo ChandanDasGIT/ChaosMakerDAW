@@ -153,7 +153,13 @@ PHASE 2 — Move logic out of QML (architecture rule 6)
          keeps a copy. Also fixed: AppSettingsWrapper rewrote ALL its keys on any change,
          so e.g. changing the piano roll display could reset "restore session" to a stale
          value; each setter now saves only its own key.
-[ ] 2.7  Make track deletion undoable (Project history only covers clip edits today).
+[x] 2.7  Make track deletion undoable (Project history only covers clip edits today).
+         Done: Project history can hold a "track removed" step (full track copy + row);
+         removing a track no longer clears the undo history. Undo restores the track with
+         the same id, row, clips, colour and EQ; redo removes it again. TrackListWrapper
+         announces just that row (no model reset). EngineController keeps a removed
+         track's pedalboard (session data) and gives it back on undo; cleared on new/open.
+         The delete confirmation is kept and now says Ctrl+Z brings the track back.
 
 
 PHASE 3 — Layout and workflow

@@ -1,4 +1,6 @@
 #pragma once
+
+#include <optional>
 #include "transport/tempomap.h"
 #include "midi/midinote.h"
 
@@ -49,6 +51,7 @@ struct Track {
 class Project {
 public:
     Track& addTrack(TrackKind kind, const std::string& name, const std::string& type = {});
+    // Removing a track is an undoable step: undo puts it back (same id, position and content).
     void removeTrack(int id);
     void moveTrack(int from, int to);
     Track* findTrack(int id);
@@ -81,6 +84,10 @@ public:
     bool canRedo() const { return m_historyPosition < m_history.size(); }
     int undo();
     int redo();
+    // When the next undo/redo adds or removes a whole track: which track and at what row.
+    struct TrackChange { int trackId; std::size_t index; };
+    std::optional<TrackChange> undoRestoresTrack() const;
+    std::optional<TrackChange> redoRemovesTrack() const;
     void clearHistory() { m_history.clear(); m_historyPosition = 0; }
 
     const std::vector<std::unique_ptr<Track>>& tracks() const { return m_tracks; }
@@ -96,7 +103,15 @@ public:
 private:
     struct TrackClipEdit { int trackId; std::vector<AudioClip> before, after; };
     // gainClipId: set when the step is a clip gain change, so a fader drag can extend it.
-    struct ClipEdit { std::vector<TrackClipEdit> tracks; int gainClipId = -1; };
+    // removedTrack: set when the step removed a whole track (kept here so undo can restore it).
+    struct ClipEdit {
+        std::vector<TrackClipEdit> tracks;
+        int gainClipId = -1;
+        std::optional<Track> removedTrack;
+        std::size_t removedIndex = 0;
+    };
+    void pushHistory(ClipEdit edit);
+    std::size_t indexOfTrack(int id) const;
     void rememberClipEdit(int trackId, std::vector<AudioClip> before);
     std::vector<ClipEdit> m_history;
     std::size_t m_historyPosition = 0;

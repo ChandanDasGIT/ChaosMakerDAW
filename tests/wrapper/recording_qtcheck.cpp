@@ -704,3 +704,24 @@ TEST(qtmidirecording, armed_instrument_track_records_midi_into_timeline_clip) {
     CHECK(notes[0].toMap()["velocity"].toInt() == 100);
     controller.shutdownSession();
 }
+
+TEST(qtrecording, undoing_a_track_removal_restores_its_pedalboard) {
+    Storage storage;
+    auto device=std::make_unique<OfflineDevice>();
+    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar");
+    auto* fx=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(guitar)); CHECK(fx);
+    CHECK(fx->addPedal("Delay")); CHECK(fx->addPedal("Reverb")); CHECK(fx->count()==2);
+    CHECK(tracks.removeTrack(guitar));
+    CHECK(!controller.trackEffects(guitar));
+    CHECK(tracks.undo());
+    auto* back=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(guitar)); CHECK(back);
+    CHECK(back && back->count()==2);
+    // A different project must not inherit a removed track's pedalboard
+    CHECK(tracks.redo());
+    CHECK(controller.newProject());
+    const int fresh=tracks.addInstrumentTrackOfType("Electric Guitar");
+    auto* freshFx=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(fresh)); CHECK(freshFx);
+    CHECK(freshFx && freshFx->count()==0);
+    controller.shutdownSession();
+}

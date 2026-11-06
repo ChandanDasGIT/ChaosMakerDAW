@@ -1774,10 +1774,17 @@ private slots:
         QCOMPARE(dialog->property("clipCount").toInt(),1);
         QVERIFY(QMetaObject::invokeMethod(dialog,"reject"));
         QTRY_VERIFY(!dialog->property("visible").toBool()); QCOMPARE(tracks.count(),1);
-        // ...Delete removes it
+        // ...Delete removes it; the dialog says it can be undone
         click(removeFull); QTRY_VERIFY(dialog->property("visible").toBool());
+        auto* message=dialog->property("contentItem").value<QQuickItem*>(); QVERIFY(message);
+        QVERIFY(message->property("text").toString().contains("Undo (Ctrl+Z)"));
         QVERIFY(QMetaObject::invokeMethod(dialog,"accept"));
         QTRY_COMPARE(tracks.count(),0);
+        // Undo brings the track (and its card) back
+        QVERIFY(tracks.undo());
+        QTRY_COMPARE(tracks.count(),1); QCOMPARE(tracks.trackIdAt(0),full);
+        QTRY_VERIFY(visualItem(list,"trackRemoveButton"+QString::number(full)));
+        QCOMPARE(tracks.clips().size(),1);
     }
     void mixer_clip_gain_fader_follows_the_target_clip() {
         TrackListWrapper tracks;
