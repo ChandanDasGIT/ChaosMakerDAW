@@ -1,0 +1,119 @@
+ChaosMaker — Frontend UI Fix Plan
+=================================
+Source: full scan of all 24 QML files (~6,100 lines), 2026-11-06.
+Rules: follow AGENTS.md — one step at a time, test only what changed, no regressions,
+keep the 3-tier split (backend = pure C++, wrapper = Qt bridge, frontend = QML view only).
+
+Status legend:  [ ] todo   [~] in progress   [x] done
+
+
+PHASE 1 — Broken or misleading behaviour (do first)
+---------------------------------------------------
+[ ] 1.1  Piano roll playhead never moves.
+         frontend/pianoroll/PianoRollView.qml:26,660 — bind playheadBeat to the transport
+         position, relative to the clip start.
+
+[ ] 1.2  Piano roll assumes 4/4.
+         PianoRollView.qml:429-436, 646, 932-935; VelocityLane.qml:222 — take beats-per-bar
+         from the project time signature (as Timeline.qml does via TimelineWrapper).
+
+[ ] 1.3  Dead piano roll controls. Wire up or remove each one:
+         - Menu bar File/Edit/Navigate/Options/View/Contents/Actions (PianoRollView.qml:233-247)
+         - Snap toggle, Quantize, Undo, Redo buttons (PianoRollView.qml:310-344)
+         - Footer transport + zoom-tool buttons (PianoRollView.qml:1028-1063)
+         - "Notes:" combo, snap style (triplet/dotted/swing), Key snap,
+           Pitch/Channel/Track colour modes, hardcoded "Track 1/2/3" and channel combos
+           (PianoRollView.qml:1076-1148)
+         - Velocity lane "+" and "Velocity ▾" (VelocityLane.qml:137-195)
+
+[ ] 1.4  Save As shortcut is shown but missing.
+         frontend/session/ProjectActions.qml:244 — add a StandardKey.SaveAs Shortcut.
+
+[ ] 1.5  Track delete: one click, no confirmation, and it seems to skip undo history.
+         frontend/session/TrackList.qml:309; backend/session/tracklist.cpp:156 —
+         make removal undoable (backend), and/or confirm when the track has clips.
+
+[ ] 1.6  Mixer channel fader controls clip gain instead of track volume.
+         frontend/mixer/MixerPanel.qml:280-293, 339-353 — the main fader should be track
+         volume; move clip gain somewhere else (clip inspector/context).
+
+[ ] 1.7  Master fader dB labels are evenly spaced and don't match the real scale.
+         MixerPanel.qml:116-129 — position labels with the wrapper's dB→position mapping.
+
+[ ] 1.8  Duplicate shortcuts that may be ambiguous (Qt may then fire neither).
+         - Delete / Ctrl+A / Escape: PianoRollView.qml:46-61 vs Timeline.qml:60-113
+           (piano roll shortcuts are always enabled; gate them on visibility/focus)
+         - Space / R: PlaybackControls.qml:23-37 vs QuickSettings.qml:69-82
+         Check these in the running app first.
+
+[ ] 1.9  Buffer size / output device sent twice to the engine.
+         frontend/audiodevice/DeviceSettings.qml:30-34, 64-67 — call the wrapper only;
+         its request* signal already reaches EngineController.
+
+
+PHASE 2 — Move logic out of QML (architecture rule 6)
+-----------------------------------------------------
+[ ] 2.1  Piano roll snap/grid math, position formatting and note colours
+         (PianoRollView.qml:63-169) → backend + PianoRollWrapper. Combine with the
+         timeline's snap system (TimelineWrapper) so there is one snap model.
+[ ] 2.2  Note names / black-key detection (PianoKeys.qml:18-28) → backend/midi.
+[ ] 2.3  Transport time formatting (PlaybackControls.qml:96-102) → backend/core/valueformat.
+[ ] 2.4  Mixer target-clip selection (MixerPanel.qml:280-293) → MixerPanelWrapper
+         (or removed with 1.6).
+[ ] 2.5  GuitarSuiteEditor.qml: tuner string list (use standardtuning.h), beat divisions
+         (use tempodivision.h), pedalType string checks, unit formatting → wrapper
+         exposes descriptors/flags per pedal.
+[ ] 2.6  "Restore session on startup" written in 3 places (AppSettings.qml:19-23, 78-81)
+         → one owner (AppSettingsWrapper), others read it.
+
+
+PHASE 3 — Layout and workflow
+-----------------------------
+[ ] 3.1  Transport bar: show BPM, time signature and a bars.beats position inline
+         (TransportBar.qml); keep QuickSettings for metronome/count-in/snap, and give it
+         a clearer name.
+[ ] 3.2  Top bar: move buffer/output/MIDI selectors (TopBar.qml:71, DeviceSettings.qml)
+         into Preferences so the bar fits at the 980 px minimum width.
+[ ] 3.3  Menus: add Edit (Undo/Redo, Cut/Copy/Paste) and View; add recent files.
+[ ] 3.4  Bottom panel: Mixer / Piano Roll tab switch instead of the "Mixer" toggle
+         that stays lit while the piano roll is shown (Main.qml, TopBar.qml).
+[ ] 3.5  Consistent mouse wheel everywhere: wheel = vertical scroll, Shift = horizontal,
+         Ctrl = zoom (Timeline.qml:327-331 currently zooms on a plain wheel).
+[ ] 3.6  Piano roll editing: rubber-band selection with the pointer tool, vertical zoom,
+         Ctrl+wheel zoom, notes tinted by track colour.
+[ ] 3.7  Consistency: S/M order (TrackList vs Mixer), mute colour (orange vs red),
+         "Add audio track" tooltip, empty-area "add Vocal track" text, selection
+         hiding the track colour strip (TrackList.qml:130-131).
+[ ] 3.8  Add a pan control per track (backend + wrapper + mixer strip).
+[ ] 3.9  Save layout sizes between sessions: track list width, mixer height,
+         piano roll dock height, strip widths.
+[ ] 3.10 Guitar pedal cards: 2–3 column dial grid instead of one dial per row.
+[ ] 3.11 EQ: per-band double-click reset, value tooltips, response curve,
+         apply presets on selection.
+[ ] 3.12 Status strip: sample rate, buffer/latency, xruns.
+
+
+PHASE 4 — Consistency and maintenance
+-------------------------------------
+[ ] 4.1  Replace the 329 hardcoded hex colours with Theme tokens; merge the piano roll's
+         separate palette into Theme.
+[ ] 4.2  Use or delete Icons.qml (0 references) and Theme.trackColors (unused; TrackList
+         has its own 12-colour palette at TrackList.qml:363) — pick one palette.
+[ ] 4.3  Shared components: ThemedMenuItem (copy-pasted ~12 times), ToggleChip,
+         PanelButton, DarkComboBox.
+[ ] 4.4  Move the hidden 1x1 test buttons (ProjectActions.qml:324-367) into tests/ui/.
+[ ] 4.5  Raise 5–8 px fonts (7 places, e.g. "MON" at 7 px); add Accessible.name.
+
+
+PHASE 5 — Performance
+---------------------
+[ ] 5.1  One shared TrackEffectsPanel / ColorDialog / input popup instead of one per
+         track card (TrackList.qml:393-506).
+[ ] 5.2  Load only the piano roll in use (docked or floating) with a Loader
+         (Main.qml:217, 247).
+[ ] 5.3  Cache/throttle clipWaveform() calls made on every horizontal scroll frame
+         (Timeline.qml:450-452).
+
+
+Suggested order: 1.1 → 1.2 → 1.4 → 1.9 → 1.8 → 1.3 → 1.5 → 1.6/1.7, then Phase 2
+(2.1 together with 1.3), then Phases 3–5.
