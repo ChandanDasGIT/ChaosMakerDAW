@@ -23,7 +23,7 @@ Rectangle {
     signal snapModeEdited(int value)
     signal transportAction(string action)
     height: 72
-    color: "#242424"
+    color: Theme.transport.bar
     border.color: Theme.divider
 
     RowLayout {

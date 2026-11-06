@@ -69,13 +69,13 @@ RowLayout {
             }
             background: Rectangle {
                 radius: 6
-                color: index === 2 && transportButton.active ? "#633238"
-                     : transportButton.down ? "#454851"
-                     : transportButton.active ? "#203a45"
-                     : transportButton.hovered ? "#363941" : "#2b2d32"
+                color: index === 2 && transportButton.active ? Theme.recordActiveBg
+                     : transportButton.down ? Theme.transport.buttonPressed
+                     : transportButton.active ? Theme.accentBg
+                     : transportButton.hovered ? Theme.transport.buttonHover : Theme.transport.button
                 border.color: index === 2 && transportButton.active ? Theme.record
                             : transportButton.active ? Theme.accent
-                            : transportButton.hovered ? "#5a5e68" : "#41444c"
+                            : transportButton.hovered ? Theme.transport.buttonBorderHover : Theme.transport.buttonBorder
             }
             onClicked: playbackBridge.transportAction(command)
             ToolTip.visible: hovered

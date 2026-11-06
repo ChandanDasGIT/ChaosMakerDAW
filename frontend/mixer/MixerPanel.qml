@@ -13,7 +13,7 @@ Rectangle {
         trackList: root.trackModel instanceof TrackListWrapper ? root.trackModel : null
     }
 
-    color: "#1d1d1d"
+    color: Theme.mixer.background
     border.color: Theme.divider
 
     RowLayout {
@@ -28,7 +28,7 @@ Rectangle {
             property real masterChannelWidth: 124
             Layout.fillHeight: true
             Layout.preferredWidth: masterChannelWidth
-            color: "#181818"
+            color: Theme.mixer.master
             border.color: Theme.divider
 
             TapHandler {
@@ -201,7 +201,7 @@ Rectangle {
                 anchors.bottom: parent.bottom
                 anchors.right: parent.right
                 width: 7
-                color: masterResizeHandle.containsMouse || masterResizeHandle.pressed ? "#676767" : "transparent"
+                color: masterResizeHandle.containsMouse || masterResizeHandle.pressed ? Theme.mixer.resizeHandle : "transparent"
                 z: 2
 
                 Rectangle {
@@ -281,7 +281,7 @@ Rectangle {
                         objectName: "mixerStrip" + trackId
                         width: channelWidth
                         height: stripRow.height
-                        color: index % 2 ? "#202020" : "#222222"
+                        color: index % 2 ? Theme.mixer.stripAlt : Theme.mixer.strip
                         border.color: Theme.divider
 
                         // The clip this strip's fader controls: chosen by the backend
@@ -337,8 +337,8 @@ Rectangle {
                                     onMoved: panelWrapper.setPan(strip.trackId, value)
                                     background: Rectangle {
                                         radius: width / 2
-                                        color: panKnob.pressed ? Theme.controlBgActive : "#303030"
-                                        border.color: panKnob.readout === "C" ? "#4a4a4a" : Theme.accent
+                                        color: panKnob.pressed ? Theme.controlBgActive : Theme.chip
+                                        border.color: panKnob.readout === "C" ? Theme.mixer.knobBorder : Theme.accent
                                     }
                                     handle: Rectangle {
                                         // Pointer from the centre; straight up is centre pan
@@ -468,7 +468,7 @@ Rectangle {
                                     text: "M"; implicitWidth: 30; implicitHeight: 24
                                     onClicked: root.trackModel ? root.trackModel.setMuted(strip.trackId, !active) : panelWrapper.setMuted(strip.trackId, !active)
                                     contentItem: Text { text: parent.text; color: parent.active ? Theme.muteText : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                    background: Rectangle { color: parent.active ? Theme.muteBg : "#303030"; border.color: parent.active ? Theme.muteBorder : "#424242"; radius: 3 }
+                                    background: Rectangle { color: parent.active ? Theme.muteBg : Theme.chip; border.color: parent.active ? Theme.muteBorder : Theme.chipBorder; radius: 3 }
                                     ToolTip.visible: hovered
                                     ToolTip.text: panelWrapper.formatMuteTooltip(active)
                                 }
@@ -478,7 +478,7 @@ Rectangle {
                                     text: "S"; implicitWidth: 30; implicitHeight: 24
                                     onClicked: root.trackModel ? root.trackModel.setSolo(strip.trackId, !active) : panelWrapper.setSolo(strip.trackId, !active)
                                     contentItem: Text { text: parent.text; color: parent.active ? Theme.soloText : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                    background: Rectangle { color: parent.active ? Theme.soloBg : "#303030"; border.color: parent.active ? Theme.soloBorder : "#424242"; radius: 3 }
+                                    background: Rectangle { color: parent.active ? Theme.soloBg : Theme.chip; border.color: parent.active ? Theme.soloBorder : Theme.chipBorder; radius: 3 }
                                     ToolTip.visible: hovered
                                     ToolTip.text: panelWrapper.formatSoloTooltip(active)
                                 }
@@ -489,7 +489,7 @@ Rectangle {
                             anchors.bottom: parent.bottom
                             anchors.right: parent.right
                             width: 7
-                            color: resizeHandle.containsMouse || resizeHandle.pressed ? "#676767" : "transparent"
+                            color: resizeHandle.containsMouse || resizeHandle.pressed ? Theme.mixer.resizeHandle : "transparent"
                             z: 2
                             MouseArea {
                                 id: resizeHandle

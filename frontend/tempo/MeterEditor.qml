@@ -11,8 +11,8 @@ Rectangle {
     implicitWidth: 87
     implicitHeight: 29
     radius: 6
-    color: "#191a1e"
-    border.color: "#3a3d45"
+    color: Theme.transport.field
+    border.color: Theme.transport.fieldBorder
 
     Row {
         anchors.centerIn: parent
@@ -32,7 +32,7 @@ Rectangle {
             Accessible.name: "Time signature numerator"
             background: Rectangle {
                 radius: 5
-                color: numeratorField.activeFocus ? "#282b32" : "transparent"
+                color: numeratorField.activeFocus ? Theme.transport.fieldFocus : "transparent"
                 border.color: numeratorField.activeFocus ? Theme.accent : "transparent"
             }
             onEditingFinished: {
@@ -42,7 +42,7 @@ Rectangle {
                     text = String(root.numerator)
             }
         }
-        Text { text: "/"; anchors.verticalCenter: parent.verticalCenter; color: "#7e838d"; font.pixelSize: 13 }
+        Text { text: "/"; anchors.verticalCenter: parent.verticalCenter; color: Theme.transport.separatorText; font.pixelSize: 13 }
         TextField {
             id: denominatorField
             objectName: "meterDenominator"
@@ -58,7 +58,7 @@ Rectangle {
             Accessible.name: "Time signature denominator"
             background: Rectangle {
                 radius: 5
-                color: denominatorField.activeFocus ? "#282b32" : "transparent"
+                color: denominatorField.activeFocus ? Theme.transport.fieldFocus : "transparent"
                 border.color: denominatorField.activeFocus ? Theme.accent : "transparent"
             }
             onEditingFinished: {

@@ -10,7 +10,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
-Next: Phase 4 — 4.1c remaining colours (4.1a/4.1b and 4.2 done).
+Next: Phase 4 — 4.1c-2 remaining colours (guitar suite, settings, FX panel, EQ, meters).
 Then Phase 5, then Phase 6 (user requests: FX per track type, pro EQ).
 
 Decisions made by the user (keep to them):
@@ -324,8 +324,12 @@ PHASE 4 — Consistency and maintenance
            popupBorder); track-list ones went to theme/TrackListColors.qml
            (Theme.trackList); the 12-colour picker palette is Theme.trackColors. 2 merges
            (add-track popup: background 1/255, border 5/255).
-         - [ ] 4.1c the rest (timeline, mixer, guitar suite, settings, transport, tempo,
-           meters, FX panel, EQ) — reuse the shared tokens above.
+         - [done] 4.1c-1 Timeline, mixer, transport buttons, BPM and time signature fields,
+           transport bar: 47 colours -> theme/TimelineColors.qml (Theme.timeline),
+           MixerColors.qml (Theme.mixer), TransportColors.qml (Theme.transport); shared
+           chip/accentBg reused, new Theme.recordActiveBg (record button while recording
+           and the recording region; merged #633238 into #663238, 3/255).
+         - [ ] 4.1c-2 Guitar suite, device settings, Metronome & Snap, FX panel, EQ, meters.
 [x] 4.2  Use or delete Icons.qml (0 references) and Theme.trackColors (unused; TrackList
          has its own 12-colour palette at TrackList.qml:363) — pick one palette.
          - [done] Icons (user's rules): all icons live in frontend/icons/. Every text icon

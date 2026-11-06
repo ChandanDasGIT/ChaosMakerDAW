@@ -9,9 +9,9 @@ Rectangle {
     implicitWidth: 124
     implicitHeight: 29
     radius: 6
-    color: "#191a1e"
+    color: Theme.transport.field
     border.color: field.activeFocus && !editor.acceptableInput ? Theme.record
-                  : field.activeFocus ? Theme.accent : "#3a3d45"
+                  : field.activeFocus ? Theme.accent : Theme.transport.fieldBorder
 
     TempoEditorWrapper {
         id: editor
@@ -28,7 +28,7 @@ Rectangle {
             text: Icons.minus
             onClicked: editor.adjust(-1)
             contentItem: Text { text: Icons.minus; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-            background: Rectangle { color: parent.down ? "#414650" : parent.hovered ? "#2d3038" : "transparent"; radius: 4 }
+            background: Rectangle { color: parent.down ? Theme.transport.stepPressed : parent.hovered ? Theme.transport.stepHover : "transparent"; radius: 4 }
             ToolTip.visible: hovered; ToolTip.text: "Decrease BPM by 1"
         }
         TextField {
@@ -63,7 +63,7 @@ Rectangle {
             text: Icons.plus
             onClicked: editor.adjust(1)
             contentItem: Text { text: Icons.plus; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-            background: Rectangle { color: parent.down ? "#414650" : parent.hovered ? "#2d3038" : "transparent"; radius: 4 }
+            background: Rectangle { color: parent.down ? Theme.transport.stepPressed : parent.hovered ? Theme.transport.stepHover : "transparent"; radius: 4 }
             ToolTip.visible: hovered; ToolTip.text: "Increase BPM by 1"
         }
     }
