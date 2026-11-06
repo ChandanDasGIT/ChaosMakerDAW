@@ -80,6 +80,12 @@ Item {
     }
 
     FileDialog {
+
+        // Inside the main window: a separate dialog window keeps app focus after closing,
+
+        // which left the app without keyboard input (plan item 1.11).
+
+        popupType: Popup.Item
         id: eqSaveDialog
         title: "Save equalizer preset"
         fileMode: FileDialog.SaveFile
@@ -88,6 +94,9 @@ Item {
         onAccepted: root.trackModel.saveEqPreset(root.trackId, selectedFile)
     }
     FileDialog {
+        // Inside the main window: a separate dialog window keeps app focus after closing,
+        // which left the app without keyboard input (plan item 1.11).
+        popupType: Popup.Item
         id: eqLoadDialog
         title: "Load equalizer preset"
         fileMode: FileDialog.OpenFile

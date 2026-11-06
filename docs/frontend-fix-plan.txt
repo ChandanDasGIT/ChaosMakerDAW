@@ -83,17 +83,23 @@ PHASE 1 — Broken or misleading behaviour (do first)
          - mixer_split_meters_show_independent_channels_beside_the_vertical_fader: passes in
            the full run, fails alone (meter levels read -120): order-dependent -> 1.11.
 
-[ ] 1.11 Leftover test-order problems from 1.10:
-         - After the custom ColorDialog closes, later UI tests lose keyboard/mouse input.
-           Check in the real app (on a desktop without a native colour dialog, e.g.
-           GNOME) whether typing still works after picking a custom track colour.
-           For now that test runs last in transport_qtcheck.cpp so it cannot break others.
-         - mixer_split_meters_... fails when run alone (passes in the full run).
-         - Also failing before this plan (at f059241), not investigated yet:
-           UI undo_redo_buttons_restore_deleted_clips (clips().size() 0, expected 1) and
-           wrapper presets_qtcheck.cpp:52 (updates==before+1).
-         Full-suite status after Phase 1: backend 237/237, wrapper 1 failed check
-         (pre-existing), UI 91 passed / 1 failed (pre-existing).
+[x] 1.11 Leftover test-order problems from 1.10. All fixed:
+         - APP bug: every QtQuick.Dialogs dialog (track colour, project open/save, EQ and
+           guitar presets, cabinet IR) opened as a separate popup window. After it closed,
+           that hidden window kept the app's focus, so nothing in the main window could
+           take keyboard focus (typing, renaming and shortcuts stopped working). The 8
+           dialogs now use popupType: Popup.Item (inside the main window). Regression
+           check added to the colour-picker test, which runs in its normal place again.
+         - TEST bug: undo_redo_buttons_restore_deleted_clips clicked 1x1 hidden hooks;
+           now uses File > Undo / Redo.
+         - TEST bug: presets_qtcheck.cpp:52 armed the track and expected a clean-monitor
+           update, but monitoring follows the monitor button (record arm is separate);
+           it now enables monitoring.
+         - TEST bug: mixer_split_meters_... set "levels" with setProperty(), which keeps
+           the binding to EngineController.trackLevels, so live levels overwrote it when
+           run alone; now written with QQmlProperty::write.
+         Full suites after Phase 1: backend 237/237, wrapper 53 tests 0 failed checks,
+         UI 92/92 (at f059241 the UI run had 20+ failures and did not finish).
 
 
 PHASE 2 — Move logic out of QML (architecture rule 6)

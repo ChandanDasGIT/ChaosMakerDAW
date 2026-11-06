@@ -48,7 +48,8 @@ TEST(qtpresets, eq_factory_and_custom_presets_restore_all_bands_on_only_the_sele
     Fixture f;TrackListWrapper tracks;
     const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar"),other=tracks.addVocalTrack();
     int updates=0;QObject::connect(&tracks,&TrackListWrapper::cleanMonitorEqChanged,[&]{++updates;});
-    CHECK(tracks.setRecordArmed(guitar,true));const int before=updates;
+    // The clean monitor follows the monitor button (record arm is separate), so monitor the track.
+    CHECK(tracks.setMonitorEnabled(guitar,true));const int before=updates;
     CHECK(tracks.eqPresetNames().size()==7);CHECK(tracks.applyEqPreset(guitar,4));CHECK(updates==before+1);
     CHECK(tracks.setEqBand(guitar,0,-7.5));const auto saved=bands(tracks,guitar);
     CHECK(tracks.saveEqPreset(guitar,f.url("custom.eqpreset")));CHECK(tracks.resetTrackEq(guitar));

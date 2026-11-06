@@ -394,6 +394,9 @@ Rectangle {
                         }
                     }
                     ColorDialog {
+                        // Inside the main window: a separate dialog window keeps app focus after closing,
+                        // which left the app without keyboard input (plan item 1.11).
+                        popupType: Popup.Item
                         id: colourDialog
                         objectName: "trackColourDialog" + trackCard.trackId
                         title: "Choose track colour"
