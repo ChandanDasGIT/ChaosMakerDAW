@@ -9,7 +9,6 @@ Rectangle {
     id: root
     property var trackModel: null
     property var timeline: null
-    property bool mixerVisible: true
     property bool mixerShown: true
     property bool pianoRollShown: false
     property bool pianoRollAvailable: false
@@ -58,33 +57,13 @@ Rectangle {
         AppSettings {
             id: appSettings
         }
-        ToolButton {
-            id: mixerToggleBtn
-            objectName: "toggleMixerButton"
-            implicitHeight: 32
-            onClicked: root.toggleMixerRequested()
-            ToolTip.visible: hovered
-            ToolTip.text: "Toggle bottom mixer panel (M)"
-            contentItem: RowLayout {
-                spacing: 6
-                Rectangle {
-                    width: 7; height: 7; radius: 3.5
-                    color: root.mixerVisible ? Theme.accent : Theme.textMuted
-                }
-                Text {
-                    text: "Mixer"
-                    color: root.mixerVisible ? Theme.text : Theme.textMuted
-                    font.pixelSize: Theme.bodySize
-                    font.bold: root.mixerVisible
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-            }
-            background: Rectangle {
-                radius: 4
-                color: parent.down ? Theme.controlBgActive : parent.hovered ? Theme.controlBgHover : root.mixerVisible ? Theme.cardBgAlt : "transparent"
-                border.color: root.mixerVisible ? Theme.divider : "transparent"
-            }
+        PanelTabs {
+            id: panelTabs
+            mixerShown: root.mixerShown
+            pianoRollShown: root.pianoRollShown
+            pianoRollAvailable: root.pianoRollAvailable
+            onToggleMixerRequested: root.toggleMixerRequested()
+            onTogglePianoRollRequested: root.togglePianoRollRequested()
         }
         Item { Layout.fillWidth: true }
     }

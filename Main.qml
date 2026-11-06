@@ -105,7 +105,6 @@ Window {
             id: topBar
             trackModel: trackModel
             timeline: timeline
-            mixerVisible: window.mixerVisible
             mixerShown: window.mixerShown
             pianoRollShown: window.pianoRollShown
             pianoRollAvailable: window.pianoRollAvailable
