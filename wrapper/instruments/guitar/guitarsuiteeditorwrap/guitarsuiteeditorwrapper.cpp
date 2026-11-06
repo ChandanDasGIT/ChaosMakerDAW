@@ -43,6 +43,7 @@ QVariantList GuitarSuiteEditorWrapper::parameterList(const PedalSlot& slot) cons
             {QStringLiteral("min"), parameter->min},
             {QStringLiteral("max"), parameter->max},
             {QStringLiteral("value"), parameter->get()},
+            {QStringLiteral("default"), parameter->def},
             {QStringLiteral("unit"), QString::fromStdString(parameter->unit)}
         });
     }

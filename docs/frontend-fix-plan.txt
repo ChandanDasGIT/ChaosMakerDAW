@@ -9,9 +9,10 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
-Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. 3.1–3.9 done.
-Next: 3.10 (guitar pedal cards: 2–3 column dial grid).
-Then 3.11 … 3.12, Phase 4, Phase 5.
+Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. 3.1–3.10 done.
+Next: 3.11 is the EQ (the user will change the EQ plugin later), so ask first;
+otherwise 3.12.
+Then Phase 4, Phase 5.
 
 Decisions made by the user (keep to them):
 - Mixer: track strips have NO track volume fader. Each strip's vertical fader is clip gain
@@ -287,7 +288,14 @@ PHASE 3 — Layout and workflow
            mixer limits) in projects and session restore; old files use the default 108 px.
            The strip resizes live and stores the width once on release (marks the project
            unsaved, like other track settings). Hand check: widen a strip, save, reopen.
-[ ] 3.10 Guitar pedal cards: 2–3 column dial grid instead of one dial per row.
+[x] 3.10 Guitar pedal cards: 2–3 column dial grid instead of one dial per row.
+         Changed by the user's choice: a clean list of "name | slider | value" rows instead
+         of dials (about a third of a dial row's height). Double-click resets to the
+         pedal's default (wrapper now passes each parameter's "default"); the plain wheel
+         scrolls the card and never changes a value; mouse drags belong to the sliders
+         (the card's Flickable accepts no buttons). Cards are 276 px wide (was 242) and
+         content keeps clear of the scroll bar. Only the guitar pedal cards; the EQ
+         plugin will be redone by the user later.
 [ ] 3.11 EQ: per-band double-click reset, value tooltips, response curve,
          apply presets on selection.
 [ ] 3.12 Status strip: sample rate, buffer/latency, xruns.
