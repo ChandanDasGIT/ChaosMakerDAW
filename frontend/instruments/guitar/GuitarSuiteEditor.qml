@@ -60,7 +60,7 @@ Item {
                 Layout.preferredWidth: 210
                 spacing: 0
                 Text {
-                    text: "INPUT TRIM  " + (root.effectsModel.inputTrimDb > 0 ? "+" : "") + Number(root.effectsModel.inputTrimDb).toFixed(1) + " dB"
+                    text: "INPUT TRIM  " + root.effectsModel.formatTrim(root.effectsModel.inputTrimDb)
                     color: Theme.text; font.pixelSize: 10
                 }
                 RowLayout {
@@ -161,6 +161,8 @@ Item {
                     // Keep control descriptors stable: value updates must not rebuild
                     // the Repeater and destroy a dial holding keyboard/mouse focus.
                     property var controlDescriptors: []
+                    // Which extra sections this pedal shows (backend pedaleditorrules)
+                    readonly property var features: root.effectsModel.pedalFeatures(pedalType)
                     Component.onCompleted: {
                         controlDescriptors = parameters.map(function(parameter) {
                             return {id: parameter.id, name: parameter.name,
@@ -233,13 +235,13 @@ Item {
                             ColumnLayout {
                                 width: controlScroll.availableWidth
                                 Text {
-                                    visible: pedalCard.pedalType === "pedal.octaver" || pedalCard.pedalType === "pedal.pitchshift"
+                                    visible: pedalCard.features.pitchDelayNote
                                     text: "Shifted voices have a short processing delay. Best with clear single notes."
                                     Layout.fillWidth: true; wrapMode: Text.WordWrap
                                     color: Theme.textMuted; font.pixelSize: 10
                                 }
                                 ColumnLayout {
-                                    visible: pedalCard.pedalType === "pedal.cabinet"
+                                    visible: pedalCard.features.cabinetIr
                                     Layout.fillWidth: true
                                     Button {
                                         text: "Load cabinet IR…"
@@ -260,7 +262,7 @@ Item {
                                 }
                                 ColumnLayout {
                                     id: tunerDisplay
-                                    visible: pedalCard.pedalType === "pedal.tuner"
+                                    visible: pedalCard.features.tuner
                                     Layout.fillWidth: true
                                     spacing: 10
                                     property var reading: ({})
@@ -268,14 +270,14 @@ Item {
                                     property int staleTicks: 0
                                     property bool hasPitch: !pedalCard.isBypassed && staleTicks <= 4 && Number(reading.frequency) > 0
                                     property real cents: hasPitch ? Number(reading.cents) : 0
-                                    property bool inTune: hasPitch && Math.abs(cents) <= 3
+                                    property bool inTune: hasPitch && root.effectsModel.inTune(cents)
                                     property int selection: {
                                         for (const parameter of pedalCard.parameters)
                                             if (parameter.id === "string") return Math.round(parameter.value)
                                         return 0
                                     }
                                     Text {
-                                        text: "Standard tuning · A4 = 440 Hz"
+                                        text: root.effectsModel.tunerReferenceText
                                         color: Theme.textMuted; font.pixelSize: 11
                                         Layout.alignment: Qt.AlignHCenter
                                     }
@@ -290,7 +292,7 @@ Item {
                                         columns: 3
                                         Layout.fillWidth: true
                                         Repeater {
-                                            model: ["6 · E2", "5 · A2", "4 · D3", "3 · G3", "2 · B3", "1 · E4"]
+                                            model: root.effectsModel.tunerStringLabels
                                             delegate: Button {
                                                 required property int index
                                                 required property string modelData
@@ -309,9 +311,7 @@ Item {
                                         Layout.alignment: Qt.AlignHCenter
                                     }
                                     Text {
-                                        text: !tunerDisplay.hasPitch ? (pedalCard.isBypassed ? "Tuner bypassed" : "Play one open string")
-                                            : tunerDisplay.inTune ? "In tune"
-                                            : tunerDisplay.cents < 0 ? "LOW / FLAT · Tune up ↑" : "HIGH / SHARP · Tune down ↓"
+                                        text: root.effectsModel.tunerStatus(tunerDisplay.hasPitch, pedalCard.isBypassed, tunerDisplay.cents)
                                         color: tunerDisplay.inTune ? "#74d69a" : Theme.text
                                         font.pixelSize: 11
                                         Layout.alignment: Qt.AlignHCenter
@@ -345,12 +345,12 @@ Item {
                                         Text { text: "HIGH · +50"; color: Theme.textMuted; font.pixelSize: 9 }
                                     }
                                     Text {
-                                        text: tunerDisplay.hasPitch ? (tunerDisplay.cents > 0 ? "+" : "") + tunerDisplay.cents.toFixed(1) + " cents" : ""
+                                        text: tunerDisplay.hasPitch ? root.effectsModel.formatCents(tunerDisplay.cents) : ""
                                         color: Theme.text; font.pixelSize: 16
                                         Layout.alignment: Qt.AlignHCenter
                                     }
                                     Text {
-                                        text: tunerDisplay.hasPitch ? Number(tunerDisplay.reading.frequency).toFixed(1) + " Hz → " + Number(tunerDisplay.reading.targetHz).toFixed(2) + " Hz" : ""
+                                        text: tunerDisplay.hasPitch ? root.effectsModel.formatTunerFrequency(Number(tunerDisplay.reading.frequency), Number(tunerDisplay.reading.targetHz)) : ""
                                         color: Theme.textMuted; font.pixelSize: 10
                                         Layout.alignment: Qt.AlignHCenter
                                     }
@@ -368,7 +368,7 @@ Item {
                                 }
                                 CheckBox {
                                     objectName: "tremoloSustainToggle"
-                                    visible: pedalCard.pedalType === "pedal.tremolo"
+                                    visible: pedalCard.features.sustainToggle
                                     text: "Sustain only"
                                     palette.windowText: Theme.text
                                     checked: pedalCard.parameterValue("sustain", 0) >= 0.5
@@ -376,7 +376,7 @@ Item {
                                 }
                                 ColumnLayout {
                                     id: modulationSync
-                                    visible: pedalCard.pedalType === "pedal.tremolo" || pedalCard.pedalType === "pedal.phaser"
+                                    visible: pedalCard.features.tempoSync
                                     Layout.fillWidth: true
                                     spacing: 6
                                     function parameterValue(id, fallback) {
@@ -401,45 +401,44 @@ Item {
                                         objectName: pedalCard.pedalType === "pedal.phaser" ? "phaserBeatDivision" : "tremoloBeatDivision"
                                         Layout.fillWidth: true
                                         enabled: modulationSync.synced
-                                        model: ["1/1 · Whole note", "1/2 · Half note", "1/4 · Quarter note", "1/8 · Eighth note", "1/16 · Sixteenth note", "1/8 · Dotted eighth", "1/8 · Eighth triplet"]
+                                        model: root.effectsModel.beatDivisionNames
                                         currentIndex: modulationSync.division
                                         onActivated: root.effectsModel.setParameter(pedalCard.pedalId, "division", currentIndex)
                                     }
                                     Text {
                                         Layout.fillWidth: true
                                         wrapMode: Text.WordWrap
-                                        text: modulationSync.synced ? Number(EngineController.bpm).toString() + " BPM · follows bottom-bar tempo"
-                                                                  : "Free rate · adjust Rate below"
+                                        text: root.effectsModel.syncText(modulationSync.synced, EngineController.bpm)
                                         color: Theme.textMuted
                                         font.pixelSize: 10
                                     }
                                 }
                                 Repeater {
-                                    model: pedalCard.pedalType === "pedal.tuner" ? []
-                                        : pedalCard.controlDescriptors.filter(function(parameter) {
-                                            return (pedalCard.pedalType !== "pedal.tremolo" && pedalCard.pedalType !== "pedal.phaser") || (parameter.id !== "sync" && parameter.id !== "division" && parameter.id !== "sustain")
+                                    model: pedalCard.controlDescriptors.filter(function(parameter) {
+                                            return root.effectsModel.isDial(pedalCard.pedalType, parameter.id)
                                         })
                                     delegate: ColumnLayout {
                                         required property var modelData
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 84
                                         spacing: 2
-                                        Text { text: modelData.name + ((pedalCard.pedalType === "pedal.tremolo" || pedalCard.pedalType === "pedal.phaser") && modelData.id === "rate" && modulationSync.synced ? " (manual)" : ""); color: Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                                        readonly property bool syncedOff: root.effectsModel.disabledWhenSynced(pedalCard.pedalType, modelData.id) && modulationSync.synced
+                                        Text { text: modelData.name + (parent.syncedOff ? " (manual)" : ""); color: Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                                         Dial {
                                             objectName: pedalCard.pedalType + "." + modelData.id
                                             Layout.alignment: Qt.AlignHCenter
                                             implicitWidth: 52
                                             implicitHeight: 52
-                                            enabled: !((pedalCard.pedalType === "pedal.tremolo" || pedalCard.pedalType === "pedal.phaser") && modelData.id === "rate" && modulationSync.synced)
+                                            enabled: !parent.syncedOff
                                             opacity: enabled ? 1 : 0.35
-                                            stepSize: pedalCard.pedalType === "pedal.pitchshift" && modelData.id === "semitones" ? 1 : 0
+                                            stepSize: root.effectsModel.dialStep(pedalCard.pedalType, modelData.id)
                                             from: modelData.min
                                             to: modelData.max
                                             value: pedalCard.parameterValue(modelData.id, modelData.value)
                                             onMoved: root.effectsModel.setParameter(pedalCard.pedalId, modelData.id, value)
                                         }
                                         Text {
-                                            text: Number(pedalCard.parameterValue(modelData.id, modelData.value)).toFixed((modelData.unit === "ms" || modelData.unit === "st") ? 0 : 2) + (modelData.unit.length ? " " + modelData.unit : "")
+                                            text: root.effectsModel.formatValue(Number(pedalCard.parameterValue(modelData.id, modelData.value)), modelData.unit)
                                             color: Theme.text
                                             font.pixelSize: 9
                                             horizontalAlignment: Text.AlignHCenter

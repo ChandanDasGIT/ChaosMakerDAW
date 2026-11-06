@@ -27,6 +27,10 @@ class GuitarSuiteEditorWrapper : public QAbstractListModel {
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     Q_PROPERTY(QString presetFilePath READ presetFilePath NOTIFY presetFilePathChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
+    // Editor rules from backend pedaleditorrules (lists, tuner texts, per-pedal features).
+    Q_PROPERTY(QStringList beatDivisionNames READ beatDivisionNames CONSTANT)
+    Q_PROPERTY(QStringList tunerStringLabels READ tunerStringLabels CONSTANT)
+    Q_PROPERTY(QString tunerReferenceText READ tunerReferenceText CONSTANT)
 
 public:
     enum Role {
@@ -63,6 +67,22 @@ public:
     QStringList factoryPresetNames() const;
     Q_INVOKABLE bool applyFactoryPreset(const QString& name);
     Q_INVOKABLE QVariantMap tunerReading(int pedalId) const;
+
+    static QStringList beatDivisionNames();
+    static QStringList tunerStringLabels();
+    static QString tunerReferenceText();
+    // {pitchDelayNote, cabinetIr, tuner, sustainToggle, tempoSync} for a pedal type.
+    Q_INVOKABLE QVariantMap pedalFeatures(const QString& pedalType) const;
+    Q_INVOKABLE bool isDial(const QString& pedalType, const QString& parameterId) const;
+    Q_INVOKABLE bool disabledWhenSynced(const QString& pedalType, const QString& parameterId) const;
+    Q_INVOKABLE double dialStep(const QString& pedalType, const QString& parameterId) const;
+    Q_INVOKABLE QString formatValue(double value, const QString& unit) const;
+    Q_INVOKABLE QString formatTrim(double db) const;
+    Q_INVOKABLE QString syncText(bool synced, double bpm) const;
+    Q_INVOKABLE bool inTune(double cents) const;
+    Q_INVOKABLE QString tunerStatus(bool hasPitch, bool bypassed, double cents) const;
+    Q_INVOKABLE QString formatCents(double cents) const;
+    Q_INVOKABLE QString formatTunerFrequency(double hz, double targetHz) const;
     Q_INVOKABLE QStringList availablePedals() const;
     Q_INVOKABLE bool loadCabinetIr(int pedalId, const QUrl& url);
     Q_INVOKABLE bool clearCabinetIr(int pedalId);
