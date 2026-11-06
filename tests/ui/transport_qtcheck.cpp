@@ -1461,6 +1461,72 @@ private slots:
         auto* dialog=window->findChild<QObject*>("saveProjectDialog"); QVERIFY(dialog);
         QVERIFY(QMetaObject::invokeMethod(dialog,"reject"));
     }
+    void transport_keys_fire_once_while_quick_settings_is_open() {
+        QSignalSpy actions(bar,SIGNAL(transportAction(QString))); QVERIFY(actions.isValid());
+        auto* button=visualItem(window->contentItem(),"quickSettingsButton"); QVERIFY(button);
+        auto* popup=window->findChild<QObject*>("quickSettingsPopup"); QVERIFY(popup);
+        const auto restore=qScopeGuard([&] { QMetaObject::invokeMethod(popup,"close"); });
+        click(button); QTRY_VERIFY(popup->property("visible").toBool());
+        QTest::keyClick(window,Qt::Key_Space);
+        QCOMPARE(actions.count(),1);
+        QTest::keyClick(window,Qt::Key_R);
+        QCOMPARE(actions.count(),2);
+        QCOMPARE(actions.at(1).first().toString(),QString("record"));
+    }
+    void timeline_clip_keys_work_with_a_piano_roll_in_the_window_data() {
+        QTest::addColumn<bool>("pianoRollVisible");
+        QTest::newRow("piano roll hidden") << false;
+        QTest::newRow("piano roll docked") << true;
+    }
+    void timeline_clip_keys_work_with_a_piano_roll_in_the_window() {
+        QFETCH(bool,pianoRollVisible);
+        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        QVERIFY(tracks.addClipAtBeat(track,0,4)>0);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        const auto restore=qScopeGuard([&] {
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); roll->setVisible(false);
+        });
+        roll->setVisible(pianoRollVisible);
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        timeline->forceActiveFocus(); QVERIFY(timeline->hasActiveFocus());
+        QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);      // select all clips
+        QCOMPARE(selectedIds(timeline).size(),1);
+        QTest::keyClick(window,Qt::Key_Escape);                     // deselect
+        QCOMPARE(selectedIds(timeline).size(),0);
+        QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
+        QTest::keyClick(window,Qt::Key_Delete);                     // delete the clip
+        QCOMPARE(tracks.clips().size(),0);
+    }
+    void piano_roll_keys_edit_notes_only_when_it_has_focus() {
+        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        QVERIFY(tracks.addClipAtBeat(track,0,4)>0);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* notes=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(notes);
+        const auto count=[&] { return notes->property("count").toInt(); };
+        const auto restore=qScopeGuard([&] {
+            QMetaObject::invokeMethod(notes,"clear");
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); roll->setVisible(false);
+        });
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        roll->setVisible(true);
+        int id=-1;
+        for(int pitch:{60,64})QVERIFY(QMetaObject::invokeMethod(notes,"addNote",Q_RETURN_ARG(int,id),Q_ARG(int,pitch),Q_ARG(double,0.0),Q_ARG(double,1.0),Q_ARG(int,100)));
+        QCOMPARE(count(),2);
+        // Focus in the timeline: the piano roll's keys stay out of the way.
+        timeline->forceActiveFocus();
+        QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier); QTest::keyClick(window,Qt::Key_Delete);
+        QCOMPARE(count(),2); QCOMPARE(tracks.clips().size(),0);
+        // Focus in the piano roll: its keys select and delete notes.
+        roll->forceActiveFocus(); QVERIFY(roll->hasActiveFocus());
+        QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
+        QCOMPARE(notes->property("selectedCount").toInt(),2);
+        QTest::keyClick(window,Qt::Key_Escape);
+        QCOMPARE(notes->property("selectedCount").toInt(),0);
+        QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier); QTest::keyClick(window,Qt::Key_Delete);
+        QCOMPARE(count(),0);
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());

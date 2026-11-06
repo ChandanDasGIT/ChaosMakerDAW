@@ -35,6 +35,7 @@ Item {
 
     PianoRollWrapper {
         id: pianoRollBackend
+        objectName: "pianoRollBackend"
         trackList: root.trackModel
         trackId: root.trackId
         clipId: root.clipId
@@ -44,20 +45,29 @@ Item {
 
     focus: true
 
+    // Editing keys only while this piano roll is shown and has keyboard focus (clicking in it
+    // takes focus). Otherwise they would clash with the timeline's Delete / Ctrl+A / Escape in
+    // the same window, and Qt would hand the key to this view even while it is hidden.
+    readonly property bool keyboardActive: visible && activeFocus
+
     Shortcut {
         sequence: "Delete"
+        enabled: root.keyboardActive
         onActivated: pianoRollBackend.deleteSelected()
     }
     Shortcut {
         sequence: "Backspace"
+        enabled: root.keyboardActive
         onActivated: pianoRollBackend.deleteSelected()
     }
     Shortcut {
         sequence: "Ctrl+A"
+        enabled: root.keyboardActive
         onActivated: pianoRollBackend.selectAll()
     }
     Shortcut {
         sequence: "Escape"
+        enabled: root.keyboardActive
         onActivated: pianoRollBackend.clearSelection()
     }
 
