@@ -9,9 +9,8 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
-Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. 3.1 done.
-Next: 3.2 (move buffer/output/MIDI selectors out of the top bar into Preferences).
-Then 3.3 … 3.12, Phase 4, Phase 5.
+Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. 3.1, 3.2 done.
+Next: 3.3 (Edit and View menus, recent files). Then 3.4 … 3.12, Phase 4, Phase 5.
 
 Decisions made by the user (keep to them):
 - Mixer: track strips have NO track volume fader. Each strip's vertical fader is clip gain
@@ -210,8 +209,12 @@ PHASE 3 — Layout and workflow
          6/8 counts eighth-note beats (it counted quarter notes before). The popup keeps
          metronome/count-in/snap, is titled "Metronome & Snap" and opens from a drawn
          metronome icon (settings/MetronomeIcon.qml; blue while the metronome is on).
-[ ] 3.2  Top bar: move buffer/output/MIDI selectors (TopBar.qml:71, DeviceSettings.qml)
+[x] 3.2  Top bar: move buffer/output/MIDI selectors (TopBar.qml:71, DeviceSettings.qml)
          into Preferences so the bar fits at the 980 px minimum width.
+         Done: DeviceSettings is a label | picker grid in Settings > Preferences under
+         "Audio & MIDI" (the dialog now sizes to its content). Same wiring as before. The
+         top bar keeps File, Settings and Mixer; the status strip still shows the device
+         and buffer.
 [ ] 3.3  Menus: add Edit (Undo/Redo, Cut/Copy/Paste) and View; add recent files.
 [ ] 3.4  Bottom panel: Mixer / Piano Roll tab switch instead of the "Mixer" toggle
          that stays lit while the piano roll is shown (Main.qml, TopBar.qml).

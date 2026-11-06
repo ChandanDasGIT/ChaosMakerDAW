@@ -3,9 +3,12 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import ".."
 
-RowLayout {
+// Audio and MIDI device pickers, laid out as label | picker rows (shown in Preferences).
+GridLayout {
     id: root
-    spacing: 12
+    columns: 2
+    columnSpacing: 12
+    rowSpacing: 8
 
     // Buffer changes go through the wrapper (it validates the size and forwards it once).
     // Output changes go straight to EngineController, which owns the real device list.
@@ -23,12 +26,14 @@ RowLayout {
 
     ComboBox {
         id: bufferSelector
+        objectName: "bufferSizeSelector"
         Layout.preferredWidth: 82
         Layout.preferredHeight: 30
         model: EngineController.bufferSizes
         enabled: EngineController.selectedBufferSize > 0
         currentIndex: model.indexOf(String(EngineController.selectedBufferSize))
         onActivated: index => deviceBridge.setBufferSize(Number(currentText))
+        Accessible.name: "Buffer size"
         contentItem: Text {
             leftPadding: 8
             rightPadding: 20
@@ -53,12 +58,15 @@ RowLayout {
 
     ComboBox {
         id: outputSelector
-        Layout.preferredWidth: 300
+        objectName: "outputDeviceSelector"
+        Layout.fillWidth: true
+        Layout.minimumWidth: 220
         Layout.preferredHeight: 30
         model: EngineController.outputDevices
         enabled: count > 0
         currentIndex: EngineController.selectedOutputIndex
         onActivated: index => EngineController.setOutputDevice(index)
+        Accessible.name: "Output device"
         contentItem: Text {
             leftPadding: 9
             rightPadding: 23
@@ -85,7 +93,9 @@ RowLayout {
 
     ComboBox {
         id: midiSelector
-        Layout.preferredWidth: 200
+        objectName: "midiInputSelector"
+        Layout.fillWidth: true
+        Layout.minimumWidth: 220
         Layout.preferredHeight: 30
         model: EngineController.midiInputPorts
         enabled: count > 0
@@ -93,6 +103,7 @@ RowLayout {
         onActivated: index => {
             EngineController.connectMidiInput(currentText)
         }
+        Accessible.name: "MIDI input"
         contentItem: Text {
             leftPadding: 9
             rightPadding: 23
