@@ -24,6 +24,8 @@ Item {
 
     // Optional object providing noteFillColor(velocity) (the piano roll), so stalks match notes
     property var colorSource: null
+    // PianoRollWrapper: shared tick rules (count and bar ticks) so the lane matches the ruler
+    property var gridSource: null
     // Live drag preview: note id -> velocity (also read by the note grid to recolour notes)
     property var previewVelocities: ({})
     property int hoveredNoteId: -1
@@ -177,10 +179,10 @@ Item {
 
                 // Vertical beat grid lines in velocity lane (one per counted beat; bars thicker)
                 Repeater {
-                    model: Math.ceil(root.contentWidth / (root.beatUnit * root.beatWidth)) + 1
+                    model: root.gridSource ? root.gridSource.tickCount(root.contentWidth / root.beatWidth, root.beatUnit, true) : 0
                     delegate: Rectangle {
                         required property int index
-                        readonly property bool isBar: index % root.beatsInBar === 0
+                        readonly property bool isBar: root.gridSource ? root.gridSource.isBarTick(index, root.beatsInBar) : false
                         x: Math.round(index * root.beatUnit * root.beatWidth)
                         y: 0
                         width: isBar ? 2 : 1

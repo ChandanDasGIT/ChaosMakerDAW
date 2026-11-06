@@ -1835,6 +1835,35 @@ private slots:
         }
         QVERIFY(!visualItem(mixer,"mixerMasterScale-90"));
     }
+    void piano_roll_ruler_and_grid_follow_the_meter() {
+        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        const int clip=tracks.addClipAtBeat(track,0,4); QVERIFY(clip>0);
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        const auto restore=qScopeGuard([&] {
+            roll->setVisible(false); roll->setProperty("trackModel",QVariant::fromValue<QObject*>(nullptr));
+            roll->setProperty("trackId",-1); roll->setProperty("clipId",-1);
+        });
+        roll->setProperty("trackModel",QVariant::fromValue(&tracks));
+        roll->setProperty("trackId",track); roll->setProperty("clipId",clip); roll->setVisible(true);
+        QTest::qWait(30);
+        const auto texts=[&] {
+            QStringList result;
+            std::function<void(QQuickItem*)> collect=[&](QQuickItem* item) {
+                const auto text=item->property("text");
+                if(text.isValid() && item->isVisible())result<<text.toString();
+                for(auto* child:item->childItems())collect(child);
+            };
+            collect(roll); return result;
+        };
+        // 4/4: bar 2 starts after 4 beats, beats are labelled bar.beat
+        QVERIFY(texts().contains("1.2")); QVERIFY(texts().contains("2")); QVERIFY(!texts().contains("1.5"));
+        QCOMPARE(roll->property("beatsInBar").toInt(),4);
+        // 6/8: six counted beats per bar
+        tracks.setTempo(tracks.project().tempo().bpm(),6,8);
+        QTRY_COMPARE(roll->property("beatsInBar").toInt(),6);
+        QTRY_VERIFY(texts().contains("1.6"));
+        QCOMPARE(roll->property("gridLinesPerBar").toInt()*roll->property("gridLineBeats").toDouble(),3.0);
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());

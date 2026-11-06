@@ -89,3 +89,51 @@ TEST(musicalgrid, invalid_meters_are_ignored)
     g.setMeter(-1, 1); g.setMeter(4, 0); g.setMeter(std::nan(""), 1);
     CHECK(g.beatsPerBar() == 4.0 && g.beatUnit() == 1.0);
 }
+
+TEST(musicalgrid, visible_line_ranges_match_the_old_timeline_formulas)
+{
+    // The timeline used: stride = max(1, ceil(min / unit)),
+    // first = floor(scroll / (unit * stride)) * stride, count = ceil(view / (unit * stride)) + 3
+    for (double unit : {0.7, 3.0, 8.0, 24.0, 48.0, 96.0, 384.0}) {
+        for (double minimum : {8.0, 48.0}) {
+            const int stride = MusicalGrid::lineStride(unit, minimum);
+            CHECK(stride == std::max(1, static_cast<int>(std::ceil(minimum / unit))));
+            for (double scroll : {0.0, 13.0, 250.5, 9999.0}) {
+                CHECK(near(MusicalGrid::firstVisibleLine(scroll, unit, stride),
+                           std::floor(scroll / (unit * stride)) * stride));
+                CHECK(MusicalGrid::visibleLineCount(1000.0, unit, stride)
+                      == static_cast<int>(std::ceil(1000.0 / (unit * stride))) + 3);
+            }
+        }
+    }
+    // Invalid sizes: draw nothing instead of dividing by zero
+    CHECK(MusicalGrid::lineStride(0.0, 8.0) == 1);
+    CHECK(MusicalGrid::firstVisibleLine(100.0, 0.0, 1) == 0.0);
+    CHECK(MusicalGrid::visibleLineCount(1000.0, 0.0, 1) == 0);
+    CHECK(MusicalGrid::visibleLineCount(1000.0, std::nan(""), 1) == 0);
+}
+
+TEST(musicalgrid, ruler_ticks_and_grid_lines_match_the_old_piano_roll_formulas)
+{
+    CHECK(MusicalGrid::countedBeatsPerBar(4, 1) == 4);
+    CHECK(MusicalGrid::countedBeatsPerBar(3, 0.5) == 6);              // 6/8
+    CHECK(MusicalGrid::countedBeatsPerBar(0, 1) == 1);                // invalid -> 1
+    // Ticks: the ruler drew ceil(length / unit), the velocity lane one more
+    CHECK(MusicalGrid::tickCount(12.0, 1.0, false) == 12 && MusicalGrid::tickCount(12.0, 1.0, true) == 13);
+    CHECK(MusicalGrid::tickCount(12.2, 0.5, false) == 25);
+    CHECK(MusicalGrid::tickCount(5.0, 0.0, false) == 0);
+    CHECK(MusicalGrid::isBarTick(8, 4) && !MusicalGrid::isBarTick(9, 4) && !MusicalGrid::isBarTick(1, 0));
+    CHECK(MusicalGrid::tickLabel(0, 4) == "1" && MusicalGrid::tickLabel(6, 4) == "2.3");
+    CHECK(MusicalGrid::tickLabel(7, 6) == "2.2");                     // 6/8
+    // Grid lines: ceil(length / bar) * linesPerBar + 1, each bar restarting at its line
+    CHECK(MusicalGrid::lineCount(12.0, 4.0, 16) == 49);
+    CHECK(MusicalGrid::lineCount(12.5, 4.0, 11) == 45);
+    CHECK(MusicalGrid::lineCount(12.0, 0.0, 16) == 0);
+    for (int index = 0; index < 60; ++index) {
+        const int perBar = 11; const double spacing = 0.375, bar = 4.0; // dotted 1/16 in 4/4
+        CHECK(near(MusicalGrid::lineOffsetInBar(index, perBar, spacing), (index % perBar) * spacing));
+        CHECK(near(MusicalGrid::linePosition(index, perBar, spacing, bar),
+                   (index / perBar) * bar + (index % perBar) * spacing));
+        CHECK(MusicalGrid::isBarLineIndex(index, perBar) == (index % perBar == 0));
+    }
+}

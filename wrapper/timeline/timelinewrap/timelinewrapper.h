@@ -1,5 +1,6 @@
 #pragma once
 
+#include "transport/musicalgrid.h"
 #include "timeline/timeline.h"
 #include "wrapper/session/tracklistwrap/tracklistwrapper.h"
 #include <QObject>
@@ -131,6 +132,10 @@ public:
     Q_INVOKABLE double clipEndBeat(int track, int clip) const { return m_timeline.clipEndBeat(track, clip); }
     Q_INVOKABLE bool isBarLine(double beat, double beatsPerBar) const { return Timeline::isBarLine(beat, beatsPerBar); }
     Q_INVOKABLE QString barLabel(double bar) const { return QString::fromStdString(m_timeline.barLabel(bar)); }
+    // Which bar labels / grid lines to draw (shared MusicalGrid rules; see musicalgrid.h).
+    Q_INVOKABLE int lineStride(double unitPixels, double minimumPixels) const { return MusicalGrid::lineStride(unitPixels, minimumPixels); }
+    Q_INVOKABLE double firstVisibleLine(double scrollPixels, double unitPixels, int stride) const { return MusicalGrid::firstVisibleLine(scrollPixels, unitPixels, stride); }
+    Q_INVOKABLE int visibleLineCount(double viewPixels, double unitPixels, int stride) const { return MusicalGrid::visibleLineCount(viewPixels, unitPixels, stride); }
     Q_INVOKABLE void beginSelection(double beat, double lane, bool clips) { m_timeline.beginSelection(beat, lane, clips); emit stateChanged(); }
     Q_INVOKABLE void updateSelection(double beat, double lane, bool dragged) { m_timeline.updateSelection(beat, lane, dragged); emit stateChanged(); }
     Q_INVOKABLE void finishSelection(double top, double bottom, double padding);

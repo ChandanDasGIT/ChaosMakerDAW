@@ -137,14 +137,15 @@ Item {
     readonly property real barWidth: beatWidth * editor.beatsPerBar
     readonly property real contentEndBars: editor.contentEndBars
     readonly property real contentWidth: Math.max(width, (Math.ceil(contentEndBars) + 1) * barWidth, recordingTailX)
-    readonly property real barLabelStride: Math.max(1, Math.ceil(48 / barWidth))
-    readonly property real firstVisibleBar: Math.floor(scroll.contentX / (barWidth * barLabelStride)) * barLabelStride
-    readonly property int visibleBarCount: Math.ceil(width / (barWidth * barLabelStride)) + 3
+    // Which bar labels and grid lines to draw: backend rules (MusicalGrid via TimelineWrapper).
+    readonly property real barLabelStride: editor.lineStride(barWidth, 48)
+    readonly property real firstVisibleBar: editor.firstVisibleLine(scroll.contentX, barWidth, barLabelStride)
+    readonly property int visibleBarCount: editor.visibleLineCount(width, barWidth, barLabelStride)
     readonly property real gridStepBeats: editor.gridStepBeats
     readonly property real gridUnitWidth: gridStepBeats * beatWidth
-    readonly property real beatGridStride: Math.max(1, Math.ceil(8 / gridUnitWidth))
-    readonly property real firstVisibleBeat: Math.floor(scroll.contentX / (gridUnitWidth * beatGridStride)) * beatGridStride
-    readonly property int visibleBeatCount: Math.ceil(width / (gridUnitWidth * beatGridStride)) + 3
+    readonly property real beatGridStride: editor.lineStride(gridUnitWidth, 8)
+    readonly property real firstVisibleBeat: editor.firstVisibleLine(scroll.contentX, gridUnitWidth, beatGridStride)
+    readonly property int visibleBeatCount: editor.visibleLineCount(width, gridUnitWidth, beatGridStride)
 
     function scrollVertically(amount) {
         scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, scroll.contentY + amount))

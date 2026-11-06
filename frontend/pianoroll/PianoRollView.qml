@@ -153,7 +153,9 @@ Item {
     // Project meter from the backend, in quarter-note beats (6/8 -> 3 per bar, 0.5 per beat).
     readonly property real beatsPerBar: pianoRollBackend.beatsPerBar
     readonly property real beatUnit: pianoRollBackend.beatUnit
-    readonly property int beatsInBar: Math.max(1, Math.round(beatsPerBar / beatUnit))
+    readonly property int beatsInBar: pianoRollBackend.countedBeatsPerBar(beatsPerBar, beatUnit)
+    // Visible length in beats (grid lines and ruler ticks cover it)
+    readonly property real totalGridBeats: totalGridWidth / pixelsPerBeat
 
     function isOnGrid(position, unit) { return pianoRollBackend.isOnGrid(position, unit) }
     readonly property real gridLineBeats: pianoRollBackend.gridLineBeats
@@ -425,12 +427,10 @@ Item {
 
                     // One tick per counted beat of the project meter
                     Repeater {
-                        model: Math.ceil(root.totalGridWidth / (root.beatUnit * root.pixelsPerBeat))
+                        model: pianoRollBackend.tickCount(root.totalGridBeats, root.beatUnit, false)
                         delegate: Item {
                             required property int index
-                            readonly property int bar: Math.floor(index / root.beatsInBar) + 1
-                            readonly property int beat: index % root.beatsInBar + 1
-                            readonly property bool isMajorBar: beat === 1
+                            readonly property bool isMajorBar: pianoRollBackend.isBarTick(index, root.beatsInBar)
 
                             x: index * root.beatUnit * root.pixelsPerBeat
                             y: 0
@@ -452,7 +452,7 @@ Item {
                                 anchors.topMargin: isMajorBar ? 4 : 8
                                 // Beat labels drop out when beats are too narrow to read
                                 visible: isMajorBar || parent.width >= 24
-                                text: isMajorBar ? String(bar) : (bar + "." + beat)
+                                text: pianoRollBackend.tickLabel(index, root.beatsInBar)
                                 color: isMajorBar ? "#d8dce5" : "#7c8393"
                                 font.pixelSize: isMajorBar ? 11 : 9
                                 font.bold: isMajorBar
@@ -639,13 +639,12 @@ Item {
 
                     // Vertical Bar / Beat / Subdivision Grid Lines (follow the Grid setting)
                     Repeater {
-                        model: Math.ceil(root.totalGridWidth / (root.beatsPerBar * root.pixelsPerBeat)) * root.gridLinesPerBar + 1
+                        model: pianoRollBackend.lineCount(root.totalGridBeats, root.beatsPerBar, root.gridLinesPerBar)
                         delegate: Rectangle {
                             required property int index
-                            readonly property int lineInBar: index % root.gridLinesPerBar
-                            readonly property real offsetInBar: lineInBar * root.gridLineBeats
-                            readonly property real position: Math.floor(index / root.gridLinesPerBar) * root.beatsPerBar + offsetInBar
-                            readonly property bool isMajorBar: lineInBar === 0
+                            readonly property real offsetInBar: pianoRollBackend.lineOffsetInBar(index, root.gridLinesPerBar, root.gridLineBeats)
+                            readonly property real position: pianoRollBackend.linePosition(index, root.gridLinesPerBar, root.gridLineBeats, root.beatsPerBar)
+                            readonly property bool isMajorBar: pianoRollBackend.isBarLineIndex(index, root.gridLinesPerBar)
                             readonly property bool isBeat: root.isOnGrid(offsetInBar, root.beatUnit)
 
                             // Whole-pixel positions & widths keep every line crisp
@@ -1010,6 +1009,7 @@ Item {
             contentX: gridVerticalFlickable.contentX
             notes: root.notes
             colorSource: root
+            gridSource: pianoRollBackend
             onVelocitiesEdited: (ids, velocities) => pianoRollBackend.setNoteVelocities(ids, velocities)
         }
 
