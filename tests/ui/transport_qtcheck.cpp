@@ -1206,6 +1206,32 @@ private slots:
         QVERIFY(!entry("viewMixerItem")->property("checked").toBool());
         QMetaObject::invokeMethod(menu,"close"); QTRY_VERIFY(!menu->property("visible").toBool());
     }
+    void panel_tabs_light_only_the_shown_panel_and_request_toggles() {
+        auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
+        const auto restore=qScopeGuard([&] {
+            top->setProperty("mixerShown",true); top->setProperty("pianoRollShown",false);
+            top->setProperty("pianoRollAvailable",false);
+        });
+        QSignalSpy mixerToggles(top,SIGNAL(toggleMixerRequested())); QVERIFY(mixerToggles.isValid());
+        QSignalSpy pianoToggles(top,SIGNAL(togglePianoRollRequested())); QVERIFY(pianoToggles.isValid());
+        QVERIFY(!visualItem(window->contentItem(),"toggleMixerButton")); // replaced by the tabs
+        auto* mixerTab=visualItem(window->contentItem(),"mixerTab"); QVERIFY(mixerTab);
+        auto* pianoTab=visualItem(window->contentItem(),"pianoRollTab"); QVERIFY(pianoTab);
+        // Mixer on screen, no clip opened yet.
+        QVERIFY(mixerTab->property("shown").toBool()); QVERIFY(!pianoTab->property("shown").toBool());
+        QVERIFY(!pianoTab->isEnabled());
+        click(pianoTab); QCOMPARE(pianoToggles.count(),0);
+        click(mixerTab); QCOMPARE(mixerToggles.count(),1);
+        // Docked piano roll on screen: only the Piano Roll part is lit (the old button stayed lit).
+        top->setProperty("mixerShown",false); top->setProperty("pianoRollShown",true); top->setProperty("pianoRollAvailable",true);
+        QVERIFY(!mixerTab->property("shown").toBool()); QVERIFY(pianoTab->property("shown").toBool());
+        QVERIFY(pianoTab->isEnabled());
+        click(pianoTab); QCOMPARE(pianoToggles.count(),1);
+        click(mixerTab); QCOMPARE(mixerToggles.count(),2);
+        // Bottom panel hidden: nothing lit.
+        top->setProperty("pianoRollShown",false);
+        QVERIFY(!mixerTab->property("shown").toBool()); QVERIFY(!pianoTab->property("shown").toBool());
+    }
     void edit_menu_cuts_copies_pastes_duplicates_and_deletes_timeline_clips() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
