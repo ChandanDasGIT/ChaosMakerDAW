@@ -35,13 +35,13 @@ Popup {
     closePolicy: Popup.CloseOnEscape
     padding: 0
     onAboutToShow: effectsModel = supportsGuitarSuite ? EngineController.trackEffects(trackId) : null
-    background: Rectangle { color: "#22252b"; radius: 10; border.color: "#4a4d56" }
+    background: Rectangle { color: Theme.popupBg; radius: 10; border.color: Theme.popupBorder }
     contentItem: ColumnLayout {
         spacing: 0
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: 66
-            color: "#2b2f37"
+            color: Theme.effects.header
             RowLayout {
                 anchors.fill: parent
                 anchors.margins: 16
@@ -78,7 +78,7 @@ Popup {
             Rectangle {
                 Layout.preferredWidth: 200
                 Layout.fillHeight: true
-                color: "#1c1f25"
+                color: Theme.effects.sidebar
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 12
@@ -91,7 +91,7 @@ Popup {
                         selectByMouse: true
                         color: Theme.text
                         placeholderTextColor: Theme.textMuted
-                        background: Rectangle { color: "#292e36"; border.color: search.activeFocus ? Theme.accent : "#414752"; radius: 5 }
+                        background: Rectangle { color: Theme.effects.search; border.color: search.activeFocus ? Theme.accent : Theme.effects.searchBorder; radius: 5 }
                     }
                     Text { text: "EFFECTS"; color: Theme.textMuted; font.pixelSize: 10; font.letterSpacing: 1 }
                     Repeater {
@@ -106,7 +106,7 @@ Popup {
                             onClicked: panelBridge.selectEffect(modelData.key)
                             background: Rectangle {
                                 radius: 6
-                                color: parent.highlighted ? "#344044" : parent.hovered ? "#2b3038" : "transparent"
+                                color: parent.highlighted ? Theme.effects.itemSelected : parent.hovered ? Theme.effects.itemHover : "transparent"
                                 border.color: parent.highlighted ? Theme.accent : "transparent"
                             }
                             contentItem: ColumnLayout {

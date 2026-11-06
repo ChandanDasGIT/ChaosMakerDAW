@@ -26,7 +26,7 @@ Item {
                 text: "Reset"
                 onClicked: root.trackModel.resetTrackEq(root.trackId)
                 contentItem: Text { text: "Reset"; color: parent.hovered ? Theme.text : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                background: Rectangle { radius: 4; color: parent.hovered ? "#383838" : "#303030"; border.color: "#424242" }
+                background: Rectangle { radius: 4; color: parent.hovered ? Theme.chipHover : Theme.chip; border.color: Theme.chipBorder }
             }
         }
         RowLayout {

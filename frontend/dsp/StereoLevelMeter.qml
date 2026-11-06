@@ -55,7 +55,7 @@ ColumnLayout {
                     }
                     Rectangle {
                         width: parent.width; height: 3
-                        color: parent.clipped ? Theme.meterClip : "#393b42"
+                        color: parent.clipped ? Theme.meterClip : Theme.meterClipOff
                     }
                 }
             }

@@ -137,6 +137,7 @@ if(DAW_BUILD_APP)
         qt_add_executable(transporttests tests/ui/transport_qtcheck.cpp)
         qt_add_qml_module(transporttests URI TransportTests
             QML_FILES frontend/theme/Theme.qml frontend/theme/PianoRollColors.qml frontend/theme/TrackListColors.qml frontend/theme/TimelineColors.qml frontend/theme/MixerColors.qml frontend/theme/TransportColors.qml
+                      frontend/theme/GuitarSuiteColors.qml frontend/theme/SettingsColors.qml frontend/theme/EffectsColors.qml
                       frontend/icons/Icons.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
                       frontend/window/EditMenu.qml frontend/window/ViewMenu.qml frontend/window/PanelTabs.qml
                       frontend/window/StatusStrip.qml

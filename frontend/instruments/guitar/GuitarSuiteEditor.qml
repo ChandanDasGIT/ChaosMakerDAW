@@ -24,13 +24,13 @@ Item {
                 text: "Save preset"
                 onClicked: savePresetDialog.open()
                 contentItem: Text { text: "Save preset"; color: parent.hovered ? Theme.text : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                background: Rectangle { radius: 4; color: parent.hovered ? "#383838" : "#303030"; border.color: "#424242" }
+                background: Rectangle { radius: 4; color: parent.hovered ? Theme.chipHover : Theme.chip; border.color: Theme.chipBorder }
             }
             ToolButton {
                 text: "Load preset"
                 onClicked: loadPresetDialog.open()
                 contentItem: Text { text: "Load preset"; color: parent.hovered ? Theme.text : Theme.textMuted; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                background: Rectangle { radius: 4; color: parent.hovered ? "#383838" : "#303030"; border.color: "#424242" }
+                background: Rectangle { radius: 4; color: parent.hovered ? Theme.chipHover : Theme.chip; border.color: Theme.chipBorder }
             }
 
         }
@@ -184,8 +184,8 @@ Item {
                     width: root.cardWidth
                     height: pedalScroll.height - 12
                     radius: 7
-                    color: "#2c2e34"
-                    border.color: dragArea.drag.active ? Theme.accent : "#454851"
+                    color: Theme.guitarSuite.card
+                    border.color: dragArea.drag.active ? Theme.accent : Theme.guitarSuite.cardBorder
                     Drag.source: pedalCard
                     Drag.keys: ["guitarsuite-pedal"]
                     Drag.hotSpot.x: width / 2
@@ -219,7 +219,7 @@ Item {
                                 text: pedalCard.isBypassed ? "BYP" : "ON"
                                 onClicked: root.effectsModel.setBypassed(pedalCard.pedalId, !pedalCard.isBypassed)
                                 contentItem: Text { text: parent.text; color: pedalCard.isBypassed ? Theme.textMuted : Theme.accent; font.pixelSize: 9; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: pedalCard.isBypassed ? "#303030" : "#203a45"; border.color: pedalCard.isBypassed ? "#424242" : Theme.accent }
+                                background: Rectangle { radius: 4; color: pedalCard.isBypassed ? Theme.chip : Theme.accentBg; border.color: pedalCard.isBypassed ? Theme.chipBorder : Theme.accent }
                             }
                             ToolButton {
                                 text: Icons.close
@@ -316,24 +316,24 @@ Item {
                                     }
                                     Text {
                                         text: tunerDisplay.hasPitch ? tunerDisplay.reading.note : "—"
-                                        color: tunerDisplay.inTune ? "#74d69a" : Theme.text
+                                        color: tunerDisplay.inTune ? Theme.guitarSuite.inTune : Theme.text
                                         font.pixelSize: 34; font.bold: true
                                         Layout.alignment: Qt.AlignHCenter
                                     }
                                     Text {
                                         text: root.effectsModel.tunerStatus(tunerDisplay.hasPitch, pedalCard.isBypassed, tunerDisplay.cents)
-                                        color: tunerDisplay.inTune ? "#74d69a" : Theme.text
+                                        color: tunerDisplay.inTune ? Theme.guitarSuite.inTune : Theme.text
                                         font.pixelSize: 11
                                         Layout.alignment: Qt.AlignHCenter
                                     }
                                     Rectangle {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 32
-                                        color: "#202227"; radius: 4
+                                        color: Theme.guitarSuite.tunerScale; radius: 4
                                         Rectangle {
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             width: parent.width * 0.06; height: parent.height
-                                            color: "#294b39"
+                                            color: Theme.guitarSuite.tunerZone
                                         }
                                         Rectangle {
                                             anchors.horizontalCenter: parent.horizontalCenter
@@ -343,7 +343,7 @@ Item {
                                             visible: tunerDisplay.hasPitch
                                             x: (parent.width - width) * (0.5 + Math.max(-50, Math.min(50, tunerDisplay.cents)) / 100)
                                             width: 4; height: parent.height
-                                            color: tunerDisplay.inTune ? "#74d69a" : "#efbd70"
+                                            color: tunerDisplay.inTune ? Theme.guitarSuite.inTune : Theme.guitarSuite.offTune
                                         }
                                     }
                                     RowLayout {
@@ -465,7 +465,7 @@ Item {
                                                 Rectangle {
                                                     anchors.verticalCenter: parent.verticalCenter
                                                     width: parent.width; height: 4; radius: 2
-                                                    color: "#3a3d45"
+                                                    color: Theme.guitarSuite.sliderTrack
                                                 }
                                                 Rectangle {
                                                     anchors.verticalCenter: parent.verticalCenter
@@ -477,8 +477,8 @@ Item {
                                                 x: parameterSlider.leftPadding + parameterSlider.visualPosition * (parameterSlider.availableWidth - width)
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 width: 12; height: 12; radius: 6
-                                                color: parameterSlider.pressed ? "#ffffff" : Theme.text
-                                                border.color: parameterSlider.activeFocus ? Theme.accent : "#1e2025"
+                                                color: parameterSlider.pressed ? Theme.textStrong : Theme.text
+                                                border.color: parameterSlider.activeFocus ? Theme.accent : Theme.guitarSuite.handleBorder
                                             }
                                             TapHandler {
                                                 acceptedButtons: Qt.LeftButton

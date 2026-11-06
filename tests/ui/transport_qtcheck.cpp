@@ -639,21 +639,15 @@ private slots:
     }
     void colours_live_only_in_the_theme_folder() {
         // Plan 4.1: every colour is a token in frontend/theme/ (Theme.qml and its area palettes).
-        // Areas not converted yet are listed here; the list shrinks as each area is done.
-        const QStringList notConvertedYet{
-            "frontend/instruments/guitar/GuitarSuiteEditor.qml", "frontend/instruments/guitar/GuitarSuitePanel.qml",
-            "frontend/audiodevice/DeviceSettings.qml", "frontend/settings/QuickSettings.qml",
-            "frontend/plugins/TrackEffectsPanel.qml", "frontend/plugins/eq/Tenbandeq.qml",
-            "frontend/dsp/StereoLevelMeter.qml", "frontend/dsp/LevelMeter.qml"};
         const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
-        const QRegularExpression hex(QStringLiteral("\"#[0-9a-fA-F]{6,8}\""));
+        const QRegularExpression hex(QStringLiteral("\"#[0-9a-fA-F]{3,8}\""));
         QStringList offenders;
         QStringList files{root+"/Main.qml"};
         QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
         while(it.hasNext()) files<<it.next();
         for(const QString& path:files) {
             const QString rel=path.mid(root.size()+1);
-            if(rel.startsWith("frontend/theme/") || notConvertedYet.contains(rel)) continue;
+            if(rel.startsWith("frontend/theme/")) continue;
             QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
             int line=0;
             for(const QByteArray& bytes:file.readAll().split('\n')) {
@@ -662,7 +656,6 @@ private slots:
             }
         }
         QVERIFY2(offenders.isEmpty(),qPrintable("Hard-coded colours outside frontend/theme/: "+offenders.join(", ")));
-        for(const QString& rel:notConvertedYet) QVERIFY2(QFile::exists(root+"/"+rel),qPrintable(rel+" no longer exists"));
         // The piano roll palette is reachable through Theme.
         auto* theme=engine->singletonInstance<QObject*>("TransportTests","Theme"); QVERIFY(theme);
         auto* pianoRoll=qvariant_cast<QObject*>(theme->property("pianoRoll")); QVERIFY(pianoRoll);
@@ -670,7 +663,7 @@ private slots:
         auto* trackList=qvariant_cast<QObject*>(theme->property("trackList")); QVERIFY(trackList);
         QCOMPARE(trackList->property("rowSelected").value<QColor>(),QColor("#2a343d"));
         QCOMPARE(theme->property("trackColors").toList().size(),12);   // the palette the picker offers
-        for(const char* area:{"timeline","mixer","transport"})
+        for(const char* area:{"timeline","mixer","transport","guitarSuite","settings","effects"})
             QVERIFY2(qvariant_cast<QObject*>(theme->property(area)),area);
     }
     void layout_sizes_are_saved_and_restored_between_sessions() {

@@ -43,7 +43,7 @@ ColumnLayout {
         Rectangle {
             anchors.right: parent.right
             width: 4; height: parent.height
-            color: root.clipped ? Theme.meterClip : "#393b42"
+            color: root.clipped ? Theme.meterClip : Theme.meterClipOff
         }
     }
 }

@@ -39,8 +39,8 @@ Item {
         }
         background: Rectangle {
             radius: 6
-            color: quickSettingsPopup.visible ? "#203a45" : parent.hovered ? "#363941" : "#2b2d32"
-            border.color: quickSettingsPopup.visible ? Theme.accent : "#41444c"
+            color: quickSettingsPopup.visible ? Theme.accentBg : parent.hovered ? Theme.transport.buttonHover : Theme.transport.button
+            border.color: quickSettingsPopup.visible ? Theme.accent : Theme.transport.buttonBorder
         }
         ToolTip.visible: hovered
         ToolTip.text: "Metronome, count-in and snap grid"
@@ -104,7 +104,7 @@ Item {
                         text: "CLICK"
                         onClicked: root.transport.metronomeEnabled = !active
                         contentItem: Text { text: parent.text; color: parent.active ? Theme.accent : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                        background: Rectangle { radius: 5; color: parent.active ? "#203a45" : "#2b2d32"; border.color: parent.active ? Theme.accent : "#41444c" }
+                        background: Rectangle { radius: 5; color: parent.active ? Theme.accentBg : Theme.transport.button; border.color: parent.active ? Theme.accent : Theme.transport.buttonBorder }
                         ToolTip.visible: hovered
                         ToolTip.text: active ? "Disable metronome" : "Enable metronome; first beat is accented"
                         Accessible.name: "Metronome"
@@ -129,7 +129,7 @@ Item {
                         text: root.transport.countingIn ? "IN " + root.transport.countInBeatsRemaining : "COUNT"
                         onClicked: root.transport.countInEnabled = !active
                         contentItem: Text { text: parent.text; color: parent.active ? Theme.accent : Theme.textMuted; font.pixelSize: 9; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                        background: Rectangle { radius: 5; color: parent.active ? "#203a45" : "#2b2d32"; border.color: parent.active ? Theme.accent : "#41444c" }
+                        background: Rectangle { radius: 5; color: parent.active ? Theme.accentBg : Theme.transport.button; border.color: parent.active ? Theme.accent : Theme.transport.buttonBorder }
                         ToolTip.visible: hovered
                         ToolTip.text: "One-bar recording count-in/pre-roll; uses the metronome volume"
                         Accessible.name: "Recording count-in"
