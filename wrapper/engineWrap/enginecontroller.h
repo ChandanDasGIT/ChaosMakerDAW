@@ -58,6 +58,13 @@ class EngineController : public AudioEngineWrapper {
     Q_PROPERTY(double bpm READ bpm WRITE setBpm NOTIFY bpmChanged)
     Q_PROPERTY(QString version READ version CONSTANT)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
+    // Status strip readouts (backend enginestatus): sample rate, buffer/latency, xruns.
+    Q_PROPERTY(QString sampleRateText READ sampleRateText NOTIFY audioInfoChanged)
+    Q_PROPERTY(QString bufferText READ bufferText NOTIFY audioInfoChanged)
+    Q_PROPERTY(QString bufferTooltip READ bufferTooltip NOTIFY audioInfoChanged)
+    Q_PROPERTY(int xrunCount READ xrunCount NOTIFY audioInfoChanged)
+    Q_PROPERTY(QString xrunText READ xrunText NOTIFY audioInfoChanged)
+    Q_PROPERTY(QString xrunTooltip READ xrunTooltip NOTIFY audioInfoChanged)
     Q_PROPERTY(QStringList inputPorts READ inputPorts CONSTANT)
     Q_PROPERTY(QStringList inputDevices READ inputDevices NOTIFY inputDevicesChanged)
     Q_PROPERTY(QStringList outputDevices READ outputDevices NOTIFY outputDevicesChanged)
@@ -133,6 +140,13 @@ public:
     void setBpm(double bpm);
     QString version() const;
     QString status() const { return m_status; }
+    QString sampleRateText() const;
+    QString bufferText() const;
+    QString bufferTooltip() const;
+    int xrunCount() const;
+    QString xrunText() const;
+    QString xrunTooltip() const;
+    Q_INVOKABLE void resetXruns();
     QStringList inputPorts() const { return m_inputPorts; }
     QStringList inputDevices() const { return m_inputDevices; }
     QStringList outputDevices() const { return m_outputDevices; }
@@ -173,6 +187,7 @@ signals:
     void metronomeChanged();
     void countInSettingsChanged();
     void statusChanged();
+    void audioInfoChanged();
     void audioRoutingChanged();
     void outputDevicesChanged();
     void outputDeviceChanged();
@@ -196,6 +211,8 @@ private:
     explicit EngineController(QObject* parent);
     void setStatus(const QString& status);
     void updateAudioStatus();
+    // Emits audioInfoChanged when the device rate, buffer or xrun count changed (polled).
+    void refreshAudioInfo();
     void discoverOutputDevices();
     void discoverInputDevices();
     void connectOutputDevicePorts(const QString& description);
@@ -233,6 +250,10 @@ private:
     bool m_masterMuted = false;
     QString m_transportMessage;
     QString m_status = QStringLiteral("not started");
+    // Last values sent to QML by refreshAudioInfo().
+    double m_infoRate = 0.0;
+    int m_infoFrames = 0;
+    std::uint64_t m_infoXruns = 0;
     GuitarSuiteModel* m_guitarSuite = nullptr;
     QTimer m_snapshotTimer;
     QTimer m_meterTimer;

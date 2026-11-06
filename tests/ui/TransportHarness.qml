@@ -29,6 +29,11 @@ Window {
         visible: false
     }
     GuitarSuitePanel { trackName: "Transport interaction test" }
+    StatusStrip {
+        objectName: "testStatusStrip"
+        x: 0; y: 600; width: parent.width
+        visible: false
+    }
     TrackList {
         objectName: "testTrackList"
         x: 0; y: 90; width: 340; height: 650

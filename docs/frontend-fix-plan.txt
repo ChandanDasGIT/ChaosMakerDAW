@@ -9,10 +9,9 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
-Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. 3.1–3.10 done.
-Next: 3.11 is the EQ (the user will change the EQ plugin later), so ask first;
-otherwise 3.12.
-Then Phase 4, Phase 5.
+Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
+Next: Phase 4 (4.1 Theme tokens for hardcoded colours ...).
+Then Phase 5, then Phase 6 (user requests: FX per track type, pro EQ).
 
 Decisions made by the user (keep to them):
 - Mixer: track strips have NO track volume fader. Each strip's vertical fader is clip gain
@@ -296,9 +295,16 @@ PHASE 3 — Layout and workflow
          (the card's Flickable accepts no buttons). Cards are 276 px wide (was 242) and
          content keeps clear of the scroll bar. Only the guitar pedal cards; the EQ
          plugin will be redone by the user later.
-[ ] 3.11 EQ: per-band double-click reset, value tooltips, response curve,
+[-] 3.11 EQ: per-band double-click reset, value tooltips, response curve,
          apply presets on selection.
-[ ] 3.12 Status strip: sample rate, buffer/latency, xruns.
+         Folded into 6.2 (new pro EQ), on the user's request 2026-11-07.
+[x] 3.12 Status strip: sample rate, buffer/latency, xruns.
+         Done: AudioEngine counts xruns (atomic, any thread; nothing read the event queue
+         before), backend engine/enginestatus formats "48 kHz", "128 smp · 2.7 ms",
+         "N xruns" and tooltips; EngineController exposes them (polled on the meter timer)
+         plus resetXruns(). The strip shows them on the right; xruns turn orange and a
+         click resets. The "JACK block … frames" text left the status message.
+         Hand check: readouts show your JACK rate/buffer; change the buffer in Preferences.
 
 
 PHASE 4 — Consistency and maintenance
@@ -321,6 +327,27 @@ PHASE 5 — Performance
          (Main.qml:217, 247).
 [ ] 5.3  Cache/throttle clipWaveform() calls made on every horizontal scroll frame
          (Timeline.qml:450-452).
+
+
+PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
+-------------------------------------------------------------------
+[ ] 6.1  FX per track type, chosen by the user. Today the FX panel always lists the
+         10-band EQ (built into every track: Track::eqGainDb, always run by the engine)
+         plus GuitarSuite when supported. Wanted: a guitar track (electric or acoustic)
+         opens with GuitarSuite, and the user picks which other FX to add.
+         Needs: a per-track effect list (add / remove / reorder, saved in the project and
+         session, undo?), the engine chain built from it, an "Add FX" picker in the panel
+         (backend rules decide what each track type starts with and what it may add).
+         Old projects: keep the EQ on a track when its bands are not flat.
+         Ask first: what other track types start with (vocal, audio, piano, drums...);
+         whether GuitarSuite can be removed from a guitar track; FX order rules.
+[ ] 6.2  A professional parametric EQ plugin in the spirit of FabFilter Pro-Q 3 (our own
+         design and name, not a copy of its look or branding). Interactive curve with
+         draggable band nodes, many band shapes (bell, shelves, cuts with slopes, notch,
+         band pass, tilt), per-band solo/bypass, live spectrum analyzer (hand-written FFT,
+         see the from-scratch rule). Replaces 3.11.
+         Ask first: band count; which extras matter (dynamic EQ, mid/side, linear phase,
+         auto-gain, spectrum match); whether it replaces the 10-band EQ or sits beside it.
 
 
 Suggested order: 1.1 → 1.2 → 1.4 → 1.9 → 1.8 → 1.3 → 1.5 → 1.6/1.7, then Phase 2

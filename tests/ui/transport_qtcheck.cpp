@@ -544,6 +544,30 @@ private slots:
         QVERIFY(visualItem(window->contentItem(),"pedal.tremolo.fade"));
         QVERIFY(QMetaObject::invokeMethod(board,"close")); QVERIFY(model->removePedal(id));
     }
+    void status_strip_shows_device_readouts_and_resets_xruns() {
+        auto* controller=EngineController::instance();
+        auto* strip=window->findChild<QQuickItem*>("testStatusStrip"); QVERIFY(strip);
+        const auto restore=qScopeGuard([&] { strip->setVisible(false); controller->resetXruns(); });
+        strip->setVisible(true); controller->resetXruns(); QTest::qWait(30);
+        auto* rate=visualItem(strip,"statusSampleRate"); auto* buffer=visualItem(strip,"statusBuffer");
+        auto* xruns=visualItem(strip,"statusXruns"); auto* message=visualItem(strip,"statusMessage");
+        QVERIFY(rate); QVERIFY(buffer); QVERIFY(xruns); QVERIFY(message);
+        // The readouts show the controller's backend-formatted text.
+        QCOMPARE(rate->property("text").toString(),controller->sampleRateText());
+        QCOMPARE(buffer->property("text").toString(),controller->bufferText());
+        QVERIFY(!controller->status().contains("JACK block"));    // no longer repeated in the message
+        QCOMPARE(xruns->property("text").toString(),QString("0 xruns"));
+        const QColor calm=xruns->property("color").value<QColor>();
+        // Dropouts reported by the device show up (polled) and turn the readout orange.
+        controller->engine()->xrunOccurred(); controller->engine()->xrunOccurred();
+        QTRY_COMPARE(xruns->property("text").toString(),QString("2 xruns"));
+        QCOMPARE(controller->xrunCount(),2);
+        QVERIFY(xruns->property("color").value<QColor>()!=calm);
+        // Clicking it starts counting again.
+        click(xruns);
+        QTRY_COMPARE(xruns->property("text").toString(),QString("0 xruns"));
+        QCOMPARE(xruns->property("color").value<QColor>(),calm);
+    }
     void layout_sizes_are_saved_and_restored_between_sessions() {
         QSettings qs;
         const auto restore=qScopeGuard([&] {
