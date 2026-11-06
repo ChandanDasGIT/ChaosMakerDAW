@@ -1000,8 +1000,22 @@ private slots:
         wheel(QPoint(-120,0),Qt::NoModifier);
         const double trackpadX=scroll->property("contentX").toDouble(); QVERIFY(trackpadX>afterStop);
         wheel(QPoint(0,-120),Qt::ShiftModifier);
-        QVERIFY(scroll->property("contentX").toDouble()>trackpadX);
+        const double shiftX=scroll->property("contentX").toDouble(); QVERIFY(shiftX>trackpadX);
         QCOMPARE(timeline->property("pixelsPerSecond").toDouble(),zoom);
+        // A plain wheel scrolls the tracks up and down, not the zoom or the time position.
+        QVERIFY(QMetaObject::invokeMethod(timeline,"scrollVertically",Q_ARG(QVariant,-1.0e6)));
+        wheel(QPoint(0,-120),Qt::NoModifier);
+        const double scrolledY=timeline->property("verticalScrollPosition").toDouble(); QCOMPARE(scrolledY,90.0);
+        wheel(QPoint(0,120),Qt::NoModifier);
+        QCOMPARE(timeline->property("verticalScrollPosition").toDouble(),0.0);
+        QCOMPARE(scroll->property("contentX").toDouble(),shiftX);
+        QCOMPARE(timeline->property("pixelsPerSecond").toDouble(),zoom);
+        // Ctrl+wheel zooms (in on wheel-up, out on wheel-down) and leaves the vertical position alone.
+        wheel(QPoint(0,120),Qt::ControlModifier);
+        QVERIFY(timeline->property("pixelsPerSecond").toDouble()>zoom);
+        wheel(QPoint(0,-120),Qt::ControlModifier);
+        QVERIFY(qAbs(timeline->property("pixelsPerSecond").toDouble()-zoom)<zoom*1e-9);
+        QCOMPARE(timeline->property("verticalScrollPosition").toDouble(),0.0);
         controller.shutdownSession();
     }
     void pause_preserves_timeline_view_data() {
