@@ -1651,6 +1651,29 @@ private slots:
         for(const auto& fake:{"Track 1","All channels","Key snap","Pitch","Channel","File","Navigate","Contents"})
             QVERIFY2(!texts.contains(QString::fromLatin1(fake)),fake);
     }
+    void piano_roll_notes_box_sets_the_length_of_drawn_notes() {
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* notes=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(notes);
+        auto* grid=visualItem(roll,"pianoRollGrid"); QVERIFY(grid);
+        auto* lengthBox=visualItem(roll,"pianoRollNoteLength"); QVERIFY(lengthBox);
+        const auto restore=qScopeGuard([&] {
+            QMetaObject::invokeMethod(notes,"clear"); lengthBox->setProperty("currentIndex",0); roll->setVisible(false);
+        });
+        roll->setVisible(true); QTest::qWait(30);
+        const double ppb=roll->property("pixelsPerBeat").toDouble();
+        const auto drawAt=[&](double beat) {
+            auto* flick=grid->parentItem()->parentItem();
+            const double y=flick->property("contentY").toDouble()+40;
+            QTest::mouseClick(window,Qt::LeftButton,{},grid->mapToScene(QPointF(beat*ppb,y)).toPoint());
+            return notes->property("notes").toList().last().toMap().value("lengthBeats").toDouble();
+        };
+        QCOMPARE(drawAt(0.1),0.25);                                 // "Grid" = 1/16 grid
+        lengthBox->setProperty("currentIndex",3);                   // "1/4"
+        QCOMPARE(roll->property("noteLengthMode").toString(),QString("1/4"));
+        QCOMPARE(drawAt(2.1),1.0);
+        lengthBox->setProperty("currentIndex",2);                   // "1/8"
+        QCOMPARE(drawAt(4.1),0.5);
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());

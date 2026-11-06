@@ -83,6 +83,20 @@ Item {
         pianoRollBackend.quantize(step > 0 ? step : root.beatUnit)
     }
 
+    // "Notes:" box: length of newly drawn notes. "Grid" follows the Grid division.
+    property string noteLengthMode: "Grid"
+    function newNoteLength() {
+        switch (root.noteLengthMode) {
+            case "1/16": return 0.25
+            case "1/8": return 0.5
+            case "1/4": return 1.0
+            default: {
+                const division = gridDivisionBeats()
+                return division > 0 ? division : 0.25
+            }
+        }
+    }
+
     // Magnet button: when off, notes move and draw freely but the grid lines stay.
     property bool snapEnabled: true
 
@@ -983,10 +997,11 @@ Item {
 
                         // gridMouse fills the content item, so cx is already a content coordinate
                         function applyDrag(cx, cy) {
+                            // Stretch to the grid cell under the cursor (or the cursor itself with
+                            // snap off), never shorter than the chosen note length.
                             const step = root.getSnapBeats()
                             const snappedCurrent = root.snapToGrid(cx / root.pixelsPerBeat)
-                            const unitLen = step > 0 ? step : 0.25
-                            drawLength = Math.max(unitLen, (snappedCurrent - drawStartBeat) + unitLen)
+                            drawLength = Math.max(root.newNoteLength(), (snappedCurrent - drawStartBeat) + step)
                             root.dragEndBeats = drawStartBeat + drawLength
                         }
 
@@ -1008,10 +1023,9 @@ Item {
 
                             if (mouse.button === Qt.LeftButton) {
                                 if (root.activeTool === "pencil") {
-                                    const step = root.getSnapBeats()
                                     drawStartBeat = root.snapToGrid(beat)
                                     drawPitch = pitch
-                                    drawLength = step > 0 ? step : 0.25
+                                    drawLength = root.newNoteLength()
                                     isDrawing = true
                                 } else {
                                     pianoRollBackend.clearSelection()
@@ -1126,10 +1140,14 @@ Item {
 
                 Text { text: "Notes:"; color: "#8f95a3"; font.pixelSize: 11 }
                 PianoRollComboBox {
+                    objectName: "pianoRollNoteLength"
                     implicitWidth: 70
                     implicitHeight: 22
                     model: ["Grid", "1/16", "1/8", "1/4"]
                     currentIndex: 0
+                    onCurrentTextChanged: root.noteLengthMode = currentText
+                    ToolTip.visible: hovered
+                    ToolTip.text: "Length of newly drawn notes (Grid = the Grid division)"
                 }
 
                 Item { Layout.fillWidth: true }
