@@ -1527,6 +1527,29 @@ private slots:
         QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier); QTest::keyClick(window,Qt::Key_Delete);
         QCOMPARE(count(),0);
     }
+    void piano_roll_undo_redo_buttons_use_the_project_history() {
+        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        const int clip=tracks.addClipAtBeat(track,0,4); QVERIFY(clip>0);
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* notes=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(notes);
+        const auto restore=qScopeGuard([&] {
+            roll->setVisible(false); roll->setProperty("trackModel",QVariant::fromValue<QObject*>(nullptr));
+            roll->setProperty("trackId",-1); roll->setProperty("clipId",-1);
+        });
+        roll->setProperty("trackModel",QVariant::fromValue(&tracks));
+        roll->setProperty("trackId",track); roll->setProperty("clipId",clip); roll->setVisible(true);
+        auto* undo=visualItem(roll,"pianoRollUndo"); auto* redo=visualItem(roll,"pianoRollRedo");
+        QVERIFY(undo); QVERIFY(redo);
+        // Only the clip creation is in the history so far; nothing to redo.
+        QVERIFY(!redo->isEnabled());
+        int id=-1;
+        QVERIFY(QMetaObject::invokeMethod(notes,"addNote",Q_RETURN_ARG(int,id),Q_ARG(int,60),Q_ARG(double,0.0),Q_ARG(double,1.0),Q_ARG(int,100)));
+        QVERIFY(id>0); QCOMPARE(notes->property("count").toInt(),1); QVERIFY(undo->isEnabled());
+        click(undo); QTRY_COMPARE(notes->property("count").toInt(),0);
+        QVERIFY(redo->isEnabled());
+        click(redo); QTRY_COMPARE(notes->property("count").toInt(),1);
+        QVERIFY(!redo->isEnabled());
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());

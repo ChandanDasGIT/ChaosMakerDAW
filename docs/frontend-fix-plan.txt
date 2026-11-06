@@ -17,9 +17,9 @@ PHASE 1 — Broken or misleading behaviour (do first)
          PianoRollView.qml:429-436, 646, 932-935; VelocityLane.qml:222 — take beats-per-bar
          from the project time signature (as Timeline.qml does via TimelineWrapper).
 
-[ ] 1.3  Dead piano roll controls. Wire up or remove each one:
-         - Menu bar File/Edit/Navigate/Options/View/Contents/Actions (PianoRollView.qml:233-247)
-         - Snap toggle, Quantize, Undo, Redo buttons (PianoRollView.qml:310-344)
+[~] 1.3  Dead piano roll controls. Wire up or remove each one:
+         - [done] Menu bar File/Edit/Navigate/Options/View/Contents/Actions (PianoRollView.qml:233-247)
+         - Snap toggle, Quantize buttons; [done] Undo/Redo (PianoRollView.qml:310-344)
          - Footer transport + zoom-tool buttons (PianoRollView.qml:1028-1063)
          - "Notes:" combo, snap style (triplet/dotted/swing), Key snap,
            Pitch/Channel/Track colour modes, hardcoded "Track 1/2/3" and channel combos
