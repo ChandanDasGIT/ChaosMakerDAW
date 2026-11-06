@@ -10,7 +10,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done
 RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
-Next: Phase 4 — 4.1b track list colours (4.1a piano roll done; icons part of 4.2 done).
+Next: Phase 4 — 4.1c remaining colours (4.1a/4.1b and 4.2 done).
 Then Phase 5, then Phase 6 (user requests: FX per track type, pro EQ).
 
 Decisions made by the user (keep to them):
@@ -319,9 +319,14 @@ PHASE 4 — Consistency and maintenance
          - [done] 4.1a Piano roll (PianoRollView, PianoKeys, VelocityLane,
            PianoRollComboBox): 150 colours -> theme/PianoRollColors.qml (Theme.pianoRoll);
            8 near-duplicates merged (max 4/255 per channel, borders/text only).
-         - [ ] 4.1b Track list   - [ ] 4.1c the rest (timeline, mixer, guitar suite,
-           settings, transport, tempo, meters, FX panel, EQ)
-[ ] 4.2  Use or delete Icons.qml (0 references) and Theme.trackColors (unused; TrackList
+         - [done] 4.1b Track list: 55 colours. Shared ones became Theme tokens (chip,
+           chipHover, chipBorder, chipBorderHover, accentBg, recordBg, textStrong, popupBg,
+           popupBorder); track-list ones went to theme/TrackListColors.qml
+           (Theme.trackList); the 12-colour picker palette is Theme.trackColors. 2 merges
+           (add-track popup: background 1/255, border 5/255).
+         - [ ] 4.1c the rest (timeline, mixer, guitar suite, settings, transport, tempo,
+           meters, FX panel, EQ) — reuse the shared tokens above.
+[x] 4.2  Use or delete Icons.qml (0 references) and Theme.trackColors (unused; TrackList
          has its own 12-colour palette at TrackList.qml:363) — pick one palette.
          - [done] Icons (user's rules): all icons live in frontend/icons/. Every text icon
            is a named property in frontend/icons/Icons.qml, written as code points
@@ -329,7 +334,8 @@ PHASE 4 — Consistency and maintenance
            One close symbol (×) everywhere; one pause symbol (Ⅱ). A UI test fails if an
            icon symbol is written in any other QML file, if Icons.qml holds a literal
            symbol, or if a drawn icon is not listed.
-         - [ ] Palette: Theme.trackColors vs the TrackList palette.
+         - [done] Palette: Theme.trackColors now holds the 12 colours the track colour
+           picker uses (the old unused 7-colour list is gone); TrackList reads it.
 [ ] 4.3  Shared components: ThemedMenuItem (copy-pasted ~12 times), ToggleChip,
          PanelButton, DarkComboBox.
 [ ] 4.4  Move the hidden 1x1 test buttons (ProjectActions.qml:324-367) into tests/ui/.

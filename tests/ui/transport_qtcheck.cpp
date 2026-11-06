@@ -641,7 +641,6 @@ private slots:
         // Plan 4.1: every colour is a token in frontend/theme/ (Theme.qml and its area palettes).
         // Areas not converted yet are listed here; the list shrinks as each area is done.
         const QStringList notConvertedYet{
-            "frontend/session/TrackList.qml",
             "frontend/instruments/guitar/GuitarSuiteEditor.qml", "frontend/instruments/guitar/GuitarSuitePanel.qml",
             "frontend/timeline/Timeline.qml", "frontend/mixer/MixerPanel.qml",
             "frontend/audiodevice/DeviceSettings.qml", "frontend/settings/QuickSettings.qml",
@@ -670,6 +669,9 @@ private slots:
         auto* theme=engine->singletonInstance<QObject*>("TransportTests","Theme"); QVERIFY(theme);
         auto* pianoRoll=qvariant_cast<QObject*>(theme->property("pianoRoll")); QVERIFY(pianoRoll);
         QCOMPARE(pianoRoll->property("toolButton").value<QColor>(),QColor("#2f323a"));
+        auto* trackList=qvariant_cast<QObject*>(theme->property("trackList")); QVERIFY(trackList);
+        QCOMPARE(trackList->property("rowSelected").value<QColor>(),QColor("#2a343d"));
+        QCOMPARE(theme->property("trackColors").toList().size(),12);   // the palette the picker offers
     }
     void layout_sizes_are_saved_and_restored_between_sessions() {
         QSettings qs;

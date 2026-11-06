@@ -29,7 +29,7 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             height: 38
-            color: "#252525"
+            color: Theme.panelHeaderBg
             RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 14
@@ -42,7 +42,7 @@ Rectangle {
                     implicitWidth: 28; implicitHeight: 28
                     onClicked: addTrackPopup.open()
                     contentItem: Text { text: Icons.plus; color: Theme.accent; font.pixelSize: 20; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                    background: Rectangle { radius: 4; color: parent.down ? "#383838" : "transparent" }
+                    background: Rectangle { radius: 4; color: parent.down ? Theme.chipHover : "transparent" }
                     ToolTip.visible: hovered
                     ToolTip.text: "Add track…"
                     ToolTip.delay: 450
@@ -123,7 +123,7 @@ Rectangle {
                     y: index * root.laneHeight
                     width: trackScroll.width
                     height: root.laneHeight
-                    color: isSelected ? "#2a343d" : (index % 2 ? "#222222" : "#252525")
+                    color: isSelected ? Theme.trackList.rowSelected : (index % 2 ? Theme.trackList.rowAlt : Theme.trackList.row)
                     border.color: isSelected ? Theme.accent : (root.dropRow === index ? Theme.accent : Theme.divider)
                     border.width: isSelected || root.dropRow === index ? 2 : 1
                     Rectangle {
@@ -158,7 +158,7 @@ Rectangle {
                                     anchors.verticalCenter: parent.verticalCenter
                                     width: 14; height: 14
                                     onClicked: colourPopup.open()
-                                    background: Rectangle { color: trackCard.trackColour; border.color: parent.hovered ? Theme.text : "#777777"; radius: 3 }
+                                    background: Rectangle { color: trackCard.trackColour; border.color: parent.hovered ? Theme.text : Theme.trackList.swatchBorder; radius: 3 }
                                     ToolTip.visible: hovered
                                     ToolTip.text: "Choose track colour"
                                 }
@@ -218,7 +218,7 @@ Rectangle {
                                     color: Theme.text
                                     font.pixelSize: 12
                                     padding: 2
-                                    background: Rectangle { color: "#292e36"; border.color: Theme.accent; radius: 3 }
+                                    background: Rectangle { color: Theme.trackList.nameEditor; border.color: Theme.accent; radius: 3 }
                                     onEditingFinished: trackCard.finishRename(true)
                                     Keys.onEscapePressed: event => {
                                         trackCard.finishRename(false)
@@ -239,7 +239,7 @@ Rectangle {
                                 text: "M"; implicitWidth: 22; implicitHeight: 24
                                 onClicked: root.trackModel.setMuted(trackCard.trackId, !active)
                                 contentItem: Text { text: "M"; color: parent.active ? Theme.muteText : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: parent.active ? Theme.muteBg : "#303030"; border.color: parent.active ? Theme.muteBorder : "#424242" }
+                                background: Rectangle { radius: 4; color: parent.active ? Theme.muteBg : Theme.chip; border.color: parent.active ? Theme.muteBorder : Theme.chipBorder }
                                 ToolTip.visible: hovered
                                 ToolTip.text: active ? "Mute enabled" : "Mute disabled"
                                 ToolTip.delay: 450
@@ -251,7 +251,7 @@ Rectangle {
                                 text: "S"; implicitWidth: 22; implicitHeight: 24
                                 onClicked: root.trackModel.setSolo(trackCard.trackId, !active)
                                 contentItem: Text { text: "S"; color: parent.active ? Theme.soloText : Theme.textMuted; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: parent.active ? Theme.soloBg : "#303030"; border.color: parent.active ? Theme.soloBorder : "#424242" }
+                                background: Rectangle { radius: 4; color: parent.active ? Theme.soloBg : Theme.chip; border.color: parent.active ? Theme.soloBorder : Theme.chipBorder }
                                 ToolTip.visible: hovered
                                 ToolTip.text: active ? "Solo enabled" : "Solo disabled"
                                 ToolTip.delay: 450
@@ -263,7 +263,7 @@ Rectangle {
                                 implicitWidth: 26; implicitHeight: 24
                                 onClicked: inputPopup.open()
                                 contentItem: Text { text: "IN"; color: trackCard.inputPort.length > 0 ? Theme.accent : Theme.textMuted; font.pixelSize: 8; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: inputButton.hovered ? "#383838" : "#303030"; border.color: trackCard.inputPort.length > 0 ? Theme.accent : (inputButton.hovered ? "#626671" : "#424242") }
+                                background: Rectangle { radius: 4; color: inputButton.hovered ? Theme.chipHover : Theme.chip; border.color: trackCard.inputPort.length > 0 ? Theme.accent : (inputButton.hovered ? Theme.chipBorderHover : Theme.chipBorder) }
                                 ToolTip.visible: hovered
                                 ToolTip.text: trackCard.inputPort.length > 0 ? trackCard.inputPort : "Choose this track's input"
                                 ToolTip.delay: 450
@@ -276,7 +276,7 @@ Rectangle {
                                 text: "MON"
                                 onClicked: root.trackModel.setMonitorEnabled(trackCard.trackId, !active)
                                 contentItem: Text { text: parent.text; color: parent.active ? Theme.accent : Theme.textMuted; font.pixelSize: 7; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: parent.active ? "#203a45" : "#303030"; border.color: parent.active ? Theme.accent : "#424242" }
+                                background: Rectangle { radius: 4; color: parent.active ? Theme.accentBg : Theme.chip; border.color: parent.active ? Theme.accent : Theme.chipBorder }
                                 ToolTip.visible: hovered
                                 ToolTip.text: active ? "Disable live input monitoring" : "Monitor this track's input without arming recording"
                                 ToolTip.delay: 450
@@ -288,8 +288,8 @@ Rectangle {
                                 implicitWidth: 50; implicitHeight: 24
                                 text: active ? "REC ON" : "REC OFF"
                                 onClicked: root.trackModel.setRecordArmed(trackCard.trackId, !active)
-                                contentItem: Text { text: parent.text; color: parent.active ? "#ffffff" : Theme.textMuted; font.pixelSize: 8; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: parent.active ? "#a9363c" : "#303030"; border.color: parent.active ? Theme.record : "#424242" }
+                                contentItem: Text { text: parent.text; color: parent.active ? Theme.textStrong : Theme.textMuted; font.pixelSize: 8; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                background: Rectangle { radius: 4; color: parent.active ? Theme.recordBg : Theme.chip; border.color: parent.active ? Theme.record : Theme.chipBorder }
                                 ToolTip.visible: hovered
                                 ToolTip.text: active ? "Recording armed" : "Arm track for recording"
                                 ToolTip.delay: 450
@@ -301,7 +301,7 @@ Rectangle {
                                 implicitWidth: 28; implicitHeight: 24
                                 onClicked: fxPopup.open()
                                 contentItem: Text { text: "FX"; color: fxButton.hovered ? Theme.text : Theme.textMuted; font.pixelSize: 9; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: fxButton.hovered ? "#383838" : "#303030"; border.color: fxButton.hovered ? "#626671" : "#424242" }
+                                background: Rectangle { radius: 4; color: fxButton.hovered ? Theme.chipHover : Theme.chip; border.color: fxButton.hovered ? Theme.chipBorderHover : Theme.chipBorder }
                                 ToolTip.visible: hovered
                                 ToolTip.text: "Browse track effects"
                                 ToolTip.delay: 450
@@ -313,8 +313,8 @@ Rectangle {
                                 text: Icons.close
                                 implicitWidth: 20; implicitHeight: 24
                                 onClicked: root.requestRemoveTrack(trackCard.trackId, trackCard.name, trackCard.clips ? trackCard.clips.length : 0)
-                                contentItem: Text { text: Icons.close; color: closeTrackButton.hovered ? "#ffffff" : Theme.textMuted; font.pixelSize: 17; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: closeTrackButton.hovered ? "#a9363c" : "transparent"; border.color: closeTrackButton.hovered ? Theme.record : "transparent" }
+                                contentItem: Text { text: Icons.close; color: closeTrackButton.hovered ? Theme.textStrong : Theme.textMuted; font.pixelSize: 17; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                                background: Rectangle { radius: 4; color: closeTrackButton.hovered ? Theme.recordBg : "transparent"; border.color: closeTrackButton.hovered ? Theme.record : "transparent" }
                                 ToolTip.visible: hovered
                                 ToolTip.text: "Remove track"
                                 ToolTip.delay: 450
@@ -357,7 +357,7 @@ Rectangle {
                         padding: 12
                         x: Math.max(8, Math.min(parent.width - width - 8, trackCard.mapToItem(parent, 0, 0).x))
                         y: Math.max(8, Math.min(parent.height - height - 8, trackCard.mapToItem(parent, 0, 28).y))
-                        background: Rectangle { color: "#25272c"; border.color: "#4a4d56"; radius: 6 }
+                        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
                         contentItem: Column {
                             spacing: 10
                             Text { text: "Track colour"; color: Theme.text; font.pixelSize: 12 }
@@ -365,8 +365,7 @@ Rectangle {
                                 columns: 6
                                 spacing: 7
                                 Repeater {
-                                    model: ["#58b7b1", "#6fa8dc", "#b18bd9", "#de849c", "#e2a565", "#d8c16b",
-                                            "#86bd83", "#9babb7", "#d97c73", "#72b9ce", "#8c9bdd", "#b49a87"]
+                                    model: Theme.trackColors
                                     delegate: Rectangle {
                                         required property int index
                                         required property string modelData
@@ -374,7 +373,7 @@ Rectangle {
                                         width: 28; height: 28; radius: 4
                                         color: modelData
                                         border.width: trackCard.trackColour.toString() === modelData ? 2 : 1
-                                        border.color: trackCard.trackColour.toString() === modelData ? Theme.text : "#45484e"
+                                        border.color: trackCard.trackColour.toString() === modelData ? Theme.text : Theme.trackList.swatchChoiceBorder
                                         MouseArea {
                                             anchors.fill: parent
                                             onClicked: {
@@ -426,7 +425,7 @@ Rectangle {
                         width: 300
                         height: Math.min(340, Math.max(150, 100 + EngineController.inputDevices.length * 34))
                         padding: 0
-                        background: Rectangle { radius: 8; color: "#25272c"; border.color: "#4a4d56" }
+                        background: Rectangle { radius: 8; color: Theme.popupBg; border.color: Theme.popupBorder }
                         contentItem: ColumnLayout {
                             anchors.fill: parent
                             anchors.margins: 10
@@ -436,8 +435,8 @@ Rectangle {
                                 Layout.fillWidth: true
                                 height: 32
                                 radius: 5
-                                color: defaultInputArea.containsMouse ? "#343841" : "#2c2e34"
-                                border.color: trackCard.inputPort.length === 0 ? Theme.accent : "#40434b"
+                                color: defaultInputArea.containsMouse ? Theme.trackList.optionHover : Theme.trackList.option
+                                border.color: trackCard.inputPort.length === 0 ? Theme.accent : Theme.trackList.optionBorder
                                 Text {
                                     anchors.fill: parent
                                     anchors.leftMargin: 9
@@ -484,7 +483,7 @@ Rectangle {
                                             width: inputRows.width
                                             height: 34
                                             radius: 5
-                                            color: inputRowArea.containsMouse ? "#343841" : "transparent"
+                                            color: inputRowArea.containsMouse ? Theme.trackList.optionHover : "transparent"
                                             border.color: trackCard.inputPort === EngineController.inputPortForDevice(index)
                                                 ? Theme.accent : "transparent"
                                             Text {
@@ -573,7 +572,7 @@ Rectangle {
         property string addTrackStage: "kind"
         padding: 0
         onClosed: addTrackStage = "kind"
-        background: Rectangle { radius: 10; color: "#24262b"; border.color: "#454851" }
+        background: Rectangle { radius: 10; color: Theme.popupBg; border.color: Theme.popupBorder }
 
         contentItem: Column {
             anchors.fill: parent
@@ -589,7 +588,7 @@ Rectangle {
                     text: Icons.back
                     onClicked: addTrackPopup.addTrackStage = "kind"
                     contentItem: Text { text: Icons.back; color: Theme.text; font.pixelSize: 21; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                    background: Rectangle { radius: 5; color: parent.hovered ? "#383b42" : "transparent" }
+                    background: Rectangle { radius: 5; color: parent.hovered ? Theme.trackList.backHover : "transparent" }
                 }
                 Column {
                     spacing: 3
@@ -613,8 +612,8 @@ Rectangle {
                     width: parent.width
                     height: 40
                     radius: 6
-                    color: choiceArea.containsMouse ? "#343841" : "#2c2e34"
-                    border.color: choiceArea.containsMouse ? Theme.accent : "#40434b"
+                    color: choiceArea.containsMouse ? Theme.trackList.optionHover : Theme.trackList.option
+                    border.color: choiceArea.containsMouse ? Theme.accent : Theme.trackList.optionBorder
                     Item {
                         anchors.fill: parent
                         anchors.leftMargin: 12
