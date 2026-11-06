@@ -85,3 +85,32 @@ TEST(projectactions, direct_save_and_save_as)
     CHECK(actions.requestSaveAs() == Request::ShowSaveDialog);
     CHECK(!actions.resumeAfterSave());
 }
+
+TEST(projectactions, open_file_goes_through_the_unsaved_prompt)
+{
+    ProjectActions actions;
+    // Not dirty: open straight away.
+    CHECK(actions.requestOpenFile("/p/a.chaos", false) == Request::ExecuteOpenFile);
+    CHECK(actions.openFilePath() == "/p/a.chaos");
+    CHECK(actions.pendingAction() == ActionType::None);
+    CHECK(actions.requestOpenFile("", false) == Request::None);
+    // A path alone cannot be asked for by name.
+    CHECK(actions.requestAction("OpenFile", false) == Request::None);
+
+    // Dirty, then Discard: open the chosen file.
+    CHECK(actions.requestOpenFile("/p/b.chaos", true) == Request::ShowUnsavedConfirmation);
+    CHECK(actions.pendingAction() == ActionType::OpenFile);
+    CHECK(actions.onUnsavedDiscard() == Request::ExecuteOpenFile);
+    CHECK(actions.openFilePath() == "/p/b.chaos");
+
+    // Dirty, then Save: open after the save completes.
+    CHECK(actions.requestOpenFile("/p/c.chaos", true) == Request::ShowUnsavedConfirmation);
+    CHECK(actions.onUnsavedSave(false) == Request::ShowSaveDialog);
+    CHECK(actions.onSaveCompleted() == Request::ExecuteOpenFile);
+    CHECK(actions.openFilePath() == "/p/c.chaos");
+
+    // Dirty, then Cancel: nothing happens.
+    CHECK(actions.requestOpenFile("/p/d.chaos", true) == Request::ShowUnsavedConfirmation);
+    actions.onUnsavedCancel();
+    CHECK(actions.pendingAction() == ActionType::None);
+}

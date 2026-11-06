@@ -38,6 +38,9 @@ void ProjectActionsWrapper::dispatch(ProjectActions::Request request)
     case ProjectActions::Request::ExecuteClose:
         emit executeClose();
         break;
+    case ProjectActions::Request::ExecuteOpenFile:
+        emit executeOpenFile(QUrl::fromLocalFile(QString::fromStdString(m_actions.openFilePath())));
+        break;
     case ProjectActions::Request::None:
     default:
         break;
@@ -47,6 +50,11 @@ void ProjectActionsWrapper::dispatch(ProjectActions::Request request)
 void ProjectActionsWrapper::requestAction(const QString& action, bool isDirty)
 {
     dispatch(m_actions.requestAction(action.toStdString(), isDirty));
+}
+
+void ProjectActionsWrapper::requestOpenFile(const QString& path, bool isDirty)
+{
+    dispatch(m_actions.requestOpenFile(path.toStdString(), isDirty));
 }
 
 void ProjectActionsWrapper::requestSave(bool hasExistingFile)

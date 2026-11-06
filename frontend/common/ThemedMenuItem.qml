@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // A menu entry in the app's style: label on the left, optional shortcut text on the right.
-// Checkable entries get a tick column in front of the label.
+// Checkable entries get a tick column in front of the label; submenu entries an arrow.
 MenuItem {
     id: root
     property string shortcutText: ""
@@ -11,6 +11,7 @@ MenuItem {
     leftPadding: Theme.margin
     rightPadding: Theme.margin
     indicator: Item {}
+    arrow: Item {}
     contentItem: RowLayout {
         Text {
             visible: root.checkable
@@ -24,6 +25,12 @@ MenuItem {
             color: !root.enabled ? Theme.textMuted : root.highlighted ? Theme.accent : Theme.text
             font.pixelSize: Theme.bodySize
             Layout.fillWidth: true
+        }
+        Text {
+            visible: !!root.subMenu
+            text: "›"
+            color: Theme.textMuted
+            font.pixelSize: Theme.bodySize
         }
         Text {
             visible: root.shortcutText.length > 0

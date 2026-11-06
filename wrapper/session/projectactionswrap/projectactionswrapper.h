@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QUrl>
 #include <QtQml/qqmlregistration.h>
 #include "session/projectactions.h"
 
@@ -23,6 +24,8 @@ public:
     bool resumeAfterSave() const noexcept { return m_actions.resumeAfterSave(); }
 
     Q_INVOKABLE void requestAction(const QString& action, bool isDirty);
+    // Open a known project file (Open Recent); asks about unsaved changes first.
+    Q_INVOKABLE void requestOpenFile(const QString& path, bool isDirty);
     Q_INVOKABLE void requestSave(bool hasExistingFile);
     Q_INVOKABLE void requestSaveAs();
     Q_INVOKABLE void onUnsavedSave(bool hasExistingFile);
@@ -38,6 +41,7 @@ signals:
     void showSaveDialog();
     void executeNew();
     void executeClose();
+    void executeOpenFile(const QUrl& file);
     void directSaveRequested();
 
 private:

@@ -8,7 +8,8 @@ public:
         None,
         New,
         Open,
-        Close
+        Close,
+        OpenFile    // open a known file (e.g. from Open Recent), no file dialog
     };
 
     enum class Request {
@@ -17,7 +18,8 @@ public:
         ShowOpenDialog,
         ShowSaveDialog,
         ExecuteNew,
-        ExecuteClose
+        ExecuteClose,
+        ExecuteOpenFile   // open openFilePath()
     };
 
     ProjectActions();
@@ -33,6 +35,11 @@ public:
     // User triggers New / Open / Close
     Request requestAction(ActionType action, bool isDirty);
     Request requestAction(const std::string& actionName, bool isDirty);
+
+    // User picks a file to open directly (Open Recent). Asks about unsaved changes
+    // first, like Open; openFilePath() is the file to open once the request resolves.
+    Request requestOpenFile(const std::string& path, bool isDirty);
+    const std::string& openFilePath() const noexcept { return m_openFilePath; }
 
     // User triggers Save
     Request requestSave(bool hasExistingFile, bool resume = false);
@@ -56,4 +63,6 @@ private:
 
     ActionType m_pendingAction = ActionType::None;
     bool m_resumeAfterSave = false;
+    // Kept after the action resolves, so the caller can read it; replaced by the next request.
+    std::string m_openFilePath;
 };

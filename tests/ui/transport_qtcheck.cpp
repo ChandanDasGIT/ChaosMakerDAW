@@ -1580,6 +1580,57 @@ private slots:
         timeline->setProperty("transport",QVariant::fromValue(EngineController::instance()));
         controller.shutdownSession();
     }
+    void open_recent_lists_saved_projects_and_opens_them() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks); tracks.addAudioTrack();
+        auto* recent=window->findChild<QObject*>("recentProjects"); QVERIFY(recent);
+        QMetaObject::invokeMethod(recent,"clear");
+        const auto restore=qScopeGuard([&] { QMetaObject::invokeMethod(recent,"clear"); controller->newProject(); });
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString first=dir.filePath("first.chaos"), second=dir.filePath("second.chaos");
+        QVERIFY(controller->saveProject(QUrl::fromLocalFile(first)));
+        QVERIFY(controller->saveProject(QUrl::fromLocalFile(second)));
+        // Saved projects are listed newest first.
+        QCOMPARE(recent->property("paths").toStringList(),QStringList({second,first}));
+        QCOMPARE(recent->property("labels").toStringList(),QStringList({"second.chaos","first.chaos"}));
+
+        auto* fileButton=visualItem(window->contentItem(),"fileMenuButton"); QVERIFY(fileButton);
+        auto* fileMenu=window->findChild<QObject*>("fileMenu"); QVERIFY(fileMenu);
+        auto* recentMenu=window->findChild<QObject*>("fileOpenRecentMenu"); QVERIFY(recentMenu);
+        const auto chooseRecent=[&](const char* name) {
+            click(fileButton); QTRY_VERIFY(fileMenu->property("visible").toBool());
+            QVERIFY(recentMenu->property("enabled").toBool());
+            QMetaObject::invokeMethod(recentMenu,"open"); QTRY_VERIFY(recentMenu->property("visible").toBool());
+            QQuickItem* entry=nullptr; QTRY_VERIFY((entry=visualItem(window->contentItem(),name)));
+            click(entry); QTRY_VERIFY(!fileMenu->property("visible").toBool());
+        };
+        chooseRecent("recentProject_1");
+        QCOMPARE(controller->projectFile(),QUrl::fromLocalFile(first));
+        QCOMPARE(recent->property("paths").toStringList(),QStringList({first,second}));
+
+        // Unsaved changes: ask first; cancelling keeps the current project.
+        tracks.addClipAtBeat(tracks.trackIdAt(0),0,4); QTRY_VERIFY(controller->projectDirty());
+        chooseRecent("recentProject_1");
+        auto* dialog=window->findChild<QObject*>("unsavedProjectChanges"); QVERIFY(dialog);
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog,"reject"));
+        QCOMPARE(controller->projectFile(),QUrl::fromLocalFile(first));
+
+        // A deleted project leaves the list when the File menu opens.
+        QVERIFY(QFile::remove(second));
+        click(fileButton); QTRY_VERIFY(fileMenu->property("visible").toBool());
+        QCOMPARE(recent->property("paths").toStringList(),QStringList({first}));
+        QMetaObject::invokeMethod(fileMenu,"close"); QTRY_VERIFY(!fileMenu->property("visible").toBool());
+
+        // Clear Recent empties the list and disables the submenu.
+        click(fileButton); QTRY_VERIFY(fileMenu->property("visible").toBool());
+        QMetaObject::invokeMethod(recentMenu,"open"); QTRY_VERIFY(recentMenu->property("visible").toBool());
+        QQuickItem* clear=nullptr; QTRY_VERIFY((clear=visualItem(window->contentItem(),"clearRecentProjects")));
+        click(clear); QTRY_VERIFY(!fileMenu->property("visible").toBool());
+        QVERIFY(recent->property("empty").toBool()); QVERIFY(!recentMenu->property("enabled").toBool());
+        // The list is kept in the (test) app settings.
+        QCOMPARE(QSettings().value("session/recentProjects").toStringList(),QStringList());
+    }
     void new_project_prompts_before_discarding_unsaved_clips() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks); const int track=tracks.addAudioTrack(); tracks.addClipAtBeat(track,0,4);
