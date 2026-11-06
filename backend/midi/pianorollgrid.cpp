@@ -4,7 +4,6 @@
 #include <cmath>
 
 namespace {
-constexpr double tolerance = 1e-9;
 constexpr double minimumLinePixels = 6.0;
 constexpr double defaultNoteBeats = 0.25;
 
@@ -75,21 +74,22 @@ double PianoRollGrid::snapStep() const noexcept
     return m_snapEnabled ? divisionBeats() : 0.0;
 }
 
+MusicalGrid PianoRollGrid::musicalGrid(double step) const noexcept
+{
+    MusicalGrid grid;
+    grid.setMeter(m_beatsPerBar, m_beatUnit);
+    grid.setStep(step);
+    return grid;
+}
+
 double PianoRollGrid::snapFloor(double beat) const noexcept
 {
-    if (!std::isfinite(beat)) return 0.0;
-    const double step = snapStep();
-    if (step <= 0) return std::max(0.0, beat);
-    const double bar = std::floor(beat / m_beatsPerBar + tolerance) * m_beatsPerBar;
-    return std::max(0.0, bar + std::floor((beat - bar) / step + tolerance) * step);
+    return musicalGrid(snapStep()).snap(beat, MusicalGrid::Rounding::Floor);
 }
 
 double PianoRollGrid::snapDelta(double deltaBeats) const noexcept
 {
-    if (!std::isfinite(deltaBeats)) return 0.0;
-    const double step = snapStep();
-    if (step <= 0) return deltaBeats;
-    return std::round(deltaBeats / step) * step;
+    return musicalGrid(snapStep()).snapDelta(deltaBeats);
 }
 
 double PianoRollGrid::newNoteLength() const noexcept
@@ -118,27 +118,16 @@ double PianoRollGrid::quantizeStep() const noexcept
 
 double PianoRollGrid::lineBeats(double pixelsPerBeat) const noexcept
 {
-    const bool usable = std::isfinite(pixelsPerBeat) && pixelsPerBeat > 0;
-    const double step = divisionBeats();
-    if (step > 0 && m_style != Style::Straight) {
-        double beats = step;
-        while (usable && beats * pixelsPerBeat < minimumLinePixels) beats *= 2;
-        return beats;
-    }
-    double beats = step > 0 ? std::min(m_beatUnit, step) : m_beatUnit;
-    while (usable && beats < m_beatUnit && beats * pixelsPerBeat < minimumLinePixels) beats *= 2;
-    return std::min(beats, m_beatUnit);
+    // Straight grids keep a line on every counted beat; triplet/dotted show their own step.
+    return musicalGrid(divisionBeats()).lineSpacing(pixelsPerBeat, m_style == Style::Straight, minimumLinePixels);
 }
 
 int PianoRollGrid::linesPerBar(double pixelsPerBeat) const noexcept
 {
-    const double beats = lineBeats(pixelsPerBeat);
-    return std::max(1, static_cast<int>(std::ceil(m_beatsPerBar / beats - 1e-6)));
+    return musicalGrid(divisionBeats()).linesPerBar(lineBeats(pixelsPerBeat));
 }
 
 bool PianoRollGrid::isOnGrid(double position, double unit) noexcept
 {
-    if (!std::isfinite(position) || !std::isfinite(unit) || unit <= 0) return false;
-    const double ratio = position / unit;
-    return std::abs(ratio - std::round(ratio)) < 1e-6;
+    return MusicalGrid::isOnGrid(position, unit);
 }
