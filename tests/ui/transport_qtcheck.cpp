@@ -1887,6 +1887,56 @@ private slots:
         for(const auto& fake:{"Track 1","All channels","Key snap","Pitch","Channel","File","Navigate","Contents"})
             QVERIFY2(!texts.contains(QString::fromLatin1(fake)),fake);
     }
+    void piano_roll_pointer_drag_on_empty_grid_box_selects_notes() {
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* notes=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(notes);
+        auto* grid=visualItem(roll,"pianoRollGrid"); QVERIFY(grid);
+        auto* box=visualItem(roll,"pianoRollSelectionBox"); QVERIFY(box);
+        const auto restore=qScopeGuard([&] {
+            QMetaObject::invokeMethod(notes,"clear"); roll->setProperty("activeTool","pencil"); roll->setVisible(false);
+        });
+        roll->setVisible(true); QTest::qWait(30);
+        roll->setProperty("activeTool","pointer");
+        const double ppb=roll->property("pixelsPerBeat").toDouble();
+        const double kh=roll->property("keyHeight").toDouble();
+        auto* flick=grid->parentItem()->parentItem();
+        const int top=127-int(std::floor((flick->property("contentY").toDouble()+20)/kh)); // a visible row
+        const auto add=[&](int pitch,double start,double length) {
+            int id=-1;
+            QMetaObject::invokeMethod(notes,"addNote",Q_RETURN_ARG(int,id),Q_ARG(int,pitch),Q_ARG(double,start),Q_ARG(double,length),Q_ARG(int,100));
+            return id;
+        };
+        const int a=add(top-1,0.5,1.0), b=add(top-2,1.0,0.5), c=add(top-1,3.0,1.0), d=add(top-6,1.0,1.0);
+        const auto at=[&](double beat,int pitch,double dy) {
+            return grid->mapToScene(QPointF(beat*ppb,(127-pitch)*kh+dy)).toPoint();
+        };
+        const auto selected=[&] {
+            QSet<int> ids;
+            for(const auto& n:notes->property("notes").toList())
+                if(n.toMap().value("selected").toBool())ids.insert(n.toMap().value("id").toInt());
+            return ids;
+        };
+        const auto drag=[&](QPoint from,QPoint to,Qt::KeyboardModifiers modifiers) {
+            QTest::mousePress(window,Qt::LeftButton,modifiers,from);
+            QTest::mouseMove(window,(from+to)/2,10); QTest::mouseMove(window,to,10);
+            const bool shown=box->isVisible();
+            QTest::mouseRelease(window,Qt::LeftButton,modifiers,to);
+            return shown;
+        };
+        // Box over the first two notes: touching a note is enough (b only partly covered).
+        QVERIFY(drag(at(0.25,top-1,2),at(1.2,top-2,kh-2),Qt::NoModifier));
+        QCOMPARE(selected(),(QSet<int>{a,b}));
+        QVERIFY(!box->isVisible());
+        QCOMPARE(notes->property("count").toInt(),4);              // pointer never draws notes
+        // Shift adds; a new plain box replaces.
+        drag(at(2.8,top-1,2),at(3.5,top-1,kh-2),Qt::ShiftModifier);
+        QCOMPARE(selected(),(QSet<int>{a,b,c}));
+        drag(at(0.8,top-5,2),at(1.5,top-6,kh-2),Qt::NoModifier);
+        QCOMPARE(selected(),(QSet<int>{d}));
+        // A plain click on empty grid clears the selection.
+        QTest::mouseClick(window,Qt::LeftButton,{},at(6.0,top-3,kh/2));
+        QVERIFY(selected().isEmpty());
+    }
     void piano_roll_notes_box_sets_the_length_of_drawn_notes() {
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
         auto* notes=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(notes);

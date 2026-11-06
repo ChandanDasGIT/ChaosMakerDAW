@@ -123,6 +123,9 @@ public:
     Q_INVOKABLE bool setNoteVelocities(const QVariantList& noteIds, const QVariantList& velocities);
     Q_INVOKABLE void selectNote(int noteId, bool addToSelection = false);
     Q_INVOKABLE void selectAll();
+    // Rubber-band box (pitches and clip-relative beats, any order); returns notes touched.
+    Q_INVOKABLE int selectNotesInRange(int lowNote, int highNote, double startBeat, double endBeat,
+                                       bool addToSelection = false);
     Q_INVOKABLE void clearSelection();
     Q_INVOKABLE bool deleteSelected();
     // Quantize note starts to stepBeats within each bar of the project meter (selected notes,

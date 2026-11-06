@@ -271,7 +271,7 @@ Item {
                     border.color: root.activeTool === "pointer" ? "#60cdff" : "#202227"
                     Text { anchors.centerIn: parent; text: "⌖"; color: "#d8dce4"; font.pixelSize: 13 }
                     MouseArea { id: tool1Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "pointer" }
-                    ToolTip.visible: tool1Hover.containsMouse; ToolTip.text: "Select (Pointer)"
+                    ToolTip.visible: tool1Hover.containsMouse; ToolTip.text: "Select (Pointer) · drag on empty grid to box-select, Shift adds"
                 }
 
                 Rectangle {
@@ -683,6 +683,20 @@ Item {
                         z: 8
                     }
 
+                    // Rubber-band box (Pointer tool drag on empty grid)
+                    Rectangle {
+                        objectName: "pianoRollSelectionBox"
+                        visible: gridMouse.isBanding && gridMouse.bandMoved
+                        x: Math.min(gridMouse.bandStartX, gridMouse.bandEndX)
+                        y: Math.min(gridMouse.bandStartY, gridMouse.bandEndY)
+                        width: Math.abs(gridMouse.bandEndX - gridMouse.bandStartX)
+                        height: Math.abs(gridMouse.bandEndY - gridMouse.bandStartY)
+                        color: "#2060cdff"
+                        border.color: "#60cdff"
+                        border.width: 1
+                        z: 9
+                    }
+
                     // Notes Blocks
                     Repeater {
                         model: root.notes
@@ -928,6 +942,14 @@ Item {
                         property int drawPitch: 60
                         property real drawStartBeat: 0.0
                         property real drawLength: 0.25
+                        // Rubber band (content coordinates); bandAdd = Shift/Ctrl held at press
+                        property bool isBanding: false
+                        property bool bandMoved: false
+                        property bool bandAdd: false
+                        property real bandStartX: 0
+                        property real bandStartY: 0
+                        property real bandEndX: 0
+                        property real bandEndY: 0
 
                         onPositionChanged: mouse => {
                             root.currentPosText = pianoRollBackend.positionLabel(mouse.x / root.pixelsPerBeat)
@@ -938,11 +960,23 @@ Item {
                             if (pressed && (mouse.buttons & Qt.LeftButton) && isDrawing) {
                                 applyDrag(mouse.x, mouse.y)
                                 root.trackAutoScroll(gridMouse, mapToItem(gridVerticalFlickable, mouse.x, mouse.y), false)
+                            } else if (pressed && (mouse.buttons & Qt.LeftButton) && isBanding) {
+                                const vp = mapToItem(gridVerticalFlickable, mouse.x, mouse.y)
+                                applyDrag(mouse.x, mouse.y)
+                                if (bandMoved)
+                                    root.trackAutoScroll(gridMouse, vp, true)
                             }
                         }
 
                         // gridMouse fills the content item, so cx is already a content coordinate
                         function applyDrag(cx, cy) {
+                            if (isBanding) {
+                                bandEndX = Math.max(0, Math.min(width, cx))
+                                bandEndY = Math.max(0, Math.min(height, cy))
+                                if (Math.abs(bandEndX - bandStartX) > 3 || Math.abs(bandEndY - bandStartY) > 3)
+                                    bandMoved = true
+                                return
+                            }
                             // Stretch to the grid cell under the cursor (or the cursor itself with
                             // snap off), never shorter than the chosen note length.
                             const step = root.getSnapBeats()
@@ -955,6 +989,19 @@ Item {
                             root.endAutoScroll()
                             root.dragEndBeats = 0
                             isDrawing = false
+                            isBanding = false
+                        }
+
+                        // Select the notes the band touches: pitches of the rows it crosses and
+                        // the beats it spans (the backend decides what overlaps).
+                        function finishBand() {
+                            const top = Math.min(bandStartY, bandEndY)
+                            const bottom = Math.max(bandStartY, bandEndY)
+                            const highNote = 127 - Math.floor(top / root.keyHeight)
+                            const lowNote = 127 - Math.min(127, Math.floor(Math.max(top, bottom - 0.01) / root.keyHeight))
+                            pianoRollBackend.selectNotesInRange(lowNote, highNote,
+                                                                bandStartX / root.pixelsPerBeat,
+                                                                bandEndX / root.pixelsPerBeat, bandAdd)
                         }
 
                         onPressed: mouse => {
@@ -974,13 +1021,25 @@ Item {
                                     drawLength = root.newNoteLength()
                                     isDrawing = true
                                 } else {
-                                    pianoRollBackend.clearSelection()
+                                    // Pointer: start a rubber band; a plain click (no drag)
+                                    // clears the selection on release.
+                                    bandAdd = (mouse.modifiers & Qt.ShiftModifier) || (mouse.modifiers & Qt.ControlModifier)
+                                    bandStartX = bandEndX = mouse.x
+                                    bandStartY = bandEndY = mouse.y
+                                    bandMoved = false
+                                    isBanding = true
                                 }
                             }
                         }
 
                         onReleased: mouse => {
                             root.endAutoScroll()
+                            if (isBanding) {
+                                isBanding = false
+                                if (bandMoved) finishBand()
+                                else if (!bandAdd) pianoRollBackend.clearSelection()
+                                return
+                            }
                             if (isDrawing) {
                                 isDrawing = false
                                 pianoRollBackend.addNote(drawPitch, drawStartBeat, drawLength, 100)
