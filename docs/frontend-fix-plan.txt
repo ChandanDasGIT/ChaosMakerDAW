@@ -30,9 +30,12 @@ PHASE 1 — Broken or misleading behaviour (do first)
 [x] 1.4  Save As shortcut is shown but missing.
          frontend/session/ProjectActions.qml:244 — add a StandardKey.SaveAs Shortcut.
 
-[ ] 1.5  Track delete: one click, no confirmation, and it seems to skip undo history.
+[x] 1.5  Track delete: one click, no confirmation, and it seems to skip undo history.
          frontend/session/TrackList.qml:309; backend/session/tracklist.cpp:156 —
          make removal undoable (backend), and/or confirm when the track has clips.
+         Done: confirmation when the track has clips. Confirmed that Project::removeTrack
+         clears the whole (clip-only) undo history. Undoable track deletion is a larger
+         backend change (model rows, engine effect chains, inputs) -> see 2.7.
 
 [ ] 1.6  Mixer channel fader controls clip gain instead of track volume.
          frontend/mixer/MixerPanel.qml:280-293, 339-353 — the main fader should be track
@@ -56,9 +59,15 @@ PHASE 1 — Broken or misleading behaviour (do first)
          Done: buffer goes through the wrapper only; output goes to EngineController only
          (the QML wrapper has no device list, so its output path never worked).
 
-[ ] 1.10 UI test new_project_prompts_before_discarding_unsaved_clips fails, also on the
-         committed code before 1.4 (found 2026-11-06). The "save changes?" dialog never
-         becomes visible. Find out whether the prompt is broken or the test is.
+[ ] 1.10 Pre-existing failing UI tests (all fail at f059241, before this plan started):
+         - new_project_prompts_before_discarding_unsaved_clips ("save changes?" dialog
+           never becomes visible)
+         - track_colour_picker_updates_cards_timeline_and_mixer_and_cancels_custom_edits
+         - track_effects_switch_in_place_and_keep_edits_on_the_selected_track
+         - track_names_edit_inline_commit_cancel_and_update_mixer_and_fx
+         - vocal_effects_offer_eq_and_recording_controls_without_guitarsuite
+         - volume_faders_double_click_restores_unity_gain (looks for a "mixerFader")
+         Find out for each whether the app or the test is wrong.
 
 
 PHASE 2 — Move logic out of QML (architecture rule 6)
@@ -75,6 +84,7 @@ PHASE 2 — Move logic out of QML (architecture rule 6)
          exposes descriptors/flags per pedal.
 [ ] 2.6  "Restore session on startup" written in 3 places (AppSettings.qml:19-23, 78-81)
          → one owner (AppSettingsWrapper), others read it.
+[ ] 2.7  Make track deletion undoable (Project history only covers clip edits today).
 
 
 PHASE 3 — Layout and workflow

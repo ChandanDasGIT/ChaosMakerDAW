@@ -101,6 +101,7 @@ Rectangle {
                     required property bool recordDry
                     required property bool recordsWithFx
                     required property var eqBands
+                    required property var clips
                     property bool renaming: false
                     readonly property bool isSelected: !!root.trackModel && root.trackModel.selectedTrackId === trackCard.trackId
 
@@ -304,9 +305,10 @@ Rectangle {
                             Item { Layout.fillWidth: true }
                             ToolButton {
                                 id: closeTrackButton
+                                objectName: "trackRemoveButton" + trackCard.trackId
                                 text: "×"
                                 implicitWidth: 20; implicitHeight: 24
-                                onClicked: root.trackModel.removeTrack(trackCard.trackId)
+                                onClicked: root.requestRemoveTrack(trackCard.trackId, trackCard.name, trackCard.clips ? trackCard.clips.length : 0)
                                 contentItem: Text { text: "×"; color: closeTrackButton.hovered ? "#ffffff" : Theme.textMuted; font.pixelSize: 17; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                                 background: Rectangle { radius: 4; color: closeTrackButton.hovered ? "#a9363c" : "transparent"; border.color: closeTrackButton.hovered ? Theme.record : "transparent" }
                                 ToolTip.visible: hovered
@@ -507,6 +509,47 @@ Rectangle {
                 }
             }
         }
+    }
+
+    // Deleting a track cannot be undone and clears the undo history, so ask first when the
+    // track holds clips. Empty tracks are removed straight away.
+    function requestRemoveTrack(trackId, name, clipCount) {
+        if (!root.trackModel) return
+        if (clipCount <= 0) { root.trackModel.removeTrack(trackId); return }
+        removeTrackDialog.trackId = trackId
+        removeTrackDialog.trackName = name
+        removeTrackDialog.clipCount = clipCount
+        removeTrackDialog.open()
+    }
+
+    Dialog {
+        id: removeTrackDialog
+        objectName: "removeTrackDialog"
+        property int trackId: -1
+        property string trackName: ""
+        property int clipCount: 0
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(420, parent.width - 32)
+        modal: true
+        title: "Delete track?"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        background: Rectangle { color: Theme.panelBg; border.color: Theme.divider; radius: 8 }
+        palette.windowText: Theme.text
+        palette.text: Theme.text
+        contentItem: Text {
+            text: "Delete \u201c" + removeTrackDialog.trackName + "\u201d and its " + removeTrackDialog.clipCount
+                  + (removeTrackDialog.clipCount === 1 ? " clip" : " clips")
+                  + "?\nThis can't be undone, and it clears the undo history."
+            color: Theme.text
+            wrapMode: Text.WordWrap
+            padding: 16
+        }
+        Component.onCompleted: {
+            const ok = standardButton(Dialog.Ok)
+            if (ok) ok.text = "Delete"
+        }
+        onAccepted: if (root.trackModel) root.trackModel.removeTrack(trackId)
     }
 
     Popup {

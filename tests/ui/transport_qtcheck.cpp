@@ -1728,6 +1728,31 @@ private slots:
         QVERIFY(near(fill(127),track127));                           // loud note = track colour
         QVERIFY(fill(10).lightnessF()<fill(127).lightnessF());       // soft notes are darker
     }
+    void removing_a_track_with_clips_asks_first() {
+        TrackListWrapper tracks;
+        const int empty=tracks.addAudioTrack();
+        const int full=tracks.addInstrumentTrack(); QVERIFY(tracks.addClipAtBeat(full,0,4)>0);
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        const auto restore=qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel",QVariant()); });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QCoreApplication::processEvents();
+        auto* dialog=window->findChild<QObject*>("removeTrackDialog"); QVERIFY(dialog);
+        // Empty track: removed straight away, no dialog
+        auto* removeEmpty=visualItem(list,"trackRemoveButton"+QString::number(empty)); QVERIFY(removeEmpty);
+        click(removeEmpty);
+        QTRY_COMPARE(tracks.count(),1); QVERIFY(!dialog->property("visible").toBool());
+        // Track with a clip: asks; Cancel keeps it
+        auto* removeFull=visualItem(list,"trackRemoveButton"+QString::number(full)); QVERIFY(removeFull);
+        click(removeFull);
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        QCOMPARE(dialog->property("clipCount").toInt(),1);
+        QVERIFY(QMetaObject::invokeMethod(dialog,"reject"));
+        QTRY_VERIFY(!dialog->property("visible").toBool()); QCOMPARE(tracks.count(),1);
+        // ...Delete removes it
+        click(removeFull); QTRY_VERIFY(dialog->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog,"accept"));
+        QTRY_COMPARE(tracks.count(),0);
+    }
     void unavailable_audio_does_not_simulate_playback() {
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());
