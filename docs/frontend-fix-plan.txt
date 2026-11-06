@@ -26,7 +26,7 @@ PHASE 1 — Broken or misleading behaviour (do first)
            (PianoRollView.qml:1076-1148)
          - Velocity lane "+" and "Velocity ▾" (VelocityLane.qml:137-195)
 
-[ ] 1.4  Save As shortcut is shown but missing.
+[x] 1.4  Save As shortcut is shown but missing.
          frontend/session/ProjectActions.qml:244 — add a StandardKey.SaveAs Shortcut.
 
 [ ] 1.5  Track delete: one click, no confirmation, and it seems to skip undo history.
