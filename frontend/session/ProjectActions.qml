@@ -63,6 +63,12 @@ RowLayout {
     }
 
     FileDialog {
+
+        // Inside the main window: a separate dialog window keeps app focus after closing,
+
+        // which left the app without keyboard input (plan item 1.11).
+
+        popupType: Popup.Item
         id: saveProjectDialog
         objectName: "saveProjectDialog"
         title: "Save project"
@@ -80,6 +86,12 @@ RowLayout {
     }
 
     FileDialog {
+
+        // Inside the main window: a separate dialog window keeps app focus after closing,
+
+        // which left the app without keyboard input (plan item 1.11).
+
+        popupType: Popup.Item
         id: openProjectDialog
         title: "Open project"
         fileMode: FileDialog.OpenFile

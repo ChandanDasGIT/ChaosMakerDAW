@@ -2,6 +2,7 @@
 #include "wrapper/engineWrap/enginecontroller.h"
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
 #include <QQmlApplicationEngine>
+#include <QQmlProperty>
 #include <QQuickItem>
 #include <QPointer>
 #include <QQuickWindow>
@@ -625,6 +626,55 @@ private slots:
         list->setVisible(false); list->setProperty("trackModel",QVariant());
         mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
     }
+    void track_colour_picker_updates_cards_timeline_and_mixer_and_cancels_custom_edits() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int a=tracks.addVocalTrack(),b=tracks.addInstrumentTrackOfType("Electric Guitar");
+        const int first=tracks.addClipAtBeat(a,0,4),second=tracks.addClipAtBeat(a,4,4),other=tracks.addClipAtBeat(b,0,4);
+        auto* list=window->findChild<QQuickItem*>("testTrackList");
+        auto* mixer=window->findChild<QQuickItem*>("testMixer");
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(list); QVERIFY(mixer); QVERIFY(timeline);
+        list->setHeight(540); timeline->setX(340); timeline->setWidth(760);
+        for(auto* view:{list,mixer,timeline}) { view->setProperty("trackModel",QVariant::fromValue(&tracks)); view->setVisible(true); }
+        QTest::qWait(30);
+        auto* button=visualItem(list,"trackColourButton"+QString::number(a)); QVERIFY(button); click(button);
+        auto* popup=visualObject(window->contentItem(),"trackColourPopup"+QString::number(a)); QVERIFY(popup);
+        QTRY_VERIFY(popup->property("visible").toBool());
+        auto* choice=visualItem(window->contentItem(),"trackColourChoice"+QString::number(a)+"_8"); QVERIFY(choice); click(choice);
+        QTRY_VERIFY(!popup->property("visible").toBool());
+        auto verify=[&](const QString& colour) {
+            const QColor expected(colour);
+            QCOMPARE(QString::fromStdString(tracks.project().findTrack(a)->colour),colour);
+            for(const auto& name:{"trackColourAccent"+QString::number(a),"mixerColour"+QString::number(a),"timelineLaneColour"+QString::number(a)}) {
+                auto* accent=visualItem(window->contentItem(),name); QVERIFY(accent);
+                QCOMPARE(accent->property("color").value<QColor>(),expected);
+            }
+            for(int clip:{first,second}) {
+                auto* block=visualItem(timeline,"clipBlock"+QString::number(clip)); QVERIFY(block);
+                QCOMPARE(block->property("trackColour").value<QColor>(),expected);
+                QCOMPARE(block->property("color").value<QColor>(),expected.darker(240));
+            }
+            auto* untouched=visualItem(timeline,"clipBlock"+QString::number(other)); QVERIFY(untouched);
+            QCOMPARE(untouched->property("trackColour").value<QColor>(),QColor("#6fa8dc"));
+        };
+        QCoreApplication::processEvents(); verify("#d97c73");
+        click(button); QTRY_VERIFY(popup->property("visible").toBool());
+        auto* custom=visualItem(window->contentItem(),"customTrackColour"+QString::number(a)); QVERIFY(custom); click(custom);
+        auto* dialog=visualObject(window->contentItem(),"trackColourDialog"+QString::number(a)); QVERIFY(dialog);
+        QTRY_VERIFY(dialog->property("visible").toBool()); dialog->setProperty("selectedColor",QColor("#112233"));
+        QVERIFY(QMetaObject::invokeMethod(dialog,"reject")); QTRY_VERIFY(!dialog->property("visible").toBool()); verify("#d97c73");
+        click(button); QTRY_VERIFY(popup->property("visible").toBool()); click(custom);
+        QTRY_VERIFY(dialog->property("visible").toBool()); dialog->setProperty("selectedColor",QColor("#4d91c2"));
+        QVERIFY(QMetaObject::invokeMethod(dialog,"accept")); QTRY_VERIFY(!dialog->property("visible").toBool());
+        QCoreApplication::processEvents(); verify("#4d91c2");
+        // The dialog lives inside the main window, so closing it leaves keyboard input working.
+        QCOMPARE(QGuiApplication::focusWindow(),static_cast<QWindow*>(window));
+        auto* focusTarget=window->findChild<QQuickItem*>("otherFocus"); QVERIFY(focusTarget);
+        focusTarget->forceActiveFocus(); QVERIFY(focusTarget->hasActiveFocus());
+        QVERIFY(window->grabWindow().save("/tmp/chaosmaker-track-colours.png"));
+        for(auto* view:{list,mixer,timeline}) { view->setVisible(false); view->setProperty("trackModel",QVariant()); }
+        list->setHeight(650); timeline->setX(0); timeline->setWidth(1000);
+    }
     void adjacent_empty_cells_merge_from_the_context_menu() {
         TrackListWrapper tracks; const int track=tracks.addAudioTrack();
         const int a=tracks.addClipAtBeat(track,0,2),b=tracks.addClipAtBeat(track,2,2),c=tracks.addClipAtBeat(track,4,2);
@@ -1034,10 +1084,16 @@ private slots:
         top->setProperty("trackModel",QVariant::fromValue(&tracks));
         const int track=tracks.addAudioTrack(); const int clip=tracks.addClipAtBeat(track,0,4);
         QVERIFY(tracks.removeAudioClip(track,clip));
-        auto* undo=visualItem(window->contentItem(),"undoClipEdit");
-        auto* redo=visualItem(window->contentItem(),"redoClipEdit"); QVERIFY(undo); QVERIFY(redo);
-        QVERIFY(undo->isEnabled()); click(undo); QCOMPARE(tracks.clips().size(),1);
-        QVERIFY(redo->isEnabled()); click(redo); QCOMPARE(tracks.clips().size(),0);
+        // Use the real File > Undo / Redo items (a mouse click cannot hit the 1x1 test hooks).
+        auto* fileButton=visualItem(window->contentItem(),"fileMenuButton"); QVERIFY(fileButton);
+        auto* fileMenu=window->findChild<QObject*>("fileMenu"); QVERIFY(fileMenu);
+        const auto choose=[&](const char* item) {
+            click(fileButton); QTRY_VERIFY(fileMenu->property("visible").toBool());
+            auto* entry=visualItem(window->contentItem(),item); QVERIFY(entry); QVERIFY(entry->isEnabled());
+            click(entry); QTRY_VERIFY(!fileMenu->property("visible").toBool());
+        };
+        choose("fileUndoItem"); QCOMPARE(tracks.clips().size(),1);
+        choose("fileRedoItem"); QCOMPARE(tracks.clips().size(),0);
         top->setProperty("trackModel",QVariant());
     }
     void timeline_bpm_edit_updates_grid_and_preserves_recorded_audio_timing() {
@@ -1358,7 +1414,9 @@ private slots:
         mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
         QVariantMap levels{{QString::number(a),QVariantMap{{"inputLeftDb",-6.0},{"inputRightDb",-18.0},
             {"outputLeftDb",1.0},{"outputRightDb",-12.0},{"outputLeftClip",true}}}};
-        mixer->setProperty("levels",levels); QTest::qWait(30);
+        // Replace the binding to EngineController.trackLevels; a plain setProperty() keeps it,
+        // so live engine level updates would overwrite these test values.
+        QQmlProperty::write(mixer,"levels",levels); QTest::qWait(30);
         auto* input=visualItem(mixer,"mixerInput"+QString::number(a));
         auto* output=visualItem(mixer,"mixerOutput"+QString::number(a));
         auto* fader=visualItem(mixer,"mixerVolume"+QString::number(a));
@@ -1754,53 +1812,6 @@ private slots:
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play);
         QVERIFY(!EngineController::instance()->playing());
         QVERIFY(EngineController::instance()->transportMessage().contains("unavailable"));
-    }
-    // Runs last on purpose: after its "Custom colour..." ColorDialog closes, later tests lose
-    // keyboard/mouse input (see docs/frontend-fix-plan.txt item 1.11).
-    void track_colour_picker_updates_cards_timeline_and_mixer_and_cancels_custom_edits() {
-        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
-        const int a=tracks.addVocalTrack(),b=tracks.addInstrumentTrackOfType("Electric Guitar");
-        const int first=tracks.addClipAtBeat(a,0,4),second=tracks.addClipAtBeat(a,4,4),other=tracks.addClipAtBeat(b,0,4);
-        auto* list=window->findChild<QQuickItem*>("testTrackList");
-        auto* mixer=window->findChild<QQuickItem*>("testMixer");
-        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(list); QVERIFY(mixer); QVERIFY(timeline);
-        list->setHeight(540); timeline->setX(340); timeline->setWidth(760);
-        for(auto* view:{list,mixer,timeline}) { view->setProperty("trackModel",QVariant::fromValue(&tracks)); view->setVisible(true); }
-        QTest::qWait(30);
-        auto* button=visualItem(list,"trackColourButton"+QString::number(a)); QVERIFY(button); click(button);
-        auto* popup=visualObject(window->contentItem(),"trackColourPopup"+QString::number(a)); QVERIFY(popup);
-        QTRY_VERIFY(popup->property("visible").toBool());
-        auto* choice=visualItem(window->contentItem(),"trackColourChoice"+QString::number(a)+"_8"); QVERIFY(choice); click(choice);
-        QTRY_VERIFY(!popup->property("visible").toBool());
-        auto verify=[&](const QString& colour) {
-            const QColor expected(colour);
-            QCOMPARE(QString::fromStdString(tracks.project().findTrack(a)->colour),colour);
-            for(const auto& name:{"trackColourAccent"+QString::number(a),"mixerColour"+QString::number(a),"timelineLaneColour"+QString::number(a)}) {
-                auto* accent=visualItem(window->contentItem(),name); QVERIFY(accent);
-                QCOMPARE(accent->property("color").value<QColor>(),expected);
-            }
-            for(int clip:{first,second}) {
-                auto* block=visualItem(timeline,"clipBlock"+QString::number(clip)); QVERIFY(block);
-                QCOMPARE(block->property("trackColour").value<QColor>(),expected);
-                QCOMPARE(block->property("color").value<QColor>(),expected.darker(240));
-            }
-            auto* untouched=visualItem(timeline,"clipBlock"+QString::number(other)); QVERIFY(untouched);
-            QCOMPARE(untouched->property("trackColour").value<QColor>(),QColor("#6fa8dc"));
-        };
-        QCoreApplication::processEvents(); verify("#d97c73");
-        click(button); QTRY_VERIFY(popup->property("visible").toBool());
-        auto* custom=visualItem(window->contentItem(),"customTrackColour"+QString::number(a)); QVERIFY(custom); click(custom);
-        auto* dialog=visualObject(window->contentItem(),"trackColourDialog"+QString::number(a)); QVERIFY(dialog);
-        QTRY_VERIFY(dialog->property("visible").toBool()); dialog->setProperty("selectedColor",QColor("#112233"));
-        QVERIFY(QMetaObject::invokeMethod(dialog,"reject")); QTRY_VERIFY(!dialog->property("visible").toBool()); verify("#d97c73");
-        click(button); QTRY_VERIFY(popup->property("visible").toBool()); click(custom);
-        QTRY_VERIFY(dialog->property("visible").toBool()); dialog->setProperty("selectedColor",QColor("#4d91c2"));
-        QVERIFY(QMetaObject::invokeMethod(dialog,"accept")); QTRY_VERIFY(!dialog->property("visible").toBool());
-        QCoreApplication::processEvents(); verify("#4d91c2");
-        QVERIFY(window->grabWindow().save("/tmp/chaosmaker-track-colours.png"));
-        for(auto* view:{list,mixer,timeline}) { view->setVisible(false); view->setProperty("trackModel",QVariant()); }
-        list->setHeight(650); timeline->setX(0); timeline->setWidth(1000);
     }
 private:
     QTemporaryDir storage{QStringLiteral("/tmp/chaosmaker-ui-XXXXXX")};

@@ -451,6 +451,9 @@ Item {
                         }
                     }
                     FileDialog {
+                        // Inside the main window: a separate dialog window keeps app focus after closing,
+                        // which left the app without keyboard input (plan item 1.11).
+                        popupType: Popup.Item
                         id: cabinetDialog
                         title: "Load cabinet impulse response"
                         fileMode: FileDialog.OpenFile
@@ -481,6 +484,12 @@ Item {
     }
 
     FileDialog {
+
+        // Inside the main window: a separate dialog window keeps app focus after closing,
+
+        // which left the app without keyboard input (plan item 1.11).
+
+        popupType: Popup.Item
         id: savePresetDialog
         title: "Save GuitarSuite preset"
         fileMode: FileDialog.SaveFile
@@ -490,6 +499,12 @@ Item {
     }
 
     FileDialog {
+
+        // Inside the main window: a separate dialog window keeps app focus after closing,
+
+        // which left the app without keyboard input (plan item 1.11).
+
+        popupType: Popup.Item
         id: loadPresetDialog
         title: "Load GuitarSuite preset"
         fileMode: FileDialog.OpenFile
