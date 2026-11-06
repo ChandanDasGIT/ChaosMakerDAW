@@ -160,6 +160,29 @@ TEST(qtpianoroll, meter_follows_the_project_time_signature) {
     CHECK(unbound.beatsPerBar() == 4.0 && unbound.beatUnit() == 1.0);
 }
 
+TEST(qtpianoroll, quantize_is_one_undoable_edit) {
+    QObject owner;
+    TrackListWrapper tracks;
+    const int t = tracks.addInstrumentTrack();
+    const int c = tracks.addClipAtBeat(t, 0, 4);
+    auto* roll = boundRoll(tracks, t, c, &owner);
+    const int a = roll->addNote(60, 0.3, 0.5);
+    const int b = roll->addNote(64, 1.13, 0.5);
+
+    int clipsChanges = 0;
+    QObject::connect(&tracks, &TrackListWrapper::clipsChanged, &owner, [&] { ++clipsChanges; });
+    CHECK(roll->quantize(0.25));
+    CHECK(clipsChanges == 1);                                  // one document edit
+    const auto stored = tracks.domain().clipNotes(t, c);
+    CHECK(stored[0].startBeat == 0.25 && stored[1].startBeat == 1.25);
+    CHECK(!roll->quantize(0.25));                              // already on the grid
+    CHECK(clipsChanges == 1);
+
+    CHECK(tracks.undo());                                      // single undo restores both
+    CHECK(roll->backend().findNote(a)->startBeat == 0.3);
+    CHECK(roll->backend().findNote(b)->startBeat == 1.13);
+}
+
 TEST(qtpianoroll, velocity_edits_are_one_undoable_change_and_clamped) {
     QObject owner;
     TrackListWrapper tracks;

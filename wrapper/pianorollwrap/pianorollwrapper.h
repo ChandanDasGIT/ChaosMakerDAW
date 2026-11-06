@@ -64,6 +64,8 @@ public:
     Q_INVOKABLE void selectAll();
     Q_INVOKABLE void clearSelection();
     Q_INVOKABLE bool deleteSelected();
+    // Quantize note starts to stepBeats (selected notes, or all when none selected): one edit.
+    Q_INVOKABLE bool quantize(double stepBeats);
     Q_INVOKABLE void clear();
     Q_INVOKABLE void reload();
 

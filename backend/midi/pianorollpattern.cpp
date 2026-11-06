@@ -1,5 +1,6 @@
 #include "midi/pianorollpattern.h"
 #include <algorithm>
+#include <cmath>
 
 int PianoRollPattern::addNote(int note, double startBeat, double lengthBeats, int velocity) {
     MidiNote n;
@@ -77,6 +78,18 @@ void PianoRollPattern::clearSelection() {
     for (auto& n : m_notes) {
         n.selected = false;
     }
+}
+
+bool PianoRollPattern::quantize(double stepBeats) {
+    if (!std::isfinite(stepBeats) || stepBeats <= 0) return false;
+    const bool onlySelected = selectedCount() > 0;
+    bool moved = false;
+    for (auto& n : m_notes) {
+        if ((onlySelected && !n.selected) || n.startBeat < 0) continue;
+        const double snapped = std::max(0.0, std::round(n.startBeat / stepBeats) * stepBeats);
+        if (snapped != n.startBeat) { n.startBeat = snapped; moved = true; }
+    }
+    return moved;
 }
 
 bool PianoRollPattern::deleteSelected() {
