@@ -45,3 +45,6 @@ compile_commands.json
 # Local reference material, never committed: q3.jpg (EQ screenshot), sampleGuitarRaw.wav
 # (dry guitar DI) and the "Modern Boutique 4x12" IRs, used for plan 6.3 listening tests.
 /local-reference/
+
+# Downloaded sample libraries (Gogodze Phu Vol II, Splendid Grand Piano, ...): large, never committed.
+/sample-kits/

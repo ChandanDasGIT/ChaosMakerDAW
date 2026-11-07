@@ -10,20 +10,20 @@ view only), and the from-scratch rule (app uses only std, Qt, libjack, nlohmann 
 Before starting an item, check the code: some notes below come from older lists and may lag.
 
 Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (decision or check)
+                [L] will do later (the user's choice; section H)
 
 
 A. LEFT OVER FROM PLAN 6 (small, closest to recent work)
 ---------------------------------------------------------
-[ ] A1  Re-voice the factory GuitarSuite presets (resources/presets/guitarsuite/Djent.gspreset,
-        Jazz.gspreset) for the rebuilt amp and drives. They have no amp "channel" value, so the
-        amp loads on Crunch, and their drive settings were tuned for the old pedals. Option: base
-        the new factory Djent on the fitted local preset (without the IR, which cannot ship).
+[ ] A1  Re-voice only the factory Jazz preset (resources/presets/guitarsuite/Jazz.gspreset) for
+        the rebuilt amp and drives. It has no amp "channel" value, so the amp loads on Crunch,
+        and its settings were tuned for the old pedals. (Djent, MetalSolo, RockChords and
+        RockSolo are already new, fitted factory presets.)
 [ ] A2  Chaos EQ: bells above ~10 kHz come out slightly narrower than their Q (standard RBJ
         design cramps near Nyquist). Possible fix: a matched / pre-warped bell design.
 [ ] A3  Merge the two backend clock formatters (PlaybackControls::formatTime and
         valueformat::position); they differ only for negative times.
-[?] A4  Chaos EQ extras the user chose "not now": dynamic EQ, linear phase.
-[?] A5  The 10-band EQ page's look: the user said they would redo it themselves (plan 3.10).
+(A4 and A5 moved to section H, "will do later".)
 
 
 B. CHECKS IN THE REAL APP (need the user; JACK/hardware)
@@ -45,12 +45,92 @@ Every instrument track type (guitars, piano, strings, drums) plays through TestS
 backend/instruments/instrumentfactory.cpp maps all of them to it. The folders
 backend/instruments/{sfz,piano,drums,strings} are empty; sampler/ has only samplezone.h;
 tools/sfzcheck is empty.
-[ ] C1  Sampler engine (hand-written): sample zones, key/velocity mapping, loop points,
-        envelopes, voice allocation with a fixed voice pool (no allocation on the audio thread).
-[ ] C2  SFZ loading (hand-written parser, off the audio thread) and tools/sfzcheck.
-[ ] C3  Instruments on top: piano, drums, strings, acoustic guitar — content plus controls.
-[ ] C4  Map each instrument type to its real instrument in instrumentfactory.cpp.
-[?] C5  Decide where instrument samples come from (licensing: only content we may ship).
+BUILD ORDER (the user, 2026-11-07): the shared sampler first, then drums, then the piano.
+[ ] C1  Sampler engine (hand-written): sample zones, key/velocity mapping, round robins, loop
+        points, envelopes, release triggers, choke groups (e.g. closed hi-hat stops the open
+        one), voice allocation with a fixed voice pool (no allocation on the audio thread).
+[ ] C2  SFZ loader (hand-written parser, off the audio thread) and tools/sfzcheck (loads an
+        SFZ file and reports missing samples, unsupported opcodes, overlapping regions).
+        Support the opcodes the chosen libraries use first, including the ARIA extensions
+        both use (#define, set_hdcc, ...); add more later.
+[ ] C3  DRUMS FIRST: Gogodze Phu Vol II (see C9) as the real "Drums" instrument. WAV
+        samples, so no decoder is needed yet. Drum keys, hi-hat choke, mic mix controls.
+        Map the Drums track type to it in instrumentfactory.cpp. Listen with the user; if it
+        disappoints, switch to the fallback SM Drums (we write its map).
+[ ] C4  FLAC decoder, hand-written, in the app (backend, shared): the sampler loads the
+        Splendid piano with it, and audio import (E) reuses it later. Stream and frame
+        parsing, subframes (constant, verbatim, fixed and LPC prediction), Rice-coded
+        residuals, stereo decorrelation, 16/24-bit, MD5 check. Tests: decode reference
+        files and compare sample for sample with the same audio as WAV.
+[ ] C5  PIANO NEXT: Splendid Grand Piano (see C9) as the real "Piano" instrument, loaded
+        through the FLAC decoder. Sustain pedal, release, string resonance controls. Map the
+        Piano track type. Listen with the user; if it disappoints, switch to the fallback
+        Accurate-Salamander (WAV; CC-BY, so a credit is then required: see C8).
+[ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
+        model), mapped in instrumentfactory.cpp.
+[ ] C7  Harmonium (synthesis, no samples needed): a new "Harmonium" instrument track type that
+        plays from the piano roll / MIDI. Model: free-reed tone (bright, nasal, rich overtones)
+        with a light wooden-case resonance; several reed sets per key with stops (bass reed,
+        octave-up reeds), tuned slightly apart for the typical beating; air pressure from a
+        bellows/expression control sets the level (soft breathy attack, air noise, swells, no
+        key-speed velocity); small key click; drone stops. Tune by ear with the user, and
+        against a reference recording if the user provides one (like the guitar presets).
+[ ] C8  Credits: the user's rule (2026-11-07): no third-party credit or attribution of any
+        kind in the GitHub repo. So no courtesy credits, no "Third-party sounds" README
+        section. The first choices need none (Gogodze Phu Vol II is CC0, Splendid is public
+        domain). Only if a CC-BY library is used (the Accurate-Salamander fallback) is a
+        credit legally required; then ask the user where it goes before adding anything.
+        Ready-made text for that case:
+          Accurate-Salamander Grand Piano. Original recordings: Salamander Grand Piano by
+          Alexander Holm (Yamaha C5). Remaster: Accurate-Salamander by Chisato Yamauchi.
+          Licence: CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/).
+          Changes: converted and mapped for ChaosMaker.
+[x] C9  Sample libraries chosen, the reference for C3 and C5 (the user, 2026-11-07: try the
+        first choices, switch to the fallback if they disappoint). Licences checked against the
+        sources on that date; re-read the licence file in each download.
+        FIRST CHOICES
+        - Drums: Gogodze Phu Vol II by Karoryfer Samples (acoustic kit, up to 7 mics, from
+          one-mic lo-fi to full multi-mic; suited to rock/indie). CC0 1.0 (public domain, no
+          credit needed). WAV samples, ready-made SFZ maps.
+            https://github.com/sfzinstruments/karoryfer.gogodze-phu-vol-ii  (Code -> Download ZIP)
+        - Grand piano: Splendid Grand Piano (Steinway, Akai samples, 4 velocity layers + a
+          filtered 5th, 256 MB). Its README states public domain (released by Akai in early
+          2000); no separate LICENSE file. If we distribute a changed SFZ based on theirs,
+          note that it is derived from sfzinstruments/SplendidGrandPiano.
+            https://github.com/sfzinstruments/SplendidGrandPiano  (Code -> Download ZIP)
+          Its samples are FLAC only: decoded by our own FLAC decoder (C4, decided by the user).
+        FALLBACKS (if the first choices disappoint)
+        - Drums: SM Drums (1960s Ludwig, multi-mic, up to 8 round robins, many velocity
+          layers). Public domain. WAV only, no SFZ map: we write our own map.
+            page: https://smmdrums.wordpress.com/
+            1. SMD Cymbals Stereo (1.8 GB)
+               https://drive.google.com/file/d/0B8sahgYlFzKrN3ZCU1V3N181VVk/view
+            2. SMDrums Multi-Mic: kicks, snares, toms (1.4 GB)
+               https://drive.google.com/file/d/0B8sahgYlFzKrS0dDR2NuQm8wR0U/view
+            3. SMD Snare HyB Stereo (69 MB)
+               https://drive.google.com/file/d/0B8sahgYlFzKrVFFlVURsZWdCN28/view
+            Keymap & installation guides (which sample is which, for our map):
+               https://drive.google.com/file/d/0B8sahgYlFzKrYnJ4X1ljTlltLWM/view
+            (the Kontakt files are not needed)
+        - Grand piano: Accurate-Salamander Grand Piano V6.2a (Yamaha C5, 16 velocity layers,
+          48 kHz/24-bit). Remaster by Chisato Yamauchi of the Salamander Grand Piano by
+          Alexander Holm. CC-BY 3.0: credit required (see C8). Use the WAV zip (1.6 GB):
+            https://archive.org/download/httpswww.ir.isas.jaxa.jpcyamauchaccuratesalamander/AccurateSalamanderGrandPianoV6.2a_48khz24bit.zip
+            page: https://www.ir.isas.jaxa.jp/~cyamauch/AccurateSalamander/
+        OTHER OPTIONS NOTED
+        - Karoryfer (all CC0, SFZ): Big Rusty Drums (big 1980s kit, mostly FLAC), Frankensnare
+          (snares), Swirly Drums (brushes), Unruly Drums (snare wires on every drum); basses
+          Black And Blue Basses, Growlybass, Meatbass (upright); guitars Black And Green
+          Guitars. AVL Drumkits (CC-BY-SA 3.0), Virtuosity Drums (CC0, jazz), Headroom Piano
+          (CC-BY 4.0, Yamaha C3).
+        NOTES
+        - Both pianos' SFZ files use SFZ 2.0 + ARIA extensions (#define, set_hdcc, ...); the
+          loader (C2) must support those, or we write simpler maps ourselves.
+        - Downloads live in sample-kits/ (in .gitignore; never committed):
+            sample-kits/AccousticDrums/Gogodze_Phu_vol_II
+            sample-kits/GrandPiano/SplendidGrandPiano
+        - CC0 1.0 = public domain dedication with a fallback licence: use, change, ship and
+          sell freely, no credit required.
 
 
 D. PIANO ROLL / MIDI FOLLOW-UPS — from docs/follow-trail.md (roadmap Phase 10)
@@ -75,7 +155,8 @@ E. AUDIO IMPORT — planned in docs/follow-trail.md, not started
 ---------------------------------------------------------------
 Target: WAV, MP3 and FLAC import through a file picker, editable clips, reliable reopen.
 Note: the old plan proposes libsndfile, which breaks the from-scratch rule. Decoders would
-be hand-written (WAV first; FLAC and MP3 are large jobs) unless the user decides otherwise.
+be hand-written (WAV first; MP3 is a large job). The FLAC decoder comes from C4 (built for
+the piano) and is reused here.
 [?] E0  Decide: hand-written decoders, which formats first.
 [ ] E1  Decoder foundation: common WAV variants, mono/stereo, damaged files, memory limits,
         sample-rate handling, with focused test files.
@@ -100,10 +181,17 @@ F. LATER ROADMAP PHASES — from docs/roadmap.txt
 
 G. LOCAL-ONLY MATERIAL (in .gitignore, never committed)
 --------------------------------------------------------
-local-reference/ holds: q3.jpg (EQ reference screenshot), sampleGuitarRaw.wav and
+sample-kits/ holds the downloaded sample libraries (see C9). local-reference/ holds: q3.jpg (EQ reference screenshot), sampleGuitarRaw.wav and
 soloGuitarRaw.wav (dry guitar DIs), needGuiterStem.mp3 / metal.mp3 / rock.mp3 (references,
 with -ref.wav conversions), "Modern Boutique 4x12" IRs (48 kHz), presets/ (tone-matched
 GuitarSuite presets: djent chords, metal solo, rock chords, rock solo) and renders/
 (fxrender output). build/fxrender renders a WAV through pedals; fxrender --analyze compares
 tone balance and crest factor (do not use --analyze on IR files: its Hann window hides an
 impulse at the file start; measure IRs with an unwindowed FFT instead).
+
+
+H. WILL DO LATER (the user's choice)
+-------------------------------------
+[L] H1  (was A4) Chaos EQ extras the user chose "not now": dynamic EQ, linear phase.
+[L] H2  (was A5) The 10-band EQ page's look: the user said they would redo it themselves
+        (plan 3.10).
