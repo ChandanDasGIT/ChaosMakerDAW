@@ -12,18 +12,28 @@ constexpr int ControlHeld = 1000;                          // a held z/x/c/v: no
 int TypingKeyboard::semitoneFor(char key) noexcept
 {
     switch (key) {
-    case 'a': return 0;  case 'w': return 1;  case 's': return 2;  case 'e': return 3;
-    case 'd': return 4;  case 'f': return 5;  case 't': return 6;  case 'g': return 7;
-    case 'y': return 8;  case 'h': return 9;  case 'u': return 10; case 'j': return 11;
-    case 'k': return 12; case 'o': return 13; case 'l': return 14; case 'p': return 15;
-    case ';': return 16; case '\'': return 17;
-    default: return -1;
+    // white keys, lower Pa .. upper Ma            black keys between them
+    case '\t': return -5;                          case '1': return -4;
+    case 'q': return -3;                           case '2': return -2;
+    case 'w': return -1;
+    case 'e': return 0;                            case '4': return 1;
+    case 'r': return 2;                            case '5': return 3;
+    case 't': return 4;
+    case 'y': return 5;                            case '7': return 6;
+    case 'u': return 7;                            case '8': return 8;
+    case 'i': return 9;                            case '9': return 10;
+    case 'o': return 11;
+    case 'p': return 12;                           case '-': return 13;
+    case '[': return 14;                           case '=': return 15;
+    case ']': return 16;
+    case '\\': return 17;                          case '\b': return 18;
+    default: return NoNote;
     }
 }
 
 bool TypingKeyboard::handles(char key) noexcept
 {
-    return semitoneFor(key) >= 0 || key == 'z' || key == 'x' || key == 'c' || key == 'v';
+    return semitoneFor(key) != NoNote || key == 'z' || key == 'x' || key == 'c' || key == 'v';
 }
 
 TypingKeyboard::Action TypingKeyboard::press(char key) noexcept
@@ -39,9 +49,9 @@ TypingKeyboard::Action TypingKeyboard::press(char key) noexcept
     default: break;
     }
     const int semitone = semitoneFor(key);
-    if (semitone < 0) return {};
-    const int note = 12 * (m_octave + 1) + semitone;       // octave 4: C4 = 60
-    if (note > 127) return {};
+    if (semitone == NoNote) return {};
+    const int note = 12 * (m_octave + 1) + semitone;       // octave 4: Sa = C4 = 60
+    if (note < 0 || note > 127) return {};
     held = note + 1;
     return {Action::Kind::NoteOn, note, m_velocity};
 }

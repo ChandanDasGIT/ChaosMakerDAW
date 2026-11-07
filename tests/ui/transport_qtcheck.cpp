@@ -1224,6 +1224,67 @@ private slots:
         list->setWidth(oldWidth); QTest::qWait(30);
         list->setVisible(false); list->setProperty("trackModel",QVariant());
     }
+    void keys_switch_plays_notes_from_the_computer_keyboard() {
+        auto* keys=bar->findChild<QObject*>("typingKeyboard"); QVERIFY(keys);
+        auto* chip=visualItem(window->contentItem(),"typingKeyboardButton"); QVERIFY(chip);
+        auto* other=window->findChild<QQuickItem*>("otherFocus"); QVERIFY(other);
+        QSignalSpy notes(keys,SIGNAL(noteSent(int,int,bool)));
+        const auto last=[&](int index=-1){ return notes.at(index<0 ? notes.size()+index : index); };
+        other->forceActiveFocus();
+
+        QTest::keyClick(window,Qt::Key_E);                        // off: the key is not taken
+        QCOMPARE(notes.size(),0);
+
+        click(chip); QTRY_VERIFY(keys->property("enabled").toBool());
+        QCOMPARE(chip->property("text").toString(),QString("Sa = C4"));
+        other->forceActiveFocus();
+        QTest::keyPress(window,Qt::Key_E);                        // Sa
+        QCOMPARE(notes.size(),1);
+        QCOMPARE(last().at(0).toInt(),60); QCOMPARE(last().at(1).toInt(),100); QVERIFY(last().at(2).toBool());
+        QKeyEvent repeat(QEvent::KeyPress,Qt::Key_E,Qt::NoModifier,"e",true);   // the key held down
+        QCoreApplication::sendEvent(window,&repeat);
+        QCOMPARE(notes.size(),1);
+        QTest::keyRelease(window,Qt::Key_E);
+        QCOMPARE(notes.size(),2); QCOMPARE(last().at(0).toInt(),60); QVERIFY(!last().at(2).toBool());
+
+        // The ends of the layout: Tab is lower Pa, Backspace upper tivra Ma, both played rather
+        // than moving the focus or deleting.
+        QTest::keyClick(window,Qt::Key_Tab);
+        QCOMPARE(notes.size(),4); QCOMPARE(last(-2).at(0).toInt(),55);
+        QVERIFY(other->hasActiveFocus());
+        QTest::keyClick(window,Qt::Key_Backspace);
+        QCOMPARE(notes.size(),6); QCOMPARE(last(-2).at(0).toInt(),78);
+        QTest::keyClick(window,Qt::Key_4);                        // komal Re on the number row
+        QCOMPARE(notes.size(),8); QCOMPARE(last(-2).at(0).toInt(),61);
+
+        QTest::keyClick(window,Qt::Key_X);                        // octave up: no note
+        QCOMPARE(notes.size(),8);
+        QCOMPARE(chip->property("text").toString(),QString("Sa = C5"));
+        QTest::keyClick(window,Qt::Key_R);                        // Re, an octave up
+        QCOMPARE(notes.size(),10); QCOMPARE(last(-2).at(0).toInt(),74);
+        QTest::keyClick(window,Qt::Key_Z);
+        QCOMPARE(chip->property("text").toString(),QString("Sa = C4"));
+
+        QTest::keyClick(window,Qt::Key_Q,Qt::ControlModifier);    // shortcuts keep working
+        QTest::keyClick(window,Qt::Key_A);                        // the old layout: nothing
+        QTest::keyClick(window,Qt::Key_S);
+        QCOMPARE(notes.size(),10);
+
+        field->forceActiveFocus();                                // typing in a field reaches it
+        QTest::keyClick(window,Qt::Key_5);
+        QTest::keyClick(window,Qt::Key_Backspace);
+        QCOMPARE(notes.size(),10);
+
+        other->forceActiveFocus();                                // turning off ends held notes
+        QTest::keyPress(window,Qt::Key_U);                        // Pa
+        QCOMPARE(notes.size(),11); QCOMPARE(last().at(0).toInt(),67);
+        click(chip); QTRY_VERIFY(!keys->property("enabled").toBool());
+        QCOMPARE(notes.size(),12); QCOMPARE(last().at(0).toInt(),67); QVERIFY(!last().at(2).toBool());
+        QTest::keyRelease(window,Qt::Key_U);                      // the late release changes nothing
+        QTest::keyClick(window,Qt::Key_E);
+        QCOMPARE(notes.size(),12);
+        QCOMPARE(chip->property("text").toString(),QString("Off"));
+    }
     void chaos_eq_adds_drags_edits_and_removes_bands_on_the_curve() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks); const int vocal=tracks.addVocalTrack();

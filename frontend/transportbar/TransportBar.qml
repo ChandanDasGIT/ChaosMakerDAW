@@ -43,6 +43,33 @@ Rectangle {
 
         Item { Layout.fillWidth: true }
 
+        // KEYS: the computer keyboard plays the monitored or armed instrument tracks.
+        TypingKeyboardWrapper {
+            id: typingKeys
+            objectName: "typingKeyboard"
+            engine: root.transport
+        }
+        ColumnLayout {
+            spacing: 2
+            Text { text: "KEYS"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
+            ToggleChip {
+                objectName: "typingKeyboardButton"
+                Layout.preferredHeight: 29
+                implicitWidth: 64
+                active: typingKeys.enabled
+                hoverHighlight: true
+                textSize: Theme.smallSize
+                cornerRadius: 5
+                text: typingKeys.enabled ? "Sa = " + typingKeys.saNote : "Off"
+                onClicked: typingKeys.enabled = !typingKeys.enabled
+                tooltip: typingKeys.enabled
+                    ? "Typing keyboard on (velocity " + typingKeys.velocity + "): Tab Q W E R T Y U I O P [ ] \\ "
+                      + "play lower Pa to upper Ma (E = Sa), the number row and Backspace the black keys. "
+                      + "Z/X octave, C/V velocity. Plays tracks with MON or REC on. Click to turn off."
+                    : "Play instruments from the computer keyboard"
+            }
+        }
+
         ColumnLayout {
             spacing: 2
             enabled: !(root.transport && root.transport.countingIn)
