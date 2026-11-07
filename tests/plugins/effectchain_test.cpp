@@ -1,0 +1,81 @@
+#include "testkit.h"
+#include "plugins/effectchain.h"
+#include "session/project.h"
+
+#include <string>
+#include <vector>
+
+namespace {
+std::vector<std::string> types(const Track& track)
+{
+    std::vector<std::string> result;
+    for (const auto& slot : track.effects) result.push_back(slot.type);
+    return result;
+}
+}
+
+TEST(effectchain, only_instrument_tracks_start_with_their_instrument_fx)
+{
+    using List = std::vector<std::string>;
+    CHECK(effectchain::initialEffects("Electric Guitar") == List{"guitarsuite"});
+    CHECK(effectchain::initialEffects("Acoustic Guitar") == List{"guitarsuite"});
+    for (const char* type : {"Vocal", "Audio", "Instrument", "Piano", "Strings", "Drums", "Unknown"})
+        CHECK(effectchain::initialEffects(type).empty());
+}
+
+TEST(effectchain, eq_is_added_once_and_guitarsuite_is_fixed)
+{
+    std::vector<TrackEffectSlot> chain;
+    CHECK(effectchain::canAdd(chain, "eq"));
+    CHECK(!effectchain::canAdd(chain, "guitarsuite"));   // only placed on guitar tracks at creation
+    CHECK(!effectchain::canAdd(chain, "reverb"));        // unknown type
+    CHECK(effectchain::addableEffects(chain).size() == 1);
+    chain.push_back({1, "eq"});
+    CHECK(!effectchain::canAdd(chain, "eq"));            // one set of EQ bands per track
+    CHECK(effectchain::addableEffects(chain).empty());
+    CHECK(effectchain::canRemove("eq"));
+    CHECK(!effectchain::canRemove("guitarsuite"));
+    CHECK(!effectchain::canRemove("reverb"));
+    const auto* eq = effectchain::find("eq");
+    CHECK(eq && eq->title == "Equalizer");
+}
+
+TEST(effectchain, project_adds_removes_and_reorders_track_effects_without_undo)
+{
+    Project project;
+    auto& guitar = project.addTrack(TrackKind::Instrument, "Gtr", "Electric Guitar");
+    auto& vocal = project.addTrack(TrackKind::Audio, "Vox", "Vocal");
+    const int guitarId = guitar.id, vocalId = vocal.id;
+    CHECK(types(guitar) == std::vector<std::string>{"guitarsuite"});
+    CHECK(types(vocal).empty());
+
+    const int eq = project.addTrackEffect(guitarId, "eq");
+    CHECK(eq > 0 && eq != guitar.effects.front().id);
+    CHECK(project.addTrackEffect(guitarId, "eq") == -1);          // already on the chain
+    CHECK(project.addTrackEffect(vocalId, "guitarsuite") == -1);  // never added by the user
+    CHECK(project.addTrackEffect(999, "eq") == -1);               // no such track
+    const int vocalEq = project.addTrackEffect(vocalId, "eq");
+    CHECK(vocalEq > 0 && vocalEq != eq);                          // ids unique across tracks
+    CHECK(types(*project.findTrack(guitarId)) == (std::vector<std::string>{"guitarsuite", "eq"}));
+
+    // Free reordering, GuitarSuite included; bad indices and ids are refused.
+    CHECK(project.moveTrackEffect(guitarId, eq, 0));
+    CHECK(types(*project.findTrack(guitarId)) == (std::vector<std::string>{"eq", "guitarsuite"}));
+    CHECK(!project.moveTrackEffect(guitarId, eq, 0));             // already there
+    CHECK(!project.moveTrackEffect(guitarId, eq, 2));
+    CHECK(!project.moveTrackEffect(guitarId, eq, -1));
+    CHECK(!project.moveTrackEffect(guitarId, 12345, 1));
+
+    const int suite = project.findTrack(guitarId)->effects.back().id;
+    CHECK(!project.removeTrackEffect(guitarId, suite));           // GuitarSuite stays
+    CHECK(project.removeTrackEffect(guitarId, eq));
+    CHECK(!project.removeTrackEffect(guitarId, eq));
+    CHECK(types(*project.findTrack(guitarId)) == std::vector<std::string>{"guitarsuite"});
+    CHECK(!project.canUndo());                                    // effect edits are not undo steps
+
+    // Undoing a track removal brings its effects back.
+    project.removeTrack(vocalId);
+    project.undo();
+    CHECK(project.findTrack(vocalId));
+    CHECK(types(*project.findTrack(vocalId)) == std::vector<std::string>{"eq"});
+}

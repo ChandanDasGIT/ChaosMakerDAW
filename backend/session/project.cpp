@@ -24,6 +24,8 @@ Track& Project::addTrack(TrackKind kind, const std::string& name, const std::str
     track->name = name;
     track->type = type.empty() ? (kind == TrackKind::Instrument ? "Instrument" : "Audio") : type;
     track->recordDry = track->type == "Audio";
+    for (auto& type : effectchain::initialEffects(track->type))
+        track->effects.push_back({m_nextEffectId++, std::move(type)});
     m_tracks.push_back(std::move(track));
     return *m_tracks.back();
 }
@@ -207,6 +209,40 @@ bool Project::setTrackEqBand(int id, int band, float gainDb)
     if (!track || band < 0 || band >= static_cast<int>(track->eqGainDb.size()) || !std::isfinite(gainDb))
         return false;
     track->eqGainDb[static_cast<std::size_t>(band)] = std::clamp(gainDb, -12.0f, 12.0f);
+    return true;
+}
+
+int Project::addTrackEffect(int trackId, const std::string& type)
+{
+    auto* track = findTrack(trackId);
+    if (!track || !effectchain::canAdd(track->effects, type)) return -1;
+    track->effects.push_back({m_nextEffectId++, type});
+    return track->effects.back().id;
+}
+
+bool Project::removeTrackEffect(int trackId, int effectId)
+{
+    auto* track = findTrack(trackId);
+    if (!track) return false;
+    const auto it = std::find_if(track->effects.begin(), track->effects.end(),
+                                 [effectId](const auto& slot) { return slot.id == effectId; });
+    if (it == track->effects.end() || !effectchain::canRemove(it->type)) return false;
+    track->effects.erase(it);
+    return true;
+}
+
+bool Project::moveTrackEffect(int trackId, int effectId, int toIndex)
+{
+    auto* track = findTrack(trackId);
+    if (!track || toIndex < 0 || toIndex >= static_cast<int>(track->effects.size())) return false;
+    const auto it = std::find_if(track->effects.begin(), track->effects.end(),
+                                 [effectId](const auto& slot) { return slot.id == effectId; });
+    if (it == track->effects.end()) return false;
+    const auto from = it - track->effects.begin();
+    if (from == toIndex) return false;
+    auto slot = std::move(*it);
+    track->effects.erase(it);
+    track->effects.insert(track->effects.begin() + toIndex, std::move(slot));
     return true;
 }
 

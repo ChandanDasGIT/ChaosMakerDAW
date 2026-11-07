@@ -3,6 +3,7 @@
 #include <optional>
 #include "transport/tempomap.h"
 #include "midi/midinote.h"
+#include "plugins/effectchain.h"
 
 #include <cstdint>
 #include <array>
@@ -44,6 +45,8 @@ struct Track {
     float pan = 0.0f; // -1 left .. 0 centre .. +1 right (panlaw::balance)
     float stripWidth = 108.0f; // mixer strip width in px (mixer::defaultStripWidth, clamped by mixer::clampStripWidth)
     std::array<float, 10> eqGainDb{};
+    // Insert effects in processing order (plan 6.1); rules in effectchain.
+    std::vector<TrackEffectSlot> effects;
     std::vector<AudioClip> audioClips;
 
     bool hasLiveInput() const;
@@ -68,6 +71,11 @@ public:
     bool setTrackPan(int id, float pan);
     bool setTrackStripWidth(int id, float width);
     bool setTrackEqBand(int id, int band, float gainDb);
+    // Insert effects. Not undoable by design (the user removes an effect by hand); undoing a
+    // track removal still brings the track back with its effects.
+    int addTrackEffect(int trackId, const std::string& type); // new effect id, or -1
+    bool removeTrackEffect(int trackId, int effectId);
+    bool moveTrackEffect(int trackId, int effectId, int toIndex);
     int addAudioClip(int trackId, AudioClip clip);
     std::vector<int> addAudioClips(const std::vector<std::pair<int, AudioClip>>& clips);
     bool removeAudioClip(int trackId, int clipId);
@@ -124,5 +132,6 @@ private:
     float m_masterVolume = 1.0f;
     bool m_masterMuted = false;
     int m_nextId = 1;
+    int m_nextEffectId = 1;
     int m_nextClipId = 1;
 };
