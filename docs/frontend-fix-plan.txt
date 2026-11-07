@@ -12,14 +12,16 @@ RESUME HERE (last updated 2026-11-07)
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
 Phase 4 done (4.4 not needed). Track list minimum width settled: chips wrap (see 4.5).
 Phase 5 done (5.1–5.3).
-Next: Phase 6 (user requests). 6.1, 6.2 (Chaos EQ), 6.4, 6.5, 6.6 done. Left: 6.3 (guitar
-suite sound): done (steps 1-6 committed). Tone-matching presets (user request):
-djent chords preset for needGuitarStem done (local-reference/presets/, fitted by renders);
-next the user brings a song for a rock solo preset. Steps 4-6 after that. After 6.3 the user
-wants a song's guitar tone analysed and a matching GuitarSuite preset made.
-Local-only material (in .gitignore) lives in local-reference/: q3.jpg, sampleGuitarRaw.wav (dry
-DI), "Modern Boutique 4x12" IRs (48 kHz), renders/ (fxrender output).  Added 2026-11-07: 6.4 stop-at-end setting (done),
-6.5 time readout with 2 digits (done), 6.6 default recording mode (Dry).
+Phase 6 (user requests) done: 6.1 effect chains, 6.2 Chaos EQ, 6.3 guitar suite sound (steps
+1-6), 6.4 stop-at-end, 6.5 two-digit time readout, 6.6 default recording mode (Dry).
+Tone-matched GuitarSuite presets (djent chords, metal solo, rock chords, rock solo) are in
+local-reference/presets/ (local only; see 6.3).
+Next, not started (user to choose): re-voice the factory Djent/Jazz presets for the new amp and
+drives (they load the amp on Crunch); real instruments (every instrument type is TestSynth);
+piano roll follow-ups (docs/follow-trail.md); audio import; auto chord player; export.
+Local-only material (in .gitignore) lives in local-reference/: q3.jpg, sampleGuitarRaw.wav and
+soloGuitarRaw.wav (dry DIs), reference songs/stems (+ -ref.wav conversions), "Modern Boutique
+4x12" IRs (48 kHz), presets/, renders/ (fxrender output).
 
 Decisions made by the user (keep to them):
 - Mixer: track strips have NO track volume fader. Each strip's vertical fader is clip gain
