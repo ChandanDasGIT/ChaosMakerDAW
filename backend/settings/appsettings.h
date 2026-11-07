@@ -7,6 +7,8 @@
 class AppSettings {
 public:
     static constexpr const char* KeyRestoreSessionOnStartup = "session/restoreOnStartup";
+    // Owned by EngineController like the key above: stop playback at the arrangement end (default on).
+    static constexpr const char* KeyStopPlaybackAtEnd = "playback/stopAtEnd";
     static constexpr const char* KeyDefaultProjectDir = "paths/defaultProjectDirectory";
     static constexpr const char* KeyAutoSaveEnabled = "autosave/enabled";
     static constexpr const char* KeyAutoSaveInterval = "autosave/intervalSeconds";

@@ -5,7 +5,8 @@ struct RecordingGroup;
 
 struct EngineCommand {
     enum class Type : std::uint8_t { Play, Pause, Stop, Seek, SetLoop, ClearLoop, StartRecording, StopRecording, SetCleanMonitor,
-                                     SetMetronome, NoteFromUi, TestTone, SetCleanMonitorGain, StartRecordingGroup };
+                                     SetMetronome, NoteFromUi, TestTone, SetCleanMonitorGain, StartRecordingGroup,
+                                     SetStopAtEnd }; // SetStopAtEnd: a = 1 stops playback at the arrangement end
     Type type = Type::Stop;
     std::int64_t a = 0; // StartRecordingGroup: count-in/pre-roll duration in samples.
     std::int64_t b = 0;

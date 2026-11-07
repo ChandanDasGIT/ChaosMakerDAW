@@ -60,6 +60,16 @@ ToolButton {
             Binding on checked { value: EngineController.restoreSessionOnStartup }
         }
 
+        ThemedMenuItem {
+            objectName: "stopAtEndSetting"
+            text: "Stop playback at the end"
+            checkable: true
+            // Owned by EngineController; when off, playback and the metronome run until Stop/Pause.
+            checked: EngineController.stopPlaybackAtEnd
+            onTriggered: EngineController.stopPlaybackAtEnd = checked
+            Binding on checked { value: EngineController.stopPlaybackAtEnd }
+        }
+
         ThemedMenuSeparator {}
 
         ThemedMenuItem {
