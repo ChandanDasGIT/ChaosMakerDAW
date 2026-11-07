@@ -735,3 +735,63 @@ TEST(qtrecording, undoing_a_track_removal_restores_its_pedalboard) {
     CHECK(freshFx && freshFx->count()==0);
     controller.shutdownSession();
 }
+
+TEST(qttrackeffects, effects_role_lists_the_chain_and_edits_follow_the_backend_rules) {
+    Storage storage; TrackListWrapper tracks;
+    const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar"), vocal=tracks.addVocalTrack();
+    const auto effects=[&](int id) { return tracks.data(tracks.index(tracks.indexOfTrack(id)),TrackListWrapper::EffectsRole).toList(); };
+    CHECK(tracks.roleNames().value(TrackListWrapper::EffectsRole)=="effects");
+    // Guitar: GuitarSuite, fixed. Vocal: nothing.
+    CHECK(effects(guitar).size()==1);
+    const auto suite=effects(guitar)[0].toMap();
+    CHECK(suite["type"].toString()=="guitarsuite" && suite["title"].toString()=="GuitarSuite" && !suite["removable"].toBool());
+    CHECK(effects(vocal).isEmpty());
+    // The picker offers the EQ once.
+    CHECK(tracks.addableEffects(vocal).size()==1);
+    CHECK(tracks.addableEffects(vocal)[0].toMap()["title"].toString()=="Equalizer");
+    int roleChanges=0, projectChanges=0;
+    QObject::connect(&tracks,&QAbstractItemModel::dataChanged,&tracks,[&](const QModelIndex&,const QModelIndex&,const QList<int>& roles) {
+        if(roles.contains(TrackListWrapper::EffectsRole)) ++roleChanges; });
+    QObject::connect(&tracks,&TrackListWrapper::projectChanged,&tracks,[&] { ++projectChanges; });
+    const int eq=tracks.addTrackEffect(vocal,"eq"); CHECK(eq>0);
+    CHECK(roleChanges==1 && projectChanges==1);
+    CHECK(effects(vocal).size()==1 && effects(vocal)[0].toMap()["id"].toInt()==eq && effects(vocal)[0].toMap()["removable"].toBool());
+    CHECK(tracks.addableEffects(vocal).isEmpty());
+    CHECK(tracks.addTrackEffect(vocal,"eq")==-1 && tracks.addTrackEffect(vocal,"guitarsuite")==-1);
+    CHECK(roleChanges==1);                                          // refused edits notify nothing
+    // Move and remove on the guitar; GuitarSuite cannot be removed.
+    const int guitarEq=tracks.addTrackEffect(guitar,"eq");
+    CHECK(tracks.moveTrackEffect(guitar,guitarEq,0));
+    CHECK(effects(guitar)[0].toMap()["type"].toString()=="eq" && effects(guitar)[1].toMap()["type"].toString()=="guitarsuite");
+    CHECK(!tracks.removeTrackEffect(guitar,suite["id"].toInt()));
+    CHECK(tracks.removeTrackEffect(guitar,guitarEq)); CHECK(effects(guitar).size()==1);
+    CHECK(!tracks.canUndo());                                       // not undo steps
+    // A recording track's chain is locked.
+    tracks.domain().lockRecordingTrack(vocal);
+    CHECK(!tracks.removeTrackEffect(vocal,eq)); CHECK(tracks.addableEffects(vocal).isEmpty());
+    CHECK(tracks.addTrackEffect(guitar,"eq")>0);                    // other tracks are not locked
+    tracks.domain().lockRecordingTrack(-1);
+    CHECK(tracks.removeTrackEffect(vocal,eq));
+}
+
+TEST(qttrackeffects, the_engine_runs_the_eq_only_while_it_is_on_the_track) {
+    Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
+    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    const int vocal=tracks.addVocalTrack();
+    CHECK(tracks.setTrackInputPort(vocal,"test:mic")); CHECK(tracks.setVolume(vocal,0.5));
+    for(int band=0;band<10;++band) CHECK(tracks.setEqBand(vocal,band,12));
+    CHECK(setCaptureAndMonitor(tracks,vocal,true));
+    // A 1 kHz tone (an EQ band centre), compared by the level of a whole block.
+    for(int i=0;i<128;++i) io->input[i]=float(0.1*std::sin(2*M_PI*1000.0*i/48000.0));
+    const auto rms=[](const float* x) { double sum=0; for(int i=0;i<128;++i) sum+=double(x[i])*x[i]; return std::sqrt(sum/128); };
+    const auto listen=[&] { tick(); for(int i=0;i<40;++i) io->process(); return rms(io->output); };
+    const double dry=rms(io->input)*0.5;
+    CHECK_NEAR(listen(),dry,1e-3);                                  // bands set, but no EQ on the chain
+    CHECK(controller.saveProject(QUrl::fromLocalFile(storage.dir.path()+"/fx.chaos"))); CHECK(!controller.projectDirty());
+    const int eq=tracks.addTrackEffect(vocal,"eq"); CHECK(eq>0);
+    CHECK(listen()>dry*2);                                          // the +12 dB boost is heard now
+    CHECK(controller.projectDirty());
+    CHECK(tracks.removeTrackEffect(vocal,eq));
+    CHECK_NEAR(listen(),dry,1e-3);
+    controller.shutdownSession();
+}

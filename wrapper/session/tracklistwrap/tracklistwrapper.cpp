@@ -127,6 +127,18 @@ QVariant TrackListWrapper::data(const QModelIndex& index, int role) const
         for (const auto& clip : m_state.clips()) if (clip.trackId == track.id) result.append(clipMap(clip));
         return result;
     }
+    case EffectsRole: {
+        QVariantList result;
+        for (const auto& slot : track.effects) {
+            const auto* effect = effectchain::find(slot.type);
+            result.append(QVariantMap{
+                {QStringLiteral("id"), slot.id},
+                {QStringLiteral("type"), QString::fromStdString(slot.type)},
+                {QStringLiteral("title"), effect ? QString::fromUtf8(effect->title.data(), qsizetype(effect->title.size())) : QString()},
+                {QStringLiteral("removable"), effectchain::canRemove(slot.type)}});
+        }
+        return result;
+    }
     default:
         return {};
     }
@@ -150,6 +162,7 @@ QHash<int, QByteArray> TrackListWrapper::roleNames() const
         {StripWidthRole, "stripWidth"},
         {ClipsRole, "clips"},
         {EqBandsRole, "eqBands"},
+        {EffectsRole, "effects"},
         {LiveInputRole, "hasLiveInput"},
         {RecordsWithFxRole, "recordsWithFx"},
         {RecordDryRole, "recordDry"}
@@ -407,6 +420,37 @@ bool TrackListWrapper::setEqBand(int id, int band, double gain)
     notifyTrackChanged(id, EqBandsRole, change);
     if (change.changed && m_state.isMonitored(id)) emit cleanMonitorEqChanged();
     return change.accepted;
+}
+
+int TrackListWrapper::addTrackEffect(int trackId, const QString& type)
+{
+    const int id = m_state.addTrackEffect(trackId, type.toStdString());
+    notifyTrackChanged(trackId, EffectsRole, {id > 0, id > 0});
+    return id;
+}
+
+bool TrackListWrapper::removeTrackEffect(int trackId, int effectId)
+{
+    return notifyTrackChanged(trackId, EffectsRole, m_state.removeTrackEffect(trackId, effectId));
+}
+
+bool TrackListWrapper::moveTrackEffect(int trackId, int effectId, int toIndex)
+{
+    return notifyTrackChanged(trackId, EffectsRole, m_state.moveTrackEffect(trackId, effectId, toIndex));
+}
+
+QVariantList TrackListWrapper::addableEffects(int trackId) const
+{
+    QVariantList result;
+    const auto* track = m_project.findTrack(trackId);
+    if (!track || m_state.trackLocked(trackId)) return result;
+    const auto text = [](std::string_view s) { return QString::fromUtf8(s.data(), qsizetype(s.size())); };
+    for (const auto type : effectchain::addableEffects(track->effects)) {
+        const auto* effect = effectchain::find(type);
+        result.append(QVariantMap{{QStringLiteral("type"), text(type)}, {QStringLiteral("title"), text(effect->title)},
+                                  {QStringLiteral("subtitle"), text(effect->subtitle)}});
+    }
+    return result;
 }
 
 bool TrackListWrapper::resetTrackEq(int trackId)
