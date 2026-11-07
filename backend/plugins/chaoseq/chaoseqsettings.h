@@ -1,6 +1,6 @@
 #pragma once
 
-#include "plugins/chaoseq/eqbanddesign.h"
+#include "dsp/eqbanddesign.h"
 
 #include <array>
 #include <string_view>

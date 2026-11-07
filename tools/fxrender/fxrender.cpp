@@ -9,13 +9,21 @@
 // Pedals run in the order given, in 128-frame blocks, at the input file's sample rate.
 // --rms scales the output to that RMS level, so renders compare at equal loudness.
 // Prints the peak and RMS level of the input and the output.
+//
+//   fxrender --analyze <a.wav> [<b.wav> ...]
+//
+// Prints each file's tone balance (average spectrum in third-octave bands, relative to the
+// 1 kHz band) and crest factors (peak over RMS: how much picking attack survives), ignoring
+// silent parts. Use it to compare renders with a reference recording.
 
+#include "dsp/fft.h"
 #include "instruments/guitar/audiofile/impulsewav.h"
 #include "instruments/guitar/plugins/cabinet/cabinet.h"
 #include "instruments/guitar/plugins/guitarsuite/pedalregistry.h"
 #include "processor/processor.h"
 
 #include <algorithm>
+#include <complex>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -146,10 +154,79 @@ std::shared_ptr<Processor> makePedal(const std::string& spec, const std::string&
     return pedal;
 }
 
+// Tone balance and dynamics of one file (mono mix), skipping parts quieter than -50 dBFS.
+void analyze(const std::string& path)
+{
+    const Audio audio = readWav(path);
+    const auto& x = audio.mono;
+    constexpr int size = 8192;
+    Fft fft(size);
+    std::vector<std::complex<double>> bins(size);
+    std::vector<double> window(size), power(size / 2 + 1, 0.0);
+    for (int i = 0; i < size; ++i) window[std::size_t(i)] = 0.5 - 0.5 * std::cos(6.283185307179586 * i / size);
+    int frames = 0;
+    for (std::size_t start = 0; start + size <= x.size(); start += size / 2) {
+        double sum = 0.0;
+        for (int i = 0; i < size; ++i) sum += double(x[start + std::size_t(i)]) * x[start + std::size_t(i)];
+        if (10 * std::log10(sum / size + 1e-30) < -50.0) continue;
+        for (int i = 0; i < size; ++i) bins[std::size_t(i)] = {x[start + std::size_t(i)] * window[std::size_t(i)], 0.0};
+        fft.forward(bins.data());
+        for (std::size_t k = 0; k < power.size(); ++k) power[k] += std::norm(bins[k]);
+        ++frames;
+    }
+    std::printf("%s\n  %.1f s, %d Hz, %d analysed frames\n", path.c_str(), double(x.size()) / audio.sampleRate,
+                audio.sampleRate, frames);
+    if (frames == 0) return;
+    // Third-octave bands, 31.5 Hz .. 16 kHz, power relative to the 1 kHz band.
+    std::vector<double> centres, levels;
+    for (int n = -15; n <= 12; ++n) centres.push_back(1000.0 * std::pow(2.0, n / 3.0));
+    const double binHz = double(audio.sampleRate) / size;
+    for (double centre : centres) {
+        const double lo = centre / std::pow(2.0, 1.0 / 6.0), hi = centre * std::pow(2.0, 1.0 / 6.0);
+        double sum = 0.0;
+        for (std::size_t k = 1; k < power.size(); ++k)
+            if (k * binHz >= lo && k * binHz < hi) sum += power[k];
+        levels.push_back(10 * std::log10(sum + 1e-30));
+    }
+    const double ref = levels[15];
+    std::printf("  tone balance (dB vs 1 kHz):\n");
+    for (std::size_t i = 0; i < centres.size(); ++i) {
+        const double rel = levels[i] - ref;
+        const int bar = std::clamp(int(std::lround((rel + 40) / 2)), 0, 40);
+        std::printf("  %7.0f Hz %6.1f  %s\n", centres[i], rel, std::string(std::size_t(bar), '#').c_str());
+    }
+    // Crest factor of the whole file, and the median over 50 ms windows that have sound.
+    double peak = 0.0, sum = 0.0;
+    std::size_t counted = 0;
+    std::vector<double> crests;
+    const std::size_t win = std::size_t(audio.sampleRate / 20);
+    for (std::size_t start = 0; start + win <= x.size(); start += win) {
+        double p = 0.0, s2 = 0.0;
+        for (std::size_t i = start; i < start + win; ++i) { p = std::max(p, double(std::abs(x[i]))); s2 += double(x[i]) * x[i]; }
+        const double rms = std::sqrt(s2 / double(win));
+        if (20 * std::log10(rms + 1e-30) < -50.0) continue;
+        crests.push_back(20 * std::log10(p / rms));
+        peak = std::max(peak, p); sum += s2; counted += win;
+    }
+    if (counted == 0) return;
+    std::sort(crests.begin(), crests.end());
+    std::printf("  crest factor: whole %.1f dB, 50 ms median %.1f dB (sine = 3.0, square = 0.0)\n",
+                20 * std::log10(peak / std::sqrt(sum / double(counted))), crests[crests.size() / 2]);
+}
+
 } // namespace
 
 int main(int argc, char** argv)
 {
+    if (argc >= 3 && std::string(argv[1]) == "--analyze") {
+        try {
+            for (int i = 2; i < argc; ++i) analyze(argv[i]);
+        } catch (const std::exception& e) {
+            std::fprintf(stderr, "fxrender: %s\n", e.what());
+            return 1;
+        }
+        return 0;
+    }
     if (argc < 4) {
         std::fprintf(stderr, "usage: fxrender <in.wav> <out.wav> [--ir <cabinet.wav>] [--rms <dBFS>] <pedal>[:param=value,...] ...\n");
         return 2;

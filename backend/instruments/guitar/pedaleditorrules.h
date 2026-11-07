@@ -21,9 +21,10 @@ Features features(const std::string& pedalType);
 bool isDial(const std::string& pedalType, const std::string& parameterId);
 // Dials disabled while the pedal is synced to BPM (the free Rate).
 bool disabledWhenSynced(const std::string& pedalType, const std::string& parameterId);
-// Dial step: whole semitones for pitch shift, otherwise continuous (0).
+// Dial step: whole semitones for pitch shift, whole channels for the amp, otherwise continuous (0).
 double dialStep(const std::string& pedalType, const std::string& parameterId);
 // Dial value text: no decimals for ms and semitones ("st"), two otherwise, then the unit.
+// Unit "channel" (the amp's switch) shows the channel name: Clean, Crunch, High Gain.
 std::string formatValue(double value, const std::string& unit);
 // Input trim readout with a sign: "+1.5 dB", "0.0 dB", "-3.0 dB".
 std::string formatTrim(double db);

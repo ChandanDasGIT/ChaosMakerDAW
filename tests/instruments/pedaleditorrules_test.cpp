@@ -27,6 +27,8 @@ TEST(pedaleditorrules, which_parameters_are_dials)
     CHECK(!pedaleditor::disabledWhenSynced("pedal.chorus", "rate"));
     CHECK(pedaleditor::dialStep("pedal.pitchshift", "semitones") == 1.0);
     CHECK(pedaleditor::dialStep("pedal.pitchshift", "mix") == 0.0);
+    CHECK(pedaleditor::dialStep("pedal.amp", "channel") == 1.0);     // whole channels
+    CHECK(pedaleditor::dialStep("pedal.amp", "drive") == 0.0);
 }
 
 TEST(pedaleditorrules, value_and_tuner_texts)
@@ -35,6 +37,10 @@ TEST(pedaleditorrules, value_and_tuner_texts)
     CHECK(pedaleditor::formatValue(-7.0, "st") == "-7 st");
     CHECK(pedaleditor::formatValue(0.255, "") == "0.26");
     CHECK(pedaleditor::formatValue(3.0, "dB") == "3.00 dB");
+    CHECK(pedaleditor::formatValue(0.0, "channel") == "Clean");
+    CHECK(pedaleditor::formatValue(1.2, "channel") == "Crunch");
+    CHECK(pedaleditor::formatValue(2.0, "channel") == "High Gain");
+    CHECK(pedaleditor::formatValue(9.0, "channel") == "High Gain");   // out of range: clamped
     CHECK(pedaleditor::formatTrim(1.5) == "+1.5 dB" && pedaleditor::formatTrim(0) == "0.0 dB");
     CHECK(pedaleditor::formatTrim(-3) == "-3.0 dB");
     CHECK(pedaleditor::beatDivisionNames().size() == 7);

@@ -5,6 +5,8 @@
 #include "instruments/guitar/dsp/partitionedconvolver.h"
 #include "plugins/eq/eqpresets.h"
 #include "plugins/eq/tenbandeq.h"
+#include "dsp/fft.h"
+#include <complex>
 #include <numeric>
 
 namespace {
@@ -13,6 +15,29 @@ void convolve(PartitionedConvolver& convolution,const std::vector<float>& input,
     for(std::size_t i=0;i<input.size();++i)output[i]=convolution.process(input[i]);
 }
 double tailRms(const std::vector<float>& audio) { return testsignals::rmsDb({audio.begin()+audio.size()/2,audio.end()}); }
+// A guitar-like note: a bright (sawtooth-ish) 110 Hz pluck that decays, repeated every 0.25 s.
+std::vector<float> plucks(double gainDb,int frames=48000) {
+    std::vector<float> x(static_cast<std::size_t>(frames));
+    const double g=std::pow(10.0,gainDb/20);
+    for(int i=0;i<frames;++i) {
+        const double t=double(i%12000)/48000, phase=std::fmod(110.0*t,1.0);
+        x[std::size_t(i)]=float(g*(2*phase-1)*std::exp(-t*6));
+    }
+    return x;
+}
+// Energy (dB) between lo and hi Hz, from one 32768-point FFT over the middle of the signal.
+double bandDb(const std::vector<float>& x,double lo,double hi) {
+    const int n=32768; Fft fft(n); std::vector<std::complex<double>> bins(n);
+    const std::size_t start=(x.size()-std::size_t(n))/2;
+    for(int i=0;i<n;++i) bins[std::size_t(i)]={x[start+std::size_t(i)]*(0.5-0.5*std::cos(6.283185307179586*i/n)),0.0};
+    fft.forward(bins.data());
+    double sum=0;for(int k=1;k<n/2;++k){const double hz=k*48000.0/n;if(hz>=lo&&hz<hi)sum+=std::norm(bins[std::size_t(k)]);}
+    return 10*std::log10(sum+1e-30);
+}
+double crestDb(const std::vector<float>& x) {
+    double peak=0,sum=0;for(float v:x){peak=std::max(peak,double(std::abs(v)));sum+=double(v)*v;}
+    return 20*std::log10(peak/std::sqrt(sum/double(x.size())));
+}
 }
 TEST(ampcab, partitioned_convolution_matches_direct_reference_without_latency) {
     for(int length : {1,127,128,129,255,256,301,9600}) {
@@ -76,4 +101,48 @@ TEST(ampcab, eq_factory_presets_have_valid_distinct_curves_and_flat_is_dry) {
         const auto output=testsignals::render(eq,input,128);
         for(float value:output)CHECK(std::isfinite(value));
     }
+}
+
+TEST(ampcab, amp_has_three_channels_and_the_channel_switches_rather_than_glides) {
+    Amp amp;
+    const Parameter* channel=nullptr;
+    for(const auto& p:amp.parameters()) if(p->id=="channel") channel=p.get();
+    CHECK(channel && channel->min==0 && channel->max==2 && channel->unit=="channel");
+    const auto input=plucks(-14);
+    std::vector<std::vector<float>> outputs;
+    for(float c:{0.0f,1.0f,2.0f}) { set(amp,"channel",c); set(amp,"drive",20); outputs.push_back(testsignals::render(amp,input,128)); }
+    CHECK(outputs[0]!=outputs[1] && outputs[1]!=outputs[2]);
+    // Block size does not change any channel.
+    set(amp,"channel",2); CHECK(testsignals::render(amp,input,37)==outputs[2]);
+}
+TEST(ampcab, clean_channel_stays_clean_at_low_drive) {
+    Amp amp; set(amp,"channel",0); set(amp,"drive",0);
+    // A 220 Hz sine at a typical pickup level: harmonics stay far below the note.
+    const auto out=testsignals::render(amp,testsignals::sine(220,-14,48000),128);
+    const double fundamental=bandDb(out,200,240), harmonics=bandDb(out,400,5000);
+    CHECK(harmonics<fundamental-35);
+}
+TEST(ampcab, crunch_adds_even_harmonics_like_a_tube_stage) {
+    Amp amp; set(amp,"channel",1); set(amp,"drive",18);
+    const auto out=testsignals::render(amp,testsignals::sine(220,-14,48000),128);
+    // Uneven clipping: the 2nd harmonic (440 Hz) is clearly there, not only odd ones.
+    CHECK(bandDb(out,430,450)>bandDb(out,200,240)-30);
+}
+TEST(ampcab, high_gain_is_tight_and_bright_compared_with_crunch) {
+    Amp amp; const auto input=plucks(-14);
+    set(amp,"drive",24); set(amp,"channel",1); const auto crunch=testsignals::render(amp,input,128);
+    set(amp,"channel",2); const auto high=testsignals::render(amp,input,128);
+    // Less low-mid mud (150-400 Hz) than Crunch, and articulation (2-5 kHz) kept about level
+    // with 1 kHz, like a mixed high-gain reference tone. High Gain's mid push lifts 1 kHz too,
+    // so its 2-5 kHz is not "brighter than Crunch" relative to 1 kHz, only balanced.
+    const auto rel=[&](const std::vector<float>& x,double lo,double hi){return bandDb(x,lo,hi)-bandDb(x,900,1100);};
+    CHECK(rel(high,150,400)<rel(crunch,150,400)-3);
+    CHECK(rel(high,2000,5000)>-3.0);
+}
+TEST(ampcab, high_gain_keeps_picking_dynamics) {
+    Amp amp; set(amp,"channel",2); set(amp,"drive",28);
+    const auto soft=testsignals::render(amp,plucks(-30),128), hard=testsignals::render(amp,plucks(-12),128);
+    // Not a brick-wall limiter: harder picking is still louder, and the attack stands out.
+    CHECK(testsignals::rmsDb(hard)>testsignals::rmsDb(soft)+1.5);
+    CHECK(crestDb(hard)>6.0);
 }

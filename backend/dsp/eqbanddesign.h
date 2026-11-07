@@ -4,7 +4,7 @@
 
 #include <array>
 
-// The maths for one band of Chaos EQ (plan 6.2): band settings in, filter sections out.
+// The maths for one parametric EQ band (Chaos EQ, guitar amp): settings in, filter sections out.
 // A band is a chain of up to four biquads; steeper slopes use more of them.
 namespace eqband {
 

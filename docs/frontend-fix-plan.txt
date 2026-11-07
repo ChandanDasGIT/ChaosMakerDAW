@@ -13,7 +13,8 @@ Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Ph
 Phase 4 done (4.4 not needed). Track list minimum width settled: chips wrap (see 4.5).
 Phase 5 done (5.1–5.3).
 Next: Phase 6 (user requests). 6.1, 6.2 (Chaos EQ), 6.4, 6.5, 6.6 done. Left: 6.3 (guitar
-suite sound), in progress: step 1 done, the user listens to the "before" renders, next is step 2.
+suite sound), in progress: steps 1-2 done, next is step 3 (drive pedals). After 6.3 the user
+wants a song's guitar tone analysed and a matching GuitarSuite preset made.
 Local-only material (in .gitignore) lives in local-reference/: q3.jpg, sampleGuitarRaw.wav (dry
 DI), "Modern Boutique 4x12" IRs (48 kHz), renders/ (fxrender output).  Added 2026-11-07: 6.4 stop-at-end setting (done),
 6.5 time readout with 2 digits (done), 6.6 default recording mode (Dry).
@@ -479,7 +480,7 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
          - User asked to run steps 2-7 in one go (2026-11-07).
          Steps (one at a time):
          [x] 1 Backend filter maths: backend/dsp/biquad.h (double-precision section and its
-               response) and backend/plugins/chaoseq/eqbanddesign.h (band settings -> up to 4
+               response) and backend/dsp/eqbanddesign.h (band settings -> up to 4
                sections; every shape, slopes 6/12/24/48 dB/oct, Q as corner resonance for
                cuts/shelves, values sanitized). Tests: biquad, eqbanddesign.
          [x] 2 Backend processor backend/plugins/chaoseq/chaoseq.h (ChaosEq, "eq.chaos"):
@@ -526,9 +527,20 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
                loudness). "Before" renders in local-reference/renders/before-*.wav
                (clean, crunch, high gain, high gain without IR). High gain without IR has
                a 6 dB crest factor (squared off).
-         [ ] 2 Amp rebuild: real tone stack, inter-stage filtering, no 75 Hz input cut,
-               asymmetric clipping that reacts to picking, power stage with mild sag;
-               Clean / Crunch / High Gain channels.
+         [x] 2 Amp rebuilt (pedal.amp, same ids + "channel" 0-2 and "resonance"): 30 Hz input
+               cut; per-channel voicing before the preamp (low cut, mid push, treble boost);
+               2-3 triode-like uneven stages at 4x with coupling/treble-loss filters and
+               bias shift on hard picking; tone stack with its own mid scoop; presence,
+               resonance; power stage with sag; no 8 kHz dulling filter. Uses backend/dsp
+               eqbanddesign (moved there from plugins/chaoseq). Editor: channel dial shows
+               Clean / Crunch / High Gain. fxrender --analyze compares tone balance + crest.
+               Reference (needGuitarStem, a lower-tuned guitar) vs High Gain + Medium IR:
+               1-4 kHz within ~2 dB, crest 8.6 vs 8.8 dB (was 6.3); 200-500 Hz still 6-10 dB
+               above the reference (the DI is standard tuning). Tests: ampcab (5 new).
+               User: "way better", High Gain a bit tight and slightly fizzy. A looser,
+               smoother v3 was tried (low cut 140 Hz, +4 dB boost, 9.5 kHz treble loss,
+               -11 dB scoop); the user preferred v1 by ear, so v1 is kept. Solo DI
+               (soloGuitarRaw.wav) crest: old amp 4.5 dB, v1 7.8.
          [ ] 3 Drive pedals: own pre-clip voicing, asymmetric clipping, tighter lows.
          [ ] 4 Noise gate check at high gain (DI noise floor).
          [ ] 5 Built-in cabinet models when no IR is loaded.
