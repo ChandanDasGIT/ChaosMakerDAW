@@ -5,6 +5,7 @@
 #include "midi/midinote.h"
 #include "plugins/effectchain.h"
 #include "plugins/chaoseq/chaoseqsettings.h"
+#include "instruments/harmonium/harmoniumsettings.h"
 
 #include <cstdint>
 #include <array>
@@ -48,6 +49,8 @@ struct Track {
     std::array<float, 10> eqGainDb{};
     // Chaos EQ bands (plan 6.2); heard only while "chaoseq" is on the effect list.
     chaoseq::Settings chaosEq;
+    // Harmonium tracks: stops, bellows, drones... (the harmonium instrument).
+    harmonium::Settings harmonium;
     // Insert effects in processing order (plan 6.1); rules in effectchain.
     std::vector<TrackEffectSlot> effects;
     std::vector<AudioClip> audioClips;
@@ -76,6 +79,8 @@ public:
     bool setTrackEqBand(int id, int band, float gainDb);
     // Not undoable, like the 10-band EQ. The settings are sanitised for the project rate.
     bool setTrackChaosEq(int id, const chaoseq::Settings& settings);
+    // Not undoable either, like the instrument knobs of other DAWs. The settings are sanitised.
+    bool setTrackHarmonium(int id, const harmonium::Settings& settings);
     // Insert effects. Not undoable by design (the user removes an effect by hand); undoing a
     // track removal still brings the track back with its effects.
     int addTrackEffect(int trackId, const std::string& type); // new effect id, or -1

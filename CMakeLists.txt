@@ -109,7 +109,7 @@ endforeach()
 if(DAW_BUILD_APP)
     add_executable(wrappertests
         tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp tests/wrapper/clipediting_qtcheck.cpp
-        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp
+        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp
         wrapper/pianorollwrap/pianorollwrapper.cpp wrapper/pianorollwrap/pianorollwrapper.h
         wrapper/engineWrap/enginecontroller.cpp wrapper/engineWrap/enginecontroller.h
         wrapper/session/tracklistwrap/tracklistwrapper.cpp wrapper/session/tracklistwrap/tracklistwrapper.h
@@ -122,7 +122,8 @@ if(DAW_BUILD_APP)
         wrapper/settings/appsettingswrap/appsettingswrapper.cpp wrapper/settings/appsettingswrap/appsettingswrapper.h
         wrapper/engine/playbackcontrolswrap/playbackcontrolswrapper.cpp wrapper/engine/playbackcontrolswrap/playbackcontrolswrapper.h
         wrapper/engine/audioenginewrap/audioenginewrapper.cpp wrapper/engine/audioenginewrap/audioenginewrapper.h
-        wrapper/plugins/chaoseq/chaoseqwrap/chaoseqwrapper.cpp wrapper/plugins/chaoseq/chaoseqwrap/chaoseqwrapper.h)
+        wrapper/plugins/chaoseq/chaoseqwrap/chaoseqwrapper.cpp wrapper/plugins/chaoseq/chaoseqwrap/chaoseqwrapper.h
+        wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.cpp wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.h)
     target_include_directories(wrappertests PRIVATE "${CMAKE_CURRENT_LIST_DIR}" "${CMAKE_CURRENT_LIST_DIR}/tests" ${WRAPPER_DIRS})
     target_compile_options(wrappertests PRIVATE -Wall -Wextra)
     target_link_libraries(wrappertests PRIVATE Qt6::Qml Qt6::Concurrent dawengine)
@@ -136,6 +137,7 @@ if(DAW_BUILD_APP)
     add_test(NAME qttrackeffects COMMAND wrappertests qttrackeffects)
     add_test(NAME qtaudioengine COMMAND wrappertests qtaudioengine)
     add_test(NAME qtpianoroll COMMAND wrappertests qtpianoroll)
+    add_test(NAME qtharmonium COMMAND wrappertests qtharmonium)
 endif()
 
 # Exercise actual mouse/keyboard tempo editing when Qt Test is available.
@@ -157,6 +159,7 @@ if(DAW_BUILD_APP)
                       frontend/icons/MetronomeIcon.qml
                       frontend/instruments/guitar/GuitarSuitePanel.qml
                       frontend/instruments/guitar/GuitarSuiteEditor.qml
+                      frontend/instruments/harmonium/HarmoniumEditor.qml
                       frontend/plugins/TrackEffectsPanel.qml frontend/plugins/eq/Tenbandeq.qml frontend/plugins/chaoseq/ChaosEqEditor.qml
                       frontend/session/TrackList.qml frontend/timeline/Timeline.qml
                       frontend/mixer/MixerPanel.qml

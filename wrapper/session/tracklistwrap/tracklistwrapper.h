@@ -133,6 +133,9 @@ public:
     // the engine updates the track's EQ processors without rebuilding playback on every drag.
     const chaoseq::Settings* chaosEq(int trackId) const;
     bool setChaosEq(int trackId, const chaoseq::Settings& settings);
+    // Harmonium tracks, for HarmoniumWrapper, the same way: harmoniumChanged, not dataChanged.
+    const harmonium::Settings* harmonium(int trackId) const;   // null unless a Harmonium track
+    bool setHarmonium(int trackId, const harmonium::Settings& settings);
     Q_INVOKABLE bool resetTrackEq(int trackId);
     bool newTrackRecordDry() const { return m_newTrackRecordDry; }
     void setNewTrackRecordDry(bool dry);
@@ -187,6 +190,7 @@ signals:
     void historyChanged();
     void projectChanged();
     void chaosEqChanged(int trackId);
+    void harmoniumChanged(int trackId);
     void eqPresetErrorChanged();
     void countChanged();
     void contentEndBeatsChanged();

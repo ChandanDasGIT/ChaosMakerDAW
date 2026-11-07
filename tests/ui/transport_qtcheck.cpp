@@ -1119,6 +1119,55 @@ private slots:
         QVERIFY(!tracks.project().findTrack(vocal)->recordArmed);
         list->setVisible(false); list->setProperty("trackModel",QVariant());
     }
+    void harmonium_panel_opens_from_the_track_card_and_edits_its_settings() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int h=tracks.addInstrumentTrackOfType("Harmonium"), piano=tracks.addInstrumentTrackOfType("Piano");
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QTest::qWait(30);
+        const auto settings=[&]{ return tracks.project().findTrack(h)->harmonium; };
+        auto* pianoInst=visualItem(list,"trackInstrumentButton"+QString::number(piano));
+        QVERIFY(!pianoInst || !pianoInst->isVisible());                 // no panel for TestSynth yet
+        auto* inst=visualItem(list,"trackInstrumentButton"+QString::number(h)); QVERIFY(inst); QVERIFY(inst->isVisible());
+        click(inst);
+        auto* panel=visualObject(window->contentItem(),"trackHarmoniumPanel"+QString::number(h)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+
+        auto* female=visualItem(window->contentItem(),"harmoniumFemale"); QVERIFY(female); QVERIFY(female->isVisible());
+        click(female); QTRY_VERIFY(settings().indian.female);
+        click(female); QTRY_VERIFY(!settings().indian.female);
+
+        auto* bellows=visualItem(window->contentItem(),"harmoniumBellows"); QVERIFY(bellows);
+        QQuickItem* slider=nullptr;
+        for (auto* child : bellows->findChildren<QQuickItem*>()) if (child->inherits("QQuickSlider")) slider=child;
+        QVERIFY(slider);
+        slider->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Right);
+        QTRY_VERIFY(settings().bellows>0.75);
+
+        auto* up=visualItem(window->contentItem(),"harmoniumTransposeUp"); QVERIFY(up);
+        click(up); click(up); QTRY_COMPARE(settings().transpose,2);
+        auto* label=visualItem(window->contentItem(),"harmoniumTranspose"); QVERIFY(label);
+        QCOMPARE(label->property("text").toString(),QString("C plays D (+2)"));
+
+        auto* drone=visualItem(window->contentItem(),"harmoniumDrone0"); QVERIFY(drone);
+        drone->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Down);
+        QTRY_COMPARE(settings().drones[0],36);
+
+        auto* style=visualItem(window->contentItem(),"harmoniumStyle"); QVERIFY(style);
+        style->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Down);
+        QTRY_VERIFY(settings().style==harmonium::Style::Western);
+        QTRY_VERIFY(!visualItem(window->contentItem(),"harmoniumMale")->isVisible());
+        auto* vox=visualItem(window->contentItem(),"harmoniumVoxHumana"); QVERIFY(vox); QVERIFY(vox->isVisible());
+        click(vox); QTRY_VERIFY(settings().western.voxHumana);
+        QVERIFY(window->grabWindow().save("/tmp/chaosmaker-harmonium.png"));
+
+        auto* reset=visualItem(window->contentItem(),"harmoniumReset"); QVERIFY(reset);
+        click(reset); QTRY_VERIFY(settings()==harmonium::Settings{});
+        auto* close=visualItem(window->contentItem(),"harmoniumClose"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!panel->property("visible").toBool());
+        list->setVisible(false); list->setProperty("trackModel",QVariant());
+    }
     void chaos_eq_adds_drags_edits_and_removes_bands_on_the_curve() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks); const int vocal=tracks.addVocalTrack();

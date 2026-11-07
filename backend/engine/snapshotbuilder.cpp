@@ -1,4 +1,5 @@
 #include "engine/snapshotbuilder.h"
+#include "instruments/harmonium/harmonium.h"
 #include "dsp/panlaw.h"
 
 SnapshotBuilder::Context SnapshotBuilder::Context::fromProject(const Project& project)
@@ -39,6 +40,8 @@ void SnapshotBuilder::syncTrackEq(const Project& project, const MutableEffectRes
         }
         if (fx->chaosEq) fx->chaosEq->setSettings(track->chaosEq);
         if (fx->playbackChaosEq) fx->playbackChaosEq->setSettings(track->chaosEq);
+        if (fx->instrument && fx->instrument->typeId() == "harmonium")
+            static_cast<Harmonium&>(*fx->instrument).setSettings(track->harmonium);
     }
 }
 
