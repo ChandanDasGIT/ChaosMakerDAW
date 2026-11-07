@@ -6,10 +6,14 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 
 int main(int argc, char* argv[])
 {
+    // Drums tracks look for the sample kit here: a folder that is never there, so no test
+    // reads the real kit. Tests that need a kit write a small one and pass its folder.
+    setenv("CHAOSMAKER_SAMPLE_KITS", "/nonexistent/chaosmaker-tests/sample-kits", 1);
     const std::string filter = argc > 1 ? argv[1] : "";
     auto& tests = testkit::allTests();
     std::sort(tests.begin(), tests.end(), [](const auto& a, const auto& b) { return a.name < b.name; });

@@ -50,5 +50,6 @@ TEST(instrumentcatalog, instruments_with_controls_name_their_fx_page)
     CHECK(instrumentcatalog::find("Electric Guitar")->page == "guitarsuite");
     CHECK(instrumentcatalog::find("Acoustic Guitar")->page == "guitarsuite");
     CHECK(instrumentcatalog::find("Harmonium")->page == "harmonium");
-    for (const char* id : {"Piano", "Strings", "Drums"}) CHECK(instrumentcatalog::find(id)->page.empty());
+    CHECK(instrumentcatalog::find("Drums")->page == "drumkit");
+    for (const char* id : {"Piano", "Strings"}) CHECK(instrumentcatalog::find(id)->page.empty());
 }

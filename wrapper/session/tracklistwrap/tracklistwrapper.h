@@ -137,6 +137,9 @@ public:
     // Harmonium tracks, for HarmoniumWrapper, the same way: harmoniumChanged, not dataChanged.
     const harmonium::Settings* harmonium(int trackId) const;   // null unless a Harmonium track
     bool setHarmonium(int trackId, const harmonium::Settings& settings);
+    // Drums tracks, for DrumKitWrapper, the same way: drumKitChanged.
+    const drumkit::Settings* drumKit(int trackId) const;       // null unless a Drums track
+    bool setDrumKit(int trackId, const drumkit::Settings& settings);
     Q_INVOKABLE bool resetTrackEq(int trackId);
     bool newTrackRecordDry() const { return m_newTrackRecordDry; }
     void setNewTrackRecordDry(bool dry);
@@ -192,6 +195,7 @@ signals:
     void projectChanged();
     void chaosEqChanged(int trackId);
     void harmoniumChanged(int trackId);
+    void drumKitChanged(int trackId);
     void eqPresetErrorChanged();
     void countChanged();
     void contentEndBeatsChanged();

@@ -12,7 +12,7 @@ std::span<const InstrumentDefinition> instrumentcatalog::instruments()
         const auto guitars = guitardefinition::variants();
         entries.insert(entries.end(), guitars.begin(), guitars.end());
         entries.push_back({"Strings", "Strings", false, false});
-        entries.push_back({"Drums", "Drums", false, false});
+        entries.push_back({"Drums", "Drums", false, false, "drumkit"});
         entries.push_back({"Harmonium", "Harmonium", false, false, "harmonium"});
         return entries;
     }();

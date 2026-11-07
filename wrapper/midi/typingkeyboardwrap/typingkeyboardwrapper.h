@@ -7,7 +7,7 @@
 #include <QtQml/qqmlregistration.h>
 
 // The KEYS switch: while on, the computer keyboard plays notes into the engine's MIDI input,
-// like a MIDI keyboard (TypingKeyboard's sargam layout: Tab .. Backspace, lower Pa to upper Ma).
+// like a MIDI keyboard (TypingKeyboard's sargam layout: Tab .. backslash, lower Pa to upper tivra Ma).
 // It listens app-wide, takes only its own keys, and leaves them alone when Ctrl, Alt or Meta is
 // held or a text field has the focus (a track name, the BPM). Its keys win over single-key
 // shortcuts (Q, Tab focus moves) while it is on. Turning it off or leaving the window ends

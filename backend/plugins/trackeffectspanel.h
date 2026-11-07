@@ -25,6 +25,8 @@ public:
     bool supportsGuitarSuite() const;
     // The harmonium's page likewise, on Harmonium tracks.
     bool supportsHarmonium() const;
+    // The drum kit's page likewise, on Drums tracks.
+    bool supportsDrumKit() const;
 
     const std::string& selectedEffect() const { return m_selectedEffect; }
     void setSelectedEffect(std::string_view key);

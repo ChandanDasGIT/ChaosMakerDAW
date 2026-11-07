@@ -9,11 +9,11 @@ using Kind = TypingKeyboard::Action::Kind;
 TEST(typingkeyboard, q_row_plays_lower_pa_to_upper_ma_with_e_as_sa)
 {
     TypingKeyboard keys;
-    // White keys Tab .. backslash: Pa. Dha. Ni. Sa Re Ga Ma Pa Dha Ni Sa' Re' Ga' Ma'.
-    const std::string white = "\tqwertyuiop[]\\";
+    // White keys Tab .. Backspace: Pa. Dha. Ni. Sa Re Ga Ma Pa Dha Ni Sa' Re' Ga' Ma'.
+    const std::string white = "\tqwertyuiop[]\b";
     const std::array<int, 14> whiteNotes{55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77};
-    // Black keys on the number row and Backspace, between them.
-    const std::string black = "12457" "89-=\b";
+    // Black keys on the number row, and backslash for upper tivra Ma after Backspace.
+    const std::string black = "12457" "89-=\\";
     const std::array<int, 10> blackNotes{56, 58, 61, 63, 66, 68, 70, 73, 75, 78};
     const auto plays = [&keys](char key, int note) {
         const auto on = keys.press(key);
@@ -58,7 +58,9 @@ TEST(typingkeyboard, octave_and_velocity_stay_in_range)
     keys.release('\t');
     for (int i = 0; i < 12; ++i) { keys.press('x'); keys.release('x'); }
     CHECK(keys.octave() == TypingKeyboard::MaxOctave);
-    CHECK(keys.press('\b').note == 126);                          // upper tivra Ma still fits MIDI
+    CHECK(keys.press('\\').note == 126);                         // upper tivra Ma still fits MIDI
+    keys.release('\\');
+    CHECK(keys.press('\b').note == 125);                          // Backspace: upper Ma, just below
     keys.release('\b');
     for (int i = 0; i < 10; ++i) { keys.press('c'); keys.release('c'); }
     CHECK(keys.velocity() == 1);

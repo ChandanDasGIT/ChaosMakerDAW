@@ -26,7 +26,7 @@ int TypingKeyboard::semitoneFor(char key) noexcept
     case 'p': return 12;                           case '-': return 13;
     case '[': return 14;                           case '=': return 15;
     case ']': return 16;
-    case '\\': return 17;                          case '\b': return 18;
+    case '\b': return 17;                          case '\\': return 18;
     default: return NoNote;
     }
 }

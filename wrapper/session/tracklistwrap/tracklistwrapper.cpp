@@ -431,6 +431,21 @@ bool TrackListWrapper::setChaosEq(int trackId, const chaoseq::Settings& settings
     return change.accepted;
 }
 
+const drumkit::Settings* TrackListWrapper::drumKit(int trackId) const
+{
+    const auto* track = m_project.findTrack(trackId);
+    return track && track->type == "Drums" ? &track->drumkit : nullptr;
+}
+
+bool TrackListWrapper::setDrumKit(int trackId, const drumkit::Settings& settings)
+{
+    if (!drumKit(trackId)) return false;
+    const auto before = *drumKit(trackId);
+    const auto change = m_state.setDrumKit(trackId, settings);
+    if (change.accepted && !(before == *drumKit(trackId))) emit drumKitChanged(trackId);
+    return change.accepted;
+}
+
 const harmonium::Settings* TrackListWrapper::harmonium(int trackId) const
 {
     const auto* track = m_project.findTrack(trackId);

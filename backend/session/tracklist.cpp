@@ -241,6 +241,10 @@ TrackList::Change TrackList::setHarmonium(int id, const harmonium::Settings& set
 {
     return result(m_project.setTrackHarmonium(id, settings));
 }
+TrackList::Change TrackList::setDrumKit(int id, const drumkit::Settings& settings)
+{
+    return result(m_project.setTrackDrumKit(id, settings));
+}
 int TrackList::addTrackEffect(int trackId, const std::string& type)
 {
     return trackLocked(trackId) ? -1 : m_project.addTrackEffect(trackId, type);

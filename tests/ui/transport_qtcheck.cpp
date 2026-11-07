@@ -54,6 +54,7 @@ private slots:
     void initTestCase() {
         QVERIFY(storage.isValid());
         qputenv("XDG_DATA_HOME", storage.path().toUtf8());
+        qputenv("CHAOSMAKER_SAMPLE_KITS", (storage.path() + "/no-sample-kits").toUtf8());   // never the real kit
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, storage.path());
         QCoreApplication::setOrganizationName("ChaosMakerTest");
@@ -823,6 +824,39 @@ private slots:
         QMetaObject::invokeMethod(input,"close"); QTRY_VERIFY(!input->property("visible").toBool());
         controller->shutdownSession();
     }
+    void main_window_piano_roll_edits_its_clip_and_names_drum_parts() {
+        // The real main window's piano roll (a Loader's component) must reach the project's
+        // tracks: before, its "trackModel: trackModel" bound to itself and it stood alone.
+        QTest::failOnWarning(QRegularExpression("^(?!This plugin does not support raise\\(\\)).*"));
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        QQmlComponent component(engine.get()); component.loadFromModule("TransportTests","Main");
+        std::unique_ptr<QObject> created(component.create()); QVERIFY2(created,qPrintable(component.errorString()));
+        auto* main=qobject_cast<QQuickWindow*>(created.get()); QVERIFY(main);
+        auto* settings=qvariant_cast<AppSettingsWrapper*>(main->property("layoutSettings")); QVERIFY(settings);
+        const auto restore=qScopeGuard([&] {
+            settings->setPianoRollPresentation("dock"); controller->shutdownSession();
+            created.reset(); window->requestActivate(); [[maybe_unused]] const bool active=QTest::qWaitForWindowActive(window);
+        });
+        settings->setPianoRollPresentation("dock");
+        auto* tracks=main->findChild<TrackListWrapper*>(); QVERIFY(tracks);
+        const int drums=tracks->addInstrumentTrackOfType("Drums"), clip=tracks->addClipAtBeat(drums,0,4);
+        QVERIFY(QMetaObject::invokeMethod(main,"openPianoRoll",Q_ARG(QVariant,drums),Q_ARG(QVariant,clip),
+                                          Q_ARG(QVariant,QString("Clip")),Q_ARG(QVariant,4.0)));
+        auto* loader=main->findChild<QObject*>("dockedPianoRollLoader"); QVERIFY(loader);
+        auto* view=loader->property("item").value<QObject*>(); QVERIFY(view);
+        auto* backend=view->findChild<QObject*>("pianoRollBackend"); QVERIFY(backend);
+        QCOMPARE(backend->property("trackList").value<QObject*>(),static_cast<QObject*>(tracks));
+        QVERIFY(backend->property("bound").toBool());
+        QTRY_VERIFY(backend->property("drumMode").toBool());
+        auto* kick=visualItem(qobject_cast<QQuickItem*>(view),"drumKeyLabel60");
+        QVERIFY(kick); QTRY_VERIFY(kick->isVisible());
+        QCOMPARE(kick->property("text").toString(),QString("Kick"));
+        // A note drawn in the piano roll lands in the clip.
+        int id=-1;
+        QVERIFY(QMetaObject::invokeMethod(backend,"addNote",Q_RETURN_ARG(int,id),Q_ARG(int,62),Q_ARG(double,0.0),Q_ARG(double,1.0),Q_ARG(int,100)));
+        QTRY_COMPARE(int(tracks->domain().clipNotes(drums,clip).size()),1);
+        QVERIFY(main->grabWindow().save("/tmp/chaosmaker-main-drum-piano-roll.png"));
+    }
     void piano_rolls_load_on_first_use_and_only_for_the_chosen_presentation() {
         // The real main window: any QML warning (e.g. a broken binding) fails the test. The
         // offscreen platform cannot raise windows; that warning is not about the QML.
@@ -1121,6 +1155,132 @@ private slots:
         QVERIFY(!tracks.project().findTrack(vocal)->recordArmed);
         list->setVisible(false); list->setProperty("trackModel",QVariant());
     }
+    void virtual_piano_floats_and_plays_clicked_keys() {
+        // One KEYS switch: it turns on the typing keyboard and opens the on-screen piano.
+        auto* chip=visualItem(window->contentItem(),"typingKeyboardButton"); QVERIFY(chip);
+        QVERIFY(!visualItem(window->contentItem(),"virtualKeyboardButton"));   // no second switch
+        auto* piano=window->findChild<QQuickWindow*>("virtualKeyboardWindow"); QVERIFY(piano);
+        auto* typing=window->findChild<QObject*>("typingKeyboard"); QVERIFY(typing);
+        QVERIFY(!piano->isVisible()); QVERIFY(!typing->property("enabled").toBool());
+        const auto restore=qScopeGuard([&] {
+            typing->setProperty("enabled",false); piano->setVisible(false);
+            window->requestActivate(); QTest::qWaitForWindowActive(window);   // later tests type into the main window
+        });
+        click(chip);
+        QTRY_VERIFY(piano->isVisible());
+        QVERIFY(typing->property("enabled").toBool());
+        QVERIFY(piano->flags() & Qt::Tool);                         // floats over the main window
+        QVERIFY(piano->flags() & Qt::WindowDoesNotAcceptFocus);     // and leaves it the keyboard focus
+        auto* bridge=piano->contentItem()->findChild<QObject*>("virtualKeyboardBridge");
+        if (!bridge) bridge=piano->findChild<QObject*>("virtualKeyboardBridge");
+        QVERIFY(bridge);
+        QSignalSpy sent(bridge,SIGNAL(noteSent(int,int,bool)));
+        // A full-size keyboard: all 88 keys, A0 .. C8.
+        QVERIFY(visualItem(piano->contentItem(),"virtualKey21")); QVERIFY(visualItem(piano->contentItem(),"virtualKey108"));
+        QVERIFY(!visualItem(piano->contentItem(),"virtualKey20")); QVERIFY(!visualItem(piano->contentItem(),"virtualKey109"));
+        // The band marks the keys KEYS reaches: Tab (G3, 55) .. backslash (F#5, 78).
+        auto* band=visualItem(piano->contentItem(),"virtualKeyboardTypingBand"); QVERIFY(band);
+        const auto edges=[&](int low,int high) {
+            auto* first=visualItem(piano->contentItem(),"virtualKey"+QString::number(low));
+            auto* last=visualItem(piano->contentItem(),"virtualKey"+QString::number(high));
+            const qreal left=band->mapToScene(QPointF(0,0)).x(), right=band->mapToScene(QPointF(band->width(),0)).x();
+            return std::abs(left-first->mapToScene(QPointF(0,0)).x())<1.5
+                && std::abs(right-last->mapToScene(QPointF(last->width(),0)).x())<1.5;
+        };
+        QTRY_VERIFY(edges(55,78));
+
+        auto* c4=visualItem(piano->contentItem(),"virtualKey60"); QVERIFY(c4);
+        auto* d4=visualItem(piano->contentItem(),"virtualKey62"); QVERIFY(d4);
+        const QPoint at=c4->mapToScene(QPointF(c4->width()/2,c4->height()*0.9)).toPoint();   // low on the key: loud
+        QTest::mousePress(piano,Qt::LeftButton,Qt::NoModifier,at);
+        QTRY_COMPARE(sent.count(),1);
+        QCOMPARE(sent[0][0].toInt(),60); QVERIFY(sent[0][1].toInt()>110); QVERIFY(sent[0][2].toBool());
+        QTRY_COMPARE(c4->property("color").value<QColor>(),QColor("#60cdff"));          // lit (Theme.accent) while held
+        const QPoint next=d4->mapToScene(QPointF(d4->width()/2,d4->height()*0.9)).toPoint();
+        QTest::mouseMove(piano,next);                                // a glissando to D4
+        QTRY_COMPARE(sent.count(),3);
+        QCOMPARE(sent[1][0].toInt(),60); QVERIFY(!sent[1][2].toBool());
+        QCOMPARE(sent[2][0].toInt(),62); QVERIFY(sent[2][2].toBool());
+        QVERIFY(piano->grabWindow().save("/tmp/chaosmaker-virtual-piano.png"));
+        click(chip);                                                 // KEYS off: the piano closes, its note ends
+        QTRY_VERIFY(!piano->isVisible());
+        QVERIFY(!typing->property("enabled").toBool());
+        QTRY_COMPARE(sent.count(),4);
+        QCOMPARE(sent[3][0].toInt(),62); QVERIFY(!sent[3][2].toBool());
+        QTest::mouseRelease(piano,Qt::LeftButton,Qt::NoModifier,next);
+
+        // KEYS an octave down (Z): the band follows; up again (X).
+        click(chip); QTRY_VERIFY(piano->isVisible()); QVERIFY(typing->property("enabled").toBool());
+        QTest::keyClick(window,Qt::Key_Z);
+        QTRY_COMPARE(typing->property("octave").toInt(),3);
+        QTRY_VERIFY(edges(43,66));
+        QTest::keyClick(window,Qt::Key_X);
+        QTRY_COMPARE(typing->property("octave").toInt(),4);
+        QTRY_VERIFY(edges(55,78));
+        piano->close();                                              // closing the piano turns KEYS off
+        QTRY_VERIFY(!typing->property("enabled").toBool());
+        QCOMPARE(chip->property("text").toString(),QString("Off"));
+    }
+    void drum_kit_lives_in_fx_and_edits_its_settings() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int d=tracks.addInstrumentTrackOfType("Drums");
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        const auto restore=qScopeGuard([&] {
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+        });
+        QTest::qWait(30);
+        const auto settings=[&]{ return tracks.project().findTrack(d)->drumkit; };
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(d)); QVERIFY(fx); click(fx);
+        auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(d)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("drumkit"));   // opens on its page
+        QVERIFY(panel->property("supportsDrumKit").toBool());
+        QVERIFY(!visualItem(window->contentItem(),"removeEffect_drumkit")->isVisible());   // fixed
+
+        auto* kick=visualItem(window->contentItem(),"drumKitKick"); QVERIFY(kick); QTRY_VERIFY(kick->isVisible());
+        QQuickItem* slider=nullptr;
+        for (auto* child : kick->findChildren<QQuickItem*>()) if (child->inherits("QQuickSlider")) slider=child;
+        QVERIFY(slider);
+        slider->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Left);
+        QTRY_VERIFY(settings().kickDb<0.0);
+
+        auto* room=visualItem(window->contentItem(),"drumKitRoom"); QVERIFY(room);
+        room->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Down);
+        QTRY_VERIFY(settings().room==drumkit::Room::Full);
+
+        // The drawn kit: a press on the snare's head plays Snare (harder in the middle), on
+        // its rim Snare edge.
+        auto* picture=visualItem(window->contentItem(),"drumKitPicture"); QVERIFY(picture); QVERIFY(picture->height()>100);
+        auto* bridge=visualObject(window->contentItem(),"drumKitBridge"); QVERIFY(bridge);
+        QSignalSpy played(bridge,SIGNAL(played(int,int)));
+        auto* snare=visualItem(picture,"drumPiece_snare"); QVERIFY(snare);
+        const qreal scale=picture->property("s").toReal(), rx=snare->property("rx").toReal()*scale, ry=snare->property("ry").toReal()*scale;
+        const auto pressAt=[&](QPointF local) {
+            const QPoint at=snare->mapToScene(local).toPoint();
+            QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at); QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,at);
+        };
+        pressAt(QPointF(rx,ry));                                    // the centre
+        QTRY_COMPARE(played.count(),1);
+        QCOMPARE(played[0][0].toInt(),62); QVERIFY(played[0][1].toInt()>=120);   // the middle hits hard
+        pressAt(QPointF(rx+rx*0.9,ry));                             // the rim
+        QTRY_COMPARE(played.count(),2);
+        QCOMPARE(played[1][0].toInt(),64);
+        auto* pedal=visualItem(picture,"drumPiece_hihatPedal"); QVERIFY(pedal); click(pedal);
+        QTRY_COMPARE(played.count(),3);
+        QCOMPARE(played[2][0].toInt(),68);
+
+        auto* status=visualItem(window->contentItem(),"drumKitStatus"); QVERIFY(status);
+        QTRY_VERIFY(status->isVisible());                          // the tests have no kit: it says where it looked
+        QVERIFY(status->property("text").toString().contains("not found"));
+        QVERIFY(window->grabWindow().save("/tmp/chaosmaker-drumkit-page.png"));
+
+        auto* reset=visualItem(window->contentItem(),"drumKitReset"); QVERIFY(reset);
+        click(reset); QTRY_VERIFY(settings()==drumkit::Settings{});
+        auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!panel->property("visible").toBool());
+    }
     void harmonium_lives_in_fx_like_guitarsuite_and_edits_its_settings() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks);
@@ -1255,42 +1415,44 @@ private slots:
         QTest::keyRelease(window,Qt::Key_E);
         QCOMPARE(notes.size(),2); QCOMPARE(last().at(0).toInt(),60); QVERIFY(!last().at(2).toBool());
 
-        // The ends of the layout: Tab is lower Pa, Backspace upper tivra Ma, both played rather
-        // than moving the focus or deleting.
+        // The top of the layout: Tab is lower Pa, Backspace upper Ma, backslash upper tivra
+        // Ma, all played rather than moving the focus or deleting.
         QTest::keyClick(window,Qt::Key_Tab);
         QCOMPARE(notes.size(),4); QCOMPARE(last(-2).at(0).toInt(),55);
         QVERIFY(other->hasActiveFocus());
         QTest::keyClick(window,Qt::Key_Backspace);
-        QCOMPARE(notes.size(),6); QCOMPARE(last(-2).at(0).toInt(),78);
+        QCOMPARE(notes.size(),6); QCOMPARE(last(-2).at(0).toInt(),77);
+        QTest::keyClick(window,Qt::Key_Backslash);
+        QCOMPARE(notes.size(),8); QCOMPARE(last(-2).at(0).toInt(),78);
         QTest::keyClick(window,Qt::Key_4);                        // komal Re on the number row
-        QCOMPARE(notes.size(),8); QCOMPARE(last(-2).at(0).toInt(),61);
+        QCOMPARE(notes.size(),10); QCOMPARE(last(-2).at(0).toInt(),61);
 
         QTest::keyClick(window,Qt::Key_X);                        // octave up: no note
-        QCOMPARE(notes.size(),8);
+        QCOMPARE(notes.size(),10);
         QCOMPARE(chip->property("text").toString(),QString("Sa = C5"));
         QTest::keyClick(window,Qt::Key_R);                        // Re, an octave up
-        QCOMPARE(notes.size(),10); QCOMPARE(last(-2).at(0).toInt(),74);
+        QCOMPARE(notes.size(),12); QCOMPARE(last(-2).at(0).toInt(),74);
         QTest::keyClick(window,Qt::Key_Z);
         QCOMPARE(chip->property("text").toString(),QString("Sa = C4"));
 
         QTest::keyClick(window,Qt::Key_Q,Qt::ControlModifier);    // shortcuts keep working
         QTest::keyClick(window,Qt::Key_A);                        // the old layout: nothing
         QTest::keyClick(window,Qt::Key_S);
-        QCOMPARE(notes.size(),10);
+        QCOMPARE(notes.size(),12);
 
         field->forceActiveFocus();                                // typing in a field reaches it
         QTest::keyClick(window,Qt::Key_5);
         QTest::keyClick(window,Qt::Key_Backspace);
-        QCOMPARE(notes.size(),10);
+        QCOMPARE(notes.size(),12);
 
         other->forceActiveFocus();                                // turning off ends held notes
         QTest::keyPress(window,Qt::Key_U);                        // Pa
-        QCOMPARE(notes.size(),11); QCOMPARE(last().at(0).toInt(),67);
+        QCOMPARE(notes.size(),13); QCOMPARE(last().at(0).toInt(),67);
         click(chip); QTRY_VERIFY(!keys->property("enabled").toBool());
-        QCOMPARE(notes.size(),12); QCOMPARE(last().at(0).toInt(),67); QVERIFY(!last().at(2).toBool());
+        QCOMPARE(notes.size(),14); QCOMPARE(last().at(0).toInt(),67); QVERIFY(!last().at(2).toBool());
         QTest::keyRelease(window,Qt::Key_U);                      // the late release changes nothing
         QTest::keyClick(window,Qt::Key_E);
-        QCOMPARE(notes.size(),12);
+        QCOMPARE(notes.size(),14);
         QCOMPARE(chip->property("text").toString(),QString("Off"));
     }
     void chaos_eq_adds_drags_edits_and_removes_bands_on_the_curve() {
@@ -2775,6 +2937,48 @@ private slots:
         click(button("play")); io->process(); QVERIFY(controller.playing());
         click(button("stop")); io->process(); QVERIFY(!controller.playing());
         controller.shutdownSession();
+    }
+    void piano_roll_names_the_drum_kit_parts_on_a_drums_track() {
+        TrackListWrapper tracks;
+        const int drums=tracks.addInstrumentTrackOfType("Drums"), piano=tracks.addInstrumentTrackOfType("Piano");
+        const int drumClip=tracks.addClipAtBeat(drums,0,4), pianoClip=tracks.addClipAtBeat(piano,0,4);
+        QVERIFY(drumClip>0 && pianoClip>0);
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* backend=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(backend);
+        const auto restore=qScopeGuard([&] {
+            roll->setVisible(false); roll->setProperty("clipId",-1); roll->setProperty("trackId",-1);
+            roll->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+        });
+        roll->setProperty("trackModel",QVariant::fromValue(&tracks));
+        roll->setProperty("trackId",drums); roll->setProperty("clipId",drumClip);
+        roll->setVisible(true);
+        QTRY_VERIFY(backend->property("drumMode").toBool());
+        auto* keys=visualItem(roll,"pianoKeys"); QVERIFY(keys);
+        QCOMPARE(keys->width(),90.0);                               // the same keys as any track
+        const auto label=[&](int note) { return visualItem(roll,"drumKeyLabel"+QString::number(note)); };
+        QVERIFY(label(60)); QTRY_VERIFY(label(60)->isVisible());
+        QCOMPARE(label(60)->property("text").toString(),QString("Kick"));
+        QCOMPARE(label(62)->property("text").toString(),QString("Snare"));
+        QCOMPARE(label(66)->property("text").toString(),QString("Hi-hat closed"));
+        QCOMPARE(label(70)->property("text").toString(),QString("Hi-hat open"));
+        QCOMPARE(label(55)->property("text").toString(),QString("Hi-hat tight"));
+        QVERIFY(!label(73)->isVisible());                          // no cymbals in this kit
+        QVERIFY(label(66)->width()<54);                            // a black key's part sits inside the black key
+        // Keys the kit does not play keep their note names (D#4 between snare and snare edge).
+        bool noteNameShown=false;
+        const std::function<void(QQuickItem*)> scan=[&](QQuickItem* item) {
+            if (item->isVisible() && item->property("text").toString()=="D#4") noteNameShown=true;
+            for (auto* child : item->childItems()) scan(child);
+        };
+        scan(keys);
+        QVERIFY(noteNameShown);
+        QTest::qWait(50);
+        QVERIFY(window->grabWindow().save("/tmp/chaosmaker-drum-piano-roll.png"));
+
+        roll->setProperty("trackId",piano); roll->setProperty("clipId",pianoClip);   // a piano clip: as before
+        QTRY_VERIFY(!backend->property("drumMode").toBool());
+        QCOMPARE(keys->width(),90.0);
+        QVERIFY(!label(60)->isVisible());                           // no part names on other instruments
     }
     void piano_roll_shows_no_placeholder_controls() {
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
