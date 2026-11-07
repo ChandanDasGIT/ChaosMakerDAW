@@ -88,6 +88,11 @@ private:
     SnapshotSlot<EngineSnapshot> m_snapshot;
     SnapshotSlot<EngineSnapshot> m_playback;
     void finishRecording() noexcept;
+    // Playback reached the end of the arrangement: the transport stops there (the playhead stays
+    // at the end) and the instruments ring out while stopped: held notes get their note-off
+    // and the tracks keep running for RingOutSeconds, so releases fade instead of being cut.
+    void endPlayback() noexcept;
+    void cancelRingOut() noexcept { m_ringOut = 0; m_endNoteOffs = false; }
     void mixMetronome(const AudioIO& io, int offset, int frames, const TempoMap& tempo) noexcept;
     void renderTracks(const AudioIO& io, const EngineSnapshot& snapshot, int frames) noexcept;
     RecordingGroup* m_recordingGroup = nullptr;
@@ -103,6 +108,9 @@ private:
     bool m_playing = false, m_looping = false;
     bool m_metronomeEnabled = false;
     bool m_stopAtEnd = true; // Stop playback at the end of the arrangement (user setting).
+    static constexpr double RingOutSeconds = 2.0;
+    std::int64_t m_ringOut = 0;                             // frames of ring-out left after the end
+    bool m_endNoteOffs = false;                             // the next block sends the end's note-offs
     float m_metronomeVolume = 0.5f;
     RtQueue<EngineCommand, 512> m_commands;
     RtQueue<MidiEvent, 256> m_keyboardMidi;
