@@ -17,6 +17,7 @@ Popup {
     readonly property var effectsModel: visible && supportsGuitarSuite ? EngineController.trackEffects(trackId) : null
     property alias selectedEffect: panelBridge.selectedEffect
     readonly property bool supportsGuitarSuite: panelBridge.supportsGuitarSuite
+    readonly property bool supportsHarmonium: panelBridge.supportsHarmonium
     // What "+ Add FX" offers; re-read whenever the chain changes.
     readonly property var addableEffects: (root.effects, root.trackModel && root.trackId >= 0
                                            ? root.trackModel.addableEffects(root.trackId) : [])
@@ -261,7 +262,8 @@ Popup {
                 Layout.fillHeight: true
                 currentIndex: root.selectedEffect === "eq" ? 0
                             : root.selectedEffect === "guitarsuite" ? 1
-                            : root.selectedEffect === "chaoseq" ? 2 : 3
+                            : root.selectedEffect === "chaoseq" ? 2
+                            : root.selectedEffect === "harmonium" ? 3 : 4
                 Tenbandeq {
                     trackModel: root.trackModel
                     trackId: root.trackId
@@ -290,6 +292,15 @@ Popup {
                     trackId: root.trackId
                     trackName: root.trackName
                     active: root.visible && root.selectedEffect === "chaoseq"
+                }
+                Loader {
+                    active: root.supportsHarmonium
+                    sourceComponent: HarmoniumEditor {
+                        objectName: "trackHarmonium" + root.trackId
+                        trackModel: root.trackModel
+                        trackId: root.trackId
+                        trackName: root.trackName
+                    }
                 }
                 Item {
                     Text {

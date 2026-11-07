@@ -2,9 +2,10 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// The Harmonium track's instrument panel: style, stops, bellows, tone, scale changer and
-// drones. Every change goes straight to the track through HarmoniumWrapper.
-Popup {
+// The harmonium's page in the track's FX panel (like GuitarSuite for guitars): style, stops,
+// bellows, tone, scale changer and drones. Every change goes straight to the track through
+// HarmoniumWrapper.
+Item {
     id: root
     property var trackModel
     property int trackId: -1
@@ -82,65 +83,42 @@ Popup {
         cornerRadius: 6
     }
 
-    parent: Overlay.overlay
-    x: (parent.width - width) / 2
-    y: (parent.height - height) / 2
-    width: Math.min(760, parent.width - 32)
-    height: Math.min(560, parent.height - 70)
-    modal: false
-    focus: true
-    closePolicy: Popup.CloseOnEscape
-    padding: 0
-    background: Rectangle { color: Theme.popupBg; radius: 10; border.color: Theme.popupBorder }
-
-    contentItem: ColumnLayout {
+    ColumnLayout {
+        anchors.fill: parent
         spacing: 0
 
-        Rectangle {
+        RowLayout {
             Layout.fillWidth: true
-            implicitHeight: 66
-            color: Theme.effects.header
-            radius: 10
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 16
-                spacing: 10
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 3
-                    Text { text: root.trackName + " · Harmonium"; color: Theme.text; font.pixelSize: 17; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
-                    Text {
-                        text: root.indian ? "Hand harmonium: bass, male and female reeds, drones"
-                                          : "Reed organ: stops in feet, steady foot bellows"
-                        color: Theme.textMuted; font.pixelSize: 11
-                    }
+            Layout.margins: 16
+            Layout.bottomMargin: 4
+            spacing: 10
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 3
+                Text { text: "Harmonium"; color: Theme.text; font.pixelSize: 15; font.bold: true }
+                Text {
+                    text: root.indian ? "Hand harmonium: bass, male and female reeds, drones"
+                                      : "Reed organ: stops in feet, steady foot bellows"
+                    color: Theme.textMuted; font.pixelSize: 11
+                    Layout.fillWidth: true; elide: Text.ElideRight
                 }
-                ThemedComboBox {
-                    objectName: "harmoniumStyle"
-                    implicitWidth: 190
-                    model: bridge.styles
-                    textRole: "title"
-                    valueRole: "id"
-                    currentIndex: root.indian ? 0 : 1
-                    onActivated: index => bridge.style = bridge.styles[index].id
-                    ToolTip.visible: hovered
-                    ToolTip.text: "Indian hand harmonium or Western reed organ"
-                }
-                PanelButton {
-                    objectName: "harmoniumReset"
-                    text: "Reset"
-                    tooltip: "Back to the default harmonium"
-                    onClicked: bridge.resetToDefaults()
-                }
-                ToolButton {
-                    id: closeButton
-                    objectName: "harmoniumClose"
-                    text: Icons.close
-                    Accessible.name: "Close"
-                    onClicked: root.close()
-                    contentItem: Text { text: Icons.close; color: closeButton.hovered ? Theme.textStrong : Theme.textMuted; font.pixelSize: 17; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                    background: Rectangle { radius: 4; color: closeButton.hovered ? Theme.controlBgHover : "transparent" }
-                }
+            }
+            ThemedComboBox {
+                objectName: "harmoniumStyle"
+                implicitWidth: 190
+                model: bridge.styles
+                textRole: "title"
+                valueRole: "id"
+                currentIndex: root.indian ? 0 : 1
+                onActivated: index => bridge.style = bridge.styles[index].id
+                ToolTip.visible: hovered
+                ToolTip.text: "Indian hand harmonium or Western reed organ"
+            }
+            PanelButton {
+                objectName: "harmoniumReset"
+                text: "Reset"
+                tooltip: "Back to the default harmonium"
+                onClicked: bridge.resetToDefaults()
             }
         }
 

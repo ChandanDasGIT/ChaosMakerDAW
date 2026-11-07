@@ -21,6 +21,11 @@ bool TrackEffectsPanel::supportsGuitarSuite() const
     return std::find(m_chain.begin(), m_chain.end(), effectchain::GuitarSuite) != m_chain.end();
 }
 
+bool TrackEffectsPanel::supportsHarmonium() const
+{
+    return std::find(m_chain.begin(), m_chain.end(), effectchain::Harmonium) != m_chain.end();
+}
+
 void TrackEffectsPanel::setSelectedEffect(std::string_view key)
 {
     m_selectedEffect = validateSelectedEffect(key, m_chain);

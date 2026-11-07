@@ -9,6 +9,9 @@ struct InstrumentDefinition {
     std::string_view name;
     bool hasLiveInput = false;
     bool supportsGuitarSuite = false;
+    // The instrument's own page in the track's FX panel, an effectchain type: guitars have
+    // "guitarsuite", the harmonium "harmonium". Empty while an instrument has no controls yet.
+    std::string_view page = {};
 };
 
 namespace instrumentcatalog {

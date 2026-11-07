@@ -306,17 +306,6 @@ Rectangle {
                                     onClicked: root.openEffects(trackCard)
                                     tooltip: "Browse track effects"
                                 }
-                                ToggleChip {
-                                    id: instrumentButton
-                                    objectName: "trackInstrumentButton" + trackCard.trackId
-                                    // Instruments with their own panel; Piano and Drums follow.
-                                    visible: trackCard.trackType === "Harmonium"
-                                    hoverHighlight: true
-                                    text: "INST"; textSize: 9
-                                    implicitWidth: 34; implicitHeight: chipFlow.chipHeight
-                                    onClicked: root.openInstrument(trackCard)
-                                    tooltip: "Open the instrument: stops, bellows, drones"
-                                }
                             }
                             ToolButton {
                                 id: closeTrackButton
@@ -385,10 +374,6 @@ Rectangle {
         // A track opened for the first time shows its chain's first effect (backend rule).
         fxPopup.selectedEffect = effectsPageByTrack[card.trackId] ?? ""
         fxPopup.open()
-    }
-    function openInstrument(card) {
-        harmoniumPopup.card = card
-        harmoniumPopup.open()
     }
     function rememberEffectsPage() {
         if (fxPopup.card) effectsPageByTrack[fxPopup.card.trackId] = fxPopup.selectedEffect
@@ -472,16 +457,6 @@ Rectangle {
         effects: card ? card.effects : []
         hasLiveInput: card ? card.hasLiveInput : true
         recordDry: card ? card.recordDry : false
-    }
-
-    HarmoniumEditor {
-        id: harmoniumPopup
-        property Item card: null
-        onCardChanged: if (!card) close()
-        objectName: "trackHarmoniumPanel" + trackId
-        trackModel: root.trackModel
-        trackId: card ? card.trackId : -1
-        trackName: card ? card.name : ""
     }
 
     Popup {

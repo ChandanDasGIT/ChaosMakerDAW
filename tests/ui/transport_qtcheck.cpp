@@ -1119,7 +1119,7 @@ private slots:
         QVERIFY(!tracks.project().findTrack(vocal)->recordArmed);
         list->setVisible(false); list->setProperty("trackModel",QVariant());
     }
-    void harmonium_panel_opens_from_the_track_card_and_edits_its_settings() {
+    void harmonium_lives_in_fx_like_guitarsuite_and_edits_its_settings() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks);
         const int h=tracks.addInstrumentTrackOfType("Harmonium"), piano=tracks.addInstrumentTrackOfType("Piano");
@@ -1127,12 +1127,15 @@ private slots:
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
         QTest::qWait(30);
         const auto settings=[&]{ return tracks.project().findTrack(h)->harmonium; };
-        auto* pianoInst=visualItem(list,"trackInstrumentButton"+QString::number(piano));
-        QVERIFY(!pianoInst || !pianoInst->isVisible());                 // no panel for TestSynth yet
-        auto* inst=visualItem(list,"trackInstrumentButton"+QString::number(h)); QVERIFY(inst); QVERIFY(inst->isVisible());
-        click(inst);
-        auto* panel=visualObject(window->contentItem(),"trackHarmoniumPanel"+QString::number(h)); QVERIFY(panel);
+        QVERIFY(!visualItem(list,"trackInstrumentButton"+QString::number(h)));   // no separate button
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(h)); QVERIFY(fx); click(fx);
+        auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(h)); QVERIFY(panel);
         QTRY_VERIFY(panel->property("visible").toBool());
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("harmonium"));   // opens on its page
+        QVERIFY(panel->property("supportsHarmonium").toBool());
+        auto* row=visualItem(window->contentItem(),"selectEffect_harmonium"); QVERIFY(row); QVERIFY(row->isVisible());
+        QVERIFY(!visualItem(window->contentItem(),"removeEffect_harmonium")->isVisible());   // fixed, like GuitarSuite
+        QVERIFY(!visualItem(window->contentItem(),"addEffect_harmonium"));
 
         auto* female=visualItem(window->contentItem(),"harmoniumFemale"); QVERIFY(female); QVERIFY(female->isVisible());
         click(female); QTRY_VERIFY(settings().indian.female);
@@ -1160,12 +1163,27 @@ private slots:
         QTRY_VERIFY(!visualItem(window->contentItem(),"harmoniumMale")->isVisible());
         auto* vox=visualItem(window->contentItem(),"harmoniumVoxHumana"); QVERIFY(vox); QVERIFY(vox->isVisible());
         click(vox); QTRY_VERIFY(settings().western.voxHumana);
+
+        // Effects still go after the instrument page; the page stays reachable.
+        auto* add=visualItem(window->contentItem(),"addEffectButton"); QVERIFY(add); QVERIFY(add->isEnabled());
+        addEffectFromPicker("eq");
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("eq"));
+        click(visualItem(window->contentItem(),"selectEffect_harmonium"));
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("harmonium"));
         QVERIFY(window->grabWindow().save("/tmp/chaosmaker-harmonium.png"));
 
         auto* reset=visualItem(window->contentItem(),"harmoniumReset"); QVERIFY(reset);
         click(reset); QTRY_VERIFY(settings()==harmonium::Settings{});
-        auto* close=visualItem(window->contentItem(),"harmoniumClose"); QVERIFY(close); click(close);
+        auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
         QTRY_VERIFY(!panel->property("visible").toBool());
+
+        // A piano has no page yet: its FX panel has no harmonium.
+        click(visualItem(list,"trackFxButton"+QString::number(piano)));
+        auto* pianoPanel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(piano)); QVERIFY(pianoPanel);
+        QTRY_VERIFY(pianoPanel->property("visible").toBool());
+        QVERIFY(!pianoPanel->property("supportsHarmonium").toBool());
+        close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!pianoPanel->property("visible").toBool());
         list->setVisible(false); list->setProperty("trackModel",QVariant());
     }
     void chaos_eq_adds_drags_edits_and_removes_bands_on_the_curve() {

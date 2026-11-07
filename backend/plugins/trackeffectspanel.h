@@ -23,6 +23,8 @@ public:
     const std::vector<std::string>& chain() const { return m_chain; }
     // GuitarSuite's editor is shown only when GuitarSuite is on the chain.
     bool supportsGuitarSuite() const;
+    // The harmonium's page likewise, on Harmonium tracks.
+    bool supportsHarmonium() const;
 
     const std::string& selectedEffect() const { return m_selectedEffect; }
     void setSelectedEffect(std::string_view key);
