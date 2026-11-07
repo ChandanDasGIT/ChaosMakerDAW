@@ -12,6 +12,7 @@ struct SampleZone {
     int roundRobinLength = 1, roundRobinPosition = 1;
     int group = 0, offBy = 0;                             // an open hi-hat is choked by the closed one
     bool releaseTrigger = false;
+    bool oneShot = false;                                 // note-off is ignored: plays to the end (drums)
     bool looping = false;
     std::int64_t loopStart = 0, loopEnd = 0;
     float tuneCents = 0.0f, volumeDb = 0.0f, pan = 0.0f;

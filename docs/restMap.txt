@@ -46,17 +46,21 @@ backend/instruments/instrumentfactory.cpp maps all of them to it. The folders
 backend/instruments/{sfz,piano,drums,strings} are empty; sampler/ has only samplezone.h;
 tools/sfzcheck is empty.
 BUILD ORDER (the user, 2026-11-07): the shared sampler first, then drums, then the piano.
-[ ] C1  Sampler engine (hand-written): sample zones, key/velocity mapping, round robins, loop
+[x] C1  Sampler engine (hand-written): sample zones, key/velocity mapping, round robins, loop
         points, envelopes, release triggers, choke groups (e.g. closed hi-hat stops the open
         one), voice allocation with a fixed voice pool (no allocation on the audio thread).
+        Done 2026-11-07: backend/instruments/sampler/ (zonemap, samplervoice, sampler; Sampler
+        is a Processor, typeId "sampler", not yet in instrumentfactory). Tests: backendtests
+        sampler. Not in yet: sustain pedal (C5), pitch bend, loop_sustain, rt_decay.
 [ ] C2  SFZ loader (hand-written parser, off the audio thread) and tools/sfzcheck (loads an
         SFZ file and reports missing samples, unsupported opcodes, overlapping regions).
         Support the opcodes the chosen libraries use first, including the ARIA extensions
         both use (#define, set_hdcc, ...); add more later.
 [ ] C3  DRUMS FIRST: Gogodze Phu Vol II (see C9) as the real "Drums" instrument. WAV
         samples, so no decoder is needed yet. Drum keys, hi-hat choke, mic mix controls.
-        Map the Drums track type to it in instrumentfactory.cpp. Listen with the user; if it
-        disappoints, switch to the fallback SM Drums (we write its map).
+        Map the Drums track type to it in instrumentfactory.cpp. Sampler::setZones() must not
+        run during process(): loading a kit into a live track needs a safe handoff. Listen
+        with the user; if it disappoints, switch to the fallback SM Drums (we write its map).
 [ ] C4  FLAC decoder, hand-written, in the app (backend, shared): the sampler loads the
         Splendid piano with it, and audio import (E) reuses it later. Stream and frame
         parsing, subframes (constant, verbatim, fixed and LPC prediction), Rice-coded
