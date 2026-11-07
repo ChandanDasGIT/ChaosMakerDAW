@@ -11,7 +11,7 @@ RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
 Phase 4 done (4.4 not needed).
-Phase 5 done (5.1–5.3). Next: Phase 6 (see below). Track list minimum width settled: chips wrap (see 4.5).
+Phase 5 done (5.1–5.3). Next: Phase 6 — 6.1 decisions recorded, implementation next. Track list minimum width settled: chips wrap (see 4.5).
 Then Phase 6 (user requests: FX per track type, pro EQ, guitar suite sound).
 
 Decisions made by the user (keep to them):
@@ -418,8 +418,17 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
          session, undo?), the engine chain built from it, an "Add FX" picker in the panel
          (backend rules decide what each track type starts with and what it may add).
          Old projects: keep the EQ on a track when its bands are not flat.
-         Ask first: what other track types start with (vocal, audio, piano, drums...);
-         whether GuitarSuite can be removed from a guitar track; FX order rules.
+         Decided by the user (2026-11-07):
+         - No track starts with an FX chain, except an instrument track, which starts with
+           its own instrument FX: Electric/Acoustic Guitar -> GuitarSuite. Piano, Strings
+           and Drums have no instrument FX yet, so they start empty (the instrument catalog
+           can name one later). Vocal tracks start empty. The 10-band EQ is no longer
+           built in; it is an effect the user adds.
+         - GuitarSuite is fixed on guitar tracks (cannot be removed) and cannot be added to
+           other track types.
+         - The user reorders effects freely; the chain runs top to bottom.
+         - No undo for FX add / remove / reorder; changes apply immediately.
+         - Old projects: keep the EQ on a track when its bands are not flat (from above).
 [ ] 6.2  A professional parametric EQ plugin in the spirit of FabFilter Pro-Q 3 (our own
          design and name, not a copy of its look or branding). Interactive curve with
          draggable band nodes, many band shapes (bell, shelves, cuts with slopes, notch,
