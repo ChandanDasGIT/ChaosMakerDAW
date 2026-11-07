@@ -27,6 +27,25 @@ TEST(phase2, gate_rejects_noise_and_opens_for_notes) {
     const auto note = testsignals::sine(220, -12, 48000);
     CHECK_NEAR(tailRms(testsignals::render(gate, note, 128)), tailRms(note), 0.05);
 }
+TEST(phase2, gate_holds_through_a_short_dip_and_still_closes_on_silence) {
+    // A note just above the threshold, a 45 ms gap, then the note again: the hold keeps the
+    // gate fully open across the gap instead of punching a hole in the phrase.
+    NoiseGate gate; set(gate, "threshold", -48);
+    auto signal = testsignals::sine(220, -45, 48000);
+    const int gapStart = 24000, gapEnd = gapStart + 2160;           // 45 ms at 48 kHz
+    for (int i = gapStart; i < gapEnd; ++i) signal[std::size_t(i)] = 0;
+    for (auto& v : signal) v += 1e-6f;                              // a probe far below the threshold
+    const auto out = testsignals::render(gate, signal, 128);
+    double lowest = 1.0;
+    for (int i = gapStart; i < gapEnd; ++i) lowest = std::min(lowest, double(out[std::size_t(i)] / 1e-6f));
+    CHECK(lowest > 0.99);
+    // Silence after the note: once the hold and release have run, the gate is shut.
+    std::vector<float> tail(48000, 0.0f);
+    for (int i = 0; i < 4800; ++i) tail[std::size_t(i)] = float(0.01 * std::sin(testsignals::kTwoPi * 220 * i / 48000));
+    for (auto& v : tail) v += 1e-6f;
+    const auto shut = testsignals::render(gate, tail, 128);
+    CHECK(shut.back() / 1e-6f < 0.01);
+}
 TEST(phase2, compressor_reduces_peaks_and_unity_ratio_is_dry) {
     Compressor compressor;
     auto input = testsignals::sine(220, -6, 48000);
