@@ -64,10 +64,21 @@ decoder (C4) and the piano (C5).
         Done 2026-11-07: backend/instruments/sampler/ (zonemap, samplervoice, sampler; Sampler
         is a Processor, typeId "sampler", not yet in instrumentfactory). Tests: backendtests
         sampler. Not in yet: sustain pedal (C5), pitch bend, loop_sustain, rt_decay.
-[ ] C2  SFZ loader (hand-written parser, off the audio thread) and tools/sfzcheck (loads an
-        SFZ file and reports missing samples, unsupported opcodes, overlapping regions).
-        Support the opcodes the chosen libraries use first, including the ARIA extensions
-        both use (#define, set_hdcc, ...); add more later.
+[x] C2  SFZ loader, done 2026-11-08 (tools/sfzcheck postponed by the user: H3).
+        backend/audiofile/wavreader (whole WAV: PCM 8-32, float 32/64, extensible, smpl loop);
+        backend/instruments/sfz/sfzparser (comments, #define in order, #include from the main
+        file's folder, <control>/<global>/<master>/<group>/<region>/<curve>, values with
+        spaces, problems with file:line); sfzloader (regions -> SampleZones; CCs at the file's
+        set_cc/set_hdcc defaults decide locc/hicc and CC modulations, CC 133 = key; one read per
+        sample; modes Load/Verify/Exists; report: missing, unreadable, not-used-yet, unknown).
+        Tests: backendtests wavreader, sfzparser, sfzloader. On the real kits (sample-kits/,
+        git-ignored): drums Kit.sfz 2205 regions -> 980 zones, 278 MB, 0 problems/unknown;
+        piano 360 -> 303 zones, its 226 FLACs wait for C4.
+        FOR C3 (from the report): 84 sample=*silence regions are choke-only hits (hi-hat): the
+        sampler must take a zone without audio; amp_velcurve_N (1680 regions); hi-hat position
+        CC 4 and the mic mix CC 105 need live CC; offset/delay per mic, polyphony, cutoff.
+        FOR C5: ampeg_hold, sustain_cc/half pedal, amp_veltrack (velocity -> level is off in
+        Splendid at its default), note_polyphony, off_time.
 [ ] C3  DRUMS FIRST: Gogodze Phu Vol II (see C9) as the real "Drums" instrument. WAV
         samples, so no decoder is needed yet. Drum keys, hi-hat choke, mic mix controls.
         Map the Drums track type to it in instrumentfactory.cpp. Sampler::setZones() must not
@@ -238,6 +249,9 @@ H. WILL DO LATER (the user's choice)
 [L] H1  (was A4) Chaos EQ extras the user chose "not now": dynamic EQ, linear phase.
 [L] H2  (was A5) The 10-band EQ page's look: the user said they would redo it themselves
         (plan 3.10).
+[L] H3  (was part of C2) tools/sfzcheck: a command-line report for an SFZ file (missing samples,
+        what the loader cannot play yet, layers per key, duplicate regions), on top of
+        sfz::loadSfz's report. Build it if we write our own map (the SM Drums fallback).
 
 DECIDED NOT TO DO
 [x] Playing the harmonium from the piano's audio cable (pitch detection): the user chose MIDI
