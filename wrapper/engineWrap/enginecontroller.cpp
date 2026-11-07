@@ -841,7 +841,8 @@ void EngineController::attachProject(TrackListWrapper* model) {
                 for (const auto& track : model->project().tracks()) {
                     auto* fx = qobject_cast<GuitarSuiteModel*>(trackEffects(track->id));
                     const auto& state = content.trackEffectsJson[row];
-                    if (!fx->restoreSessionData(state)) {
+                    // Empty: the document dropped this pedalboard (no GuitarSuite on the track).
+                    if (!state.empty() && !fx->restoreSessionData(state)) {
                         m_sessionSaveBlocked = true;
                         setTransportMessage(fx->lastError() + " · saved session kept unchanged.");
                     }
@@ -1093,7 +1094,7 @@ bool EngineController::openProject(const QUrl& file) {
         fx->configure(sampleRate,std::max(128,m_engine->latency().captureFrames));
         connect(fx,&GuitarSuiteModel::busyChanged,this,[this] { QTimer::singleShot(0,this,[this]{finishProjectLoad();}); });
         const auto& state = content.trackEffectsJson[row];
-        if(!fx->restoreSessionData(state)) {
+        if(!state.empty() && !fx->restoreSessionData(state)) { // empty: pedalboard dropped by the document
             const auto message=fx->lastError(); cancelProjectLoad(); setTransportMessage(message+" · current project kept."); return false;
         }
     }

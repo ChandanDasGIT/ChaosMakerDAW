@@ -306,7 +306,8 @@ TEST(qtrecording, each_track_owns_fx_trim_eq_and_recordings_and_restores_after_i
         auto* b=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(tracks.trackIdAt(1)));
         auto* c=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(tracks.trackIdAt(2)));
         CHECK(a->count()==2); CHECK(b->count()==0); CHECK(c->count()==0);
-        CHECK_NEAR(a->inputTrimDb(),-6.020599913,1e-6); CHECK_NEAR(b->inputTrimDb(),-12.041199827,1e-6);
+        // The vocal has no GuitarSuite (plan 6.1): its saved trim, part of the pedalboard, is dropped.
+        CHECK_NEAR(a->inputTrimDb(),-6.020599913,1e-6); CHECK(b->inputTrimDb()==0);
         CHECK(c->inputTrimDb()==0); CHECK(a->data(a->index(0),GuitarSuiteModel::PedalTypeRole).toString()=="pedal.reverb");
         CHECK(a->data(a->index(0),GuitarSuiteModel::BypassedRole).toBool());
         CHECK(tracks.project().findTrack(tracks.trackIdAt(0))->eqGainDb[2]==-3);
@@ -329,14 +330,16 @@ TEST(qtrecording, legacy_shared_chain_migrates_to_independent_copies_and_invalid
         TrackListWrapper tracks; controller.attachProject(&tracks);
         auto* a=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(tracks.trackIdAt(0)));
         auto* b=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(tracks.trackIdAt(1)));
-        CHECK(a!=b); CHECK(a->count()==1 && b->count()==1); CHECK(a->inputTrimDb()==-7 && b->inputTrimDb()==-7);
-        CHECK(a->removePedal(a->data(a->index(0),GuitarSuiteModel::PedalIdRole).toInt())); CHECK(b->count()==1);
+        // The shared chain loads onto the guitar only; the vocal has no GuitarSuite (plan 6.1).
+        CHECK(a!=b); CHECK(a->count()==1 && b->count()==0); CHECK(a->inputTrimDb()==-7 && b->inputTrimDb()==0);
+        CHECK(a->addPedal("Delay")); CHECK(a->removePedal(a->data(a->index(0),GuitarSuiteModel::PedalIdRole).toInt()));
+        CHECK(a->count()==1);
         CHECK(controller.saveSession()); controller.shutdownSession();
     }
     QJsonObject invalid;
     { QFile file(path); CHECK(file.open(QIODevice::ReadOnly)); invalid=QJsonDocument::fromJson(file.readAll()).object(); }
     CHECK(invalid["version"].toInt()==2);
-    auto effects=invalid["trackEffects"].toArray(); effects[1]=QJsonObject{{"bad",true}}; invalid["trackEffects"]=effects;
+    auto effects=invalid["trackEffects"].toArray(); effects[0]=QJsonObject{{"bad",true}}; invalid["trackEffects"]=effects;
     const auto bytes=QJsonDocument(invalid).toJson();
     { QFile file(path); CHECK(file.open(QIODevice::WriteOnly)); file.write(bytes); }
     {
@@ -354,7 +357,7 @@ TEST(qtrecording, per_track_async_cabinet_restore_waits_for_all_tracks_and_prese
             TakeRecorder writer(ir.toStdString(),48000); float impulse[]{1,0,0,0};
             CHECK(writer.capture(impulse,4)); writer.finish(); writer.wait(); CHECK(writer.error().empty());
         }
-        TrackListWrapper original; original.addInstrumentTrackOfType("Electric Guitar"); original.addVocalTrack();
+        TrackListWrapper original; original.addInstrumentTrackOfType("Electric Guitar"); original.addInstrumentTrackOfType("Acoustic Guitar");
         auto preset=[&](double trim) {
             return QJsonObject{{"format","GuitarSuitePreset"},{"version",1},{"inputTrimDb",trim},
                 {"pedals",QJsonArray{QJsonObject{{"type","pedal.cabinet"},{"irPath",ir},{"parameters",QJsonObject{}}}}}};
@@ -386,7 +389,8 @@ TEST(qtrecording, per_track_async_cabinet_restore_waits_for_all_tracks_and_prese
 TEST(qtprojectfiles, save_as_open_and_new_preserve_clips_fx_and_named_file_state) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
     EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
-    const int track=tracks.addVocalTrack(); CHECK(setCaptureAndMonitor(tracks,track,true));
+    // A guitar: only tracks with GuitarSuite keep a pedalboard (plan 6.1).
+    const int track=tracks.addInstrumentTrackOfType("Electric Guitar"); CHECK(setCaptureAndMonitor(tracks,track,true));
     auto* fx=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(track)); CHECK(fx->addPedal("Tremolo")); fx->setInputTrimDb(-5);
     std::fill_n(io->input,128,0.2f); controller.transportAction("record"); io->process();
     const QUrl first=QUrl::fromLocalFile(storage.dir.path()+"/first.chaos"), second=QUrl::fromLocalFile(storage.dir.path()+"/second.chaos");
@@ -409,7 +413,8 @@ TEST(qtprojectfiles, save_as_open_and_new_preserve_clips_fx_and_named_file_state
 }
 TEST(qtprojectfiles, corrupt_files_and_failed_effect_resources_keep_the_current_document) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); EngineController controller(std::move(device),false);
-    TrackListWrapper tracks; controller.attachProject(&tracks); const int track=tracks.addAudioTrack();
+    // A guitar, so its (broken) pedalboard is actually loaded (plan 6.1).
+    TrackListWrapper tracks; controller.attachProject(&tracks); const int track=tracks.addInstrumentTrackOfType("Electric Guitar");
     CHECK(tracks.addClipAtBeat(track,1,4)>0);
     const QUrl good=QUrl::fromLocalFile(storage.dir.path()+"/good.chaos"); CHECK(controller.saveProject(good));
     const QUrl bad=QUrl::fromLocalFile(storage.dir.path()+"/bad.chaos");
@@ -474,7 +479,8 @@ TEST(qttrackmeters, controller_polls_track_levels_and_removes_stale_project_mete
 TEST(qtmultirecording, independent_inputs_monitor_fx_and_aligned_wet_dry_takes_survive_reopen) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get(); io->multipleInputs=true;
     EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
-    const int a=tracks.addInstrumentTrackOfType("Electric Guitar"), b=tracks.addVocalTrack();
+    // Both guitars: the trim lives in GuitarSuite, which only guitar tracks keep (plan 6.1).
+    const int a=tracks.addInstrumentTrackOfType("Electric Guitar"), b=tracks.addInstrumentTrackOfType("Acoustic Guitar");
     CHECK(tracks.setTrackInputPort(a,"test:input")); CHECK(tracks.setTrackInputPort(b,"test:mic"));
     auto* fxA=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(a));
     auto* fxB=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(b));

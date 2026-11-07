@@ -12,8 +12,8 @@ RESUME HERE (last updated 2026-11-07)
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
 Phase 4 done (4.4 not needed). Track list minimum width settled: chips wrap (see 4.5).
 Phase 5 done (5.1–5.3).
-Next: Phase 6 (user requests). 6.1 steps 1-2 done; next is step 3 (save/load the effect
-list, old projects keep a non-flat EQ). Added 2026-11-07: 6.4 stop-at-end setting (done),
+Next: Phase 6 (user requests). 6.1 steps 1-3 done; next is step 4 (wrapper exposes the
+effect list and add/remove/move to QML). Added 2026-11-07: 6.4 stop-at-end setting (done),
 6.5 time readout with 2 digits (done).
 
 Decisions made by the user (keep to them):
@@ -430,7 +430,7 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
            other track types.
          - The user reorders effects freely; the chain runs top to bottom.
          - No undo for FX add / remove / reorder; changes apply immediately.
-         - Old projects: keep the EQ on a track when its bands are not flat (from above).
+         - Old projects: no migration (user 2026-11-07: they were only tests).
          Steps:
          [x] 1 Backend model: Track::effects (ordered TrackEffectSlot list) and the rules in
                backend/plugins/effectchain (initial FX per track type, EQ addable once,
@@ -439,8 +439,11 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
                on the chain). TrackInput is trim only (always first); the EQ is its own
                TenBandEq per track (monitor + playback). Vocal/Audio/other tracks no longer
                run a GuitarSuite chain. Until step 3, saved projects load without their EQ.
-         [ ] 3 Save/load the list in project and session files; old projects keep a non-flat
-               EQ, guitar tracks always get GuitarSuite.
+         [x] 3 Save/load the list in project and session files ("effects": types in chain
+               order). User 2026-11-07: old projects were only tests, so no migration; files
+               without the list load each type's defaults. Bad lists are rejected; a guitar
+               missing GuitarSuite gets it back in front. Pedalboards (and the input trim
+               inside them) load only onto tracks with GuitarSuite; others are dropped.
          [ ] 4 Wrapper: expose the list and add/remove/move to QML.
          [ ] 5 FX panel: show the chain, "Add FX" picker, remove (not GuitarSuite), drag to
                reorder.

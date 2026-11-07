@@ -11,7 +11,8 @@ TEST(projectdocument, round_trip_serialization_and_deserialization)
     Project project;
     project.tempo().set(135.0, 3, 4, 48000.0);
 
-    auto& t1 = project.addTrack(TrackKind::Audio, "Rhythm", "Audio");
+    // A guitar type, so its pedalboard (GuitarSuite) is kept on load (plan 6.1).
+    auto& t1 = project.addTrack(TrackKind::Audio, "Rhythm", "Electric Guitar");
     t1.volume = 0.8f;
     t1.pan = -0.35f;
     t1.stripWidth = 150.0f;
@@ -154,7 +155,7 @@ TEST(projectdocument, legacy_v1_compatibility)
             "numerator": 4,
             "denominator": 4,
             "tracks": [
-                {"name":"Track 1","type":"Audio","volume":1.0,"eq":[0,0,0,0,0,0,0,0,0,0],"clips":[]},
+                {"name":"Track 1","type":"Electric Guitar","volume":1.0,"eq":[0,0,0,0,0,0,0,0,0,0],"clips":[]},
                 {"name":"Track 2","type":"Audio","volume":1.0,"eq":[0,0,0,0,0,0,0,0,0,0],"clips":[]}
             ]
         }
@@ -165,8 +166,9 @@ TEST(projectdocument, legacy_v1_compatibility)
     CHECK(ProjectDocument::deserialize(v1Json, loaded, error, 48000.0));
     CHECK(loaded.project.tracks().size() == 2);
     CHECK(loaded.trackEffectsJson.size() == 2);
+    // The shared v1 pedalboard loads onto the guitar; the Audio track has no GuitarSuite (plan 6.1).
     CHECK(loaded.trackEffectsJson[0].find("-2.0") != std::string::npos);
-    CHECK(loaded.trackEffectsJson[1].find("-2.0") != std::string::npos);
+    CHECK(loaded.trackEffectsJson[1].empty());
 }
 
 namespace {
@@ -277,4 +279,58 @@ TEST(projectdocument, mixer_strip_width_is_optional_and_validated)
     CHECK(loaded.project.tracks()[0]->stripWidth == 200.0f);
     CHECK(!ProjectDocument::deserialize(document(R"(,"stripWidth":20)"), loaded, error, 48000.0));
     CHECK(!ProjectDocument::deserialize(document(R"(,"stripWidth":"wide")"), loaded, error, 48000.0));
+}
+
+TEST(projectdocument, track_effects_round_trip_old_files_get_defaults_and_bad_lists_are_rejected)
+{
+    // Saved and loaded in chain order; pedalboards only survive on tracks with GuitarSuite.
+    Project project;
+    auto& guitar = project.addTrack(TrackKind::Instrument, "Gtr", "Electric Guitar");
+    auto& vocal = project.addTrack(TrackKind::Audio, "Vox", "Vocal");
+    auto& audio = project.addTrack(TrackKind::Audio, "Aux", "Audio");
+    const int eq = project.addTrackEffect(guitar.id, "eq");
+    CHECK(project.moveTrackEffect(guitar.id, eq, 0));
+    CHECK(project.addTrackEffect(vocal.id, "eq") > 0);
+    CHECK(audio.effects.empty());
+    const std::string pedals = R"({"pedals":[{"type":"pedal.tremolo"}]})";
+    const auto json = ProjectDocument::serialize(project, {}, {pedals, pedals, pedals});
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(json, loaded, error, 48000.0));
+    const auto types = [&](std::size_t row) {
+        std::vector<std::string> result;
+        for (const auto& slot : loaded.project.tracks()[row]->effects) result.push_back(slot.type);
+        return result;
+    };
+    using List = std::vector<std::string>;
+    CHECK(types(0) == (List{"eq", "guitarsuite"}));
+    CHECK(types(1) == List{"eq"});
+    CHECK(types(2).empty());
+    CHECK(loaded.trackEffectsJson[0].find("pedal.tremolo") != std::string::npos);
+    CHECK(loaded.trackEffectsJson[1].empty());   // vocal: no GuitarSuite, pedals dropped
+    CHECK(loaded.trackEffectsJson[2].empty());   // old-style pedals on an Audio track: dropped
+
+    const auto document = [](const std::string& type, const std::string& effectsField) {
+        return R"({"format":"ChaosMakerProject","version":2,"project":{"version":1,"bpm":120.0,
+            "sampleRate":48000.0,"numerator":4,"denominator":4,"tracks":[{"name":"T1","type":")" + type
+            + R"(","volume":1.0)" + effectsField + R"(,"eq":[0,0,0,0,0,0,0,0,0,0],"clips":[]}]},"trackEffects":[""]})";
+    };
+    // Files saved before plan 6.1 have no list: each track gets its type's defaults (no EQ).
+    CHECK(ProjectDocument::deserialize(document("Electric Guitar", ""), loaded, error, 48000.0));
+    CHECK(types(0) == List{"guitarsuite"});
+    CHECK(ProjectDocument::deserialize(document("Vocal", ""), loaded, error, 48000.0));
+    CHECK(types(0).empty());
+    // GuitarSuite is fixed on guitars: a list without it gets it back in front.
+    CHECK(ProjectDocument::deserialize(document("Acoustic Guitar", R"(,"effects":["eq"])"), loaded, error, 48000.0));
+    CHECK(types(0) == (List{"guitarsuite", "eq"}));
+    // Broken lists are rejected like other invalid track data.
+    for (const auto& [type, field] : std::vector<std::pair<std::string, std::string>>{
+             {"Vocal", R"(,"effects":["guitarsuite"])"},   // only guitars have GuitarSuite
+             {"Vocal", R"(,"effects":["eq","eq"])"},       // each effect at most once
+             {"Vocal", R"(,"effects":["reverb"])"},        // unknown effect
+             {"Vocal", R"(,"effects":"eq")"},              // not a list
+             {"Vocal", R"(,"effects":[1])"}}) {            // not a type name
+        CHECK(!ProjectDocument::deserialize(document(type, field), loaded, error, 48000.0));
+        CHECK(error == "Invalid track effects.");
+    }
 }

@@ -76,6 +76,10 @@ public:
     int addTrackEffect(int trackId, const std::string& type); // new effect id, or -1
     bool removeTrackEffect(int trackId, int effectId);
     bool moveTrackEffect(int trackId, int effectId, int toIndex);
+    // Replace the whole list (loading a file): types in order, each known, at most once, and
+    // GuitarSuite only where the track type has it. A missing fixed effect (GuitarSuite on a
+    // guitar) is put back at the front. False, and no change, if the list breaks a rule.
+    bool setTrackEffects(int trackId, const std::vector<std::string>& types);
     int addAudioClip(int trackId, AudioClip clip);
     std::vector<int> addAudioClips(const std::vector<std::pair<int, AudioClip>>& clips);
     bool removeAudioClip(int trackId, int clipId);
