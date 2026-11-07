@@ -66,7 +66,7 @@
       "type": "pedal.parametriceq"
     },
     {
-      "bypassed": false,
+      "bypassed": true,
       "irPath": "",
       "parameters": {
         "feedback": 0.2800000011920929,
