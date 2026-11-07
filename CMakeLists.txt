@@ -81,6 +81,12 @@ if(DAW_BUILD_APP)
     target_link_libraries(appChaosMaker PRIVATE Qt6::Quick Qt6::Concurrent dawengine)
 endif()
 
+# ---------------------------------------------------------------- tools (no Qt)
+# fxrender: runs a dry WAV through guitar suite pedals offline (listening tests, plan 6.3).
+add_executable(fxrender tools/fxrender/fxrender.cpp)
+target_compile_options(fxrender PRIVATE -Wall -Wextra)
+target_link_libraries(fxrender PRIVATE dawengine)
+
 # ---------------------------------------------------------------- the tests (no Qt)
 # tests/abc/abc_test.cpp is found by itself, and ctest gets one entry named abc.
 enable_testing()
