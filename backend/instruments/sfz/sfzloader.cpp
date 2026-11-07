@@ -22,7 +22,7 @@ const std::set<std::string, std::less<>> Mapped{
     "volume", "group_volume", "amplitude", "pan", "tune", "pitch", "transpose",
     "seq_length", "seq_position", "group", "off_by", "trigger",
     "loop_mode", "loopmode", "loop_start", "loopstart", "loop_end", "loopend",
-    "ampeg_attack", "ampeg_decay", "ampeg_sustain", "ampeg_release",
+    "ampeg_attack", "ampeg_decay", "ampeg_sustain", "ampeg_release", "offset", "delay",
 };
 
 // Opcodes that only name things: nothing to play, nothing to report.
@@ -32,10 +32,10 @@ const std::set<std::string, std::less<>> Labels{
 
 // Understood, but the sampler does not do them yet (the drums and piano add what they need).
 const std::set<std::string, std::less<>> NotYet{
-    "offset", "offset_random", "delay", "delay_random", "end", "count",
+    "offset_random", "delay_random", "end", "count",
     "cutoff", "resonance", "fil_type", "fil_veltrack", "fil_keytrack", "fil_random",
     "polyphony", "note_polyphony", "polyphony_group", "off_mode", "off_time",
-    "amp_veltrack", "amp_velcurve_", "amp_keytrack", "amp_keycenter", "amp_random",
+    "amp_veltrack", "amp_keytrack", "amp_keycenter", "amp_random",
     "ampeg_hold", "ampeg_delay", "ampeg_start", "ampeg_dynamic",
     "ampeg_attack_shape", "ampeg_decay_shape", "ampeg_release_shape",
     "sustain_cc", "sustain_sw", "sostenuto_cc", "pitch_veltrack", "pitch_random",
@@ -50,6 +50,7 @@ const std::set<std::string, std::less<>> NotYet{
 const std::set<std::string, std::less<>> Modulated{
     "amplitude", "volume", "pan", "tune", "pitch",
     "ampeg_attack", "ampeg_decay", "ampeg_sustain", "ampeg_release", "ampeg_hold", "ampeg_delay",
+    "offset", "delay",
 };
 
 const std::set<std::string, std::less<>> ControlKnown{"default_path", "set_cc", "set_hdcc", "label_cc", "label_key"};
@@ -142,13 +143,6 @@ private:
     std::map<int, std::array<double, 128>> m_custom;
 };
 
-struct SampleEntry {
-    bool usable = false;                  // read (or, when only checking, found)
-    std::shared_ptr<const AudioData> audio;
-    bool hasLoop = false;
-    std::int64_t loopStart = 0, loopEnd = 0;
-};
-
 bool isFlac(const std::string& path)
 {
     std::string ext = std::filesystem::path(path).extension().string();
@@ -159,7 +153,8 @@ bool isFlac(const std::string& path)
 class Builder {
 public:
     Builder(const Document& doc, const LoadOptions& options, LoadResult& out)
-        : m_doc(doc), m_options(options), m_out(out), m_curves(doc)
+        : m_doc(doc), m_options(options), m_out(out), m_curves(doc),
+          m_cache(options.cache ? options.cache : std::make_shared<SampleCache>())
     {
         m_cc.fill(0.0);
         for (const auto& op : doc.control) {
@@ -175,6 +170,8 @@ public:
                 ++m_out.report.unknownOpcodes["<control> " + reportName(op.name)];
             }
         }
+        for (const auto& [cc, value] : options.controllers)
+            if (cc >= 0 && cc < 128) m_cc[std::size_t(cc)] = std::clamp(value / 127.0, 0.0, 1.0);
     }
 
     void region(const Region& r)
@@ -186,7 +183,8 @@ public:
         std::string sample;
         int keyTrack = 100;
         double volume = 0.0, groupVolume = 0.0, amplitude = 100.0, pan = 0.0, tune = 0.0, transpose = 0.0;
-        double attack = 0.0, decay = 0.0, sustain = 100.0, release = 0.001;
+        double attack = 0.0, decay = 0.0, sustain = 100.0, release = 0.001, offset = 0.0, delay = 0.0;
+        std::map<int, double> velocityPoints;                   // amp_velcurve_N
         std::string loopMode, trigger = "attack";
         bool loopStartSet = false, loopEndSet = false;
         std::map<std::string, std::map<int, Mod>> mods;         // base -> cc -> modulation
@@ -236,11 +234,18 @@ public:
                 else if (name == "ampeg_decay") decay = v;
                 else if (name == "ampeg_sustain") sustain = v;
                 else if (name == "ampeg_release") release = v;
+                else if (name == "offset") offset = v;
+                else if (name == "delay") delay = v;
                 continue;
             }
 
             const auto [prefix, n] = splitNumber(name);
             if (n >= 0) {
+                if (prefix == "amp_velcurve_") {
+                    if (!num()) continue;
+                    if (n <= 127) velocityPoints[n] = v;
+                    continue;
+                }
                 if (prefix == "locc" || prefix == "hicc") {
                     if (!num()) continue;
                     auto& range = conditions.try_emplace(n, 0, 127).first->second;
@@ -274,8 +279,14 @@ public:
         if (trigger == "release") z.releaseTrigger = true;
         else if (trigger != "attack") { ++m_out.report.unusedOpcodes["trigger=" + trigger]; leftOut(""); return; }
         if (sample.empty()) { leftOut("region has no sample"); return; }
-        if (sample[0] == '*') { ++m_out.report.unusedOpcodes["sample=" + sample]; leftOut(""); return; }
         if (z.loKey < 0 || z.hiKey < 0) { leftOut(""); ++m_out.report.unusedOpcodes["keyless region (lokey=-1)"]; return; }
+        if (sample == "*silence") {                             // a hit that only chokes its group
+            z.silent = true;
+            m_out.zones.push_back(std::move(z));
+            m_out.sources.push_back({sample, r.file, r.line});
+            return;
+        }
+        if (sample[0] == '*') { ++m_out.report.unusedOpcodes["sample=" + sample]; leftOut(""); return; }
 
         if (keyTrack == 0) {
             if (z.loKey != z.hiKey) problem(r, "pitch_keytrack=0 over a key range: played with pitch tracking");
@@ -300,6 +311,8 @@ public:
         decay += add("ampeg_decay");
         sustain += add("ampeg_sustain");
         release += add("ampeg_release");
+        offset += add("offset");
+        delay += add("delay");
         if (!(gain > 0.0)) {
             if (controlled) ++m_out.report.leftOutByControllers; else leftOut("");
             return;
@@ -311,11 +324,14 @@ public:
         z.decay = float(std::max(decay, 0.0));
         z.sustain = float(std::clamp(sustain / 100.0, 0.0, 1.0));
         z.release = float(std::max(release, 0.0));
+        z.offset = std::max<std::int64_t>(0, std::llround(offset));
+        z.delaySeconds = float(std::clamp(delay, 0.0, 10.0));
+        if (!velocityPoints.empty()) z.velocityCurve = velocityCurve(velocityPoints);
 
         std::string relative = r.defaultPath + sample;
         std::replace(relative.begin(), relative.end(), '\\', '/');
         const std::string path = (std::filesystem::path(m_doc.folder) / relative).lexically_normal().string();
-        const SampleEntry& entry = load(path);
+        const SampleCache::Entry entry = load(path);
         if (!entry.usable) { leftOut(""); return; }
         z.audio = entry.audio;
 
@@ -363,6 +379,26 @@ private:
         return false;
     }
 
+    // The gain for each velocity through the given points (0 at 0 and 1 at 127 unless given),
+    // straight lines between them. Regions with the same points share one curve.
+    std::shared_ptr<const SampleZone::VelocityCurve> velocityCurve(const std::map<int, double>& given)
+    {
+        if (const auto it = m_velocityCurves.find(given); it != m_velocityCurves.end()) return it->second;
+        std::map<int, double> points = given;
+        points.try_emplace(0, 0.0);
+        points.try_emplace(127, 1.0);
+        auto curve = std::make_shared<SampleZone::VelocityCurve>();
+        auto left = points.begin();
+        for (auto right = std::next(left); right != points.end(); left = right++) {
+            for (int v = left->first; v <= right->first; ++v) {
+                const double t = double(v - left->first) / double(right->first - left->first);
+                (*curve)[std::size_t(v)] = float(std::clamp(left->second + (right->second - left->second) * t, 0.0, 1.0));
+            }
+        }
+        m_velocityCurves.emplace(given, curve);
+        return curve;
+    }
+
     double ccValue(int cc, int rootKey) const
     {
         if (cc >= 0 && cc < 128) return m_cc[std::size_t(cc)];
@@ -370,10 +406,11 @@ private:
         return 0.0;
     }
 
-    const SampleEntry& load(const std::string& path)
+    SampleCache::Entry load(const std::string& path)
     {
-        if (const auto it = m_samples.find(path); it != m_samples.end()) return it->second;
-        SampleEntry& e = m_samples[path];
+        std::lock_guard lock(m_cache->mutex);
+        if (const auto it = m_cache->entries.find(path); it != m_cache->entries.end()) return it->second;
+        SampleCache::Entry& e = m_cache->entries[path];
         auto& report = m_out.report;
         if (!std::filesystem::exists(path)) { report.missingSamples.push_back(path); return e; }
         if (isFlac(path)) {
@@ -405,7 +442,8 @@ private:
     LoadResult& m_out;
     Curves m_curves;
     std::array<double, 128> m_cc{};
-    std::map<std::string, SampleEntry> m_samples;
+    std::shared_ptr<SampleCache> m_cache;
+    std::map<std::map<int, double>, std::shared_ptr<const SampleZone::VelocityCurve>> m_velocityCurves;
 };
 
 } // namespace

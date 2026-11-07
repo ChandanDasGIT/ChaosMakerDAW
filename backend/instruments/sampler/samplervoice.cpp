@@ -23,10 +23,12 @@ void SamplerVoice::start(const SampleZone& zone, int key, int velocity, double o
 {
     m_zone = &zone;
     m_key = key;
-    m_position = 0.0;
     if (!(outputRate > 0.0)) outputRate = 48000.0;
 
     const auto& audio = *zone.audio;
+    m_position = double(std::clamp<std::int64_t>(zone.offset, 0, audio.frames));
+    m_delayFrames = std::isfinite(zone.delaySeconds) && zone.delaySeconds > 0.0f
+                  ? std::int64_t(double(zone.delaySeconds) * outputRate) : 0;
     const double sourceRate = audio.sampleRate > 0.0 ? audio.sampleRate : outputRate;
     const double semitones = double(key - zone.rootKey) + double(zone.tuneCents) / 100.0;
     m_increment = std::exp2(semitones / 12.0) * sourceRate / outputRate;
@@ -36,8 +38,10 @@ void SamplerVoice::start(const SampleZone& zone, int key, int velocity, double o
     m_loopStart = zone.loopStart;
     m_loopEnd = zone.loopEnd;
 
-    const float vel = float(std::clamp(velocity, 0, 127)) / 127.0f;
-    const float gain = vel * vel * std::pow(10.0f, zone.volumeDb / 20.0f);
+    velocity = std::clamp(velocity, 0, 127);
+    const float vel = float(velocity) / 127.0f;
+    const float velocityGain = zone.velocityCurve ? (*zone.velocityCurve)[std::size_t(velocity)] : vel * vel;
+    const float gain = velocityGain * std::pow(10.0f, zone.volumeDb / 20.0f);
     const float pan = std::clamp(std::isfinite(zone.pan) ? zone.pan : 0.0f, -1.0f, 1.0f);
     if (audio.channels.size() >= 2) {                      // balance
         m_gainLeft = gain * std::min(1.0f, 1.0f - pan);
@@ -80,6 +84,7 @@ void SamplerVoice::stop() noexcept
     m_zone = nullptr;
     m_key = -1;
     m_fading = false;
+    m_delayFrames = 0;
 }
 
 float SamplerVoice::sampleAt(int channel, std::int64_t index) const noexcept
@@ -132,7 +137,14 @@ void SamplerVoice::render(float* left, float* right, int frames) noexcept
     const bool stereo = m_zone->audio->channels.size() >= 2;
     const std::int64_t length = m_zone->audio->frames;
 
-    for (int i = 0; i < frames; ++i) {
+    int i = 0;
+    if (m_delayFrames > 0) {                               // waiting for the sample to start
+        const int wait = int(std::min<std::int64_t>(m_delayFrames, frames));
+        m_delayFrames -= wait;
+        i = wait;
+        if (m_stage == Stage::Release && m_fading) { stop(); return; }   // choked before it began
+    }
+    for (; i < frames; ++i) {
         if (!m_looping && m_position >= double(length)) { stop(); return; }
         const float level = nextEnvelope();                // so a zero attack plays frame 0 in full
         if (m_stage == Stage::Off) return;

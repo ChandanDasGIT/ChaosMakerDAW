@@ -7,6 +7,7 @@
 #include <cmath>
 #include <memory>
 #include <numbers>
+#include <thread>
 
 namespace {
 
@@ -725,4 +726,145 @@ TEST(sampler, works_as_a_processor_and_prepare_stops_the_old_voices)
     CHECK(sampler.zones().size() == 1);                            // the zones stay
     Block empty(2, 0);
     empty.run(*processor);                                         // nothing to do, no crash
+}
+
+
+// ---------------------------------------------------------------- velocity curves, offset, delay
+
+TEST(sampler, voice_uses_the_zone_velocity_curve)
+{
+    auto curve = std::make_shared<SampleZone::VelocityCurve>();
+    for (int v = 0; v < 128; ++v) (*curve)[std::size_t(v)] = v >= 31 ? 1.0f : float(v) / 31.0f;
+    auto zone = plainZone(makeAudio({std::vector<float>(64, 1.0f)}));
+    SamplerVoice voice;
+    voice.start(zone, 60, 31, rate);
+    CHECK_NEAR(render(voice, 4).left[2], (31.0 / 127.0) * (31.0 / 127.0), 1e-6);   // no curve: velocity squared
+    zone.velocityCurve = curve;
+    voice.start(zone, 60, 31, rate);
+    CHECK_NEAR(render(voice, 4).left[2], 1.0, 1e-6);                                 // full at 31
+    voice.start(zone, 60, 10, rate);
+    CHECK_NEAR(render(voice, 4).left[2], 10.0 / 31.0, 1e-6);
+}
+
+TEST(sampler, voice_starts_at_the_offset_after_the_delay)
+{
+    auto zone = plainZone(makeAudio({ramp(32)}));
+    zone.offset = 10;
+    SamplerVoice voice;
+    voice.start(zone, 60, 127, rate);
+    CHECK_NEAR(render(voice, 1).left[0], 10.0, 1e-6);
+
+    zone.offset = 0;
+    zone.delaySeconds = float(5.0 / rate);
+    voice.start(zone, 60, 127, rate);
+    const auto out = render(voice, 8);
+    for (int i = 0; i < 5; ++i) CHECK(out.left[std::size_t(i)] == 0.0f);
+    CHECK_NEAR(out.left[5], 0.0, 1e-6);                          // the sample's frame 0
+    CHECK_NEAR(out.left[6], 1.0, 1e-6);
+
+    zone.offset = 99;                                            // past the end: nothing to play
+    zone.delaySeconds = 0.0f;
+    voice.start(zone, 60, 127, rate);
+    render(voice, 4);
+    CHECK(!voice.active());
+
+    zone.offset = 0;
+    zone.delaySeconds = 0.01f;
+    voice.start(zone, 60, 127, rate);
+    voice.fadeOut();                                             // choked before it began
+    const auto choked = render(voice, 960);
+    CHECK(!voice.active());
+    for (const float x : choked.left) CHECK(x == 0.0f);
+}
+
+TEST(sampler, sampler_silent_zone_chokes_without_starting_a_voice)
+{
+    auto open = keyZone(46); open.group = 2; open.offBy = 1;
+    SampleZone mute;                                             // sample=*silence
+    mute.silent = true;
+    mute.loKey = mute.hiKey = 44;
+    mute.group = 1;
+    SampleZone empty;                                            // no audio and not silent: dropped
+    empty.loKey = empty.hiKey = 50;
+    Sampler sampler;
+    CHECK(sampler.setZones({open, mute, empty}) == 1);
+    sampler.noteOn(46, 100);
+    sampler.noteOn(44, 100);
+    CHECK(countVoices(sampler, 46, true) == 1);                  // the open hat is choked
+    CHECK(countVoices(sampler, 44) == 0 && countVoices(sampler, 44, true) == 0);
+    CHECK(sampler.activeVoices() == 1);
+}
+
+// ---------------------------------------------------------------- handing zones to a live sampler
+
+TEST(sampler, staged_zones_reach_a_playing_sampler_and_the_old_set_is_freed)
+{
+    Sampler sampler;
+    sampler.prepare(rate, 64);
+    sampler.setZones({keyZone(60)});
+    Block block(2, 64);
+    block.event(0, 0x90, 60, 100);
+    block.run(sampler);
+    block.midi.clear();
+    CHECK(countVoices(sampler, 60) == 1);
+
+    CHECK(sampler.collectRetired() == 0);
+    CHECK(sampler.stageZones({keyZone(62, 0.5f)}) == 0);
+    CHECK(sampler.zonesPending());
+    CHECK(countVoices(sampler, 60) == 1);                        // nothing changes before the next block
+    block.run(sampler);
+    CHECK(!sampler.zonesPending());
+    CHECK(countVoices(sampler, 60, true) == 1);                  // the old note fades out
+    for (int i = 0; i < 10; ++i) block.run(sampler);             // 10 ms: the fade is over
+    CHECK(sampler.activeVoices() == 0);
+    block.run(sampler);                                          // the old set is handed back
+    CHECK(sampler.collectRetired() == 1);
+    CHECK(sampler.collectRetired() == 0);
+
+    block.event(0, 0x90, 60, 100);                               // the old key has no zone now
+    block.event(0, 0x90, 62, 100);
+    block.run(sampler);
+    CHECK(countVoices(sampler, 60) == 0 && countVoices(sampler, 62) == 1);
+    CHECK(sampler.zones().size() == 1 && sampler.zones().zone(0).loKey == 62);
+}
+
+TEST(sampler, a_newer_staged_set_replaces_one_not_taken_yet)
+{
+    Sampler sampler;
+    sampler.prepare(rate, 64);
+    sampler.stageZones({keyZone(40)});
+    sampler.stageZones({keyZone(41)});
+    Block block(2, 64);
+    block.event(0, 0x90, 40, 100);
+    block.event(0, 0x90, 41, 100);
+    block.run(sampler);
+    CHECK(countVoices(sampler, 40) == 0 && countVoices(sampler, 41) == 1);
+}
+
+TEST(sampler, staging_from_another_thread_while_blocks_play)
+{
+    Sampler sampler;
+    sampler.prepare(rate, 64);
+    sampler.setZones({keyZone(60)});
+    std::atomic<bool> done{false};
+    std::thread control([&] {
+        for (int i = 0; i < 200; ++i) sampler.stageZones({keyZone(60 + i % 3, 0.25f), keyZone(36)});
+        done = true;
+    });
+    Block block(2, 64);
+    int blocks = 0;
+    while (!done || blocks < 2000) {
+        block.event(0, 0x90, std::uint8_t(60 + blocks % 3), 100);
+        if (blocks % 7 == 0) block.event(1, 0x90, 36, 90);
+        for (auto& channel : block.data) std::fill(channel.begin(), channel.end(), 0.0f);
+        block.run(sampler);
+        block.midi.clear();
+        for (const float x : block.data[0]) CHECK(std::isfinite(x));
+        ++blocks;
+        if (blocks > 200000) break;
+    }
+    control.join();
+    for (int i = 0; i < 50; ++i) { block.run(sampler); sampler.collectRetired(); }
+    CHECK(!sampler.zonesPending());
+    CHECK(sampler.zones().size() == 2);
 }

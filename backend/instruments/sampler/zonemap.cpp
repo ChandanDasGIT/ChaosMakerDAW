@@ -6,7 +6,8 @@ namespace {
 
 bool playable(const SampleZone& zone)
 {
-    return zone.audio && zone.audio->frames > 0 && !zone.audio->channels.empty()
+    const bool sound = zone.silent || (zone.audio && zone.audio->frames > 0 && !zone.audio->channels.empty());
+    return sound
         && zone.loKey >= 0 && zone.hiKey <= 127 && zone.loKey <= zone.hiKey
         && zone.loVelocity >= 0 && zone.hiVelocity <= 127 && zone.loVelocity <= zone.hiVelocity
         && zone.roundRobinLength >= 1 && zone.roundRobinPosition >= 1

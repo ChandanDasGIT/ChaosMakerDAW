@@ -9,7 +9,9 @@
 //
 // Conventions follow SFZ:
 //   pitch      the sample plays at its own pitch on rootKey; tuneCents shifts it further
-//   velocity   gain is (velocity / 127)^2 (amp_veltrack 100 %)
+//   velocity   gain is the zone's velocity curve, or (velocity / 127)^2 (amp_veltrack 100 %)
+//   offset     the sample starts at the zone's offset frame; delaySeconds of silence come first
+//              (the envelope starts when the sample does)
 //   envelope   linear attack, then exponential decay to sustain; release falls exponentially
 //              from wherever the level is, reaching -60 dB after `release` seconds
 //   pan        -1 (left) .. +1 (right); a mono sample is panned with equal power, unity in
@@ -20,7 +22,8 @@ class SamplerVoice {
 public:
     enum class Stage { Off, Attack, Decay, Sustain, Release };
 
-    // Starts the note at the beginning of the sample. outputRate is the engine's sample rate.
+    // Starts the note at the zone's offset, after its delay. outputRate is the engine's rate.
+    // A silent zone has no sample: it must not be started.
     void start(const SampleZone& zone, int key, int velocity, double outputRate) noexcept;
 
     // Starts the release from the current level (a held note was let go).
@@ -55,6 +58,7 @@ private:
     Stage m_stage = Stage::Off;
     int m_key = -1;
     double m_position = 0.0;
+    std::int64_t m_delayFrames = 0;                        // output frames of silence left before the sample
     double m_increment = 1.0;
     bool m_looping = false;
     std::int64_t m_loopStart = 0, m_loopEnd = 0;           // checked against the sample length

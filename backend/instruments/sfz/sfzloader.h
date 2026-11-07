@@ -3,6 +3,8 @@
 #include "instruments/sfz/sfzparser.h"
 
 #include <map>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -23,8 +25,23 @@ enum class SampleMode {
     Exists,                               // only check the files are there (zones get no audio)
 };
 
+// Samples read so far, by full path. Give one cache to several loads of the same file (other
+// controller values) and each sample is read once. Safe to share between threads.
+struct SampleCache {
+    struct Entry {
+        bool usable = false;              // read (or, when only checking, found)
+        std::shared_ptr<const AudioData> audio;
+        bool hasLoop = false;
+        std::int64_t loopStart = 0, loopEnd = 0;
+    };
+    std::mutex mutex;
+    std::map<std::string, Entry> entries;
+};
+
 struct LoadOptions {
     SampleMode samples = SampleMode::Load;
+    std::map<int, double> controllers;    // CC number -> 0..127, over the file's own defaults
+    std::shared_ptr<SampleCache> cache;   // none: a cache for this load only
 };
 
 struct ZoneSource {

@@ -4,14 +4,18 @@
 #include "processor/processor.h"
 
 #include <array>
+#include <atomic>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <span>
 #include <vector>
 
 // A sample player: turns notes into voices that play the matching zones.
 //
 // prepare(), setPolyphony() and setZones() allocate and run off the audio thread, never while
-// process() or render() runs. Everything else runs on the audio thread without allocating.
+// process() or render() runs. stageZones() and collectRetired() run on any other thread, also
+// while audio plays. Everything else runs on the audio thread without allocating.
 //
 //   MIDI           process() plays note-on / note-off at their frame in the block; CC 123 (all
 //                  notes off) releases every note, CC 120 (all sound off) silences at once.
@@ -21,7 +25,12 @@
 //   release zones  play on note-off, at the velocity of the note-on, and are not cut by it
 //   one-shot zones ignore note-off and play to their end (drums)
 //   choke groups   a starting zone fades out every voice whose zone has offBy == its group
-//                  (a closed hi-hat stops the open one); group 0 chokes nothing
+//                  (a closed hi-hat stops the open one); group 0 chokes nothing. A silent zone
+//                  only chokes: it starts no voice.
+//   new zones      stageZones() hands a new set to a live sampler: the audio thread takes it at
+//                  the start of its next block and fades out what still sounds (a few ms).
+//                  The old set is kept until no voice plays from it; collectRetired() frees it
+//                  on the calling thread. The audio thread never allocates or frees.
 //   polyphony      at most `polyphony` voices sound unfaded; one more fades out the oldest.
 //                  The pool holds twice that, so fading voices finish without a click.
 class Sampler final : public Processor {
@@ -37,8 +46,17 @@ public:
 
     void setPolyphony(int polyphony);                      // default 64; stops every voice
 
+    ~Sampler() override;
+
     // Stops every voice, then replaces the zones. Returns how many zones were dropped.
     int setZones(std::vector<SampleZone> zones);
+
+    // Builds the zones here and gives them to the audio thread for its next block. Returns how
+    // many zones were dropped. A set staged before that one is taken replaces it.
+    int stageZones(std::vector<SampleZone> zones);
+    // Frees zone sets the audio thread no longer uses; returns how many. stageZones() calls it.
+    int collectRetired();
+    bool zonesPending() const noexcept { return m_pending.load(std::memory_order_acquire) != nullptr; }
 
     void noteOn(int key, int velocity) noexcept;           // velocity 0 is a note-off
     void noteOff(int key) noexcept;
@@ -50,7 +68,7 @@ public:
 
     int activeVoices() const noexcept;
     std::span<const SamplerVoice> voices() const noexcept { return m_voices; }
-    const ZoneMap& zones() const noexcept { return m_zones; }
+    const ZoneMap& zones() const noexcept { return *m_active; }   // read it while no audio runs
 
 private:
     void handle(const MidiEvent& event) noexcept;
@@ -58,8 +76,16 @@ private:
     SamplerVoice* freeVoice() noexcept;
     void limitPolyphony() noexcept;
     void startZones(int key, int velocity, std::span<const int> zones) noexcept;
+    void takeStagedZones() noexcept;                       // audio thread, block start
+    int collectRetiredLocked();
 
-    ZoneMap m_zones;
+    // Every zone set lives here until it is retired; only non-audio threads touch the list.
+    std::mutex m_ownedMutex;
+    std::vector<std::unique_ptr<ZoneMap>> m_owned;
+    const ZoneMap* m_active = nullptr;                     // what the audio thread plays
+    const ZoneMap* m_retiring = nullptr;                   // the set before, while voices still use it
+    std::atomic<ZoneMap*> m_pending{nullptr};              // staged, not taken yet
+    std::atomic<ZoneMap*> m_retired{nullptr};              // done, for collectRetired()
     double m_sampleRate = 48000.0;
     int m_polyphony = 64;
     std::vector<SamplerVoice> m_voices;

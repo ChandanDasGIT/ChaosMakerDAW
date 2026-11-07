@@ -141,11 +141,11 @@ TEST(sfzloader, missing_and_unreadable_samples_and_opcodes_are_reported)
     writeText(dir.path / "piano.flac", "fLaC");
     writeText(dir.path / "bad.wav", "not a wav");
     writeText(dir.path / "i.sfz", R"(
-<region> key=60 sample=ok.wav offset=100 amp_velcurve_31=1 cutoff=1000 region_label=x wobble=3
+<region> key=60 sample=ok.wav polyphony=2 amp_veltrack=50 cutoff=1000 region_label=x wobble=3
 <region> key=61 sample=gone.wav
 <region> key=62 sample=piano.flac
 <region> key=63 sample=bad.wav
-<region> key=64 sample=ok.wav offset_cc110=20 trigger=first
+<region> key=64 sample=ok.wav cutoff_cc1=20 trigger=first
 <region> key=65
 <region> key=66 sample=*sine
 <region> lokey=-1 sample=ok.wav
@@ -161,9 +161,9 @@ TEST(sfzloader, missing_and_unreadable_samples_and_opcodes_are_reported)
         else CHECK(file.ends_with("bad.wav") && why.find("bad.wav") != std::string::npos);
     }
     CHECK(r.report.leftOutOther == 7);
-    CHECK(r.report.unusedOpcodes.at("offset") == 1 && r.report.unusedOpcodes.at("amp_velcurve_N") == 1);
+    CHECK(r.report.unusedOpcodes.at("polyphony") == 1 && r.report.unusedOpcodes.at("amp_veltrack") == 1);
     CHECK(r.report.unusedOpcodes.at("cutoff") == 1 && r.report.unusedOpcodes.at("trigger=first") == 1);
-    CHECK(r.report.unusedOpcodes.at("offset_ccN") == 1);
+    CHECK(r.report.unusedOpcodes.at("cutoff_ccN") == 1);
     CHECK(r.report.unknownOpcodes.size() == 1 && r.report.unknownOpcodes.at("wobble") == 1);
     CHECK(!r.report.unusedOpcodes.contains("region_label"));
     bool noSample = false, badValue = false;
@@ -216,4 +216,54 @@ TEST(sfzloader, loaded_zones_play_in_the_sampler)
     float peak = 0.0f;
     for (float x : l) peak = std::max(peak, std::abs(x));
     CHECK(peak > 0.1f);
+}
+
+TEST(sfzloader, silence_velocity_curves_offset_and_delay_reach_the_zones)
+{
+    Folder dir("drumparts");
+    writeWav(dir.path / "hat.wav");
+    writeText(dir.path / "k.sfz", R"(
+<control> set_cc110=127
+<curve> curve_index=10 v000=0 v127=1
+<global> loop_mode=one_shot
+<group> key=46 hivel=31 amp_velcurve_31=1 group=2 off_by=1
+<region> sample=hat.wav offset=7 delay=0.002 offset_cc110=20 delay_oncc110=0.004 delay_curvecc110=10
+<region> sample=hat.wav seq_position=1 amp_velcurve_31=1
+<group> key=44 group=1 seq_length=1
+<region> sample=*silence
+<group> key=40 lovel=32 amp_velcurve_63=0.5
+<region> sample=hat.wav
+)");
+    const auto r = loadSfz((dir.path / "k.sfz").string());
+    CHECK(r.report.problems.empty());
+    CHECK(r.zones.size() == 4 && r.report.leftOutOther == 0);
+    CHECK(r.report.unusedOpcodes.empty() && r.report.unknownOpcodes.empty());
+    if (r.zones.size() != 4) return;
+    const auto& hit = r.zones[0];
+    CHECK(hit.offset == 27);                                     // 7 + 20 at cc110 = 127
+    CHECK_NEAR(hit.delaySeconds, 0.006, 1e-6);                   // 2 ms + 4 ms on its curve
+    CHECK(hit.velocityCurve && hit.velocityCurve == r.zones[1].velocityCurve);   // same points, one curve
+    if (hit.velocityCurve) {
+        CHECK_NEAR((*hit.velocityCurve)[0], 0.0, 1e-6);
+        CHECK_NEAR((*hit.velocityCurve)[31], 1.0, 1e-6);
+        CHECK_NEAR((*hit.velocityCurve)[127], 1.0, 1e-6);
+        CHECK_NEAR((*hit.velocityCurve)[10], 10.0 / 31.0, 1e-6);
+    }
+    const auto& mute = r.zones[2];
+    CHECK(mute.silent && !mute.audio && mute.loKey == 44 && mute.group == 1);
+    CHECK(r.sources[2].sample == "*silence");
+    const auto& soft = r.zones[3];                               // 0 at 0, 0.5 at 63, 1 at 127
+    CHECK(soft.velocityCurve && soft.velocityCurve != hit.velocityCurve);
+    if (soft.velocityCurve) {
+        CHECK_NEAR((*soft.velocityCurve)[63], 0.5, 1e-6);
+        CHECK_NEAR((*soft.velocityCurve)[95], 0.75, 1e-6);
+    }
+
+    Sampler sampler;                                             // the silent zone loads and chokes
+    CHECK(sampler.setZones(r.zones) == 0);
+    sampler.noteOn(46, 20);
+    sampler.noteOn(44, 100);
+    int fading = 0;
+    for (const auto& v : sampler.voices()) fading += v.active() && v.fading();
+    CHECK(fading == 2 && sampler.activeVoices() == 2);           // both hat layers choked, no pedal voice
 }
