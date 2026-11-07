@@ -94,6 +94,8 @@ QVariant TrackListWrapper::data(const QModelIndex& index, int role) const
         return track.kind == TrackKind::Instrument ? QStringLiteral("instrument") : QStringLiteral("audio");
     case LiveInputRole:
         return track.hasLiveInput();
+    case CanMonitorRole:
+        return track.canMonitor();
     case RecordDryRole:
         return track.recordDry;
     case RecordsWithFxRole:
@@ -165,6 +167,7 @@ QHash<int, QByteArray> TrackListWrapper::roleNames() const
         {EqBandsRole, "eqBands"},
         {EffectsRole, "effects"},
         {LiveInputRole, "hasLiveInput"},
+        {CanMonitorRole, "canMonitor"},
         {RecordsWithFxRole, "recordsWithFx"},
         {RecordDryRole, "recordDry"}
     };

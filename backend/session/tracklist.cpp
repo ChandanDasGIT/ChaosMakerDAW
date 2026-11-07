@@ -256,7 +256,7 @@ TrackList::Change TrackList::moveTrackEffect(int trackId, int effectId, int toIn
 TrackList::Change TrackList::setMonitorEnabled(int id, bool value)
 {
     auto* track = m_project.findTrack(id);
-    if (!track || !track->hasLiveInput()) return {};
+    if (!track || !track->canMonitor()) return {};
     if (track->monitorEnabled == value) return {true, false};
     track->monitorEnabled = value; return {true, true};
 }

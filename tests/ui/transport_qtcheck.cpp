@@ -714,12 +714,14 @@ private slots:
         QTest::mouseMove(window,mute->mapToScene(QPointF(mute->width()/2,mute->height()/2)).toPoint());
         QTest::qWait(30); QCOMPARE(bg(mute),chip);
         QVERIFY(tracks.setMuted(vocal,true)); QCOMPARE(bg(mute),theme->property("muteBg").value<QColor>());
-        // MON fades on a track without live input.
+        // MON works on an instrument track too (its live input is MIDI); a disabled chip fades.
         auto* liveMon=visualItem(list,"trackMonitorButton"+QString::number(vocal));
-        auto* noInputMon=visualItem(list,"trackMonitorButton"+QString::number(synth));
-        QVERIFY(liveMon); QVERIFY(noInputMon);
+        auto* midiMon=visualItem(list,"trackMonitorButton"+QString::number(synth));
+        QVERIFY(liveMon); QVERIFY(midiMon);
         QCOMPARE(liveMon->opacity(),1.0);
-        QVERIFY(!noInputMon->isEnabled()); QVERIFY(noInputMon->opacity()<0.6);
+        QVERIFY(midiMon->isEnabled()); QCOMPARE(midiMon->opacity(),1.0);
+        midiMon->setEnabled(false); QVERIFY(midiMon->opacity()<0.6);
+        midiMon->setEnabled(true);
     }
     void text_is_never_tiny_and_symbol_controls_have_accessible_names() {
         // Plan 4.5: no text below Theme.microSize (9 px) anywhere in the QML sources.

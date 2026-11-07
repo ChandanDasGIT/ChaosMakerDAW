@@ -53,6 +53,7 @@ public:
         ClipsRole,
         EqBandsRole,
         LiveInputRole,
+        CanMonitorRole,
         RecordDryRole,
         RecordsWithFxRole,
         ColourRole,
