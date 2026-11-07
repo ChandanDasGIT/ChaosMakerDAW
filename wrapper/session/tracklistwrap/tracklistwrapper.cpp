@@ -428,6 +428,21 @@ bool TrackListWrapper::setChaosEq(int trackId, const chaoseq::Settings& settings
     return change.accepted;
 }
 
+const harmonium::Settings* TrackListWrapper::harmonium(int trackId) const
+{
+    const auto* track = m_project.findTrack(trackId);
+    return track && track->type == "Harmonium" ? &track->harmonium : nullptr;
+}
+
+bool TrackListWrapper::setHarmonium(int trackId, const harmonium::Settings& settings)
+{
+    if (!harmonium(trackId)) return false;
+    const auto before = *harmonium(trackId);
+    const auto change = m_state.setHarmonium(trackId, settings);
+    if (change.accepted && !(before == *harmonium(trackId))) emit harmoniumChanged(trackId);
+    return change.accepted;
+}
+
 bool TrackListWrapper::setEqBand(int id, int band, double gain)
 {
     const auto change = m_state.setEqBand(id, band, gain);

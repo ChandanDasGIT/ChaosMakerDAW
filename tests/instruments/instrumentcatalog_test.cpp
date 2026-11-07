@@ -7,8 +7,8 @@
 
 TEST(instrumentcatalog, existing_track_type_ids_names_and_choice_order_are_preserved)
 {
-    constexpr std::array<std::string_view, 5> expected{
-        "Piano", "Acoustic Guitar", "Electric Guitar", "Strings", "Drums"
+    constexpr std::array<std::string_view, 6> expected{
+        "Piano", "Acoustic Guitar", "Electric Guitar", "Strings", "Drums", "Harmonium"
     };
     const auto entries = instrumentcatalog::instruments();
     CHECK(entries.size() == expected.size());

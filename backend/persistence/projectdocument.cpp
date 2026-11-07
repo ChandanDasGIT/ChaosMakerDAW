@@ -1,5 +1,6 @@
 #include "projectdocument.h"
 #include "chaoseqjson.h"
+#include "harmoniumjson.h"
 #include "mixer/mixerpanel.h"
 #include "recording/takerecorder.h"
 #include <nlohmann/json.hpp>
@@ -83,6 +84,7 @@ std::string ProjectDocument::serialize(const Project& project,
         trackObj["recordDry"] = track->recordDry;
         trackObj["eq"] = eqJson;
         trackObj["chaosEq"] = chaoseqjson::toJson(track->chaosEq);   // plan 6.2
+        if (track->type == "Harmonium") trackObj["harmonium"] = harmoniumjson::toJson(track->harmonium);
         json effectsList = json::array();
         for (const auto& slot : track->effects) effectsList.push_back(slot.type);
         trackObj["effects"] = std::move(effectsList);   // insert effects in chain order (plan 6.1)
@@ -268,6 +270,11 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             chaoseq::Settings chaos;
             if (!chaoseqjson::fromJson(item["chaosEq"], chaos, error)) return false;
             candidate.setTrackChaosEq(track.id, chaos);
+        }
+        if (item.contains("harmonium")) {
+            harmonium::Settings settings;
+            if (!harmoniumjson::fromJson(item["harmonium"], settings, error)) return false;
+            candidate.setTrackHarmonium(track.id, settings);
         }
 
         for (int i = 0; i < 10; ++i) {

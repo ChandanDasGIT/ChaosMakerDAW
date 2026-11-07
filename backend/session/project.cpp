@@ -211,6 +211,14 @@ bool Project::setTrackChaosEq(int id, const chaoseq::Settings& settings)
     return true;
 }
 
+bool Project::setTrackHarmonium(int id, const harmonium::Settings& settings)
+{
+    auto* track = findTrack(id);
+    if (!track) return false;
+    track->harmonium = harmonium::sanitize(settings);
+    return true;
+}
+
 bool Project::setTrackEqBand(int id, int band, float gainDb)
 {
     auto* track = findTrack(id);

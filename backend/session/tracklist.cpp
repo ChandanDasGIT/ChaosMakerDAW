@@ -237,6 +237,10 @@ TrackList::Change TrackList::setChaosEq(int id, const chaoseq::Settings& setting
 {
     return result(m_project.setTrackChaosEq(id, settings));
 }
+TrackList::Change TrackList::setHarmonium(int id, const harmonium::Settings& settings)
+{
+    return result(m_project.setTrackHarmonium(id, settings));
+}
 int TrackList::addTrackEffect(int trackId, const std::string& type)
 {
     return trackLocked(trackId) ? -1 : m_project.addTrackEffect(trackId, type);

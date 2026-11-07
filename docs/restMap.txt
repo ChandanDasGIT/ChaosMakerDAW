@@ -23,6 +23,9 @@ A. LEFT OVER FROM PLAN 6 (small, closest to recent work)
         design cramps near Nyquist). Possible fix: a matched / pre-warped bell design.
 [ ] A3  Merge the two backend clock formatters (PlaybackControls::formatTime and
         valueformat::position); they differ only for negative times.
+[ ] A4  transport_ui test factory_preset_picker_applies_djent_and_jazz still expects 2 guitar
+        factory presets; there are 5 since a254d48 (Djent, Jazz, MetalSolo, RockChords,
+        RockSolo). Update the test (found 2026-11-07; the only failing UI test).
 (A4 and A5 moved to section H, "will do later".)
 
 
@@ -37,6 +40,10 @@ B. CHECKS IN THE REAL APP (need the user; JACK/hardware)
 [?] B6  Custom track colour, then typing still works.
 [?] B7  Listen to Chaos EQ on real audio (solo, auto gain, stereo placement, analyzer).
 [?] B8  Built-in cabinet models in the app (renders in local-reference/renders/cab-*.wav).
+[?] B9  Listen to the harmonium (C7): renders in local-reference/renders/harmonium-*.wav, then
+        in the app (Harmonium track, INST button). Indian: tone balance already measured
+        within ~3 dB of the two references in local-reference/harmonium/; Western: no
+        reference, judge by ear. Note what to change (reeds, beating, bellows, case).
 
 
 C. INSTRUMENTS (the biggest musical gap) — roadmap Phase 11
@@ -74,14 +81,18 @@ decoder (C4) and the piano (C5).
         Accurate-Salamander (WAV; CC-BY, so a credit is then required: see C8).
 [ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
         model), mapped in instrumentfactory.cpp.
-[ ] C7  NEXT (before C2, the user's choice). Harmonium (synthesis, no samples needed): a new
-        "Harmonium" instrument track type that plays from the piano roll / MIDI. Model:
-        free-reed tone (bright, nasal, rich overtones) with a light wooden-case resonance; several
-        reed sets per key with stops (bass reed, octave-up reeds), tuned slightly apart for
-        the typical beating; air pressure from a bellows/expression control sets the level
-        (soft breathy attack, air noise, swells, no key-speed velocity); small key click;
-        drone stops. Tune by ear with the user, and against a reference recording if the user
-        provides one (like the guitar presets).
+[~] C7  Harmonium, built 2026-11-07 (before C2, the user's choice); tuning by ear is left (B9).
+        backend/instruments/harmonium/: reedwave (band-limited reed tables, soft/full air),
+        reedvoice (one key, all ranks, stops fade on held keys), harmonium (Processor: bellows
+        with pumping and reservoir sag, pressure -> level/brightness/flatness, breathy attack,
+        air noise, key click, case EQ + short reflections, drones, scale changer, CC 11/2),
+        harmoniumsettings; persistence/harmoniumjson. Two styles: Indian (bass/male/female
+        reeds, drones) and Western reed organ (Bourdon 16', Diapason 8', Dulciana 8',
+        Principal 4', Vox Humana tremolo). Track type "Harmonium" (instrumentfactory maps
+        it), settings saved per track, edits reach the engine without a playback rebuild.
+        UI: INST chip on the track card opens HarmoniumEditor.qml. Tests: backendtests
+        harmonium, harmoniumjson; wrappertests qtharmonium; transport_ui harmonium_panel_*.
+        Worst case (32 keys + 4 drones, all ranks) ~2 % of one core.
 [ ] C8  Credits: the user's rule (2026-11-07): no third-party credit or attribution of any
         kind in the GitHub repo. So no courtesy credits, no "Third-party sounds" README
         section. The first choices need none (Gogodze Phu Vol II is CC0, Splendid is public

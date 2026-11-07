@@ -10,6 +10,7 @@
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
 #include "instruments/guitar/plugins/guitarsuite/guitarsuite.h"
 #include "instruments/instrumentfactory.h"
+#include "instruments/harmonium/harmonium.h"
 #include "persistence/projectdocument.h"
 #include "processor/trackinput.h"
 
@@ -894,6 +895,16 @@ void EngineController::attachProject(TrackListWrapper* model) {
         if (!settings || it == m_trackEffects.end()) return;
         if (it->second.chaosEq) it->second.chaosEq->setSettings(*settings);
         if (it->second.playbackChaosEq) it->second.playbackChaosEq->setSettings(*settings);
+        if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
+    });
+    // Harmonium edits: straight into the track's instrument; no playback rebuild.
+    connect(model, &TrackListWrapper::harmoniumChanged, this, [this](int trackId) {
+        if (!m_project) return;
+        const auto* settings = m_project->harmonium(trackId);
+        const auto it = m_trackEffects.find(trackId);
+        if (!settings || it == m_trackEffects.end()) return;
+        if (it->second.instrument && it->second.instrument->typeId() == "harmonium")
+            static_cast<Harmonium&>(*it->second.instrument).setSettings(*settings);
         if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
     });
     refreshProject();
