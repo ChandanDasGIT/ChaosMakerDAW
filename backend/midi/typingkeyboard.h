@@ -3,18 +3,20 @@
 #include <array>
 #include <span>
 
-// The computer keyboard as a MIDI keyboard, in the usual DAW layout:
+// The computer keyboard as a MIDI keyboard, laid out for sargam from lower Pa to upper Ma:
 //
-//    w e   t y u   o p          black keys
-//   a s d f g h j k l ; '       white keys: C D E F G A B C D E F
+//   black:    1   2       4   5       7   8   9       -   =       Backspace
+//   white: Tab  q   w   e   r   t   y   u   i   o   p   [   ]   \ (backslash)
+//          Pa. Dh. Ni. Sa  Re  Ga  Ma  Pa  Dha Ni  Sa' Re' Ga' Ma'
 //   z / x  octave down / up     c / v  velocity down / up
 //
-// Keys are lower-case characters. Holding a key does not repeat its note (the computer's key
-// repeat is ignored), and releasing a key always ends the note it started, even after the
-// octave changed. Pure logic: the wrapper feeds it keys and sends out the notes.
+// 'e' plays Sa, the octave's C (octave 4: C4, MIDI 60). Keys are characters: letters in lower
+// case, '\t' for Tab and '\b' for Backspace. Holding a key does not repeat its note (the
+// computer's key repeat is ignored), and releasing a key always ends the note it started, even
+// after the octave changed. Pure logic: the wrapper feeds it keys and sends out the notes.
 class TypingKeyboard {
 public:
-    static constexpr int MinOctave = 0, MaxOctave = 8;     // octave 4: 'a' plays C4, MIDI 60
+    static constexpr int MinOctave = 0, MaxOctave = 8;     // octave 4: 'e' (Sa) plays C4, MIDI 60
     static constexpr int VelocityStep = 20;
 
     struct Action {
@@ -26,7 +28,9 @@ public:
     // Whether the key belongs to the layout (notes or controls): the caller keeps it from
     // reaching anything else while the typing keyboard is on.
     static bool handles(char key) noexcept;
-    // Semitones above the octave's C for a note key, or -1.
+    static constexpr int NoNote = -100;
+    // Semitones from the octave's C (Sa) for a note key: Tab is -5 (lower Pa), Backspace 18
+    // (upper tivra Ma). NoNote for other keys.
     static int semitoneFor(char key) noexcept;
 
     Action press(char key) noexcept;
