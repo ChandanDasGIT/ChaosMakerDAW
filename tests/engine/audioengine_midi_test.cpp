@@ -520,3 +520,49 @@ TEST(audioengine_midi, hardware_midi_input_routing)
         CHECK(maxAmp > 0.0f);
     }
 }
+
+TEST(audioengine_midi, typing_keyboard_notes_join_the_midi_input)
+{
+    AudioEngine engine{nullptr};
+    engine.deviceChanged(48000.0, 128);
+    auto armedSynth = std::make_shared<TestSynth>(), otherSynth = std::make_shared<TestSynth>();
+    armedSynth->prepare(48000.0, 128);
+    otherSynth->prepare(48000.0, 128);
+    auto snapshot = std::make_unique<EngineSnapshot>();
+    snapshot->tempo.set(120.0, 4, 4, 48000.0);
+    TrackRender armed, other;
+    armed.trackId = 1; armed.armed = true; armed.chain.push_back(armedSynth.get());
+    other.trackId = 2; other.chain.push_back(otherSynth.get());     // neither armed nor monitored
+    snapshot->tracks.push_back(armed);
+    snapshot->tracks.push_back(other);
+    snapshot->keepProcessors.push_back(armedSynth);
+    snapshot->keepProcessors.push_back(otherSynth);
+    engine.publishPlayback(std::move(snapshot));
+
+    float left[128]{}, right[128]{};
+    float* out[]{left, right};
+    MidiBuffer device;                                              // a MIDI keyboard, same block
+    device.add(MidiEvent{16, 0x90, 64, 90});
+    AudioIO io{{nullptr, 0, 0}, {out, 2, 128}, &device, 128};
+    const auto sounding = [](const TestSynth& synth, int key) {
+        for (const auto& v : synth.voices()) if (v.active && v.key == key && v.state != TestSynth::Voice::State::Release) return true;
+        return false;
+    };
+
+    CHECK(engine.sendKeyboardMidi(MidiEvent{0, 0x90, 60, 100}));
+    engine.renderBlock(io);
+    CHECK(sounding(*armedSynth, 60));                               // typed note
+    CHECK(sounding(*armedSynth, 64));                               // the device's note too
+    CHECK(!sounding(*otherSynth, 60));                              // routed like hardware MIDI
+
+    device.clear();
+    CHECK(engine.sendKeyboardMidi(MidiEvent{0, 0x80, 60, 0}));
+    engine.renderBlock(io);
+    CHECK(!sounding(*armedSynth, 60));
+    CHECK(sounding(*armedSynth, 64));
+
+    io.midiIn = nullptr;                                            // no MIDI device at all
+    CHECK(engine.sendKeyboardMidi(MidiEvent{0, 0x90, 67, 100}));
+    engine.renderBlock(io);
+    CHECK(sounding(*armedSynth, 67));
+}

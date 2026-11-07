@@ -32,6 +32,10 @@ public:
     void clearMonitorClips() noexcept;
     void stop();
     bool post(const EngineCommand& command) noexcept { return m_commands.push(command); }
+    // A note from the typing keyboard (any thread but the audio one). It joins the next block's
+    // MIDI input, so it reaches the same tracks as a MIDI keyboard (MON or REC) and is recorded
+    // the same way. False when the queue is full.
+    bool sendKeyboardMidi(const MidiEvent& event) noexcept { return m_keyboardMidi.push(event); }
     bool nextEvent(EngineEvent& event) noexcept { return m_events.pop(event); }
     void publish(std::unique_ptr<EngineSnapshot> snapshot);   // also frees retired snapshots
     bool tryPublish(std::unique_ptr<EngineSnapshot>& snapshot);
@@ -79,6 +83,7 @@ public:
     void xrunOccurred() noexcept override;
 
 private:
+    void processInput(const AudioIO& io) noexcept;          // process() with the MIDI input merged
     std::unique_ptr<AudioDevice> m_device;
     SnapshotSlot<EngineSnapshot> m_snapshot;
     SnapshotSlot<EngineSnapshot> m_playback;
@@ -100,6 +105,8 @@ private:
     bool m_stopAtEnd = true; // Stop playback at the end of the arrangement (user setting).
     float m_metronomeVolume = 0.5f;
     RtQueue<EngineCommand, 512> m_commands;
+    RtQueue<MidiEvent, 256> m_keyboardMidi;
+    MidiBuffer m_inputMidi;                                 // device MIDI + typing keyboard, one block
     RtQueue<EngineEvent, 512> m_events;
     std::atomic<std::uint64_t> m_xruns{0};
     TenBandEq m_monitorEq;

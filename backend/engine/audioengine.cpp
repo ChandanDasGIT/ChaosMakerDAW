@@ -180,6 +180,22 @@ void AudioEngine::renderBlock(const AudioIO& io) noexcept
 
 void AudioEngine::process(const AudioIO& io) noexcept
 {
+    // Typing-keyboard notes join the device's MIDI input for this block, after its events.
+    MidiEvent typed;
+    if (!m_keyboardMidi.pop(typed)) { processInput(io); return; }
+    m_inputMidi.clear();
+    if (io.midiIn) for (const auto& event : io.midiIn->events()) m_inputMidi.add(event);
+    do {
+        typed.offset = 0;
+        m_inputMidi.add(typed);
+    } while (m_keyboardMidi.pop(typed));
+    AudioIO merged = io;
+    merged.midiIn = &m_inputMidi;
+    processInput(merged);
+}
+
+void AudioEngine::processInput(const AudioIO& io) noexcept
+{
     DenormalGuard denormalGuard;
     m_liveMidiCount = 0;
     EngineCommand command;
