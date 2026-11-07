@@ -92,6 +92,7 @@ public:
     Change setPan(int id, double pan);
     Change setStripWidth(int id, double width);
     Change setEqBand(int id, int band, double gainDb);
+    Change setChaosEq(int id, const chaoseq::Settings& settings);
     // Recording mode for tracks the user adds from now on (the "default recording mode"
     // preference); unset keeps Project's rule (dry only for plain Audio tracks). Loaded tracks
     // keep their saved mode.

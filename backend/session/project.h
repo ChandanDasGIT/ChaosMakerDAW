@@ -4,6 +4,7 @@
 #include "transport/tempomap.h"
 #include "midi/midinote.h"
 #include "plugins/effectchain.h"
+#include "plugins/chaoseq/chaoseqsettings.h"
 
 #include <cstdint>
 #include <array>
@@ -45,6 +46,8 @@ struct Track {
     float pan = 0.0f; // -1 left .. 0 centre .. +1 right (panlaw::balance)
     float stripWidth = 108.0f; // mixer strip width in px (mixer::defaultStripWidth, clamped by mixer::clampStripWidth)
     std::array<float, 10> eqGainDb{};
+    // Chaos EQ bands (plan 6.2); heard only while "chaoseq" is on the effect list.
+    chaoseq::Settings chaosEq;
     // Insert effects in processing order (plan 6.1); rules in effectchain.
     std::vector<TrackEffectSlot> effects;
     std::vector<AudioClip> audioClips;
@@ -71,6 +74,8 @@ public:
     bool setTrackPan(int id, float pan);
     bool setTrackStripWidth(int id, float width);
     bool setTrackEqBand(int id, int band, float gainDb);
+    // Not undoable, like the 10-band EQ. The settings are sanitised for the project rate.
+    bool setTrackChaosEq(int id, const chaoseq::Settings& settings);
     // Insert effects. Not undoable by design (the user removes an effect by hand); undoing a
     // track removal still brings the track back with its effects.
     int addTrackEffect(int trackId, const std::string& type); // new effect id, or -1

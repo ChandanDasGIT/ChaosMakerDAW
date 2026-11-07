@@ -143,6 +143,13 @@ EngineController::~EngineController()
     m_recordingController.shutdown(nullptr, nullptr);
 }
 
+std::array<std::shared_ptr<ChaosEq>, 2> EngineController::chaosEqProcessors(int trackId) const
+{
+    const auto it = m_trackEffects.find(trackId);
+    if (it == m_trackEffects.end()) return {};
+    return {it->second.chaosEq, it->second.playbackChaosEq};
+}
+
 EngineController* EngineController::instance()
 {
     static auto* controller = new EngineController(QCoreApplication::instance());
@@ -218,6 +225,8 @@ void EngineController::bindTrackEffects(int trackId, GuitarSuiteModel* model)
     // The EQ effect; it runs only when on the track's effect list (bands set by syncTrackEq).
     fx.eq = std::make_shared<TenBandEq>(); fx.eq->prepare(rate, frames);
     fx.playbackEq = std::make_shared<TenBandEq>(); fx.playbackEq->prepare(rate, frames);
+    fx.chaosEq = std::make_shared<ChaosEq>(); fx.chaosEq->prepare(rate, frames);
+    fx.playbackChaosEq = std::make_shared<ChaosEq>(); fx.playbackChaosEq->prepare(rate, frames);
     fx.model->configure(rate, frames);
     if (m_project) {
         const auto* track = m_project->project().findTrack(trackId);
@@ -427,6 +436,8 @@ bool EngineController::setBufferSize(int frames)
         fx.playbackInput->setTrimDb(fx.model->inputTrimDb()); fx.playbackInput->prepare(m_engine->sampleRate(),frames);
         fx.eq=std::make_shared<TenBandEq>(); fx.eq->prepare(m_engine->sampleRate(),frames);
         fx.playbackEq=std::make_shared<TenBandEq>(); fx.playbackEq->prepare(m_engine->sampleRate(),frames);
+        fx.chaosEq=std::make_shared<ChaosEq>(); fx.chaosEq->prepare(m_engine->sampleRate(),frames);
+        fx.playbackChaosEq=std::make_shared<ChaosEq>(); fx.playbackChaosEq->prepare(m_engine->sampleRate(),frames);
         fx.model->configure(m_engine->sampleRate(), frames);
         if (fx.instrument) {
             fx.instrument->prepare(m_engine->sampleRate(), frames);
@@ -865,6 +876,16 @@ void EngineController::attachProject(TrackListWrapper* model) {
         if (m_project) setMasterMuted(m_project->masterMuted());
     });
     connect(model, &TrackListWrapper::projectChanged, this, &EngineController::refreshProject);
+    // Chaos EQ edits: copy the settings into the track's processors; no playback rebuild.
+    connect(model, &TrackListWrapper::chaosEqChanged, this, [this](int trackId) {
+        if (!m_project) return;
+        const auto* settings = m_project->chaosEq(trackId);
+        const auto it = m_trackEffects.find(trackId);
+        if (!settings || it == m_trackEffects.end()) return;
+        if (it->second.chaosEq) it->second.chaosEq->setSettings(*settings);
+        if (it->second.playbackChaosEq) it->second.playbackChaosEq->setSettings(*settings);
+        if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
+    });
     refreshProject();
     setProjectDirty(model->count()>0);
 }

@@ -37,6 +37,8 @@ void SnapshotBuilder::syncTrackEq(const Project& project, const MutableEffectRes
             if (fx->eq) fx->eq->setBandGain(band, track->eqGainDb[band]);
             if (fx->playbackEq) fx->playbackEq->setBandGain(band, track->eqGainDb[band]);
         }
+        if (fx->chaosEq) fx->chaosEq->setSettings(track->chaosEq);
+        if (fx->playbackChaosEq) fx->playbackChaosEq->setSettings(track->chaosEq);
     }
 }
 
@@ -234,6 +236,7 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
                     for (const auto& type : track.effects) {
                         std::shared_ptr<Processor> processor;
                         if (type == effectchain::Eq) processor = playback ? fx->playbackEq : fx->eq;
+                        else if (type == effectchain::ChaosEq) processor = playback ? fx->playbackChaosEq : fx->chaosEq;
                         else if (type == effectchain::GuitarSuite) processor = playback ? fx->playbackChain : fx->chain;
                         if (!processor) continue;
                         out.push_back(processor.get());

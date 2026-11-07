@@ -89,6 +89,9 @@ public:
     // Inject a device for offline integration checks; system discovery is only for JACK.
     EngineController(std::unique_ptr<AudioDevice> device, bool discoverSystemDevices, QObject* parent = nullptr);
     static EngineController* instance();
+    // The track's two Chaos EQ processors (monitor, playback); null entries when the track has
+    // none yet. For ChaosEqWrapper's analyzer. Instances are replaced when the buffer changes.
+    std::array<std::shared_ptr<ChaosEq>, 2> chaosEqProcessors(int trackId) const;
     static EngineController* create(QQmlEngine*, QJSEngine*);
     ~EngineController() override;
 

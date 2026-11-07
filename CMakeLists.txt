@@ -115,7 +115,8 @@ if(DAW_BUILD_APP)
         wrapper/audiodevice/devicesettingswrap/devicesettingswrapper.cpp wrapper/audiodevice/devicesettingswrap/devicesettingswrapper.h
         wrapper/settings/appsettingswrap/appsettingswrapper.cpp wrapper/settings/appsettingswrap/appsettingswrapper.h
         wrapper/engine/playbackcontrolswrap/playbackcontrolswrapper.cpp wrapper/engine/playbackcontrolswrap/playbackcontrolswrapper.h
-        wrapper/engine/audioenginewrap/audioenginewrapper.cpp wrapper/engine/audioenginewrap/audioenginewrapper.h)
+        wrapper/engine/audioenginewrap/audioenginewrapper.cpp wrapper/engine/audioenginewrap/audioenginewrapper.h
+        wrapper/plugins/chaoseq/chaoseqwrap/chaoseqwrapper.cpp wrapper/plugins/chaoseq/chaoseqwrap/chaoseqwrapper.h)
     target_include_directories(wrappertests PRIVATE "${CMAKE_CURRENT_LIST_DIR}" "${CMAKE_CURRENT_LIST_DIR}/tests" ${WRAPPER_DIRS})
     target_compile_options(wrappertests PRIVATE -Wall -Wextra)
     target_link_libraries(wrappertests PRIVATE Qt6::Qml Qt6::Concurrent dawengine)
@@ -138,7 +139,7 @@ if(DAW_BUILD_APP)
         qt_add_executable(transporttests tests/ui/transport_qtcheck.cpp)
         qt_add_qml_module(transporttests URI TransportTests
             QML_FILES frontend/theme/Theme.qml frontend/theme/PianoRollColors.qml frontend/theme/TrackListColors.qml frontend/theme/TimelineColors.qml frontend/theme/MixerColors.qml frontend/theme/TransportColors.qml
-                      frontend/theme/GuitarSuiteColors.qml frontend/theme/EffectsColors.qml
+                      frontend/theme/GuitarSuiteColors.qml frontend/theme/EffectsColors.qml frontend/theme/ChaosEqColors.qml
                       frontend/icons/Icons.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
                       frontend/window/EditMenu.qml frontend/window/ViewMenu.qml frontend/window/PanelTabs.qml
                       frontend/window/StatusStrip.qml
@@ -150,7 +151,7 @@ if(DAW_BUILD_APP)
                       frontend/icons/MetronomeIcon.qml
                       frontend/instruments/guitar/GuitarSuitePanel.qml
                       frontend/instruments/guitar/GuitarSuiteEditor.qml
-                      frontend/plugins/TrackEffectsPanel.qml frontend/plugins/eq/Tenbandeq.qml
+                      frontend/plugins/TrackEffectsPanel.qml frontend/plugins/eq/Tenbandeq.qml frontend/plugins/chaoseq/ChaosEqEditor.qml
                       frontend/session/TrackList.qml frontend/timeline/Timeline.qml
                       frontend/mixer/MixerPanel.qml
                       frontend/dsp/StereoLevelMeter.qml

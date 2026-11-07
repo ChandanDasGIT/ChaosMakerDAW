@@ -1,4 +1,5 @@
 #include "projectdocument.h"
+#include "chaoseqjson.h"
 #include "mixer/mixerpanel.h"
 #include "recording/takerecorder.h"
 #include <nlohmann/json.hpp>
@@ -81,6 +82,7 @@ std::string ProjectDocument::serialize(const Project& project,
         trackObj["input"] = track->inputPort;
         trackObj["recordDry"] = track->recordDry;
         trackObj["eq"] = eqJson;
+        trackObj["chaosEq"] = chaoseqjson::toJson(track->chaosEq);   // plan 6.2
         json effectsList = json::array();
         for (const auto& slot : track->effects) effectsList.push_back(slot.type);
         trackObj["effects"] = std::move(effectsList);   // insert effects in chain order (plan 6.1)
@@ -259,6 +261,13 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
                 error = "Invalid track effects.";
                 return false;
             }
+        }
+
+        // Optional: files saved before Chaos EQ existed load with no bands.
+        if (item.contains("chaosEq")) {
+            chaoseq::Settings chaos;
+            if (!chaoseqjson::fromJson(item["chaosEq"], chaos, error)) return false;
+            candidate.setTrackChaosEq(track.id, chaos);
         }
 
         for (int i = 0; i < 10; ++i) {
