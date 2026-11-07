@@ -153,10 +153,12 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
 
         for (const auto& clip : track.audioClips) {
             const double rate = context.tempo.sampleRate() > 0.0 ? context.tempo.sampleRate() : 48000.0;
-            const std::int64_t tail = (track.kind == TrackKind::Instrument || !clip.notes.empty())
-                ? static_cast<std::int64_t>(std::llround(rate * 1.0))
-                : 0;
-            snapshot->playbackEnd = std::max(snapshot->playbackEnd, clip.start + clip.length + tail);
+            // Playback stops one second after a clip whose sound can ring on: pattern notes, or
+            // recorded audio through an instrument track's effects (added below once the audio
+            // resolves). A clip with neither ends exactly at its end.
+            const std::int64_t releaseTail = static_cast<std::int64_t>(std::llround(rate * 1.0));
+            snapshot->playbackEnd = std::max(snapshot->playbackEnd,
+                clip.start + clip.length + (clip.notes.empty() ? 0 : releaseTail));
 
             const auto beatsToSamples = [&](double beats) -> std::int64_t {
                 if (context.tempo.bpm() <= 0.0 || context.tempo.sampleRate() <= 0.0) return 0;
@@ -183,6 +185,8 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
             if (!audioResolver) continue;
             auto audio = audioResolver(clip.poolId);
             if (!audio) continue;
+            if (track.kind == TrackKind::Instrument)
+                snapshot->playbackEnd = std::max(snapshot->playbackEnd, clip.start + clip.length + releaseTail);
             render.clips.push_back({
                 audio.get(),
                 clip.start,

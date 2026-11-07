@@ -28,6 +28,21 @@ TEST(playbackend, pauses_exactly_at_last_sample_and_silences_remaining_frames_in
         engine.stop();
     }
 }
+TEST(playbackend, metronome_keeps_playing_past_the_end_until_it_is_turned_off) {
+    for (bool multi:{false,true}) {
+        AudioEngine engine{nullptr}; engine.deviceChanged(48000,128);
+        engine.publishPlayback(snapshot(multi,257));
+        EngineCommand metronome; metronome.type=EngineCommand::Type::SetMetronome; metronome.a=1; metronome.value=0.5f;
+        CHECK(engine.post(metronome)); CHECK(engine.post({EngineCommand::Type::Play}));
+        float left[200]{},right[200]{}; float* out[]{left,right};
+        AudioIO io{{nullptr,0,0},{out,2,200},nullptr,200};
+        for(int i=1;i<=3;++i) { render(engine,io); CHECK(engine.playing()); CHECK(engine.position()==200*i); }
+        // Metronome off: the usual stop at the end applies again.
+        metronome.a=0; CHECK(engine.post(metronome)); render(engine,io);
+        CHECK(!engine.playing()); CHECK(engine.position()==257);
+        engine.stop();
+    }
+}
 TEST(playbackend, repeat_can_extend_past_content_and_empty_projects_keep_playing) {
     AudioEngine engine{nullptr}; engine.deviceChanged(48000,128);
     engine.publishPlayback(snapshot(true,257));
