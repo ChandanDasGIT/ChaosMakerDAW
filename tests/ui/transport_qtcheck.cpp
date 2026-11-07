@@ -1188,6 +1188,42 @@ private slots:
         QTRY_VERIFY(!pianoPanel->property("visible").toBool());
         list->setVisible(false); list->setProperty("trackModel",QVariant());
     }
+    void in_on_instrument_tracks_picks_midi_and_input_popups_stay_inside_the_window() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int vocal=tracks.addVocalTrack(), h=tracks.addInstrumentTrackOfType("Harmonium");
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QTest::qWait(30);
+        const auto inside=[&](QObject* popup) {
+            const double x=popup->property("x").toDouble(), y=popup->property("y").toDouble();
+            const double w=popup->property("width").toDouble(), ht=popup->property("height").toDouble();
+            return x>=0 && y>=0 && x+w<=window->width() && y+ht<=window->height();
+        };
+        for (const int id : {h, vocal}) {
+            click(visualItem(list,"trackInputButton"+QString::number(id)));
+            auto* popup=visualObject(window->contentItem(),"trackInputPopup"+QString::number(id)); QVERIFY(popup);
+            QTRY_VERIFY(popup->property("visible").toBool());
+            QVERIFY2(inside(popup),"the IN popup runs outside the window");
+            const bool midi=id==h;
+            QCOMPARE(popup->property("midi").toBool(),midi);
+            const auto choices=popup->property("choices").toStringList();
+            QCOMPARE(choices,midi ? controller->midiInputPorts() : controller->property("inputDevices").toStringList());
+            QVERIFY(visualItem(window->contentItem(),midi ? "midiInputOff" : "defaultInput"));
+            QMetaObject::invokeMethod(popup,"close"); QTRY_VERIFY(!popup->property("visible").toBool());
+        }
+        // A track list narrower than the popup (the app's left dock): it used to open off the
+        // window's left edge.
+        const double oldWidth=list->width();
+        list->setWidth(220); QTest::qWait(30);
+        click(visualItem(list,"trackInputButton"+QString::number(h)));
+        auto* popup=visualObject(window->contentItem(),"trackInputPopup"+QString::number(h)); QVERIFY(popup);
+        QTRY_VERIFY(popup->property("visible").toBool());
+        QVERIFY2(inside(popup),"the IN popup runs outside the window next to a narrow track list");
+        QMetaObject::invokeMethod(popup,"close"); QTRY_VERIFY(!popup->property("visible").toBool());
+        list->setWidth(oldWidth); QTest::qWait(30);
+        list->setVisible(false); list->setProperty("trackModel",QVariant());
+    }
     void chaos_eq_adds_drags_edits_and_removes_bands_on_the_curve() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks); const int vocal=tracks.addVocalTrack();

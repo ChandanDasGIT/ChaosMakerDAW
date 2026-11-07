@@ -36,6 +36,19 @@ public:
     std::string connectedInput;
     std::string connectedLeft;
     std::string connectedRight;
+
+    // MIDI devices: `plugged` is what is there now, the list is what was last looked at.
+    std::vector<std::string> plugged, midiList;
+    std::string connectedMidi;
+    bool midiOff = false;                                          // as JackAudioDevice
+    std::vector<std::string> midiInputNames() const override { return midiList; }
+    void refreshMidiInputs() override
+    {
+        midiList = plugged;
+        if (connectedMidi.empty() && !midiOff && !midiList.empty()) connectedMidi = midiList.front();
+    }
+    bool connectMidiInput(const std::string& source) override { connectedMidi = source; midiOff = source.empty(); return true; }
+    std::string connectedMidiInput() const override { return connectedMidi; }
 };
 
 } // namespace
@@ -98,4 +111,29 @@ TEST(qtaudioengine, live_note_controller_methods)
     controller.sendLiveNoteOn(1, -1, 100);
     controller.sendLiveNoteOn(1, 128, 100);
     controller.sendLiveNoteOff(1, -5);
+}
+
+TEST(qtaudioengine, a_midi_keyboard_switched_on_later_shows_up_on_refresh)
+{
+    auto device = std::make_unique<DummyOfflineDevice>();
+    auto* dev = device.get();
+    EngineController controller(std::move(device), false);
+    CHECK(controller.midiInputPorts().isEmpty());
+    CHECK(controller.connectedMidiPort().isEmpty());
+
+    dev->plugged = {"Digital Piano:midi_out"};                    // switched on after the start
+    CHECK(controller.midiInputPorts().isEmpty());                  // not looked at yet
+    int changes = 0;
+    QObject::connect(&controller, &EngineController::midiInputPortsChanged, &controller, [&changes] { ++changes; });
+    controller.refreshMidiInputs();
+    CHECK(changes == 1);
+    CHECK(controller.midiInputPorts() == QStringList{"Digital Piano:midi_out"});
+    CHECK(controller.connectedMidiPort() == "Digital Piano:midi_out");   // first one, nothing chosen before
+
+    CHECK(controller.connectMidiInput(""));                        // "No MIDI input"
+    CHECK(controller.connectedMidiPort().isEmpty());
+    controller.refreshMidiInputs();                                // reopening IN keeps that choice
+    CHECK(controller.connectedMidiPort().isEmpty());
+    CHECK(controller.connectMidiInput("Digital Piano:midi_out"));
+    CHECK(controller.connectedMidiPort() == "Digital Piano:midi_out");
 }

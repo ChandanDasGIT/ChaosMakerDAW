@@ -43,6 +43,8 @@ public:
     virtual int inputChannelCapacity() const { return 1; }
     virtual bool connectOutput(const std::string& left, const std::string& right) = 0;
     virtual std::vector<std::string> midiInputNames() const { return {}; }
+    // Looks for MIDI devices again (one switched on after the device opened). UI thread.
+    virtual void refreshMidiInputs() {}
     virtual bool connectMidiInput(const std::string& source) { (void)source; return false; }
     virtual std::string connectedMidiInput() const { return {}; }
     virtual std::string lastError() const = 0;

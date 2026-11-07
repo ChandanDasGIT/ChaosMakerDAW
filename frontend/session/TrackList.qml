@@ -270,13 +270,17 @@ Rectangle {
                                     id: inputButton
                                     objectName: "trackInputButton" + trackCard.trackId
                                     // Lit (accent text and border) once an input is chosen; still lightens on hover.
-                                    active: trackCard.inputPort.length > 0
+                                    // Instrument tracks without an audio input show the shared MIDI input.
+                                    readonly property string shownInput: trackCard.hasLiveInput ? trackCard.inputPort
+                                                                                                : EngineController.connectedMidiPort
+                                    active: shownInput.length > 0
                                     activeBg: hovered ? Theme.chipHover : Theme.chip
                                     hoverHighlight: true
                                     text: "IN"; textSize: Theme.microSize
                                     implicitWidth: 26; implicitHeight: chipFlow.chipHeight
                                     onClicked: root.openInputPopup(trackCard)
-                                    tooltip: trackCard.inputPort.length > 0 ? trackCard.inputPort : "Choose this track's input"
+                                    tooltip: shownInput.length > 0 ? shownInput
+                                             : trackCard.hasLiveInput ? "Choose this track's input" : "Choose the MIDI input"
                                 }
                                 ToggleChip {
                                     id: monitorButton
@@ -468,31 +472,53 @@ Rectangle {
         readonly property int trackId: card ? card.trackId : -1
         readonly property string trackName: card ? card.name : ""
         readonly property string inputPort: card ? card.inputPort : ""
+        // Instrument tracks with no audio input (harmonium, piano...) take MIDI: one MIDI input
+        // for the app, shared by every instrument track; MON or REC picks which ones play.
+        readonly property bool midi: card ? !card.hasLiveInput : false
+        readonly property var choices: midi ? EngineController.midiInputPorts : EngineController.inputDevices
         onCardChanged: if (!card) close()
+        onAboutToShow: if (midi) EngineController.refreshMidiInputs()
         objectName: "trackInputPopup" + trackId
         parent: Overlay.overlay
-        x: card ? card.mapToItem(Overlay.overlay, card.width - width, 34).x : 0
-        y: card ? card.mapToItem(Overlay.overlay, 0, 34).y : 0
-        width: 300
-        height: Math.min(340, Math.max(150, 100 + EngineController.inputDevices.length * 34))
+        // Below the card's IN corner, but always inside the window.
+        x: card ? Math.max(8, Math.min(card.mapToItem(Overlay.overlay, card.width - width, 34).x,
+                                       Overlay.overlay.width - width - 8)) : 0
+        y: card ? Math.max(8, Math.min(card.mapToItem(Overlay.overlay, 0, 34).y,
+                                       Overlay.overlay.height - height - 8)) : 0
+        width: Math.min(300, Overlay.overlay.width - 16)
+        height: Math.min(Math.min(340, Overlay.overlay.height - 16),
+                         Math.max(150, (midi ? 120 : 100) + choices.length * 34))
         padding: 0
         background: Rectangle { radius: 8; color: Theme.popupBg; border.color: Theme.popupBorder }
         contentItem: ColumnLayout {
             anchors.fill: parent
             anchors.margins: 10
             spacing: 6
-            Text { text: inputPopup.trackName + " · Input"; color: Theme.text; font.pixelSize: 12; font.bold: true }
+            Text {
+                text: inputPopup.trackName + (inputPopup.midi ? " · MIDI input" : " · Input")
+                color: Theme.text; font.pixelSize: 12; font.bold: true
+                Layout.fillWidth: true; elide: Text.ElideRight
+            }
+            Text {
+                visible: inputPopup.midi
+                text: "One MIDI input for all instrument tracks. MON or REC picks which tracks play it."
+                color: Theme.textMuted; font.pixelSize: 10
+                Layout.fillWidth: true; wrapMode: Text.WordWrap
+            }
             Rectangle {
+                objectName: inputPopup.midi ? "midiInputOff" : "defaultInput"
                 Layout.fillWidth: true
                 height: 32
                 radius: 5
                 color: defaultInputArea.containsMouse ? Theme.trackList.optionHover : Theme.trackList.option
-                border.color: inputPopup.inputPort.length === 0 ? Theme.accent : Theme.trackList.optionBorder
+                border.color: (inputPopup.midi ? EngineController.connectedMidiPort.length === 0
+                                               : inputPopup.inputPort.length === 0)
+                              ? Theme.accent : Theme.trackList.optionBorder
                 Text {
                     anchors.fill: parent
                     anchors.leftMargin: 9
                     verticalAlignment: Text.AlignVCenter
-                    text: "Use default input"
+                    text: inputPopup.midi ? "No MIDI input" : "Use default input"
                     color: Theme.text
                     font.pixelSize: 10
                 }
@@ -501,7 +527,8 @@ Rectangle {
                     anchors.fill: parent
                     hoverEnabled: true
                     onClicked: {
-                        root.trackModel.setTrackInputPort(inputPopup.trackId, "")
+                        if (inputPopup.midi) EngineController.connectMidiInput("")
+                        else root.trackModel.setTrackInputPort(inputPopup.trackId, "")
                         inputPopup.close()
                     }
                 }
@@ -510,14 +537,15 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                contentHeight: Math.max(inputRows.implicitHeight,
-                                        EngineController.inputDevices.length === 0 ? 34 : 0)
+                contentHeight: Math.max(inputRows.implicitHeight, inputPopup.choices.length === 0 ? 34 : 0)
                 boundsBehavior: Flickable.StopAtBounds
                 Text {
-                    visible: EngineController.inputDevices.length === 0
+                    visible: inputPopup.choices.length === 0
                     width: parent.width
                     height: 34
-                    text: "No physical input devices found"
+                    wrapMode: Text.WordWrap
+                    text: inputPopup.midi ? "No MIDI devices found. Switch the keyboard on, then open this again."
+                                          : "No physical input devices found"
                     color: Theme.textMuted
                     font.pixelSize: 10
                     verticalAlignment: Text.AlignVCenter
@@ -527,15 +555,17 @@ Rectangle {
                     id: inputRows
                     width: parent.width
                     Repeater {
-                        model: EngineController.inputDevices
+                        model: inputPopup.choices
                         delegate: Rectangle {
                             required property string modelData
                             required property int index
+                            objectName: (inputPopup.midi ? "midiInput" : "audioInput") + index
                             width: inputRows.width
                             height: 34
                             radius: 5
                             color: inputRowArea.containsMouse ? Theme.trackList.optionHover : "transparent"
-                            border.color: inputPopup.inputPort === EngineController.inputPortForDevice(index)
+                            border.color: (inputPopup.midi ? EngineController.connectedMidiPort === modelData
+                                                           : inputPopup.inputPort === EngineController.inputPortForDevice(index))
                                 ? Theme.accent : "transparent"
                             Text {
                                 anchors.fill: parent
@@ -552,7 +582,8 @@ Rectangle {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 onClicked: {
-                                    root.trackModel.setTrackInputPort(
+                                    if (inputPopup.midi) EngineController.connectMidiInput(modelData)
+                                    else root.trackModel.setTrackInputPort(
                                         inputPopup.trackId, EngineController.inputPortForDevice(index))
                                     inputPopup.close()
                                 }
