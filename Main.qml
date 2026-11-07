@@ -23,6 +23,13 @@ Window {
     property real activePianoRollClipLength: 4.0
     property string bottomPanelMode: "mixer" // "mixer" or "pianoroll"
     readonly property string pianoRollPresentation: topBar.appSettings ? topBar.appSettings.pianoRollPresentation : "dock"
+    // Plan 5.2: each piano roll is created the first time it is opened, and kept (with its tool,
+    // zoom and grid settings) while it is the chosen presentation or still on screen.
+    property bool dockedPianoRollUsed: false
+    property bool floatingPianoRollUsed: false
+    readonly property var dockedPianoRoll: dockedPianoRollLoader.item
+    readonly property var floatingPianoRollView: floatingPianoRollLoader.item
+    readonly property real pianoRollMinimumDockHeight: dockedPianoRoll ? dockedPianoRoll.minimumDockHeight : 0
 
     function openPianoRoll(trackId, clipId, label, lengthBeats) {
         window.activePianoRollTrackId = trackId
@@ -31,17 +38,19 @@ Window {
         window.activePianoRollClipLength = lengthBeats
 
         if (window.pianoRollPresentation === "window") {
+            window.floatingPianoRollUsed = true
             floatingPianoRollWindow.show()
             floatingPianoRollWindow.raise()
             floatingPianoRollWindow.requestActivate()
-            floatingPianoRollView.centerOnMiddleC()
-            floatingPianoRollView.forceActiveFocus()
+            window.floatingPianoRollView.centerOnMiddleC()
+            window.floatingPianoRollView.forceActiveFocus()
         } else {
+            window.dockedPianoRollUsed = true
             window.bottomPanelMode = "pianoroll"
             window.mixerVisible = true
-            dockedPianoRoll.centerOnMiddleC()
+            window.dockedPianoRoll.centerOnMiddleC()
             // Its editing keys (Delete, Ctrl+A, Esc) need keyboard focus.
-            dockedPianoRoll.forceActiveFocus()
+            window.dockedPianoRoll.forceActiveFocus()
         }
     }
 
@@ -214,7 +223,7 @@ Window {
                         let pt = mapToItem(window.contentItem, mouse.x, mouse.y)
                         let diff = startGlobalY - pt.y
                         if (window.pianoRollDocked) {
-                            const minH = dockedPianoRoll.minimumDockHeight
+                            const minH = window.pianoRollMinimumDockHeight
                             const maxH = Math.max(minH, window.height - 220)
                             window.pianoRollDockHeight = Math.max(minH, Math.min(maxH, startHeight + diff))
                         } else {
@@ -235,7 +244,7 @@ Window {
             Layout.fillWidth: true
             Layout.preferredHeight: !window.mixerVisible ? 0
                 // (a saved dock height never pushes the timeline off a smaller window)
-                : (window.pianoRollDocked ? Math.max(dockedPianoRoll.minimumDockHeight,
+                : (window.pianoRollDocked ? Math.max(window.pianoRollMinimumDockHeight,
                                                      Math.min(window.height - 220, window.pianoRollDockHeight))
                                           : window.mixerHeight)
             clip: true
@@ -246,18 +255,23 @@ Window {
                 visible: window.bottomPanelMode === "mixer"
             }
 
-            PianoRollView {
-                id: dockedPianoRoll
+            Loader {
+                id: dockedPianoRollLoader
+                objectName: "dockedPianoRollLoader"
                 anchors.fill: parent
-                trackModel: trackModel
                 visible: window.bottomPanelMode === "pianoroll"
-                trackId: window.activePianoRollTrackId
-                clipId: window.activePianoRollClipId
-                clipLabel: window.activePianoRollClipLabel
-                clipLengthBeats: window.activePianoRollClipLength
-                bpm: EngineController.bpm
-                onCloseRequested: {
-                    window.bottomPanelMode = "mixer"
+                active: window.dockedPianoRollUsed
+                        && (window.pianoRollPresentation === "dock" || window.bottomPanelMode === "pianoroll")
+                sourceComponent: PianoRollView {
+                    trackModel: trackModel
+                    trackId: window.activePianoRollTrackId
+                    clipId: window.activePianoRollClipId
+                    clipLabel: window.activePianoRollClipLabel
+                    clipLengthBeats: window.activePianoRollClipLength
+                    bpm: EngineController.bpm
+                    onCloseRequested: {
+                        window.bottomPanelMode = "mixer"
+                    }
                 }
             }
         }
@@ -276,17 +290,21 @@ Window {
         color: Theme.windowBg
         visible: false
 
-        PianoRollView {
-            id: floatingPianoRollView
-            width: floatingPianoRollWindow.width
-            trackModel: trackModel
-            height: floatingPianoRollWindow.height
-            trackId: window.activePianoRollTrackId
-            clipId: window.activePianoRollClipId
-            clipLabel: window.activePianoRollClipLabel
-            clipLengthBeats: window.activePianoRollClipLength
-            bpm: EngineController.bpm
-            onCloseRequested: floatingPianoRollWindow.close()
+        Loader {
+            id: floatingPianoRollLoader
+            objectName: "floatingPianoRollLoader"
+            anchors.fill: parent
+            active: window.floatingPianoRollUsed
+                    && (window.pianoRollPresentation === "window" || floatingPianoRollWindow.visible)
+            sourceComponent: PianoRollView {
+                trackModel: trackModel
+                trackId: window.activePianoRollTrackId
+                clipId: window.activePianoRollClipId
+                clipLabel: window.activePianoRollClipLabel
+                clipLengthBeats: window.activePianoRollClipLength
+                bpm: EngineController.bpm
+                onCloseRequested: floatingPianoRollWindow.close()
+            }
         }
     }
 }
