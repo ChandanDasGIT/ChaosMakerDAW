@@ -2,6 +2,7 @@
 
 #include "engine/enginesnapshot.h"
 #include "processor/trackinput.h"
+#include "plugins/eq/tenbandeq.h"
 #include "session/project.h"
 #include "dsp/trackmeters.h"
 
@@ -22,6 +23,10 @@ public:
         std::shared_ptr<Processor> instrument;
         std::shared_ptr<TrackInput> input;
         std::shared_ptr<TrackInput> playbackInput;
+        // The track's EQ effect (monitor and playback instances); runs only when "eq" is on
+        // the track's effect list, at its place in the list.
+        std::shared_ptr<TenBandEq> eq;
+        std::shared_ptr<TenBandEq> playbackEq;
         std::shared_ptr<Processor> chain;
         std::shared_ptr<Processor> playbackChain;
         int inputChannel = -1;
@@ -51,6 +56,7 @@ public:
             bool monitorEnabled = false;
             bool hasLiveInput = false;
             std::vector<AudioClip> audioClips;
+            std::vector<std::string> effects; // effect types in processing order
         };
         std::vector<TrackInfo> tracks;
 

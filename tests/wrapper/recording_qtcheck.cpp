@@ -181,7 +181,11 @@ TEST(qtrecording, vocal_and_acoustic_share_live_input_fx_recording_and_session_p
             tick(); io->process();
             for(int i=0;i<128;++i) io->input[i]=float(i+1)/512;
             io->process();
-            CHECK(io->output[64]>0); CHECK(std::abs(io->output[64]-io->input[64]*0.5f)>0.001f);
+            CHECK(io->output[64]>0);
+            // Vocal tracks start without effects (plan 6.1), so the pedal does not colour them;
+            // the acoustic guitar's GuitarSuite does.
+            if (vocal) CHECK_NEAR(io->output[64],io->input[64]*0.5f,1e-4);
+            else CHECK(std::abs(io->output[64]-io->input[64]*0.5f)>0.001f);
             CHECK(io->right[64]==io->output[64]); // same processed sound on both output channels
             controller.transportAction("record"); io->process();
             CHECK(controller.recording()); CHECK(controller.transportMessage().contains("with FX"));

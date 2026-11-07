@@ -215,6 +215,9 @@ void EngineController::bindTrackEffects(int trackId, GuitarSuiteModel* model)
     fx.input->setTrimDb(fx.model->inputTrimDb());
     fx.input->prepare(rate, frames);
     fx.playbackInput->setTrimDb(fx.model->inputTrimDb()); fx.playbackInput->prepare(rate,frames);
+    // The EQ effect; it runs only when on the track's effect list (bands set by syncTrackEq).
+    fx.eq = std::make_shared<TenBandEq>(); fx.eq->prepare(rate, frames);
+    fx.playbackEq = std::make_shared<TenBandEq>(); fx.playbackEq->prepare(rate, frames);
     fx.model->configure(rate, frames);
     if (m_project) {
         const auto* track = m_project->project().findTrack(trackId);
@@ -422,6 +425,8 @@ bool EngineController::setBufferSize(int frames)
         fx.input = std::move(input);
         fx.playbackInput=std::make_shared<TrackInput>();
         fx.playbackInput->setTrimDb(fx.model->inputTrimDb()); fx.playbackInput->prepare(m_engine->sampleRate(),frames);
+        fx.eq=std::make_shared<TenBandEq>(); fx.eq->prepare(m_engine->sampleRate(),frames);
+        fx.playbackEq=std::make_shared<TenBandEq>(); fx.playbackEq->prepare(m_engine->sampleRate(),frames);
         fx.model->configure(m_engine->sampleRate(), frames);
         if (fx.instrument) {
             fx.instrument->prepare(m_engine->sampleRate(), frames);

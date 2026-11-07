@@ -124,7 +124,8 @@ TEST(snapshotbuilder, build_playback_snapshot_basic)
 TEST(snapshotbuilder, build_playback_snapshot_with_effects_and_monitoring)
 {
     Project project;
-    auto& t = project.addTrack(TrackKind::Audio, "Vocals", "Audio");
+    // A guitar type: its effect list holds GuitarSuite, so the pedal chain runs (plan 6.1).
+    auto& t = project.addTrack(TrackKind::Audio, "Gtr", "Electric Guitar");
     t.recordArmed = true;
     t.monitorEnabled = true;
 
@@ -250,13 +251,69 @@ TEST(snapshotbuilder, sync_track_eq)
     fx.input->prepare(48000.0, 256);
     fx.playbackInput = std::make_shared<TrackInput>();
     fx.playbackInput->prepare(48000.0, 256);
+    fx.eq = std::make_shared<TenBandEq>();
+    fx.playbackEq = std::make_shared<TenBandEq>();
     fxMap[t1.id] = fx;
 
     SnapshotBuilder::syncTrackEq(project, fxMap);
 
-    // Verify through EQ process response or bands
-    CHECK(fxMap[t1.id].input != nullptr);
-    CHECK(fxMap[t1.id].playbackInput != nullptr);
+    // Both EQ instances (monitor and playback) carry the track's bands.
+    for (int i = 0; i < 10; ++i) {
+        CHECK_NEAR(fxMap[t1.id].eq->bandGain(i), t1.eqGainDb[i], 1e-6);
+        CHECK_NEAR(fxMap[t1.id].playbackEq->bandGain(i), t1.eqGainDb[i], 1e-6);
+    }
+}
+
+TEST(snapshotbuilder, track_chains_follow_the_effect_list_in_order)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    auto& guitar = project.addTrack(TrackKind::Instrument, "Gtr", "Electric Guitar");
+    auto& vocal = project.addTrack(TrackKind::Audio, "Vox", "Vocal");
+    // A pattern clip on each so the playback chain is built as well.
+    for (auto* track : {&guitar, &vocal}) {
+        AudioClip clip; clip.poolId = "p"; clip.length = 48000;
+        MidiNote n; n.note = 60; n.velocity = 100; n.startBeat = 0; n.lengthBeats = 1;
+        clip.notes = { n };
+        project.addAudioClip(track->id, clip);
+    }
+    std::unordered_map<int, SnapshotBuilder::TrackEffects> fxMap;
+    for (int id : {guitar.id, vocal.id}) {
+        auto& fx = fxMap[id];
+        fx.input = std::make_shared<TrackInput>(); fx.playbackInput = std::make_shared<TrackInput>();
+        fx.eq = std::make_shared<TenBandEq>(); fx.playbackEq = std::make_shared<TenBandEq>();
+        fx.chain = std::make_shared<DummyProcessor>(); fx.playbackChain = std::make_shared<DummyProcessor>();
+    }
+    const auto build = [&] {
+        return SnapshotBuilder::buildPlaybackSnapshot(project, nullptr,
+            [&](int id) -> const SnapshotBuilder::TrackEffects* { return &fxMap.at(id); }, false);
+    };
+    const auto chains = [&](const EngineSnapshot& snap, int id) {
+        const auto& t = *std::find_if(snap.tracks.begin(), snap.tracks.end(), [id](const auto& r) { return r.trackId == id; });
+        return std::pair{t.monitorChain, t.chain};
+    };
+    using Chain = std::vector<Processor*>;
+    const auto& g = fxMap.at(guitar.id);
+    const auto& v = fxMap.at(vocal.id);
+
+    // Guitar starts with GuitarSuite only; the vocal starts empty, so its EQ and pedals do not run.
+    auto snap = build();
+    CHECK(chains(*snap, guitar.id).first == (Chain{g.input.get(), g.chain.get()}));
+    CHECK(chains(*snap, guitar.id).second == (Chain{g.playbackInput.get(), g.playbackChain.get()}));
+    CHECK(chains(*snap, vocal.id).first == (Chain{v.input.get()}));
+    CHECK(chains(*snap, vocal.id).second == (Chain{v.playbackInput.get()}));
+
+    // Added EQ runs after GuitarSuite; moved first, it runs before it.
+    const int eq = project.addTrackEffect(guitar.id, "eq");
+    snap = build();
+    CHECK(chains(*snap, guitar.id).first == (Chain{g.input.get(), g.chain.get(), g.eq.get()}));
+    CHECK(project.moveTrackEffect(guitar.id, eq, 0));
+    snap = build();
+    CHECK(chains(*snap, guitar.id).first == (Chain{g.input.get(), g.eq.get(), g.chain.get()}));
+    CHECK(chains(*snap, guitar.id).second == (Chain{g.playbackInput.get(), g.playbackEq.get(), g.playbackChain.get()}));
+    CHECK(project.addTrackEffect(vocal.id, "eq") > 0);
+    snap = build();
+    CHECK(chains(*snap, vocal.id).first == (Chain{v.input.get(), v.eq.get()}));
 }
 
 TEST(snapshotbuilder, sync_routing_capacity_and_monitored_track)
@@ -423,7 +480,8 @@ TEST(snapshotbuilder, build_playback_snapshot_pattern_clip_notes)
 TEST(snapshotbuilder, instrument_track_chain_starts_with_instrument)
 {
     Project project;
-    auto& tInst = project.addTrack(TrackKind::Instrument, "Synth Track", "Instrument");
+    // A guitar type, so GuitarSuite (the insert effect here) is on the track's effect list.
+    auto& tInst = project.addTrack(TrackKind::Instrument, "Guitar Track", "Electric Guitar");
     auto& tAudio = project.addTrack(TrackKind::Audio, "Audio Track", "Audio");
 
     AudioClip patternClip;
