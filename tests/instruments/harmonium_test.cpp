@@ -430,6 +430,67 @@ TEST(harmonium, drones_sound_without_keys_until_turned_off)
     CHECK(rmsDb(off, 19200) < -120.0);
 }
 
+TEST(harmonium, a_drone_sits_softer_and_darker_than_the_same_key_played)
+{
+    auto s = Run::quiet();
+    Run played(s);
+    played.event(0, 0x90, 48, 100);
+    s.drones = {48, harmonium::NoDrone, harmonium::NoDrone, harmonium::NoDrone};
+    Run drone(s);
+    const auto key = played.render(fftSize * 2), held = drone.render(fftSize * 2);
+    const double drop = rmsDb(tail(key, fftSize)) - rmsDb(tail(held, fftSize));
+    CHECK(drop > 3.0 && drop < 10.0);
+    const auto kdb = spectrumDb(tail(key, fftSize)), ddb = spectrumDb(tail(held, fftSize));
+    const double f = hz(48);
+    const auto upper = [&](const std::vector<double>& db) { return levelAt(db, 8 * f) - levelAt(db, f); };
+    CHECK(upper(ddb) < upper(kdb) - 3.0);                         // fewer high overtones
+}
+
+TEST(harmonium, case_reflections_are_darker_than_the_dry_sound)
+{
+    auto s = Run::quiet();
+    s.caseResonance = 1.0;
+    s.indian.female = true;
+    Harmonium h;
+    h.prepare(rate, 256);
+    h.setSettings(s);
+    h.reset();
+    MidiBuffer midi;
+    midi.add({0, 0x90, 57, 100});
+    const int total = fftSize * 2;
+    std::vector<float> l(static_cast<std::size_t>(total)), r(static_cast<std::size_t>(total));
+    for (int pos = 0; pos < total; pos += 256) {
+        float* ch[2] = {l.data() + pos, r.data() + pos};
+        ProcessContext c;
+        c.audio = {ch, 2, 256};
+        c.midi = &midi;
+        c.sampleRate = rate;
+        h.process(c);
+        midi.clear();
+    }
+    // The dry sound is the same on both sides, so L - R holds only the reflections.
+    std::vector<float> mid(static_cast<std::size_t>(fftSize)), side(static_cast<std::size_t>(fftSize));
+    for (int i = 0; i < fftSize; ++i) {
+        const auto k = std::size_t(total - fftSize + i);
+        mid[std::size_t(i)] = l[k] + r[k];
+        side[std::size_t(i)] = l[k] - r[k];
+    }
+    const auto mdb = spectrumDb(mid), sdb = spectrumDb(side);
+    const double f = hz(57);
+    // Energy of the harmonics from 2.5 to 5 kHz against those from 200 to 800 Hz.
+    const auto tilt = [&](const std::vector<double>& db) {
+        double high = 0.0, low = 0.0;
+        int nh = 0, nl = 0;
+        for (int k = 1; k * f < 5000.0; ++k) {
+            const double x = levelAt(db, k * f);
+            if (k * f >= 2500.0) { high += x; ++nh; }
+            else if (k * f >= 200.0 && k * f <= 800.0) { low += x; ++nl; }
+        }
+        return high / std::max(nh, 1) - low / std::max(nl, 1);
+    };
+    CHECK(tilt(sdb) < tilt(mdb) - 8.0);                           // wood swallows the highs
+}
+
 TEST(harmonium, western_style_is_rounder_and_vox_humana_trembles)
 {
     auto s = Run::quiet();

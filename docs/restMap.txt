@@ -84,14 +84,16 @@ decoder (C4) and the piano (C5).
         Accurate-Salamander (WAV; CC-BY, so a credit is then required: see C8).
 [ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
         model), mapped in instrumentfactory.cpp.
-[~] C7  Harmonium, built 2026-11-07 (before C2, the user's choice); tuning by ear is left (B9).
+[x] C7  Harmonium, built 2026-11-07 (before C2, the user's choice); tuning by ear is left (B9).
         Tuning step 1 done 2026-11-08: the Indian reed is a free-reed air-puff model (lopsided
         Hann pulse, derivative radiated; puff width 0.30 at full air, 0.55 at low air), fitted
         to single notes of the references; the old flat overtone stack was the buzz.
         TUNING STEP 2: calm the roughness. 2a done 2026-11-08 (the user liked it): per-key
-        detune scatter +-1.5 -> +-0.5 cent (reedvoice.cpp; start phases unchanged). NEXT: 2b
-        softer drone brightness, 2c check the case reflections (2.9-6.9 ms taps on the dry sound
-        can sound hollow on a bright tone). A short A/B render for the user after each change.
+        detune scatter +-1.5 -> +-0.5 cent (reedvoice.cpp; start phases unchanged). 2b done
+        2026-11-08: drones get 55 % of the bellows air (Harmonium::DroneAir), ~6 dB softer and
+        darker than a played key. 2c done 2026-11-08: the case reflections go through a 2 kHz
+        high-cut and sit a little lower (0.28 at full Case); bright ones combed the 1-3 kHz band
+        and sounded hollow. Tuning step 2 is finished.
         SUSTAIN, added 2026-11-08 (the user's idea): a released key keeps ringing, full level for
         half of Settings::sustainSeconds, then fades to silence over sustainSeconds; the next key
         cuts the tail (20 ms). A key let go while a newer key (>80 ms newer) is held ends at once

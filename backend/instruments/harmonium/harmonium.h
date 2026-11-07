@@ -15,7 +15,8 @@
 //               pressure. It is smoothed, dips with each pump stroke (Settings::pumping) and
 //               sags a little when many reeds play. More air: louder, brighter, a little flat.
 //   stops       open and close their reed set on held keys too, in about 15 ms
-//   drones      up to four keys that sound until the drone is turned off
+//   drones      up to four keys that sound until the drone is turned off, through a valve
+//               only partly open: softer and darker than a played key
 //   sustain     a released key keeps ringing (Settings::sustainSeconds) unless the player has
 //               already moved on to a newer key; the next key pressed cuts the tail
 //   transpose   the scale changer: moves every key, drones included
@@ -44,6 +45,7 @@ private:
     static constexpr int Block = 32;                        // frames between control updates
     static constexpr int PoolSize = Polyphony + 16;
     static constexpr int MaxDelay = 2048;                   // reflections, up to 10 ms at 192 kHz
+    static constexpr float DroneAir = 0.55f;                // share of the bellows a drone gets
 
     void handle(const MidiEvent& event) noexcept;
     void noteOn(int key) noexcept;
@@ -98,4 +100,6 @@ private:
     int m_delayWrite = 0;
     std::array<int, 4> m_tapFrames{};                       // two taps per side
     float m_reflection = 0.0f;
+    biquad::Coefficients m_reflectionFilter{};              // wood takes the highs out of them
+    std::array<biquad::State, 2> m_reflectionState{};
 };

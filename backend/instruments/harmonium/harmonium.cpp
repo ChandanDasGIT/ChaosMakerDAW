@@ -96,6 +96,9 @@ void Harmonium::prepare(double sampleRate, int maxFrames)
     m_clickCoef = approach(0.004, m_sampleRate);
     m_airFilter = section(eqband::Shape::BandPass, 1800.0, 0.0, 0.8, m_sampleRate);
     m_clickFilter = section(eqband::Shape::BandPass, 2600.0, 0.0, 1.2, m_sampleRate);
+    // Off wood the short reflections lose their highs; bright ones would comb the nasal band
+    // (1-3 kHz) of the dry sound and make it hollow.
+    m_reflectionFilter = section(eqband::Shape::HighCut, 2000.0, 0.0, 0.707, m_sampleRate);
     // Short reflections inside the case and off the player's room: a few ms, two per side.
     const double ms[4] = {2.9, 5.7, 3.8, 6.9};
     for (int i = 0; i < 4; ++i)
@@ -117,6 +120,7 @@ void Harmonium::reset() noexcept
     m_click = 0.0f;
     m_bodyState.fill({});
     m_airState = m_clickState = {};
+    m_reflectionState.fill({});
     m_delay.fill(0.0f);
     m_delayWrite = 0;
     m_caseResonance = -1.0f;                                // design the body again
@@ -143,7 +147,7 @@ void Harmonium::designBody() noexcept
         m_body[2] = section(Shape::HighCut, 2400.0, 0.0, 0.707, r);
         m_body[3] = section(Shape::HighCut, 5000.0, 0.0, 0.707, r);
     }
-    m_reflection = float(0.35 * c);
+    m_reflection = float(0.28 * c);
 }
 
 void Harmonium::updateControls() noexcept
@@ -347,7 +351,12 @@ void Harmonium::renderBlock(float* left, float* right, int frames) noexcept
     std::array<float, Block> mono{};
     float breath = 0.0f;
     for (auto& v : m_voices) { v.render(mono.data(), frames, air); breath += v.breath(); }
-    for (auto& v : m_drones) { v.render(mono.data(), frames, air); breath += v.breath(); }
+    // A drone valve is only partly open: its reeds get a share of the air, so they sit softer
+    // and darker under the keys (about -6 dB at the default bellows).
+    Air droneAir = air;
+    droneAir.pressureFrom *= DroneAir;
+    droneAir.pressureTo *= DroneAir;
+    for (auto& v : m_drones) { v.render(mono.data(), frames, droneAir); breath += v.breath(); }
 
     // Air through open valves: a little while keys are down, more while reeds speak up. With
     // every valve shut no air flows, so there is none.
@@ -372,8 +381,10 @@ void Harmonium::renderBlock(float* left, float* right, int frames) noexcept
             if (at < 0) at += MaxDelay;
             return m_delay[std::size_t(at)];
         };
-        left[i] += dry + m_reflection * (tap(0) * 0.6f + tap(1) * 0.4f);
-        right[i] += dry + m_reflection * (tap(2) * 0.6f + tap(3) * 0.35f);
+        const double reflectedL = biquad::process(m_reflectionFilter, m_reflectionState[0], double(tap(0) * 0.6f + tap(1) * 0.4f));
+        const double reflectedR = biquad::process(m_reflectionFilter, m_reflectionState[1], double(tap(2) * 0.6f + tap(3) * 0.35f));
+        left[i] += dry + m_reflection * float(reflectedL);
+        right[i] += dry + m_reflection * float(reflectedR);
         if (++m_delayWrite == MaxDelay) m_delayWrite = 0;
     }
 }
