@@ -4,6 +4,7 @@
 #include "instruments/guitar/dsp/tempodivision.h"
 #include "instruments/guitar/plugins/tuner/standardtuning.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -35,11 +36,17 @@ bool pedaleditor::disabledWhenSynced(const std::string& type, const std::string&
 
 double pedaleditor::dialStep(const std::string& type, const std::string& id)
 {
-    return type == "pedal.pitchshift" && id == "semitones" ? 1.0 : 0.0;
+    if (type == "pedal.pitchshift" && id == "semitones") return 1.0;
+    if (type == "pedal.amp" && id == "channel") return 1.0;   // Clean / Crunch / High Gain
+    return 0.0;
 }
 
 std::string pedaleditor::formatValue(double value, const std::string& unit)
 {
+    if (unit == "channel") {   // the amp's channel switch
+        static const char* names[] = {"Clean", "Crunch", "High Gain"};
+        return names[std::clamp(int(std::lround(value)), 0, 2)];
+    }
     const int decimals = unit == "ms" || unit == "st" ? 0 : 2;
     const auto number = valueformat::fixed(value, decimals);
     return unit.empty() ? number : number + " " + unit;
