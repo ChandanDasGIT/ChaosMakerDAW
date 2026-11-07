@@ -438,7 +438,7 @@ TEST(snapshotbuilder, build_playback_snapshot_pattern_clip_notes)
     auto snapshot = SnapshotBuilder::buildPlaybackSnapshot(project, nullptr, nullptr, false);
     CHECK(snapshot != nullptr);
     CHECK(snapshot->tracks.size() == 1);
-    CHECK(snapshot->playbackEnd == 108000); // 60000 + 48000 release tail for instrument tracks
+    CHECK(snapshot->playbackEnd == 60000); // where the clip ends; rings fade after the stop
 
     const auto& render = snapshot->tracks[0];
     // n1 and n5 should be dropped. 5 notes remain: n2, n3, n4, n_long, n_short.
@@ -577,8 +577,7 @@ TEST(snapshotbuilder, bpm_change_updates_sample_times_and_release_tail)
     CHECK(snap120->tracks[0].notes.size() == 1);
     CHECK(snap120->tracks[0].notes[0].on == 24000);
     CHECK(snap120->tracks[0].notes[0].off == 48000);
-    // Release tail = 48000 samples -> playbackEnd = 48000 + 48000 = 96000
-    CHECK(snap120->playbackEnd == 96000);
+    CHECK(snap120->playbackEnd == 48000);                       // the clip's end, no tail
 
     // Change tempo to 60 BPM with 96000 sample clip
     Project project60;
@@ -593,14 +592,14 @@ TEST(snapshotbuilder, bpm_change_updates_sample_times_and_release_tail)
     // At 60 BPM, 48kHz: beat 1.0 is sample 48000, beat 2.0 is sample 96000.
     CHECK(snap60->tracks[0].notes[0].on == 48000);
     CHECK(snap60->tracks[0].notes[0].off == 96000);
-    CHECK(snap60->playbackEnd == 96000 + 48000);
+    CHECK(snap60->playbackEnd == 96000);
 }
 
 
-TEST(snapshotbuilder, release_tail_only_follows_clips_that_can_ring_on)
+TEST(snapshotbuilder, playback_ends_where_the_last_clip_ends)
 {
-    // An instrument clip with no notes and no audio ends exactly at its end; recorded audio on an
-    // instrument track (effects can ring on) and pattern notes keep the one-second tail.
+    // Every kind of clip ends playback exactly at its end: the playhead never runs past the
+    // clips. What still rings (notes, effects) fades out after the stop (AudioEngine).
     const auto build = [](bool notes, bool audio, TrackKind kind) {
         Project project;
         project.tempo().set(120.0, 4, 4, 48000.0);
@@ -618,7 +617,7 @@ TEST(snapshotbuilder, release_tail_only_follows_clips_that_can_ring_on)
         return SnapshotBuilder::buildPlaybackSnapshot(project, resolver, nullptr, false)->playbackEnd;
     };
     CHECK(build(false, false, TrackKind::Instrument) == 96000);         // empty pattern clip
-    CHECK(build(true, false, TrackKind::Instrument) == 96000 + 48000);  // notes ring on
-    CHECK(build(false, true, TrackKind::Instrument) == 96000 + 48000);  // recorded audio through FX
-    CHECK(build(false, true, TrackKind::Audio) == 96000);               // plain audio: no tail
+    CHECK(build(true, false, TrackKind::Instrument) == 96000);          // pattern notes
+    CHECK(build(false, true, TrackKind::Instrument) == 96000);          // recorded audio through FX
+    CHECK(build(false, true, TrackKind::Audio) == 96000);               // plain audio
 }

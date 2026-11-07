@@ -566,3 +566,61 @@ TEST(audioengine_midi, typing_keyboard_notes_join_the_midi_input)
     engine.renderBlock(io);
     CHECK(sounding(*armedSynth, 67));
 }
+
+TEST(audioengine_midi, playback_stops_at_the_end_and_instruments_ring_out)
+{
+    for (bool multi : {false, true}) {
+        AudioEngine engine{nullptr};
+        engine.deviceChanged(48000.0, 128);
+        auto rec = std::make_shared<MidiRecordingProcessor>();
+        auto snapshot = std::make_unique<EngineSnapshot>();
+        snapshot->multiMonitor = multi;
+        snapshot->playbackEnd = 1000;                           // the last clip's end
+        snapshot->tempo.set(120.0, 4, 4, 48000.0);
+        TrackRender track;
+        track.trackId = 1;
+        track.chain.push_back(rec.get());
+        track.notes = {NoteRender{100, 200, 60, 100}, NoteRender{900, 1000, 64, 100}};   // the second lasts to the end
+        track.noteOffs = track.notes;
+        snapshot->tracks.push_back(track);
+        snapshot->keepProcessors.push_back(rec);
+        engine.publishPlayback(std::move(snapshot));
+
+        CHECK(engine.post({EngineCommand::Type::Play}));
+        for (int i = 0; i < 9; ++i) { renderEngine(engine, 128); if (!engine.playing()) break; }   // Play starts in the first block
+        CHECK(!engine.playing());
+        CHECK(engine.position() == 1000);                       // stopped exactly at the end
+        // The ring-out starts in the same callback: the note still held gets its note-off at
+        // the end, at once.
+        bool released = false;
+        for (const auto& e : rec->events)
+            released |= e.blockPosition == 1000 && e.event.status == 0x80 && e.event.data1 == 64 && e.event.offset == 0;
+        CHECK(released);
+        rec->wasReset = false;
+        rec->events.clear();
+
+        int calls = rec->processCalls;
+        renderEngine(engine, 128);                              // still processed while stopped
+        CHECK(engine.position() == 1000);
+        CHECK(rec->processCalls > calls);
+        CHECK(!rec->wasReset);                                  // the ring is not cut
+        CHECK(rec->events.empty());                             // the note-off came once
+
+        for (int i = 0; i < 48000 * 2 / 128 + 2; ++i) renderEngine(engine, 128);
+        calls = rec->processCalls;
+        renderEngine(engine, 128);
+        CHECK(rec->processCalls == calls);                      // two seconds later: done
+        CHECK(engine.position() == 1000);
+
+        // Stop during a ring-out ends it at once.
+        CHECK(engine.post({EngineCommand::Type::Seek, 0}));
+        CHECK(engine.post({EngineCommand::Type::Play}));
+        for (int i = 0; i < 9; ++i) { renderEngine(engine, 128); if (!engine.playing()) break; }
+        CHECK(!engine.playing());
+        CHECK(engine.post({EngineCommand::Type::Stop}));
+        renderEngine(engine, 128);
+        calls = rec->processCalls;
+        renderEngine(engine, 128);
+        CHECK(rec->processCalls == calls);
+    }
+}
