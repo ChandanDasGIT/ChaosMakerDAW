@@ -61,13 +61,14 @@ std::string valueformat::meterLevel(double db)
 
 std::string valueformat::position(double seconds)
 {
-    const double milliseconds = std::floor(seconds * 1000.0);
+    // The tiny tolerance keeps exact hundredths (0.29 s is 28.999... * 0.01) from flooring down.
+    const double hundredths = std::floor(seconds * 100.0 + 1e-6);
     // 2^64 is the first double outside the unsigned counter range.
-    if (!std::isfinite(milliseconds) || seconds < 0 || milliseconds >= std::ldexp(1.0, 64))
+    if (!std::isfinite(hundredths) || seconds < 0 || hundredths >= std::ldexp(1.0, 64))
         return unavailable;
-    const auto ms = static_cast<std::uint64_t>(milliseconds);
-    return padded(ms / 3600000, 2) + ':' + padded(ms / 60000 % 60, 2)
-        + ':' + padded(ms / 1000 % 60, 2) + '.' + padded(ms % 1000, 3);
+    const auto cs = static_cast<std::uint64_t>(hundredths);
+    return padded(cs / 360000, 2) + ':' + padded(cs / 6000 % 60, 2)
+        + ':' + padded(cs / 100 % 60, 2) + '.' + padded(cs % 100, 2);
 }
 
 std::string valueformat::barBeatPosition(double beat, double beatsPerBar, double beatUnit)

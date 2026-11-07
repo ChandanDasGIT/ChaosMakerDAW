@@ -49,9 +49,10 @@ TEST(playbackcontrols, position_conversions)
 
 TEST(playbackcontrols, formatting)
 {
-    CHECK(PlaybackControls::formatTime(0.0) == "00:00:00.000");
-    CHECK(PlaybackControls::formatTime(65.432) == "00:01:05.432");
-    CHECK(PlaybackControls::formatTime(3661.123) == "01:01:01.123");
+    CHECK(PlaybackControls::formatTime(0.0) == "00:00:00.00");
+    CHECK(PlaybackControls::formatTime(65.432) == "00:01:05.43");
+    CHECK(PlaybackControls::formatTime(3661.129) == "01:01:01.12");  // floored, never rounded up
+    CHECK(PlaybackControls::formatTime(0.29) == "00:00:00.29");      // 0.29 * 100 is 28.999...
 
     CHECK(PlaybackControls::formatBarsBeats(0.0, 4, 4) == "1.1.00");
     CHECK(PlaybackControls::formatBarsBeats(4.0, 4, 4) == "2.1.00");

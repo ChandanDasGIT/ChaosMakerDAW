@@ -2870,13 +2870,13 @@ private slots:
         const auto restore=qScopeGuard([&] { window->setProperty("transport",QVariant::fromValue(EngineController::instance())); });
         window->setProperty("transport",QVariant::fromValue(&controller));
         auto* clock=visualItem(window->contentItem(),"transportClock"); QVERIFY(clock);
-        QCOMPARE(clock->property("text").toString(),QString("00:00:00.000"));
+        QCOMPARE(clock->property("text").toString(),QString("00:00:00.00"));
         controller.transportAction("play"); for(int i=0;i<200;++i)io->process();
         controller.transportAction("pause"); io->process();
         const double seconds=controller.positionSeconds(); QVERIFY(seconds>0);
-        const qint64 ms=qint64(std::floor(seconds*1000));
-        const QString expected=QString("%1:%2:%3.%4").arg(ms/3600000,2,10,QChar('0')).arg(ms/60000%60,2,10,QChar('0'))
-            .arg(ms/1000%60,2,10,QChar('0')).arg(ms%1000,3,10,QChar('0'));
+        const qint64 cs=qint64(std::floor(seconds*100+1e-6)); // hundredths (plan 6.5)
+        const QString expected=QString("%1:%2:%3.%4").arg(cs/360000,2,10,QChar('0')).arg(cs/6000%60,2,10,QChar('0'))
+            .arg(cs/100%60,2,10,QChar('0')).arg(cs%100,2,10,QChar('0'));
         QTRY_COMPARE(clock->property("text").toString(),expected);
         controller.shutdownSession();
     }

@@ -237,18 +237,19 @@ double PlaybackControls::calculateForwardSeekBeat(double currentBeat, int numera
 std::string PlaybackControls::formatTime(double seconds) noexcept {
     if (!std::isfinite(seconds) || seconds < 0.0)
         seconds = 0.0;
-    int64_t totalMs = static_cast<int64_t>(std::floor(seconds * 1000.0));
-    int64_t hours = totalMs / 3600000;
-    int64_t minutes = (totalMs / 60000) % 60;
-    int64_t secs = (totalMs / 1000) % 60;
-    int64_t ms = totalMs % 1000;
+    // HH:MM:SS.cc (hundredths). The tiny tolerance keeps exact hundredths from flooring down.
+    int64_t total = static_cast<int64_t>(std::floor(seconds * 100.0 + 1e-6));
+    int64_t hours = total / 360000;
+    int64_t minutes = (total / 6000) % 60;
+    int64_t secs = (total / 100) % 60;
+    int64_t hundredths = total % 100;
 
     std::ostringstream ss;
     ss << std::setfill('0')
        << std::setw(2) << hours << ":"
        << std::setw(2) << minutes << ":"
        << std::setw(2) << secs << "."
-       << std::setw(3) << ms;
+       << std::setw(2) << hundredths;
     return ss.str();
 }
 

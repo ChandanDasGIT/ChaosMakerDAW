@@ -64,11 +64,12 @@ TEST(valueformat, bar_beat_position_follows_the_meter)
 
 TEST(valueformat, playback_position_floors_milliseconds_and_carries_minutes_and_hours)
 {
-    CHECK(valueformat::position(0) == "00:00:00.000");
-    CHECK(valueformat::position(59.9996) == "00:00:59.999");
-    CHECK(valueformat::position(60) == "00:01:00.000");
-    CHECK(valueformat::position(3661.125) == "01:01:01.125");
-    CHECK(valueformat::position(360000) == "100:00:00.000");
+    CHECK(valueformat::position(0) == "00:00:00.00");
+    CHECK(valueformat::position(59.9996) == "00:00:59.99");   // floored, never rounded up
+    CHECK(valueformat::position(60) == "00:01:00.00");
+    CHECK(valueformat::position(3661.125) == "01:01:01.12");
+    CHECK(valueformat::position(0.29) == "00:00:00.29");      // 0.29 * 100 is 28.999...
+    CHECK(valueformat::position(360000) == "100:00:00.00");
     CHECK(valueformat::position(-0.001) == "—");
     CHECK(valueformat::position(std::numeric_limits<double>::quiet_NaN()) == "—");
     CHECK(valueformat::position(1e99) == "—");
