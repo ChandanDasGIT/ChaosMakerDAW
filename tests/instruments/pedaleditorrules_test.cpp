@@ -29,6 +29,7 @@ TEST(pedaleditorrules, which_parameters_are_dials)
     CHECK(pedaleditor::dialStep("pedal.pitchshift", "mix") == 0.0);
     CHECK(pedaleditor::dialStep("pedal.amp", "channel") == 1.0);     // whole channels
     CHECK(pedaleditor::dialStep("pedal.amp", "drive") == 0.0);
+    CHECK(pedaleditor::dialStep("pedal.cabinet", "model") == 1.0);   // whole cab models
 }
 
 TEST(pedaleditorrules, value_and_tuner_texts)
@@ -41,6 +42,10 @@ TEST(pedaleditorrules, value_and_tuner_texts)
     CHECK(pedaleditor::formatValue(1.2, "channel") == "Crunch");
     CHECK(pedaleditor::formatValue(2.0, "channel") == "High Gain");
     CHECK(pedaleditor::formatValue(9.0, "channel") == "High Gain");   // out of range: clamped
+    CHECK(pedaleditor::formatValue(0.0, "cabmodel") == "None");
+    CHECK(pedaleditor::formatValue(1.0, "cabmodel") == "1x12 Open");
+    CHECK(pedaleditor::formatValue(2.0, "cabmodel") == "2x12");
+    CHECK(pedaleditor::formatValue(3.0, "cabmodel") == "4x12 Closed");
     CHECK(pedaleditor::formatTrim(1.5) == "+1.5 dB" && pedaleditor::formatTrim(0) == "0.0 dB");
     CHECK(pedaleditor::formatTrim(-3) == "-3.0 dB");
     CHECK(pedaleditor::beatDivisionNames().size() == 7);

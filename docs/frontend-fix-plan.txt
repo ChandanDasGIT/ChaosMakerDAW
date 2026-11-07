@@ -13,7 +13,7 @@ Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Ph
 Phase 4 done (4.4 not needed). Track list minimum width settled: chips wrap (see 4.5).
 Phase 5 done (5.1–5.3).
 Next: Phase 6 (user requests). 6.1, 6.2 (Chaos EQ), 6.4, 6.5, 6.6 done. Left: 6.3 (guitar
-suite sound), in progress: steps 1-4 done and committed. Tone-matching presets (user request):
+suite sound), in progress: steps 1-5 done and committed. Tone-matching presets (user request):
 djent chords preset for needGuitarStem done (local-reference/presets/, fitted by renders);
 next the user brings a song for a rock solo preset. Steps 4-6 after that. After 6.3 the user
 wants a song's guitar tone analysed and a matching GuitarSuite preset made.
@@ -571,7 +571,14 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
                the gate now holds 50 ms (fixed, no new control) before closing. The quick
                re-opens left are new notes after real pauses (DI at -56..-58 dBFS for
                100+ ms). Test: phase2 gate_holds_through_a_short_dip_and_still_closes.
-         [ ] 5 Built-in cabinet models when no IR is loaded.
+         [x] 5 Built-in cabinet models when no IR is loaded: Cabinet "model" control (dial
+               "Cab": None / 1x12 Open / 2x12 / 4x12 Closed, default 4x12; None = the old dry
+               pass-through; an IR always wins). Models are EQ-band speaker responses; 4x12
+               fitted to the boutique 4x12 IR measured properly (whole IR, no window): 1.7 dB
+               rms 60 Hz-12 kHz; on the chord DI it renders within ~2 dB of the real IR up to
+               6.3 kHz. Models level-matched to each other. Note: the IR "tone balance" table
+               measured earlier with fxrender --analyze was wrong for IRs (its Hann window
+               hides an impulse at the start of the file). Tests: ampcab (1 new + updated).
          [ ] 6 Merge guitar dsp/radix2fft.h (pitch shifter) into backend/dsp/fft.
 
 [x] 6.4  Setting: stop playback at the end of the arrangement, on or off (user request

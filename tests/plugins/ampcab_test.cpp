@@ -64,7 +64,11 @@ TEST(ampcab, cabinet_is_block_independent_and_passes_dry_when_unloaded) {
     CHECK(testsignals::render(cabinet,input,512)==reference);
     CHECK(cabinet.latencySamples()==0);
     set(cabinet,"mix",0);CHECK(testsignals::render(cabinet,input,128)==input);
-    Cabinet unloaded;CHECK(testsignals::render(unloaded,input,128)==input);
+    // No IR and Cab = None: the old dry pass-through.
+    Cabinet unloaded;set(unloaded,"model",0);CHECK(testsignals::render(unloaded,input,128)==input);
+    // With an IR loaded the built-in model is ignored.
+    set(cabinet,"mix",1);const auto withIr=testsignals::render(cabinet,input,128);
+    set(cabinet,"model",1);CHECK(testsignals::render(cabinet,input,128)==withIr);
 }
 TEST(ampcab, cabinet_keeps_stereo_channels_separate) {
     CabinetImpulse impulse;impulse.sampleRate=48000;impulse.channels[0]={0.5f};impulse.channels[1]={0.25f};
@@ -145,4 +149,25 @@ TEST(ampcab, high_gain_keeps_picking_dynamics) {
     // Not a brick-wall limiter: harder picking is still louder, and the attack stands out.
     CHECK(testsignals::rmsDb(hard)>testsignals::rmsDb(soft)+1.5);
     CHECK(crestDb(hard)>6.0);
+}
+
+TEST(ampcab, cabinet_without_ir_uses_a_built_in_speaker_model) {
+    Cabinet cabinet;   // no IR; Cab defaults to 4x12 Closed
+    const Parameter* model=nullptr;
+    for(const auto& p:cabinet.parameters()) if(p->id=="model") model=p.get();
+    CHECK(model && model->def==3 && model->max==3 && model->unit=="cabmodel");
+    const auto level=[&](double hz){ return tailRms(testsignals::render(cabinet,testsignals::sine(hz,-18,24000),128)); };
+    // A speaker: the fizz above the cone's range is gone, the low resonance (100-160 Hz) is
+    // strong, there is presence near 3 kHz and almost nothing below the speaker's range.
+    CHECK(level(10000)<level(1000)-20);
+    CHECK(level(125)>level(1000)+5);
+    CHECK(level(3200)>level(1000)+2);
+    CHECK(level(40)<level(125)-15);
+    // Each model sounds different; block size never changes the result.
+    const auto input=testsignals::sine(3000,-18,12000);
+    std::vector<std::vector<float>> outputs;
+    for(float m:{1.0f,2.0f,3.0f}) { set(cabinet,"model",m); outputs.push_back(testsignals::render(cabinet,input,128)); }
+    CHECK(outputs[0]!=outputs[1] && outputs[1]!=outputs[2]);
+    CHECK(testsignals::render(cabinet,input,37)==outputs[2]);
+    for(float v:outputs[2]) CHECK(std::isfinite(v));
 }
