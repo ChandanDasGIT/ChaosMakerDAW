@@ -21,6 +21,7 @@ SnapshotBuilder::Context SnapshotBuilder::Context::fromProject(const Project& pr
         info.monitorEnabled = track->monitorEnabled;
         info.hasLiveInput = track->hasLiveInput();
         info.audioClips = track->audioClips;
+        for (const auto& slot : track->effects) info.effects.push_back(slot.type);
         ctx.tracks.push_back(std::move(info));
     }
     return ctx;
@@ -33,8 +34,8 @@ void SnapshotBuilder::syncTrackEq(const Project& project, const MutableEffectRes
         auto* fx = effectLookup(track->id);
         if (!fx) continue;
         for (int band = 0; band < 10; ++band) {
-            if (fx->input) fx->input->setEqBand(band, track->eqGainDb[band]);
-            if (fx->playbackInput) fx->playbackInput->setEqBand(band, track->eqGainDb[band]);
+            if (fx->eq) fx->eq->setBandGain(band, track->eqGainDb[band]);
+            if (fx->playbackEq) fx->playbackEq->setBandGain(band, track->eqGainDb[band]);
         }
     }
 }
@@ -227,14 +228,23 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
                     snapshot->keepProcessors.push_back(fx->instrument);
                 }
 
+                // Input trim first, then the track's effects in list order (plan 6.1). An effect
+                // that is not on the list does not run.
+                const auto addEffects = [&](std::vector<Processor*>& out, bool playback) {
+                    for (const auto& type : track.effects) {
+                        std::shared_ptr<Processor> processor;
+                        if (type == effectchain::Eq) processor = playback ? fx->playbackEq : fx->eq;
+                        else if (type == effectchain::GuitarSuite) processor = playback ? fx->playbackChain : fx->chain;
+                        if (!processor) continue;
+                        out.push_back(processor.get());
+                        snapshot->keepProcessors.push_back(std::move(processor));
+                    }
+                };
                 if (fx->input) {
                     render.monitorChain.push_back(fx->input.get());
                     snapshot->keepProcessors.push_back(fx->input);
                 }
-                if (fx->chain) {
-                    render.monitorChain.push_back(fx->chain.get());
-                    snapshot->keepProcessors.push_back(fx->chain);
-                }
+                addEffects(render.monitorChain, false);
 
                 bool hasUnprintedClips = false;
                 for (const auto& c : render.clips) {
@@ -249,10 +259,7 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
                         render.chain.push_back(fx->playbackInput.get());
                         snapshot->keepProcessors.push_back(fx->playbackInput);
                     }
-                    if (fx->playbackChain) {
-                        render.chain.push_back(fx->playbackChain.get());
-                        snapshot->keepProcessors.push_back(fx->playbackChain);
-                    }
+                    addEffects(render.chain, true);
                 }
             }
         }

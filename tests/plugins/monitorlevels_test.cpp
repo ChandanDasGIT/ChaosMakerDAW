@@ -64,10 +64,10 @@ TEST(monitorlevels, trim_changes_are_smooth_and_invalid_controls_are_rejected) {
     CHECK(engine.setInputTrimDb(0));
 }
 
-TEST(monitorlevels, track_input_stages_isolate_trim_eq_history_and_latest_routing) {
+TEST(monitorlevels, track_input_stages_isolate_trim_and_latest_routing) {
     AudioEngine engine(nullptr); engine.deviceChanged(48000,128); arm(engine,true);
     auto a=std::make_shared<TrackInput>(), b=std::make_shared<TrackInput>();
-    a->prepare(48000,128); a->setEqBand(5,12);
+    a->setTrimDb(12); a->prepare(48000,128); // the EQ is a separate effect since plan 6.1
     b->setTrimDb(-6.020599913); b->prepare(48000,128);
     auto publish=[&](const auto& input) {
         auto snapshot=std::make_unique<EngineSnapshot>(); snapshot->inputStage=input.get();
@@ -80,7 +80,5 @@ TEST(monitorlevels, track_input_stages_isolate_trim_eq_history_and_latest_routin
     for(float sample:output) CHECK_NEAR(sample,0.125,1e-6);
     std::fill_n(input,128,0); input[127]=0.25f; publish(a); process(engine,io);
     input[127]=0; publish(b); process(engine,io);
-    for(float sample:output) CHECK(sample==0); // no filter history from A in B
-    publish(a); process(engine,io);
-    CHECK(std::any_of(output,output+128,[](float v){return std::abs(v)>1e-6f;}));
+    for(float sample:output) CHECK(sample==0); // nothing from A carries into B
 }
