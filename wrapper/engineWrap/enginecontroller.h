@@ -182,6 +182,8 @@ public:
     QStringList midiInputPorts() const;
     QString connectedMidiPort() const;
     Q_INVOKABLE bool connectMidiInput(const QString& portName);
+    // Looks for MIDI devices again (the IN popup of instrument tracks calls it when it opens).
+    Q_INVOKABLE void refreshMidiInputs();
 
 signals:
     void projectFileChanged();

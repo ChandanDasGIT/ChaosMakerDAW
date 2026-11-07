@@ -71,10 +71,7 @@ EngineController::EngineController(std::unique_ptr<AudioDevice> device, bool dis
             }
             selectInput(preferredInput);
         }
-        const auto midiPorts = m_engine->midiInputNames();
-        if (!midiPorts.empty()) {
-            m_engine->connectMidiInput(midiPorts.front());
-        }
+        // The device connects a MIDI keyboard by itself (skipping the silent "Midi Through").
         if (discoverSystemDevices) discoverInputDevices();
     } else {
         setStatus(QStringLiteral("Audio unavailable · %1")
@@ -1237,6 +1234,12 @@ QStringList EngineController::midiInputPorts() const {
 
 QString EngineController::connectedMidiPort() const {
     return m_engine ? QString::fromStdString(m_engine->connectedMidiInput()) : QString{};
+}
+
+void EngineController::refreshMidiInputs() {
+    if (!m_engine) return;
+    m_engine->refreshMidiInputs();
+    emit midiInputPortsChanged();
 }
 
 bool EngineController::connectMidiInput(const QString& portName) {

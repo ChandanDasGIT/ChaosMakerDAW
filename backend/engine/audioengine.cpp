@@ -158,6 +158,11 @@ std::vector<std::string> AudioEngine::midiInputNames() const
     return m_device ? m_device->midiInputNames() : std::vector<std::string>{};
 }
 
+void AudioEngine::refreshMidiInputs()
+{
+    if (m_device) m_device->refreshMidiInputs();
+}
+
 bool AudioEngine::connectMidiInput(const std::string& source)
 {
     return m_device && m_device->connectMidiInput(source);

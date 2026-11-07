@@ -28,6 +28,9 @@ public:
     int inputChannelCapacity() const override { return inputChannels-1; }
     bool connectOutput(const std::string& left, const std::string& right) override;
     std::vector<std::string> midiInputNames() const override { return m_midiInputNames; }
+    // Lists JACK's MIDI sources again; with none connected yet (and "No MIDI input" not
+    // chosen), connects the first one.
+    void refreshMidiInputs() override;
     bool connectMidiInput(const std::string& source) override;
     std::string connectedMidiInput() const override { return m_connectedMidiSource; }
     std::string lastError() const override { return m_error; }
@@ -59,5 +62,6 @@ private:
     std::vector<std::string> m_outputNames;
     std::vector<std::string> m_midiInputNames;
     std::string m_connectedMidiSource;
+    bool m_midiOffByUser = false;          // "No MIDI input" chosen: do not connect one by itself
     std::string m_error;
 };

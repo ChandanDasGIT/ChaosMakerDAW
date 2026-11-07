@@ -245,10 +245,8 @@ void JackAudioDevice::enumeratePorts()
 {
     m_inputNames.clear();
     m_outputNames.clear();
-    m_midiInputNames.clear();
     const char** captures = jack_get_ports(m_client, nullptr, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput);
     const char** playbacks = jack_get_ports(m_client, nullptr, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput);
-    const char** midiCaptures = jack_get_ports(m_client, nullptr, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput);
     const std::string ownPrefix = std::string(jack_get_client_name(m_client)) + ":";
     if (captures) {
         for (std::size_t i = 0; captures[i]; ++i) {
@@ -266,7 +264,15 @@ void JackAudioDevice::enumeratePorts()
         }
         jack_free(const_cast<char**>(playbacks));
     }
-    if (midiCaptures) {
+    refreshMidiInputs();                                 // the MIDI sources
+}
+
+void JackAudioDevice::refreshMidiInputs()
+{
+    if (!m_client) return;
+    m_midiInputNames.clear();
+    const std::string ownPrefix = std::string(jack_get_client_name(m_client)) + ":";
+    if (const char** midiCaptures = jack_get_ports(m_client, nullptr, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput)) {
         for (std::size_t i = 0; midiCaptures[i]; ++i) {
             const std::string name(midiCaptures[i]);
             if (!name.starts_with(ownPrefix))
@@ -274,8 +280,16 @@ void JackAudioDevice::enumeratePorts()
         }
         jack_free(const_cast<char**>(midiCaptures));
     }
-    if (m_connectedMidiSource.empty() && !m_midiInputNames.empty()) {
-        connectMidiInput(m_midiInputNames.front());
+    // The connected device went away (switched off): forget it, so the next one can take over.
+    if (!m_connectedMidiSource.empty()
+        && std::find(m_midiInputNames.begin(), m_midiInputNames.end(), m_connectedMidiSource) == m_midiInputNames.end())
+        m_connectedMidiSource.clear();
+    // Chosen by itself: the first real device. "Midi Through" is the system's loopback port,
+    // always there and silent, so it is only used when picked by hand.
+    if (m_connectedMidiSource.empty() && !m_midiOffByUser) {
+        const auto device = std::find_if(m_midiInputNames.begin(), m_midiInputNames.end(),
+            [](const std::string& name) { return name.find("Midi Through") == std::string::npos; });
+        if (device != m_midiInputNames.end()) connectMidiInput(*device);
     }
 }
 
@@ -285,6 +299,7 @@ bool JackAudioDevice::connectMidiInput(const std::string& source)
         return false;
     disconnectAll(m_midiInput, false);
     m_connectedMidiSource.clear();
+    m_midiOffByUser = source.empty();
     if (source.empty())
         return true;
     if (jack_connect(m_client, source.c_str(), jack_port_name(m_midiInput)) != 0) {

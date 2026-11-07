@@ -61,6 +61,7 @@ public:
     int inputChannelCapacity() const { return m_device ? m_device->inputChannelCapacity() : 0; }
     bool connectOutput(const std::string& left, const std::string& right);
     std::vector<std::string> midiInputNames() const;
+    void refreshMidiInputs();
     bool connectMidiInput(const std::string& source);
     std::string connectedMidiInput() const;
     void setMonitorEqBand(int band, float gainDb) noexcept { m_monitorEq.setBandGain(band, gainDb); }
