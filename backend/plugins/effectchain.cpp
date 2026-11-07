@@ -5,11 +5,12 @@
 #include <array>
 
 namespace {
-constexpr std::array<EffectDefinition, 4> catalog{{
+constexpr std::array<EffectDefinition, 5> catalog{{
     {effectchain::Eq, "Equalizer", "10-band tone shaping", true, true},
     {effectchain::ChaosEq, "Chaos EQ", "Parametric EQ, up to 24 bands", true, true},
     {effectchain::GuitarSuite, "GuitarSuite", "Pedals and signal chain", false, false},
     {effectchain::Harmonium, "Harmonium", "Stops, bellows and drones", false, false},
+    {effectchain::DrumKit, "Drum kit", "Room, levels and character", false, false},
 }};
 
 bool onChain(std::span<const TrackEffectSlot> chain, std::string_view type)

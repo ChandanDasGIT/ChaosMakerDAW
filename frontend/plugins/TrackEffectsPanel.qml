@@ -18,6 +18,7 @@ Popup {
     property alias selectedEffect: panelBridge.selectedEffect
     readonly property bool supportsGuitarSuite: panelBridge.supportsGuitarSuite
     readonly property bool supportsHarmonium: panelBridge.supportsHarmonium
+    readonly property bool supportsDrumKit: panelBridge.supportsDrumKit
     // What "+ Add FX" offers; re-read whenever the chain changes.
     readonly property var addableEffects: (root.effects, root.trackModel && root.trackId >= 0
                                            ? root.trackModel.addableEffects(root.trackId) : [])
@@ -263,7 +264,8 @@ Popup {
                 currentIndex: root.selectedEffect === "eq" ? 0
                             : root.selectedEffect === "guitarsuite" ? 1
                             : root.selectedEffect === "chaoseq" ? 2
-                            : root.selectedEffect === "harmonium" ? 3 : 4
+                            : root.selectedEffect === "harmonium" ? 3
+                            : root.selectedEffect === "drumkit" ? 4 : 5
                 Tenbandeq {
                     trackModel: root.trackModel
                     trackId: root.trackId
@@ -297,6 +299,15 @@ Popup {
                     active: root.supportsHarmonium
                     sourceComponent: HarmoniumEditor {
                         objectName: "trackHarmonium" + root.trackId
+                        trackModel: root.trackModel
+                        trackId: root.trackId
+                        trackName: root.trackName
+                    }
+                }
+                Loader {
+                    active: root.supportsDrumKit
+                    sourceComponent: DrumKitEditor {
+                        objectName: "trackDrumKit" + root.trackId
                         trackModel: root.trackModel
                         trackId: root.trackId
                         trackName: root.trackName

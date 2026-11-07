@@ -28,6 +28,8 @@ inline constexpr std::string_view ChaosEq = "chaoseq";   // plan 6.2
 inline constexpr std::string_view GuitarSuite = "guitarsuite";
 // The harmonium's controls. A page only: the instrument itself plays first, before the effects.
 inline constexpr std::string_view Harmonium = "harmonium";
+// The acoustic drum kit's controls (room, levels, character), a page like the harmonium's.
+inline constexpr std::string_view DrumKit = "drumkit";
 
 // Every effect type, in the order an "Add FX" picker lists them.
 std::span<const EffectDefinition> effects();

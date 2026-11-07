@@ -5,8 +5,8 @@
 
 // The computer keyboard as a MIDI keyboard, laid out for sargam from lower Pa to upper Ma:
 //
-//   black:    1   2       4   5       7   8   9       -   =       Backspace
-//   white: Tab  q   w   e   r   t   y   u   i   o   p   [   ]   \ (backslash)
+//   black:    1   2       4   5       7   8   9       -   =           \ (backslash)
+//   white: Tab  q   w   e   r   t   y   u   i   o   p   [   ]   Backspace
 //          Pa. Dh. Ni. Sa  Re  Ga  Ma  Pa  Dha Ni  Sa' Re' Ga' Ma'
 //   z / x  octave down / up     c / v  velocity down / up
 //
@@ -29,8 +29,8 @@ public:
     // reaching anything else while the typing keyboard is on.
     static bool handles(char key) noexcept;
     static constexpr int NoNote = -100;
-    // Semitones from the octave's C (Sa) for a note key: Tab is -5 (lower Pa), Backspace 18
-    // (upper tivra Ma). NoNote for other keys.
+    // Semitones from the octave's C (Sa) for a note key: Tab is -5 (lower Pa), Backspace 17
+    // (upper Ma), backslash 18 (upper tivra Ma). NoNote for other keys.
     static int semitoneFor(char key) noexcept;
 
     Action press(char key) noexcept;

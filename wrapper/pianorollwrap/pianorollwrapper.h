@@ -33,6 +33,8 @@ class PianoRollWrapper : public QObject {
     Q_PROPERTY(double beatUnit READ beatUnit NOTIFY meterChanged)
     // Colour of the bound clip's track ("#rrggbb"); empty when unbound.
     Q_PROPERTY(QString trackColour READ trackColour NOTIFY trackColourChanged)
+    // A Drums track's clip: the keys the kit plays are labelled with its parts (backend drummap).
+    Q_PROPERTY(bool drumMode READ drumMode NOTIFY bindingChanged)
     // Grid and snapping (backend PianoRollGrid). Settings use the menu names below.
     Q_PROPERTY(QString gridDivision READ gridDivision WRITE setGridDivision NOTIFY gridChanged)
     Q_PROPERTY(QString gridStyle READ gridStyle WRITE setGridStyle NOTIFY gridChanged)
@@ -68,6 +70,7 @@ public:
     double beatsPerBar() const;
     double beatUnit() const;
     QString trackColour() const;
+    bool drumMode() const;
     // Clip-relative beat as "bar.beat.hundredths" in the project meter.
     Q_INVOKABLE QString positionLabel(double beat) const;
 
@@ -110,6 +113,8 @@ public:
     Q_INVOKABLE bool isBlackKey(int note) const noexcept { return notenames::isBlackKey(note); }
     Q_INVOKABLE bool isOctaveStart(int note) const noexcept { return notenames::isOctaveStart(note); }
     Q_INVOKABLE QString noteReadout(int note) const { return QString::fromStdString(notenames::readout(note)); }
+    // The drum kit's part on `note` ("Kick", "Hi-hat open"), or "" when the kit has none there.
+    Q_INVOKABLE QString drumName(int note) const;
     // Quantize to the Grid (selected notes, or all), as one undoable edit.
     Q_INVOKABLE bool quantizeToGrid() { return quantize(m_grid.quantizeStep()); }
 

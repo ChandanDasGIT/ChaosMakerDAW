@@ -18,6 +18,8 @@ Item {
 
     // PianoRollWrapper: note names and black keys come from the backend (notenames)
     property var noteSource: null
+    // A drum clip: the keys the kit plays show the part's name instead of the note name
+    property bool drumMode: false
 
     function noteLabel(note) {
         return root.noteSource ? root.noteSource.noteName(note) : ""
@@ -47,6 +49,7 @@ Item {
                 readonly property int note: 127 - index
                 readonly property bool black: root.noteSource ? root.noteSource.isBlackKey(note) : false
                 readonly property bool isC: root.noteSource ? root.noteSource.isOctaveStart(note) : false
+                readonly property string drumName: root.drumMode && root.noteSource ? root.noteSource.drumName(note) : ""
                 readonly property bool isActive: (keyRow.note === root.activeNote)
 
                 width: root.width
@@ -67,7 +70,7 @@ Item {
                     // Note name on white keys (C4, D4, E4, F4, G4, A4, B4)
                     Text {
                         // Short rows: only C labels (none below 9 px) so labels never overlap
-                        visible: !keyRow.black && root.keyHeight >= (keyRow.isC ? 9 : 12)
+                        visible: keyRow.drumName === "" && !keyRow.black && root.keyHeight >= (keyRow.isC ? 9 : 12)
                         anchors.right: parent.right
                         anchors.rightMargin: 6
                         anchors.verticalCenter: parent.verticalCenter
@@ -96,7 +99,7 @@ Item {
 
                     // Note name on black keys (C#4, D#4, F#4, G#4, A#4)
                     Text {
-                        visible: root.keyHeight >= 12
+                        visible: keyRow.drumName === "" && root.keyHeight >= 12
                         anchors.right: parent.right
                         anchors.rightMargin: 4
                         anchors.verticalCenter: parent.verticalCenter
@@ -114,6 +117,20 @@ Item {
                         height: 1
                         color: keyRow.isActive ? Theme.pianoRoll.blackKeyShineActive : Theme.pianoRoll.blackKeyShine
                     }
+                }
+
+                // Drum clip: the kit's part on this key, where the note name would be
+                Text {
+                    objectName: "drumKeyLabel" + keyRow.note
+                    visible: keyRow.drumName !== "" && root.keyHeight >= 9
+                    x: 5
+                    width: (keyRow.black ? 54 : root.width) - 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: keyRow.drumName
+                    elide: Text.ElideRight
+                    color: keyRow.black ? Theme.pianoRoll.blackKeyLabel : Theme.pianoRoll.whiteKeyLabelC
+                    font.pixelSize: keyRow.black ? 8 : Math.min(10, Math.max(8, root.keyHeight - 8))
+                    font.bold: !keyRow.black
                 }
 
                 // Mouse interaction area

@@ -37,6 +37,15 @@ TEST(trackeffectspanel, state_and_record_mode_description) {
     CHECK(panel.currentRecordModeDescription() == "Dry recording · current effects are applied during playback");
 }
 
+TEST(trackeffectspanel, drums_track_opens_on_its_drum_kit_page) {
+    TrackEffectsPanel panel;
+    panel.setTrackInfo(4, "Drums", "Drums", false, false);
+    panel.setChain({"drumkit", "eq"});
+    CHECK(panel.supportsDrumKit());
+    CHECK(!panel.supportsHarmonium() && !panel.supportsGuitarSuite());
+    CHECK(panel.selectedEffect() == "drumkit");
+}
+
 TEST(trackeffectspanel, harmonium_track_opens_on_its_harmonium_page) {
     TrackEffectsPanel panel;
     panel.setTrackInfo(3, "Harmonium", "Harmonium", false, false);

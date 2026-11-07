@@ -43,11 +43,18 @@ Rectangle {
 
         Item { Layout.fillWidth: true }
 
-        // KEYS: the computer keyboard plays the monitored or armed instrument tracks.
+        // KEYS: the computer keyboard and the floating on-screen piano play the monitored or
+        // armed instrument tracks. One switch for both; closing the piano turns KEYS off too.
         TypingKeyboardWrapper {
             id: typingKeys
             objectName: "typingKeyboard"
             engine: root.transport
+        }
+        VirtualKeyboard {
+            id: virtualKeyboard
+            engine: root.transport
+            typingKeys: typingKeys
+            onVisibleChanged: if (!visible) typingKeys.enabled = false
         }
         ColumnLayout {
             spacing: 2
@@ -61,12 +68,20 @@ Rectangle {
                 textSize: Theme.smallSize
                 cornerRadius: 5
                 text: typingKeys.enabled ? "Sa = " + typingKeys.saNote : "Off"
-                onClicked: typingKeys.enabled = !typingKeys.enabled
+                onClicked: {
+                    const on = !typingKeys.enabled
+                    typingKeys.enabled = on
+                    virtualKeyboard.visible = on
+                    // The piano never takes the focus: the main window stays the active one.
+                    const main = root.Window.window
+                    if (on && main) Qt.callLater(() => main.requestActivate())
+                }
                 tooltip: typingKeys.enabled
-                    ? "Typing keyboard on (velocity " + typingKeys.velocity + "): Tab Q W E R T Y U I O P [ ] \\ "
-                      + "play lower Pa to upper Ma (E = Sa), the number row and Backspace the black keys. "
-                      + "Z/X octave, C/V velocity. Plays tracks with MON or REC on. Click to turn off."
-                    : "Play instruments from the computer keyboard"
+                    ? "Keys on (velocity " + typingKeys.velocity + "): click the on-screen piano, or type "
+                      + "Tab Q W E R T Y U I O P [ ] Backspace for lower Pa to upper Ma (E = Sa), the number "
+                      + "row and \\ for the black keys. Z/X octave, C/V velocity. Plays tracks with MON or REC on. "
+                      + "Click to turn off."
+                    : "Play instruments from the on-screen piano and the computer keyboard"
             }
         }
 

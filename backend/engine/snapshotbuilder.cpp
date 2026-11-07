@@ -1,4 +1,5 @@
 #include "engine/snapshotbuilder.h"
+#include "instruments/drums/drumkit.h"
 #include "instruments/harmonium/harmonium.h"
 #include "dsp/panlaw.h"
 
@@ -42,6 +43,8 @@ void SnapshotBuilder::syncTrackEq(const Project& project, const MutableEffectRes
         if (fx->playbackChaosEq) fx->playbackChaosEq->setSettings(track->chaosEq);
         if (fx->instrument && fx->instrument->typeId() == "harmonium")
             static_cast<Harmonium&>(*fx->instrument).setSettings(track->harmonium);
+        if (fx->instrument && fx->instrument->typeId() == "drumkit")
+            static_cast<DrumKit&>(*fx->instrument).setSettings(track->drumkit);
     }
 }
 
