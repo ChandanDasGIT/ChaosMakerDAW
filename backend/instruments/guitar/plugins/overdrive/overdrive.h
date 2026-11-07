@@ -16,6 +16,7 @@ class Overdrive final : public Processor {
 public:
     Overdrive();
     std::string typeId() const override { return "pedal.overdrive"; }
+    int latencySamples() const noexcept override { return 23; }   // one 2x pass (oversampler test)
     void prepare(double sampleRate, int maxFrames) override;
     void reset() noexcept override;
     void process(ProcessContext& context) noexcept override;

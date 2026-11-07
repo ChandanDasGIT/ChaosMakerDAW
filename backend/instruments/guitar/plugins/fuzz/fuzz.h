@@ -12,7 +12,7 @@ class Fuzz final : public Processor {
 public:
     Fuzz();
     std::string typeId() const override { return "pedal.fuzz"; }
-    int latencySamples() const noexcept override { return 11; }
+    int latencySamples() const noexcept override { return 27; }   // one 4x pass: 26.5 (oversampler test)
     void prepare(double sampleRate, int maxFrames) override;
     void reset() noexcept override;
     void process(ProcessContext& context) noexcept override;
