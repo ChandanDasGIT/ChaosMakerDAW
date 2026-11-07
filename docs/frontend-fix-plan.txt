@@ -16,9 +16,7 @@ Phase 6 (user requests) done: 6.1 effect chains, 6.2 Chaos EQ, 6.3 guitar suite 
 1-6), 6.4 stop-at-end, 6.5 two-digit time readout, 6.6 default recording mode (Dry).
 Tone-matched GuitarSuite presets (djent chords, metal solo, rock chords, rock solo) are in
 local-reference/presets/ (local only; see 6.3).
-Next, not started (user to choose): re-voice the factory Djent/Jazz presets for the new amp and
-drives (they load the amp on Crunch); real instruments (every instrument type is TestSynth);
-piano roll follow-ups (docs/follow-trail.md); audio import; auto chord player; export.
+This plan is complete. Everything still open is collected in docs/restMap.txt (start there).
 Local-only material (in .gitignore) lives in local-reference/: q3.jpg, sampleGuitarRaw.wav and
 soloGuitarRaw.wav (dry DIs), reference songs/stems (+ -ref.wav conversions), "Modern Boutique
 4x12" IRs (48 kHz), presets/, renders/ (fxrender output).

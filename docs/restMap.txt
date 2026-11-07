@@ -1,0 +1,109 @@
+ChaosMaker — Rest Map (what is left to do)
+=========================================
+Created 2026-11-07, when docs/frontend-fix-plan.txt was finished (all items done; 3.11 was
+replaced by 6.2 Chaos EQ). This file collects everything still open, from that plan, from
+docs/follow-trail.md, from docs/roadmap.txt and from the plan 6.2/6.3 sessions.
+
+Rules: follow AGENTS.md — explain the plan first, one step at a time, test only what changed,
+no regressions, keep the 3-tier split (backend = pure C++, wrapper = Qt bridge, frontend = QML
+view only), and the from-scratch rule (app uses only std, Qt, libjack, nlohmann json).
+Before starting an item, check the code: some notes below come from older lists and may lag.
+
+Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (decision or check)
+
+
+A. LEFT OVER FROM PLAN 6 (small, closest to recent work)
+---------------------------------------------------------
+[ ] A1  Re-voice the factory GuitarSuite presets (resources/presets/guitarsuite/Djent.gspreset,
+        Jazz.gspreset) for the rebuilt amp and drives. They have no amp "channel" value, so the
+        amp loads on Crunch, and their drive settings were tuned for the old pedals. Option: base
+        the new factory Djent on the fitted local preset (without the IR, which cannot ship).
+[ ] A2  Chaos EQ: bells above ~10 kHz come out slightly narrower than their Q (standard RBJ
+        design cramps near Nyquist). Possible fix: a matched / pre-warped bell design.
+[ ] A3  Merge the two backend clock formatters (PlaybackControls::formatTime and
+        valueformat::position); they differ only for negative times.
+[?] A4  Chaos EQ extras the user chose "not now": dynamic EQ, linear phase.
+[?] A5  The 10-band EQ page's look: the user said they would redo it themselves (plan 3.10).
+
+
+B. CHECKS IN THE REAL APP (need the user; JACK/hardware)
+----------------------------------------------------------
+[?] B1  Clip gain drag, then Ctrl+Z.
+[?] B2  Delete a track that has a pedalboard, then Ctrl+Z (pedalboard comes back).
+[?] B3  Piano roll in 3/4 and 6/8.
+[?] B4  Buffer size change with JACK.
+[?] B5  Pedal cards and tuner look unchanged (now also: amp "Channel" dial shows Clean /
+        Crunch / High Gain; cabinet "Cab" dial shows None / 1x12 Open / 2x12 / 4x12 Closed).
+[?] B6  Custom track colour, then typing still works.
+[?] B7  Listen to Chaos EQ on real audio (solo, auto gain, stereo placement, analyzer).
+[?] B8  Built-in cabinet models in the app (renders in local-reference/renders/cab-*.wav).
+
+
+C. INSTRUMENTS (the biggest musical gap) — roadmap Phase 11
+------------------------------------------------------------
+Every instrument track type (guitars, piano, strings, drums) plays through TestSynth:
+backend/instruments/instrumentfactory.cpp maps all of them to it. The folders
+backend/instruments/{sfz,piano,drums,strings} are empty; sampler/ has only samplezone.h;
+tools/sfzcheck is empty.
+[ ] C1  Sampler engine (hand-written): sample zones, key/velocity mapping, loop points,
+        envelopes, voice allocation with a fixed voice pool (no allocation on the audio thread).
+[ ] C2  SFZ loading (hand-written parser, off the audio thread) and tools/sfzcheck.
+[ ] C3  Instruments on top: piano, drums, strings, acoustic guitar — content plus controls.
+[ ] C4  Map each instrument type to its real instrument in instrumentfactory.cpp.
+[?] C5  Decide where instrument samples come from (licensing: only content we may ship).
+
+
+D. PIANO ROLL / MIDI FOLLOW-UPS — from docs/follow-trail.md (roadmap Phase 10)
+-------------------------------------------------------------------------------
+Notes now reach the instrument (audioengine.cpp turns clip notes into MidiEvents), so
+follow-trail item 1 ("notes do not play yet") is out of date. Remaining there:
+[ ] D1  New notes always use velocity 100 (Reaper uses the last velocity the user set).
+[ ] D2  A velocity stalk at beat 0 sits on the lane's left edge and is half-clipped.
+[ ] D3  No velocity "paint" sweep across several notes in one drag.
+[ ] D4  Piano roll clip length is fixed when it opens: resizing the clip on the timeline while
+        the piano roll is open does not update its clip highlight.
+[ ] D5  Pattern clip sourceOffset is not rescaled when a project reopens at another sample
+        rate (a trimmed pattern clip's left edge can shift slightly; notes stay on the clip).
+[ ] D6  PianoRollWrapper::notes is a plain QVariantList, so every change rebuilds all note
+        delegates; a list model would update notes one by one.
+[ ] D7  Make the mouse-driven piano roll harness a permanent Qt Test target.
+[ ] D8  Play the instrument from the piano roll keys or a MIDI keyboard; MIDI recording.
+        (Check first: follow-trail item 7 placeholders were partly handled in plan 1.1/1.3.)
+
+
+E. AUDIO IMPORT — planned in docs/follow-trail.md, not started
+---------------------------------------------------------------
+Target: WAV, MP3 and FLAC import through a file picker, editable clips, reliable reopen.
+Note: the old plan proposes libsndfile, which breaks the from-scratch rule. Decoders would
+be hand-written (WAV first; FLAC and MP3 are large jobs) unless the user decides otherwise.
+[?] E0  Decide: hand-written decoders, which formats first.
+[ ] E1  Decoder foundation: common WAV variants, mono/stereo, damaged files, memory limits,
+        sample-rate handling, with focused test files.
+[ ] E2  Session import: Import Audio (multiple files), one new Audio track per file at the
+        playhead, background decoding + waveform with progress/cancel.
+[ ] E3  Editing/project integration: undoable import, project marked modified, shared decoder
+        on reopen; trims, splits, stereo, sample-rate differences, missing files.
+[ ] E4  Portability: project-local media copies with relative references (recordings and
+        cabinet IRs too), then drag and drop.
+
+
+F. LATER ROADMAP PHASES — from docs/roadmap.txt
+------------------------------------------------
+[ ] F1  Phase 12: Auto chord player — chord input and rhythm-pattern playback, wrapper, UI,
+        tests (backend/plugins/chordplayer has only rhythmpattern.h).
+[ ] F2  Phase 13: Export and finish — offline render of the whole song (backend/render is
+        empty), export controls, final verification.
+[ ] F3  tools/latencytest is empty (the roadmap mentions a latency tool).
+[?] F4  EducationPurpose/architecture.txt: the user updates it at the end of the project
+        (do not edit it).
+
+
+G. LOCAL-ONLY MATERIAL (in .gitignore, never committed)
+--------------------------------------------------------
+local-reference/ holds: q3.jpg (EQ reference screenshot), sampleGuitarRaw.wav and
+soloGuitarRaw.wav (dry guitar DIs), needGuiterStem.mp3 / metal.mp3 / rock.mp3 (references,
+with -ref.wav conversions), "Modern Boutique 4x12" IRs (48 kHz), presets/ (tone-matched
+GuitarSuite presets: djent chords, metal solo, rock chords, rock solo) and renders/
+(fxrender output). build/fxrender renders a WAV through pedals; fxrender --analyze compares
+tone balance and crest factor (do not use --analyze on IR files: its Hann window hides an
+impulse at the file start; measure IRs with an unwindowed FFT instead).
