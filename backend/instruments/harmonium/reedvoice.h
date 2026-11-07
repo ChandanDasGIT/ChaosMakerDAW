@@ -31,6 +31,9 @@ public:
                double sampleRate, double attackSeconds) noexcept;
     void setRanks(const std::array<Rank, MaxRanks>& ranks) noexcept;   // stops, beating
     void release() noexcept;
+    // Key up with sustain: full level for holdSeconds, then a fade to silence over fadeSeconds.
+    void sustain(double holdSeconds, double fadeSeconds) noexcept;
+    void cutTail() noexcept;              // a sustaining key ends in a short, click-free fade
     void fadeOut() noexcept;              // a few ms: style change, stolen voice
     void stop() noexcept;
 
@@ -38,7 +41,11 @@ public:
     void render(float* mono, int frames, const Air& air) noexcept;
 
     bool active() const noexcept { return m_stage != Stage::Off; }
-    bool releasing() const noexcept { return m_stage == Stage::Release || m_stage == Stage::Fade; }
+    bool releasing() const noexcept
+    {
+        return m_stage == Stage::Release || m_stage == Stage::Fade || m_stage == Stage::Sustain;
+    }
+    bool sustaining() const noexcept { return m_stage == Stage::Sustain; }
     int inputKey() const noexcept { return m_inputKey; }
     int soundingKey() const noexcept { return m_soundingKey; }
     float level() const noexcept { return m_level; }
@@ -48,7 +55,7 @@ public:
     double rankFrequency(int rank) const noexcept { return m_frequency[std::size_t(rank)]; }
 
 private:
-    enum class Stage { Off, Attack, Hold, Release, Fade };
+    enum class Stage { Off, Attack, Hold, Sustain, Release, Fade };
     void tune(const std::array<Rank, MaxRanks>& ranks) noexcept;
 
     Stage m_stage = Stage::Off;
@@ -59,6 +66,8 @@ private:
     std::array<float, MaxRanks> m_gain{}, m_gainTarget{};
     float m_level = 0.0f;
     float m_attackCoef = 0.0f, m_releaseCoef = 0.0f, m_fadeCoef = 0.0f, m_gainCoef = 0.0f;
+    float m_sustainCoef = 1.0f;
+    std::int64_t m_sustainHold = 0;       // frames left at full level
 };
 
 } // namespace harmonium

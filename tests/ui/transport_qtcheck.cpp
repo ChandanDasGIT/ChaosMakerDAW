@@ -1150,6 +1150,14 @@ private slots:
         slider->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Right);
         QTRY_VERIFY(settings().bellows>0.75);
 
+        auto* sustain=visualItem(window->contentItem(),"harmoniumSustain"); QVERIFY(sustain); QVERIFY(sustain->isVisible());
+        QCOMPARE(sustain->property("valueText").toString(),QString("1.5 s"));   // on by default
+        slider=nullptr;
+        for (auto* child : sustain->findChildren<QQuickItem*>()) if (child->inherits("QQuickSlider")) slider=child;
+        QVERIFY(slider);
+        slider->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Right);
+        QTRY_VERIFY(settings().sustainSeconds>1.55);
+
         auto* up=visualItem(window->contentItem(),"harmoniumTransposeUp"); QVERIFY(up);
         click(up); click(up); QTRY_COMPARE(settings().transpose,2);
         auto* label=visualItem(window->contentItem(),"harmoniumTranspose"); QVERIFY(label);

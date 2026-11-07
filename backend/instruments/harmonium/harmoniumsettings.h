@@ -16,6 +16,7 @@ constexpr int NoDrone = -1;
 constexpr int MaxTranspose = 12;          // the scale changer, in semitones either way
 constexpr double MaxBeatingCents = 20.0;
 constexpr double MinVolumeDb = -24.0, MaxVolumeDb = 12.0;
+constexpr double MaxSustainSeconds = 4.0;
 
 struct IndianStops {
     bool bass = false;                    // an octave down
@@ -41,6 +42,9 @@ struct Settings {
     double airNoise = 0.3;                // 0..1
     double keyClick = 0.3;                // 0..1
     double caseResonance = 0.5;           // 0..1 wooden-box colour and the short reflections
+    // A released key keeps ringing: full level for half this time, then it fades out over this
+    // time. The next key cuts it. 0 = a plain harmonium, the sound stops when the key comes up.
+    double sustainSeconds = 1.5;
     int transpose = 0;                    // scale changer
     double volumeDb = 0.0;
     std::array<int, DroneCount> drones{NoDrone, NoDrone, NoDrone, NoDrone};   // MIDI keys

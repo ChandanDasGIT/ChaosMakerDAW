@@ -25,6 +25,7 @@ Settings sanitize(const Settings& in) noexcept
     s.airNoise = clampOr(s.airNoise, 0.0, 1.0, defaults.airNoise);
     s.keyClick = clampOr(s.keyClick, 0.0, 1.0, defaults.keyClick);
     s.caseResonance = clampOr(s.caseResonance, 0.0, 1.0, defaults.caseResonance);
+    s.sustainSeconds = clampOr(s.sustainSeconds, 0.0, MaxSustainSeconds, defaults.sustainSeconds);
     s.transpose = std::clamp(s.transpose, -MaxTranspose, MaxTranspose);
     s.volumeDb = clampOr(s.volumeDb, MinVolumeDb, MaxVolumeDb, defaults.volumeDb);
     for (auto& key : s.drones)
@@ -48,6 +49,7 @@ bool operator==(const Settings& a, const Settings& b) noexcept
     return a.style == b.style && a.indian == b.indian && a.western == b.western
         && a.bellows == b.bellows && a.pumping == b.pumping && a.beatingCents == b.beatingCents
         && a.airNoise == b.airNoise && a.keyClick == b.keyClick && a.caseResonance == b.caseResonance
+        && a.sustainSeconds == b.sustainSeconds
         && a.transpose == b.transpose && a.volumeDb == b.volumeDb && a.drones == b.drones;
 }
 

@@ -160,6 +160,7 @@ struct Run {
     {
         harmonium::Settings s;
         s.pumping = 0.0; s.airNoise = 0.0; s.keyClick = 0.0; s.beatingCents = 0.0;
+        s.sustainSeconds = 0.0;                                  // a plain key release
         return s;
     }
     void event(int offset, std::uint8_t status, std::uint8_t d1, std::uint8_t d2) { midi.add({offset, status, d1, d2}); }
@@ -225,6 +226,94 @@ TEST(harmonium, note_starts_on_its_frame_ignores_velocity_and_stops_after_releas
     CHECK(rmsDb(after, 0, 480) > -40.0);                        // the reed rings briefly
     CHECK(rmsDb(after, 19200) < -120.0);                         // then nothing: no air, no reeds
     CHECK(soft.h.activeVoices() == 0);
+}
+
+static harmonium::Settings withSustain(double seconds)
+{
+    auto s = Run::quiet();
+    s.sustainSeconds = seconds;
+    return s;
+}
+
+static int frames(double seconds) { return int(seconds * rate); }
+
+TEST(harmonium, new_harmonium_sustains_for_one_and_a_half_seconds)
+{
+    CHECK_NEAR(harmonium::Settings{}.sustainSeconds, 1.5, 1e-9);
+    Harmonium h;
+    CHECK_NEAR(h.settings().sustainSeconds, 1.5, 1e-6);
+    harmonium::Settings wild;
+    wild.sustainSeconds = 99.0;
+    CHECK_NEAR(harmonium::sanitize(wild).sustainSeconds, harmonium::MaxSustainSeconds, 1e-9);
+}
+
+TEST(harmonium, sustain_keeps_a_released_key_ringing_then_it_fades_away)
+{
+    Run run(withSustain(1.0));                                   // full for 0.5 s, fade over 1 s
+    run.event(0, 0x90, 60, 100);
+    const auto held = run.render(frames(0.3));
+    const double heldDb = rmsDb(held, std::size_t(frames(0.2)));
+    run.event(0, 0x80, 60, 0);
+    const auto after = run.render(frames(1.7));
+    CHECK(std::abs(rmsDb(after, 0, std::size_t(frames(0.4))) - heldDb) < 1.0);   // still at full level
+    const double fading = rmsDb(after, std::size_t(frames(0.9)), std::size_t(frames(1.0)));
+    CHECK(fading < heldDb - 15.0 && fading > heldDb - 60.0);    // dying slowly, not cut
+    CHECK(run.h.activeVoices() == 0);                            // gone after 1.5 s
+}
+
+TEST(harmonium, the_next_key_cuts_a_sustaining_one)
+{
+    Run run(withSustain(2.0));
+    run.event(0, 0x90, 60, 100);
+    run.render(frames(0.2));
+    run.event(0, 0x80, 60, 0);
+    run.render(frames(0.3));
+    CHECK(run.h.activeVoices() == 1);                            // C still rings
+    run.event(0, 0x90, 64, 100);
+    run.render(frames(0.4));
+    CHECK(run.h.activeVoices() == 1);                            // only E now
+    run.event(0, 0x90, 64, 100);                                 // the same key again
+    run.event(0, 0x80, 64, 0);
+    run.render(frames(0.1));
+    run.event(0, 0x90, 64, 100);                                 // pressed while it sustains
+    const auto again = run.render(frames(0.2));
+    CHECK(run.h.activeVoices() == 1);
+    CHECK(rmsDb(again, 0, 480) > -40.0);                         // picked up, no gap
+}
+
+TEST(harmonium, legato_playing_does_not_sustain_the_key_left_behind)
+{
+    Run run(withSustain(2.0));
+    run.event(0, 0x90, 60, 100);
+    run.render(frames(0.3));
+    run.event(0, 0x90, 62, 100);                                 // D goes down before C comes up
+    run.render(frames(0.2));
+    run.event(0, 0x80, 60, 0);
+    run.render(frames(0.4));
+    CHECK(run.h.activeVoices() == 1);                            // C ended at once, D sounds
+
+    run.event(0, 0x80, 62, 0);                                   // the last key sustains
+    run.render(frames(0.3));
+    CHECK(run.h.activeVoices() == 1);
+}
+
+TEST(harmonium, a_chord_let_go_note_by_note_sustains_whole)
+{
+    Run run(withSustain(2.0));
+    run.event(0, 0x90, 60, 100);
+    run.event(frames(0.02), 0x90, 64, 100);                      // a slightly rolled chord
+    run.event(frames(0.04), 0x90, 67, 100);
+    run.render(frames(0.3));
+    run.event(0, 0x80, 60, 0);
+    run.render(frames(0.05));
+    run.event(0, 0x80, 64, 0);
+    run.render(frames(0.05));
+    run.event(0, 0x80, 67, 0);
+    run.render(frames(0.3));
+    CHECK(run.h.activeVoices() == 3);
+    run.event(0, 0xB0, 123, 0);                                  // all notes off ends the tails
+    run.render(frames(0.5));
+    CHECK(run.h.activeVoices() == 0);
 }
 
 TEST(harmonium, repeated_key_keeps_sounding_and_voices_are_bounded)
