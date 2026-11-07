@@ -11,7 +11,7 @@ RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
 Phase 4 done (4.4 not needed).
-Next: Phase 5 — 5.1 (see below). Open question: track list minimum width (see 4.5).
+Next: Phase 5 — 5.1 (see below). Track list minimum width settled: chips wrap (see 4.5).
 Then Phase 6 (user requests: FX per track type, pro EQ, guitar suite sound).
 
 Decisions made by the user (keep to them):
@@ -382,6 +382,9 @@ PHASE 4 — Consistency and maintenance
          Found (not from this change): at the narrowest track list (180 px) the track
          card's chip row does not fit (FX cut, remove × hidden). Raise the track list's
          minimum width or wrap the row; ask the user.
+         Resolved 2026-11-07 (user: wrap): the chips sit in a Flow; below one-line width
+         they wrap to two 18 px lines (M S IN MON / REC FX), × stays top right, card height
+         unchanged. UI test checks every chip fits the card at 340 and 180 px.
 
 
 PHASE 5 — Performance
