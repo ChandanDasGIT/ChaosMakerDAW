@@ -461,8 +461,17 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
          draggable band nodes, many band shapes (bell, shelves, cuts with slopes, notch,
          band pass, tilt), per-band solo/bypass, live spectrum analyzer (hand-written FFT,
          see the from-scratch rule). Replaces 3.11.
-         Ask first: band count; which extras matter (dynamic EQ, mid/side, linear phase,
-         auto-gain, spectrum match); whether it replaces the 10-band EQ or sits beside it.
+         Decided by the user (2026-11-07):
+         - Sits beside the 10-band EQ (kept): a new effect type added from "+ Add FX".
+         - Up to 24 bands; a new instance starts with none. Double-click the curve to add
+           a band; drag a node to change it.
+         - Shapes: bell, low/high shelf, low/high cut, plus notch, band pass, tilt shelf,
+           and selectable slopes for cuts and shelves (6/12/24/48 dB/oct).
+         - Per band: bypass, solo, and stereo placement (stereo, left, right, mid, side).
+         - Extras: live spectrum analyzer (hand-written FFT), output gain and auto-gain.
+         - Not now: dynamic EQ, linear phase (left for later).
+         - Do NOT copy Pro-Q 3's UI: our own layout, look and name. The reference
+           screenshot q3.jpg stays local only (in .gitignore); delete it when 6.2 is done.
 [ ] 6.3  Improve the guitar suite's sound quality (user request 2026-11-07).
          Ask first: which pedals / amp / cabinet sound weakest, and what "better" means
          (less harsh/fizzy distortion, more realistic amp, aliasing, cab IRs, noise).
