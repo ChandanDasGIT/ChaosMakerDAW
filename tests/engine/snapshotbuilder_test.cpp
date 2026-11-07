@@ -511,3 +511,29 @@ TEST(snapshotbuilder, bpm_change_updates_sample_times_and_release_tail)
     CHECK(snap60->playbackEnd == 96000 + 48000);
 }
 
+
+TEST(snapshotbuilder, release_tail_only_follows_clips_that_can_ring_on)
+{
+    // An instrument clip with no notes and no audio ends exactly at its end; recorded audio on an
+    // instrument track (effects can ring on) and pattern notes keep the one-second tail.
+    const auto build = [](bool notes, bool audio, TrackKind kind) {
+        Project project;
+        project.tempo().set(120.0, 4, 4, 48000.0);
+        auto& track = project.addTrack(kind, "Track", kind == TrackKind::Instrument ? "Electric Guitar" : "Vocal");
+        AudioClip clip;
+        clip.poolId = "take";
+        clip.length = 96000;
+        if (notes) {
+            MidiNote n; n.note = 60; n.velocity = 100; n.startBeat = 0; n.lengthBeats = 1;
+            clip.notes = { n };
+        }
+        project.addAudioClip(track.id, clip);
+        auto data = makeDummyAudio(96000);
+        auto resolver = [&](const std::string&) -> std::shared_ptr<const AudioData> { return audio ? data : nullptr; };
+        return SnapshotBuilder::buildPlaybackSnapshot(project, resolver, nullptr, false)->playbackEnd;
+    };
+    CHECK(build(false, false, TrackKind::Instrument) == 96000);         // empty pattern clip
+    CHECK(build(true, false, TrackKind::Instrument) == 96000 + 48000);  // notes ring on
+    CHECK(build(false, true, TrackKind::Instrument) == 96000 + 48000);  // recorded audio through FX
+    CHECK(build(false, true, TrackKind::Audio) == 96000);               // plain audio: no tail
+}
