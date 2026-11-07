@@ -6,6 +6,7 @@
 #include "engine/audioengine.h"
 #include "engine/enginecommands.h"
 #include "engine/enginesnapshot.h"
+#include "settings/appsettings.h"
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
 #include "instruments/guitar/plugins/guitarsuite/guitarsuite.h"
 #include "instruments/instrumentfactory.h"
@@ -128,6 +129,7 @@ EngineController::EngineController(std::unique_ptr<AudioDevice> device, bool dis
         pollTransport();
     });
     m_snapshotTimer.start(20);
+    m_engine->post({EngineCommand::Type::SetStopAtEnd, stopPlaybackAtEnd() ? 1 : 0});
     m_sessionTimer.setSingleShot(true);
     m_sessionTimer.setInterval(1500);
     connect(&m_sessionTimer, &QTimer::timeout, this, &EngineController::saveSession);
@@ -788,6 +790,18 @@ void EngineController::setRestoreSessionOnStartup(bool enabled) {
     if (settings.status() != QSettings::NoError) { setTransportMessage("Could not save startup preference."); return; }
     emit restoreSessionOnStartupChanged();
     if (enabled) saveSession();
+}
+bool EngineController::stopPlaybackAtEnd() const {
+    return QSettings().value(QString::fromLatin1(AppSettings::KeyStopPlaybackAtEnd), true).toBool();
+}
+void EngineController::setStopPlaybackAtEnd(bool enabled) {
+    if (enabled == stopPlaybackAtEnd()) return;
+    if (!m_engine->post({EngineCommand::Type::SetStopAtEnd, enabled ? 1 : 0})) {
+        setTransportMessage("Audio command queue is full; try again."); return;
+    }
+    QSettings settings; settings.setValue(QString::fromLatin1(AppSettings::KeyStopPlaybackAtEnd), enabled); settings.sync();
+    if (settings.status() != QSettings::NoError) setTransportMessage("Could not save the stop-at-end preference.");
+    emit stopPlaybackAtEndChanged();
 }
 void EngineController::setTransportMessage(const QString& message) {
     if (m_transportMessage == message) return;

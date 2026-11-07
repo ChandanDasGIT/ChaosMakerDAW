@@ -753,6 +753,24 @@ private slots:
         QCOMPARE(name(mute),QString("Mute disabled"));
         QVERIFY(tracks.setMuted(id,true)); QCOMPARE(name(mute),QString("Mute enabled"));
     }
+    void stop_at_end_setting_is_a_saved_settings_menu_toggle() {
+        auto* controller=EngineController::instance();
+        QSignalSpy changed(controller,SIGNAL(stopPlaybackAtEndChanged()));
+        QVERIFY(controller->stopPlaybackAtEnd()); // default on
+        const auto toggle=[&] {
+            auto* settings=visualItem(window->contentItem(),"settingsButton"); QVERIFY(settings); click(settings);
+            QQuickItem* option=nullptr;
+            QTRY_VERIFY((option=visualItem(window->contentItem(),"stopAtEndSetting")));
+            QCOMPARE(option->property("text").toString(),QString("Stop playback at the end"));
+            QCOMPARE(option->property("checked").toBool(),controller->stopPlaybackAtEnd());
+            click(option);
+        };
+        toggle(); QTRY_VERIFY(!controller->stopPlaybackAtEnd());
+        QCOMPARE(QSettings().value("playback/stopAtEnd").toBool(),false);
+        toggle(); QTRY_VERIFY(controller->stopPlaybackAtEnd());
+        QCOMPARE(QSettings().value("playback/stopAtEnd").toBool(),true);
+        QCOMPARE(changed.count(),2);
+    }
     void track_popups_are_shared_and_follow_the_card_that_opened_them() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks);

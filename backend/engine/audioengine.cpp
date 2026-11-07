@@ -202,6 +202,7 @@ void AudioEngine::process(const AudioIO& io) noexcept
             }
             break;
         }
+        case EngineCommand::Type::SetStopAtEnd: m_stopAtEnd = command.a != 0; break;
         case EngineCommand::Type::SetMetronome:
             m_metronomeEnabled=command.a!=0;
             if (std::isfinite(command.value)) m_metronomeVolume=std::clamp(command.value,0.0f,1.0f);
@@ -536,8 +537,8 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
         if (m_resetPlayback) for (auto* processor : track.chain) if (processor) processor->reset();
     }
     m_resetPlayback = false;
-    // Stop at the end of the arrangement, except while the metronome is on (playing just for the click).
-    const bool bounded=snapshot && snapshot->playbackEnd>=0 && !m_looping && !m_recorder && !m_metronomeEnabled;
+    // Stop at the end of the arrangement when the user setting asks for it (metronome included).
+    const bool bounded=snapshot && snapshot->playbackEnd>=0 && !m_looping && !m_recorder && m_stopAtEnd;
     const bool anyAudition = anyAuditionActive();
     for (int offset = 0; offset < frames && (m_playing || anyAudition);) {
         if (bounded && m_playing && m_position>=snapshot->playbackEnd) {
@@ -673,8 +674,8 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
     }
     for(int offset=0;offset<frames;) {
         if (m_countInTarget>=0 && m_position>=m_countInTarget) m_countInTarget=-1;
-        // As in process(): no automatic stop while the metronome is on.
-        const bool bounded=snapshot.playbackEnd>=0 && !m_looping && !m_recordingGroup && !m_metronomeEnabled;
+        // As in process(): stop at the end only when the user setting asks for it.
+        const bool bounded=snapshot.playbackEnd>=0 && !m_looping && !m_recordingGroup && m_stopAtEnd;
         if (bounded && m_playing && m_position>=snapshot.playbackEnd) {
             m_position=snapshot.playbackEnd; m_playing=false; m_resetPlayback=true;
         }

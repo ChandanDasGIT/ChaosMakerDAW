@@ -96,6 +96,7 @@ private:
     std::int64_t m_countInTarget = -1;
     bool m_playing = false, m_looping = false;
     bool m_metronomeEnabled = false;
+    bool m_stopAtEnd = true; // Stop playback at the end of the arrangement (user setting).
     float m_metronomeVolume = 0.5f;
     RtQueue<EngineCommand, 512> m_commands;
     RtQueue<EngineEvent, 512> m_events;

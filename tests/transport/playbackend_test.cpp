@@ -28,17 +28,19 @@ TEST(playbackend, pauses_exactly_at_last_sample_and_silences_remaining_frames_in
         engine.stop();
     }
 }
-TEST(playbackend, metronome_keeps_playing_past_the_end_until_it_is_turned_off) {
+TEST(playbackend, stop_at_end_setting_decides_whether_playback_and_metronome_stop) {
     for (bool multi:{false,true}) {
         AudioEngine engine{nullptr}; engine.deviceChanged(48000,128);
         engine.publishPlayback(snapshot(multi,257));
         EngineCommand metronome; metronome.type=EngineCommand::Type::SetMetronome; metronome.a=1; metronome.value=0.5f;
-        CHECK(engine.post(metronome)); CHECK(engine.post({EngineCommand::Type::Play}));
+        CHECK(engine.post(metronome));
+        // Setting off: playback (and the metronome with it) keeps going past the end.
+        CHECK(engine.post({EngineCommand::Type::SetStopAtEnd,0})); CHECK(engine.post({EngineCommand::Type::Play}));
         float left[200]{},right[200]{}; float* out[]{left,right};
         AudioIO io{{nullptr,0,0},{out,2,200},nullptr,200};
         for(int i=1;i<=3;++i) { render(engine,io); CHECK(engine.playing()); CHECK(engine.position()==200*i); }
-        // Metronome off: the usual stop at the end applies again.
-        metronome.a=0; CHECK(engine.post(metronome)); render(engine,io);
+        // Setting on: stops at the end even with the metronome on.
+        CHECK(engine.post({EngineCommand::Type::SetStopAtEnd,1})); render(engine,io);
         CHECK(!engine.playing()); CHECK(engine.position()==257);
         engine.stop();
     }
