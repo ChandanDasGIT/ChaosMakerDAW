@@ -42,5 +42,6 @@ compile_commands.json
 /initial-commit.txt
 /grep
 
-# Local design reference only (vendor screenshot); never commit. Delete when plan 6.2 is done.
-/q3.jpg
+# Local reference material, never committed: q3.jpg (EQ screenshot), sampleGuitarRaw.wav
+# (dry guitar DI) and the "Modern Boutique 4x12" IRs, used for plan 6.3 listening tests.
+/local-reference/
