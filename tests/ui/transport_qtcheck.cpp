@@ -751,6 +751,54 @@ private slots:
         QCOMPARE(name(mute),QString("Mute disabled"));
         QVERIFY(tracks.setMuted(id,true)); QCOMPARE(name(mute),QString("Mute enabled"));
     }
+    void track_popups_are_shared_and_follow_the_card_that_opened_them() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int a=tracks.addInstrumentTrackOfType("Electric Guitar"),b=tracks.addInstrumentTrackOfType("Electric Guitar"),
+                  vocal=tracks.addVocalTrack();
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        const auto restore=qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel",QVariant()); });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true); QTest::qWait(30);
+        // Plan 5.1: one instance of each popup, however many tracks there are.
+        for(const char* stem:{"trackEffectsPanel","trackColourPopup","trackColourDialog","trackInputPopup"}) {
+            int found=0;
+            for(auto* object:list->findChildren<QObject*>()) if(object->objectName().startsWith(stem)) ++found;
+            QVERIFY2(found==1,qPrintable(QString("%1: %2 instances").arg(stem).arg(found)));
+        }
+        // The panel covers the track list, so it is closed before opening FX on another track.
+        QObject* panel=nullptr;
+        const auto openFx=[&](int id) {
+            if(panel && panel->property("visible").toBool()) {
+                click(visualItem(window->contentItem(),"closeTrackEffects")); QTRY_VERIFY(!panel->property("visible").toBool());
+            }
+            click(visualItem(list,"trackFxButton"+QString::number(id)));
+            panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(id)); QVERIFY(panel);
+            QTRY_VERIFY(panel->property("visible").toBool());
+        };
+        openFx(a);
+        QCOMPARE(panel->property("effectsModel").value<QObject*>(),controller->trackEffects(a));
+        auto* pedals=visualItem(window->contentItem(),"selectEffect_pedals"); QVERIFY(pedals); click(pedals);
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("pedals"));
+        // The same panel serves every track; each track keeps its own page and pedalboard.
+        QObject* const shared=panel;
+        openFx(b); QCOMPARE(panel,shared);
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("eq"));
+        QCOMPARE(panel->property("effectsModel").value<QObject*>(),controller->trackEffects(b));
+        openFx(vocal); QCOMPARE(panel,shared); QVERIFY(!panel->property("supportsGuitarSuite").toBool());
+        QCOMPARE(panel->property("effectsModel").value<QObject*>(),static_cast<QObject*>(nullptr));
+        openFx(a);
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("pedals"));
+        QCOMPARE(panel->property("effectsModel").value<QObject*>(),controller->trackEffects(a));
+        QVERIFY(visualObject(window->contentItem(),"trackGuitarSuiteEditor"+QString::number(a)));
+        click(visualItem(window->contentItem(),"closeTrackEffects")); QTRY_VERIFY(!panel->property("visible").toBool());
+        // The input popup opens for the card whose IN button was clicked.
+        click(visualItem(list,"trackInputButton"+QString::number(vocal)));
+        auto* input=visualObject(window->contentItem(),"trackInputPopup"+QString::number(vocal)); QVERIFY(input);
+        QTRY_VERIFY(input->property("visible").toBool());
+        QCOMPARE(input->property("trackName").toString(),QString::fromStdString(tracks.project().findTrack(vocal)->name));
+        QMetaObject::invokeMethod(input,"close"); QTRY_VERIFY(!input->property("visible").toBool());
+        controller->shutdownSession();
+    }
     void track_card_chips_wrap_and_fit_at_the_narrowest_track_list() {
         TrackListWrapper tracks; const int id=tracks.addVocalTrack();
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
@@ -893,9 +941,10 @@ private slots:
         click(field); QTest::keyClick(window,Qt::Key_9); QTest::keyClick(window,Qt::Key_1); QTest::keyClick(window,Qt::Key_Return);
         QCOMPARE(controller->bpm(),91.0); QVERIFY(panel->property("visible").toBool());
         window->grabWindow().save("/tmp/projectdaw-track-effects.png");
-        QPointer<QObject> guardedPanel=panel;
+        // One shared panel (plan 5.1): removing its track closes it.
         QVERIFY(tracks.removeTrack(guitar));
-        QTRY_VERIFY(guardedPanel.isNull());
+        QTRY_VERIFY(!panel->property("visible").toBool());
+        QCOMPARE(panel->property("trackId").toInt(),-1);
         list->setVisible(false); list->setProperty("trackModel",QVariant());
     }
     void vocal_effects_offer_eq_and_recording_controls_without_guitarsuite() {
