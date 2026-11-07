@@ -407,9 +407,15 @@ Item {
                 Canvas {
                     id: waveform
                     objectName: "clipWaveform" + clipItem.clipId
-                    x: Math.max(0, scroll.contentX - clipItem.x)
+                    // The drawn strip is two views wide and starts on a whole-view step, so while
+                    // scrolling it just moves with the clip; new peaks are fetched (and painted)
+                    // only when the view crosses a step, not on every frame (plan 5.3).
+                    readonly property real step: Math.max(1, scroll.width)
+                    readonly property bool onScreen: clipItem.x < scroll.contentX + scroll.width
+                                                     && clipItem.x + clipItem.width > scroll.contentX
+                    x: Math.max(0, Math.floor((scroll.contentX - clipItem.x) / step) * step)
                     y: 30
-                    width: Math.max(0, Math.min(clipItem.width - x, scroll.width))
+                    width: onScreen ? Math.max(0, Math.min(clipItem.width - x, 2 * step)) : 0
                     height: Math.max(0, clipItem.height - 38)
                     property var peaks: width > 0 && root.trackModel
                         ? root.trackModel.clipWaveform(clipItem.trackId, clipItem.clipId, Math.ceil(width),

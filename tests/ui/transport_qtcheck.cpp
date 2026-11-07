@@ -4,6 +4,7 @@
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
+#include <QSignalSpy>
 #include <QQmlProperty>
 #include <QQuickItem>
 #include <QPointer>
@@ -1841,6 +1842,42 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(waveform,"requestPaint")); QTest::qWait(30);
         QVERIFY(window->grabWindow().save("/tmp/projectdaw-waveform.png"));
         timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+    }
+    void scrolling_a_long_clip_reuses_its_waveform_and_keeps_it_covering_the_view() {
+        TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+        auto audio=std::make_shared<AudioData>(); audio->path="ui-long-wave.wav"; audio->frames=48000*60;
+        audio->channels={std::vector<float>(audio->frames)};
+        for(qint64 i=0;i<audio->frames;++i)audio->channels[0][i]=float(std::sin(i*0.01)*0.7);
+        audio->buildWaveform(); QVERIFY(tracks.attachTake(track,0,audio));
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); });
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        QCoreApplication::processEvents();
+        const int clip=tracks.project().findTrack(track)->audioClips[0].id;
+        auto* scroll=visualItem(timeline,"timelineScroll"); QVERIFY(scroll);
+        auto* waveform=visualItem(timeline,"clipWaveform"+QString::number(clip)); QVERIFY(waveform);
+        auto* block=waveform->parentItem(); QVERIFY(block);
+        QVERIFY2(block->width()>scroll->width()*3,qPrintable(QString("clip only %1 px").arg(block->width())));
+        const auto covered=[&] {
+            const QRectF view=scroll->mapRectToScene(QRectF(0,0,scroll->width(),scroll->height()));
+            const QRectF clipRect=block->mapRectToScene(QRectF(0,0,block->width(),block->height()));
+            const QRectF wave=waveform->mapRectToScene(QRectF(0,0,waveform->width(),waveform->height()));
+            const qreal left=std::max(view.left(),clipRect.left()), right=std::min(view.right(),clipRect.right());
+            return wave.left()<=left+0.5 && wave.right()>=right-0.5;
+        };
+        // Plan 5.3: scrolling 300 px one pixel at a time fetches new peaks at most once,
+        // and the waveform always spans the visible part of the clip.
+        scroll->setProperty("contentX",200); QCoreApplication::processEvents(); QVERIFY(covered());
+        QSignalSpy fetched(waveform,SIGNAL(peaksChanged()));
+        for(int x=201;x<=500;++x) {
+            scroll->setProperty("contentX",x); QCoreApplication::processEvents();
+            QVERIFY2(covered(),qPrintable(QString("gap at contentX %1").arg(x)));
+        }
+        QVERIFY2(fetched.count()<=1,qPrintable(QString("%1 waveform fetches").arg(fetched.count())));
+        // Far along the clip, still covered, still one bin per pixel.
+        scroll->setProperty("contentX",block->width()-scroll->width()/2); QCoreApplication::processEvents();
+        QVERIFY(covered());
+        QCOMPARE(waveform->property("peaks").toList().size(),qsizetype(std::ceil(waveform->width())));
     }
     void timeline_left_and_right_handles_trim_without_moving_source() {
         TrackListWrapper tracks; const int track=tracks.addAudioTrack(); const int clip=tracks.addClipAtBeat(track,1,4);
