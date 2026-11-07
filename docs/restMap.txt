@@ -13,6 +13,55 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
                 [L] will do later (the user's choice; section H)
 
 
+NEXT UP (the user, 2026-11-08 night): plans below are written, NOT started. Start each only
+after the user approves it (plan + files first, one step at a time). Suggested order: N1 and
+N2 are small and touch the same window, so they can go first; N3 (C10) is the user's "next task".
+------------------------------------------------------------------------------------------------
+[ ] N1  Typing keyboard shortcuts shown with the virtual piano. Reading of the request ("the
+        shortcuts for typing keyboard under the virtual midi"); confirm with the user first:
+        - On the floating piano, every key KEYS reaches shows its computer key under it, at the
+          bottom of the key: Tab 1 Q 2 W E 4 R 5 T Y 7 U 8 I 9 O P - [ = ] Backspace \ (white
+          keys in the white key's bottom, black keys in the black key's bottom). They move with
+          the octave (Z/X or N2's buttons).
+        - A line under the keys: "Z / X octave down / up · C / V velocity down / up".
+        - The key labels come from the backend layout, not a copy in QML: TypingKeyboard gets a
+          static keyFor(semitone) (Tab for -5 ... backslash for 18), TypingKeyboardWrapper a
+          Q_INVOKABLE keyLabel(note) ("" outside its reach) for the current octave.
+        Files: backend/midi/typingkeyboard.h/.cpp, wrapper/midi/typingkeyboardwrap/
+        typingkeyboardwrapper.h/.cpp, frontend/transportbar/VirtualKeyboard.qml; tests:
+        tests/midi/typingkeyboard_test.cpp (keyFor matches semitoneFor both ways),
+        tests/ui/transport_qtcheck.cpp (labels on keys 55..78, they follow the octave).
+        Do NOT change anything else on the piano (no restyle: see the no-redesign rule).
+[ ] N2  Octave down / up for the typing keyboard with the mouse (today only Z / X).
+        - TypingKeyboardWrapper: Q_INVOKABLE octaveDown() / octaveUp() doing exactly what Z / X do
+          (TypingKeyboard gets shiftOctave(int); held notes keep their own note-off, as with
+          Z / X), plus canOctaveDown / canOctaveUp for the button states.
+        - Two small buttons "Octave -" / "Octave +" on the floating piano's top line, next to
+          "KEYS reach G3 - F#5"; the band and N1's labels follow.
+        Files: backend/midi/typingkeyboard.h/.cpp, wrapper/midi/typingkeyboardwrap/
+        typingkeyboardwrapper.h/.cpp, frontend/transportbar/VirtualKeyboard.qml; tests:
+        tests/midi/typingkeyboard_test.cpp, a wrapper or UI test (buttons move the band and the
+        notes typed, stop at octave 0 and 8).
+[ ] N3  = C10 Electronic drum kit ("creating electric drums", the user's next task). Plan:
+        - Choice to confirm first: synthesised in our own code (suggested; fits the
+          from-scratch rule, no samples or licences, knobs per drum) or a sampled library.
+        - Synthesised: a new instrument backend/instruments/electrodrums/ (Processor, like the
+          harmonium): kick (sine with a pitch drop + click), snare (two tones + noise), clap
+          (noise bursts), closed / open / pedal hi-hat (six square oscillators at inharmonic
+          ratios through a high-pass; open choked by closed and pedal), three toms (pitched
+          sines with a drop), side stick / rim; the synthesised crash and ride from the C3
+          CYMBALS note can live here too (keys 73, 75).
+        - The same keys as the acoustic kit (drummap: kick 60 on 'e', snare 62, toms 65/67/69,
+          hats 66/68/70 ...), so a pattern plays on either kit; the piano roll labels then work
+          as they are.
+        - A track type "Electronic Drums" in the instrument catalog, an FX page like the drum
+          kit's with per-drum tune / decay / level and a master volume, saved per track
+          (persistence json), a wrapper, the page.
+        - Renders for the user to listen to before it goes into the app (as with the harmonium).
+        - Steps (each one approved and tested): 1 the voices + renders, 2 the instrument + track
+          type + factory, 3 settings + json + wrapper + page, 4 the user plays it.
+
+
 A. LEFT OVER FROM PLAN 6 (small, closest to recent work)
 ---------------------------------------------------------
 [ ] A1  Re-voice only the factory Jazz preset (resources/presets/guitarsuite/Jazz.gspreset) for
@@ -79,11 +128,57 @@ decoder (C4) and the piano (C5).
         CC 4 and the mic mix CC 105 need live CC; offset/delay per mic, polyphony, cutoff.
         FOR C5: ampeg_hold, sustain_cc/half pedal, amp_veltrack (velocity -> level is off in
         Splendid at its default), note_polyphony, off_time.
-[ ] C3  DRUMS FIRST: Gogodze Phu Vol II (see C9) as the real "Drums" instrument. WAV
+[~] C3  DRUMS FIRST: Gogodze Phu Vol II (see C9) as the real "Drums" instrument. WAV
         samples, so no decoder is needed yet. Drum keys, hi-hat choke, mic mix controls.
         Map the Drums track type to it in instrumentfactory.cpp. Sampler::setZones() must not
         run during process(): loading a kit into a live track needs a safe handoff. Listen
-        with the user; if it disappoints, switch to the fallback SM Drums (we write its map).
+        with the user. STRICTLY GOGODZE (the user, 2026-11-08): no SM Drums, not even for
+        cymbals; the kit has none (kick, snare, three toms, hi-hat) and stays that way.
+        Piano roll: every drum key is labelled with its part (Kick, Snare, Hi-hat ...).
+        KEYS (moved 2026-11-08 so KEYS reaches them at its default octave): the General MIDI
+        layout two octaves up: 60 kick (e), 61 side stick, 62 snare (r), 64 snare edge,
+        65/67/69 toms (y/u/i), 66/68/70 hi-hat closed/pedal/open (7/8/9), extra hi-hats 55
+        tight, 56 loose, 57 half-open (Tab/1/q); 73 and 75 kept for a crash and a ride. Not
+        every part needs a typing key (the user). The user judges the layout by playing it.
+        KIT PICTURE (2026-11-08, EZdrummer-style, top of the Drums page): DrumKitPicture.qml, a
+        front view; click a piece to play it (centre harder; snare rim = edge, Stick pad =
+        side stick; hi-hat centre closed / edge open, Pedal, Tight/Loose/Half chips); every
+        hit lights its piece (DrumKit::hits() counters, DrumKitWrapper polls ~30/s while the
+        page is visible).
+        BUILT 2026-11-08, waiting for the user's test in the app (uncommitted):
+        - sampler: silent choke zones (*silence), velocity curves (amp_velcurve), sample offset
+          and delay (mic alignment), Sampler::stageZones() hands new zones to a live sampler
+          (taken at a block start, old notes fade, old set freed off the audio thread; TSan
+          clean). sfzloader: controller overrides, shared SampleCache.
+        - instruments/drums: drummap (the key layout and names; one kit pass per hi-hat
+          articulation, CC 4 at 0/48/80/127, key 46 -> 42/27/28/46, kit 42 -> 26),
+          drumkitsettings (room = CC 105, tune = CC 108, mic timing = CC 110, kick beater /
+          snare body / hi-hat trash / tom thud = CC 111-114; part levels + volume in dB on the
+          zones), drumkitlibrary (finds the kit in $CHAOSMAKER_SAMPLE_KITS or a sample-kits
+          folder up to 3 levels above the program; one background thread loads once and
+          rebuilds per settings; room trims Close -3 / Front -6 / Full -11 dB so a groove sits
+          near -29 dBFS RMS, peaks about -6), drumkit (the Processor, typeId "drumkit").
+          instrumentfactory: Drums -> DrumKit. Real kit: 1320 zones, first build 0.46 s,
+          rebuild 0.21 s.
+        - piano roll (the user, 2026-11-08: labels only, no redesign): on a Drums clip the keys
+          the kit plays show the part's name in place of the note name (on the white key, or
+          inside the black key); every other key, the width and the view stay as before.
+          PianoRollWrapper drumMode/drumName.
+        - Drums page in FX ("drumkit", fixed like the harmonium's): room, levels, tuning,
+          character, mic timing, reset; shows "Loading" or where the kit was looked for.
+          Saved per track (persistence/drumkitjson); edits rebuild the kit in the background.
+        - tests never read the real kit: backendtests and transporttests point
+          CHAOSMAKER_SAMPLE_KITS at a missing folder; kit tests write a small fake kit.
+          Tests: backendtests sampler, sfzloader, drummap, drumkit, drumkitjson, effectchain,
+          trackeffectspanel, instrumentcatalog; wrappertests qtdrumkit; transport_ui
+          drum_kit_lives_in_fx_*, piano_roll_names_the_drum_kit_parts_*.
+        - Not done yet (judge by ear first): the kit's per-drum polyphony, cutoff/fil_type low
+          cuts on some mics, live MIDI CC (hardware hi-hat pedal, mic mix knob); the sample
+          cache never shrinks (Full room keeps all mics, ~730 MB, until the app closes).
+        CYMBALS (the user, 2026-11-08): Gogodze has none; after Stage 1, prototype synthesised
+        cymbals in our own code (crash 49, ride 51, maybe ride bell 53: inharmonic metallic
+        oscillators + filtered noise, long darkening decay, velocity -> brightness), renders
+        for the user first; if liked, they join the Drums track and the piano roll labels.
 [ ] C4  FLAC decoder, hand-written, in the app (backend, shared): the sampler loads the
         Splendid piano with it, and audio import (E) reuses it later. Stream and frame
         parsing, subframes (constant, verbatim, fixed and LPC prediction), Rice-coded
@@ -148,7 +243,8 @@ decoder (C4) and the piano (C5).
             https://github.com/sfzinstruments/SplendidGrandPiano  (Code -> Download ZIP)
           Its samples are FLAC only: decoded by our own FLAC decoder (C4, decided by the user).
         FALLBACKS (if the first choices disappoint)
-        - Drums: SM Drums (1960s Ludwig, multi-mic, up to 8 round robins, many velocity
+        - Drums: NOT USED: the user wants strictly Gogodze (2026-11-08). Kept for reference only.
+          SM Drums (1960s Ludwig, multi-mic, up to 8 round robins, many velocity
           layers). Public domain. WAV only, no SFZ map: we write our own map.
             page: https://smmdrums.wordpress.com/
             1. SMD Cymbals Stereo (1.8 GB)
@@ -179,9 +275,38 @@ decoder (C4) and the piano (C5).
             sample-kits/GrandPiano/SplendidGrandPiano
         - CC0 1.0 = public domain dedication with a fallback licence: use, change, ship and
           sell freely, no credit required.
+[ ] C10 (NEXT, see N3 at the top for the plan) Electronic drum kit, a second drum instrument after the acoustic one (C3), added by the
+        user 2026-11-08. Open choice when we get there: synthesised in our own code like the
+        harmonium (808/909-style kick, snare, hats, claps, toms from oscillators, noise and
+        envelopes; knobs for decay, tone, tuning; no samples or licences), suggested; or a
+        sampled electronic library through the SFZ loader (pick and licence-check it as in C9).
+        Reuses C3's drum keys, piano roll drum names and track setup.
 
 
-D. PIANO ROLL / MIDI FOLLOW-UPS — from docs/follow-trail.md (roadmap Phase 10)
+D. PIANO ROLL / MIDI FOLLOW-UPS
+[~] D0  Virtual piano (the user's "virtual MIDI", 2026-11-08): a floating on-screen keyboard for
+        every instrument, opened together with the typing keyboard by the one KEYS switch in
+        the transport bar (the user: no separate PIANO switch; closing the piano turns KEYS
+        off; the main window stays active) (VirtualKeyboard.qml,
+        VirtualKeyboardWrapper). All 88 keys (A0-C8, the user asked for full size), lower on a
+        key = louder, drag for glissando, keys light for its own and KEYS notes; an accent band
+        marks the keys KEYS reaches (Tab .. backslash, follows Z/X); plays like KEYS / a MIDI
+        keyboard (MON or REC tracks); never takes the keyboard focus; closing ends held notes.
+        Built, uncommitted, waiting for the user's test.
+[x] D0d Playback ends where the last clip ends (the user, 2026-11-08: the red line ran 2 beats
+        past a 4-beat clip). The 1 s release tail is gone from SnapshotBuilder's playbackEnd;
+        AudioEngine::endPlayback() stops the transport there, sends the held notes' note-offs and
+        keeps the instruments running RingOutSeconds (2 s) while stopped so releases fade;
+        Play/Pause/Stop/Seek/Record cancel the ring-out. Tests: snapshotbuilder
+        playback_ends_where_the_last_clip_ends, audioengine_midi playback_stops_at_the_end_*.
+[x] D0b KEYS order at the top (the user, 2026-11-08): ] = upper Ga, Backspace = upper Ma,
+        backslash = upper tivra Ma (they were backslash = Ma, Backspace = tivra Ma).
+[x] D0c Fixed 2026-11-08: since d7dfdb4 (piano rolls load on first use, 2026-11-07) the main
+        window's piano rolls were not bound to the project: "trackModel: trackModel" inside the
+        Loaders' components bound PianoRollView's own property to itself, so drawn notes never
+        reached the clip and drum labels never showed. Main.qml now passes
+        window.projectTracks; transport_ui main_window_piano_roll_edits_its_clip_* loads the
+        real Main.qml and checks it. — from docs/follow-trail.md (roadmap Phase 10)
 -------------------------------------------------------------------------------
 Notes now reach the instrument (audioengine.cpp turns clip notes into MidiEvents), so
 follow-trail item 1 ("notes do not play yet") is out of date. Remaining there:
@@ -251,7 +376,7 @@ H. WILL DO LATER (the user's choice)
         (plan 3.10).
 [L] H3  (was part of C2) tools/sfzcheck: a command-line report for an SFZ file (missing samples,
         what the loader cannot play yet, layers per key, duplicate regions), on top of
-        sfz::loadSfz's report. Build it if we write our own map (the SM Drums fallback).
+        sfz::loadSfz's report. Build it if we ever write our own SFZ map.
 
 DECIDED NOT TO DO
 [x] Playing the harmonium from the piano's audio cable (pitch detection): the user chose MIDI
