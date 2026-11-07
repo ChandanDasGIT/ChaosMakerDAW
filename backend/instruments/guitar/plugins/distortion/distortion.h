@@ -4,9 +4,9 @@
 #include "instruments/guitar/dsp/pedalcontrols.h"
 #include "instruments/guitar/dsp/pedalfilter.h"
 
-// Latency of the single 4x oversampler pass, in samples at the host rate (the same value the
-// amp and crunch report for one pass).
-constexpr int kDistortionLatencySamples = 11;
+// Latency of the single 4x oversampler pass, in samples at the host rate: 26.5, rounded up
+// (measured by the oversampler test; crunch and fuzz report the same).
+constexpr int kDistortionLatencySamples = 27;
 
 // Tight high-gain distortion (reworked in plan 6.3). Tight is a steep low cut before clipping
 // (70-400 Hz), plus a fixed upper-mid push for bite. Two clipping stages run in the same 4x

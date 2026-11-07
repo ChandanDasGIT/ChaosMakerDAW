@@ -20,7 +20,7 @@ public:
 
     Amp();
     std::string typeId() const override { return "pedal.amp"; }
-    int latencySamples() const noexcept override { return 22; } // two 4x oversampling passes
+    int latencySamples() const noexcept override { return 53; } // two 4x passes, 26.5 each (oversampler test)
     void prepare(double sampleRate,int maxFrames) override;
     void reset() noexcept override;
     void process(ProcessContext& context) noexcept override;
