@@ -21,6 +21,9 @@ Window {
         newTrackRecordDry: window.layoutSettings.recordDryByDefault
     }
 
+    // The project's tracks under a name no panel uses for its own property: inside a Loader's
+    // component, "trackModel: trackModel" finds the panel's own (empty) property, not the id.
+    readonly property TrackListWrapper projectTracks: trackModel
     property int activePianoRollTrackId: -1
     property int activePianoRollClipId: -1
     property string activePianoRollClipLabel: ""
@@ -267,7 +270,7 @@ Window {
                 active: window.dockedPianoRollUsed
                         && (window.pianoRollPresentation === "dock" || window.bottomPanelMode === "pianoroll")
                 sourceComponent: PianoRollView {
-                    trackModel: trackModel
+                    trackModel: window.projectTracks
                     trackId: window.activePianoRollTrackId
                     clipId: window.activePianoRollClipId
                     clipLabel: window.activePianoRollClipLabel
@@ -301,7 +304,7 @@ Window {
             active: window.floatingPianoRollUsed
                     && (window.pianoRollPresentation === "window" || floatingPianoRollWindow.visible)
             sourceComponent: PianoRollView {
-                trackModel: trackModel
+                trackModel: window.projectTracks
                 trackId: window.activePianoRollTrackId
                 clipId: window.activePianoRollClipId
                 clipLabel: window.activePianoRollClipLabel
