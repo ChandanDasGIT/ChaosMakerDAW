@@ -158,7 +158,7 @@ Rectangle {
                                     anchors.left: parent.left
                                     anchors.verticalCenter: parent.verticalCenter
                                     width: 14; height: 14
-                                    onClicked: colourPopup.open()
+                                    onClicked: root.openColourPopup(trackCard)
                                     background: Rectangle { color: trackCard.trackColour; border.color: parent.hovered ? Theme.text : Theme.trackList.swatchBorder; radius: 3 }
                                     ToolTip.visible: hovered
                                     ToolTip.text: "Choose track colour"
@@ -273,7 +273,7 @@ Rectangle {
                                     hoverHighlight: true
                                     text: "IN"; textSize: Theme.microSize
                                     implicitWidth: 26; implicitHeight: chipFlow.chipHeight
-                                    onClicked: inputPopup.open()
+                                    onClicked: root.openInputPopup(trackCard)
                                     tooltip: trackCard.inputPort.length > 0 ? trackCard.inputPort : "Choose this track's input"
                                 }
                                 ToggleChip {
@@ -302,7 +302,7 @@ Rectangle {
                                     hoverHighlight: true
                                     text: "FX"; textSize: 9
                                     implicitWidth: 28; implicitHeight: chipFlow.chipHeight
-                                    onClicked: fxPopup.open()
+                                    onClicked: root.openEffects(trackCard)
                                     tooltip: "Browse track effects"
                                 }
                             }
@@ -349,166 +349,206 @@ Rectangle {
                         target: trackCard
                         function onVolumeChanged() { volumeSlider.value = trackCard.volume }
                     }
+                }
+            }
+        }
+    }
 
-                    Popup {
-                        id: colourPopup
-                        objectName: "trackColourPopup" + trackCard.trackId
-                        parent: Overlay.overlay
-                        width: 232
-                        padding: 12
-                        x: Math.max(8, Math.min(parent.width - width - 8, trackCard.mapToItem(parent, 0, 0).x))
-                        y: Math.max(8, Math.min(parent.height - height - 8, trackCard.mapToItem(parent, 0, 28).y))
-                        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
-                        contentItem: Column {
-                            spacing: 10
-                            Text { text: "Track colour"; color: Theme.text; font.pixelSize: 12 }
-                            Grid {
-                                columns: 6
-                                spacing: 7
-                                Repeater {
-                                    model: Theme.trackColors
-                                    delegate: Rectangle {
-                                        required property int index
-                                        required property string modelData
-                                        objectName: "trackColourChoice" + trackCard.trackId + "_" + index
-                                        width: 28; height: 28; radius: 4
-                                        color: modelData
-                                        border.width: trackCard.trackColour.toString() === modelData ? 2 : 1
-                                        border.color: trackCard.trackColour.toString() === modelData ? Theme.text : Theme.trackList.swatchChoiceBorder
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            onClicked: {
-                                                root.trackModel.setTrackColour(trackCard.trackId, modelData)
-                                                colourPopup.close()
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            PanelButton {
-                                objectName: "customTrackColour" + trackCard.trackId
-                                text: "Custom colour…"
-                                onClicked: {
-                                    colourPopup.close()
-                                    colourDialog.selectedColor = trackCard.trackColour
-                                    colourDialog.open()
-                                }
+    // One shared copy of each per-track popup (plan 5.1) instead of one per track card.
+    // Each follows the card that opened it and closes if that track is removed.
+    property var effectsPageByTrack: ({})
+
+    function openColourPopup(card) {
+        colourPopup.card = card
+        colourPopup.open()
+    }
+    function openInputPopup(card) {
+        inputPopup.card = card
+        inputPopup.open()
+    }
+    // The FX panel keeps the page (EQ or pedals) last shown for each track.
+    function openEffects(card) {
+        rememberEffectsPage()
+        fxPopup.card = card
+        fxPopup.selectedEffect = effectsPageByTrack[card.trackId] ?? "eq"
+        fxPopup.open()
+    }
+    function rememberEffectsPage() {
+        if (fxPopup.card) effectsPageByTrack[fxPopup.card.trackId] = fxPopup.selectedEffect
+    }
+
+    Popup {
+        id: colourPopup
+        property Item card: null
+        readonly property int trackId: card ? card.trackId : -1
+        readonly property string trackColour: card ? card.trackColour.toString() : ""
+        onCardChanged: if (!card) close()
+        objectName: "trackColourPopup" + trackId
+        parent: Overlay.overlay
+        width: 232
+        padding: 12
+        x: card ? Math.max(8, Math.min(parent.width - width - 8, card.mapToItem(parent, 0, 0).x)) : 0
+        y: card ? Math.max(8, Math.min(parent.height - height - 8, card.mapToItem(parent, 0, 28).y)) : 0
+        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
+        contentItem: Column {
+            spacing: 10
+            Text { text: "Track colour"; color: Theme.text; font.pixelSize: 12 }
+            Grid {
+                columns: 6
+                spacing: 7
+                Repeater {
+                    model: Theme.trackColors
+                    delegate: Rectangle {
+                        required property int index
+                        required property string modelData
+                        objectName: "trackColourChoice" + colourPopup.trackId + "_" + index
+                        width: 28; height: 28; radius: 4
+                        color: modelData
+                        border.width: colourPopup.trackColour === modelData ? 2 : 1
+                        border.color: colourPopup.trackColour === modelData ? Theme.text : Theme.trackList.swatchChoiceBorder
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                root.trackModel.setTrackColour(colourPopup.trackId, modelData)
+                                colourPopup.close()
                             }
                         }
                     }
-                    ColorDialog {
-                        // Inside the main window: a separate dialog window keeps app focus after closing,
-                        // which left the app without keyboard input (plan item 1.11).
-                        popupType: Popup.Item
-                        id: colourDialog
-                        objectName: "trackColourDialog" + trackCard.trackId
-                        title: "Choose track colour"
-                        onAccepted: root.trackModel.setTrackColour(trackCard.trackId, selectedColor.toString())
-                    }
+                }
+            }
+            PanelButton {
+                objectName: "customTrackColour" + colourPopup.trackId
+                text: "Custom colour…"
+                onClicked: {
+                    colourDialog.card = colourPopup.card
+                    colourPopup.close()
+                    colourDialog.selectedColor = colourDialog.card.trackColour
+                    colourDialog.open()
+                }
+            }
+        }
+    }
+    ColorDialog {
+        // Inside the main window: a separate dialog window keeps app focus after closing,
+        // which left the app without keyboard input (plan item 1.11).
+        popupType: Popup.Item
+        id: colourDialog
+        property Item card: null
+        readonly property int trackId: card ? card.trackId : -1
+        onCardChanged: if (!card && visible) reject()
+        objectName: "trackColourDialog" + trackId
+        title: "Choose track colour"
+        onAccepted: if (card) root.trackModel.setTrackColour(trackId, selectedColor.toString())
+    }
 
-                    TrackEffectsPanel {
-                        id: fxPopup
-                        objectName: "trackEffectsPanel" + trackCard.trackId
-                        trackModel: root.trackModel
-                        trackId: trackCard.trackId
-                        trackName: trackCard.name
-                        trackType: trackCard.trackType
-                        eqBands: trackCard.eqBands
-                        hasLiveInput: trackCard.hasLiveInput
-                        recordDry: trackCard.recordDry
-                    }
+    TrackEffectsPanel {
+        id: fxPopup
+        property Item card: null
+        onCardChanged: if (!card) close()
+        onClosed: root.rememberEffectsPage()
+        objectName: "trackEffectsPanel" + trackId
+        trackModel: root.trackModel
+        trackId: card ? card.trackId : -1
+        trackName: card ? card.name : ""
+        trackType: card ? card.trackType : ""
+        eqBands: card ? card.eqBands : []
+        hasLiveInput: card ? card.hasLiveInput : true
+        recordDry: card ? card.recordDry : false
+    }
 
-                    Popup {
-                        id: inputPopup
-                        parent: Overlay.overlay
-                        x: trackCard.mapToItem(Overlay.overlay, trackCard.width - width, 34).x
-                        y: trackCard.mapToItem(Overlay.overlay, 0, 34).y
-                        width: 300
-                        height: Math.min(340, Math.max(150, 100 + EngineController.inputDevices.length * 34))
-                        padding: 0
-                        background: Rectangle { radius: 8; color: Theme.popupBg; border.color: Theme.popupBorder }
-                        contentItem: ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 10
-                            spacing: 6
-                            Text { text: trackCard.name + " · Input"; color: Theme.text; font.pixelSize: 12; font.bold: true }
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 32
-                                radius: 5
-                                color: defaultInputArea.containsMouse ? Theme.trackList.optionHover : Theme.trackList.option
-                                border.color: trackCard.inputPort.length === 0 ? Theme.accent : Theme.trackList.optionBorder
-                                Text {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 9
-                                    verticalAlignment: Text.AlignVCenter
-                                    text: "Use default input"
-                                    color: Theme.text
-                                    font.pixelSize: 10
-                                }
-                                MouseArea {
-                                    id: defaultInputArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    onClicked: {
-                                        root.trackModel.setTrackInputPort(trackCard.trackId, "")
-                                        inputPopup.close()
-                                    }
-                                }
+    Popup {
+        id: inputPopup
+        property Item card: null
+        readonly property int trackId: card ? card.trackId : -1
+        readonly property string trackName: card ? card.name : ""
+        readonly property string inputPort: card ? card.inputPort : ""
+        onCardChanged: if (!card) close()
+        objectName: "trackInputPopup" + trackId
+        parent: Overlay.overlay
+        x: card ? card.mapToItem(Overlay.overlay, card.width - width, 34).x : 0
+        y: card ? card.mapToItem(Overlay.overlay, 0, 34).y : 0
+        width: 300
+        height: Math.min(340, Math.max(150, 100 + EngineController.inputDevices.length * 34))
+        padding: 0
+        background: Rectangle { radius: 8; color: Theme.popupBg; border.color: Theme.popupBorder }
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 10
+            spacing: 6
+            Text { text: inputPopup.trackName + " · Input"; color: Theme.text; font.pixelSize: 12; font.bold: true }
+            Rectangle {
+                Layout.fillWidth: true
+                height: 32
+                radius: 5
+                color: defaultInputArea.containsMouse ? Theme.trackList.optionHover : Theme.trackList.option
+                border.color: inputPopup.inputPort.length === 0 ? Theme.accent : Theme.trackList.optionBorder
+                Text {
+                    anchors.fill: parent
+                    anchors.leftMargin: 9
+                    verticalAlignment: Text.AlignVCenter
+                    text: "Use default input"
+                    color: Theme.text
+                    font.pixelSize: 10
+                }
+                MouseArea {
+                    id: defaultInputArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: {
+                        root.trackModel.setTrackInputPort(inputPopup.trackId, "")
+                        inputPopup.close()
+                    }
+                }
+            }
+            Flickable {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                contentHeight: Math.max(inputRows.implicitHeight,
+                                        EngineController.inputDevices.length === 0 ? 34 : 0)
+                boundsBehavior: Flickable.StopAtBounds
+                Text {
+                    visible: EngineController.inputDevices.length === 0
+                    width: parent.width
+                    height: 34
+                    text: "No physical input devices found"
+                    color: Theme.textMuted
+                    font.pixelSize: 10
+                    verticalAlignment: Text.AlignVCenter
+                    leftPadding: 8
+                }
+                Column {
+                    id: inputRows
+                    width: parent.width
+                    Repeater {
+                        model: EngineController.inputDevices
+                        delegate: Rectangle {
+                            required property string modelData
+                            required property int index
+                            width: inputRows.width
+                            height: 34
+                            radius: 5
+                            color: inputRowArea.containsMouse ? Theme.trackList.optionHover : "transparent"
+                            border.color: inputPopup.inputPort === EngineController.inputPortForDevice(index)
+                                ? Theme.accent : "transparent"
+                            Text {
+                                anchors.fill: parent
+                                anchors.leftMargin: 9
+                                anchors.rightMargin: 8
+                                text: modelData
+                                color: Theme.text
+                                font.pixelSize: 10
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideMiddle
                             }
-                            Flickable {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                clip: true
-                                contentHeight: Math.max(inputRows.implicitHeight,
-                                                        EngineController.inputDevices.length === 0 ? 34 : 0)
-                                boundsBehavior: Flickable.StopAtBounds
-                                Text {
-                                    visible: EngineController.inputDevices.length === 0
-                                    width: parent.width
-                                    height: 34
-                                    text: "No physical input devices found"
-                                    color: Theme.textMuted
-                                    font.pixelSize: 10
-                                    verticalAlignment: Text.AlignVCenter
-                                    leftPadding: 8
-                                }
-                                Column {
-                                    id: inputRows
-                                    width: parent.width
-                                    Repeater {
-                                        model: EngineController.inputDevices
-                                        delegate: Rectangle {
-                                            required property string modelData
-                                            required property int index
-                                            width: inputRows.width
-                                            height: 34
-                                            radius: 5
-                                            color: inputRowArea.containsMouse ? Theme.trackList.optionHover : "transparent"
-                                            border.color: trackCard.inputPort === EngineController.inputPortForDevice(index)
-                                                ? Theme.accent : "transparent"
-                                            Text {
-                                                anchors.fill: parent
-                                                anchors.leftMargin: 9
-                                                anchors.rightMargin: 8
-                                                text: modelData
-                                                color: Theme.text
-                                                font.pixelSize: 10
-                                                verticalAlignment: Text.AlignVCenter
-                                                elide: Text.ElideMiddle
-                                            }
-                                            MouseArea {
-                                                id: inputRowArea
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                onClicked: {
-                                                    root.trackModel.setTrackInputPort(
-                                                        trackCard.trackId, EngineController.inputPortForDevice(index))
-                                                    inputPopup.close()
-                                                }
-                                            }
-                                        }
-                                    }
+                            MouseArea {
+                                id: inputRowArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: {
+                                    root.trackModel.setTrackInputPort(
+                                        inputPopup.trackId, EngineController.inputPortForDevice(index))
+                                    inputPopup.close()
                                 }
                             }
                         }

@@ -11,7 +11,8 @@ Popup {
     property var eqBands: []
     property bool hasLiveInput: true
     property bool recordDry: false
-    property var effectsModel: null
+    // The pedalboard model of the track shown, loaded only while the panel is open.
+    readonly property var effectsModel: visible && supportsGuitarSuite ? EngineController.trackEffects(trackId) : null
     property alias selectedEffect: panelBridge.selectedEffect
     readonly property bool supportsGuitarSuite: panelBridge.supportsGuitarSuite
     readonly property var effectEntries: panelBridge.effectEntries
@@ -34,7 +35,6 @@ Popup {
     focus: true
     closePolicy: Popup.CloseOnEscape
     padding: 0
-    onAboutToShow: effectsModel = supportsGuitarSuite ? EngineController.trackEffects(trackId) : null
     background: Rectangle { color: Theme.popupBg; radius: 10; border.color: Theme.popupBorder }
     contentItem: ColumnLayout {
         spacing: 0
@@ -142,7 +142,12 @@ Popup {
                     sourceComponent: GuitarSuiteEditor {
                         objectName: "trackGuitarSuiteEditor" + root.trackId
                         trackName: root.trackName
-                        effectsModel: root.effectsModel
+                        // Keep the last model until the Loader unloads; it turns null first on close.
+                        Binding on effectsModel {
+                            value: root.effectsModel
+                            when: root.effectsModel !== null
+                            restoreMode: Binding.RestoreNone
+                        }
                         monitoring: EngineController.monitoredTracks.indexOf(root.trackId) >= 0
                         levels: EngineController.trackLevels[String(root.trackId)] ?? ({})
                         onClearClipsRequested: EngineController.clearTrackClips(root.trackId)
