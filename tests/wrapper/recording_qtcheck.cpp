@@ -4,6 +4,7 @@
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
 #include "audiodevice/audiodevice.h"
 #include "recording/takerecorder.h"
+#include "plugins/testsynth/testsynth.h"
 #include <QCoreApplication>
 #include <QSettings>
 #include <QTemporaryDir>
@@ -878,4 +879,43 @@ TEST(qttrackeffects, chaos_eq_reaches_the_engine_and_feeds_the_analyzer) {
     CHECK(std::abs(std::log2(frequencies[peak].toDouble()/1000.0))<0.1);
     eq.setAnalyzerEnabled(false);
     CHECK(eq.spectrum().isEmpty() && !processors[0]->analyzerListening() && !processors[1]->analyzerListening());
+}
+
+// An instrument may be playing on the audio thread, so it is prepared once when it is made and
+// replaced, not re-prepared, when the buffer changes; the new one must reach the audio thread.
+TEST(qtrecording, instrument_is_prepared_once_and_replaced_when_the_buffer_changes) {
+    Storage storage;
+    auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
+    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    const int piano=tracks.addInstrumentTrackOfType("Piano");
+    const int audio=tracks.addAudioTrack();
+    tick(); io->process();
+    const auto first=controller.trackInstrument(piano);
+    CHECK(first!=nullptr);
+    CHECK(controller.trackInstrument(audio)==nullptr);
+
+    const int drums=tracks.addInstrumentTrackOfType("Drums");    // edits sync every track
+    CHECK(tracks.renameTrack(piano,"Keys"));
+    tick(); io->process();
+    CHECK(controller.trackInstrument(piano)==first);
+
+    // Alone, so no other track's pedalboard republishes playback after the piano is replaced.
+    CHECK(tracks.removeTrack(drums)); CHECK(tracks.removeTrack(audio));
+    tick(); io->process();
+    CHECK(controller.trackInstrument(piano)==first);
+
+    CHECK(controller.setBufferSize(256));
+    const auto second=controller.trackInstrument(piano);
+    CHECK(second!=nullptr && second!=first);
+    CHECK(second->typeId()==first->typeId());
+
+    controller.sendLiveNoteOn(piano,60,100);                     // reaches the new instrument
+    io->process();
+    const auto* synth=dynamic_cast<const TestSynth*>(second.get());
+    CHECK(synth!=nullptr);
+    bool sounding=false;
+    if(synth) for(const auto& voice:synth->voices()) sounding=sounding||voice.active;
+    CHECK(sounding);
+    controller.sendLiveNoteOff(piano,60);
+    controller.shutdownSession();
 }
