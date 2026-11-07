@@ -217,7 +217,8 @@ TunerReading GuitarSuiteEditor::tunerReading(int pedalId) const
 
 std::vector<std::string> GuitarSuiteEditor::factoryPresetNames()
 {
-    return {"Djent", "Jazz"};
+    // Djent, MetalSolo, RockChords and RockSolo were fitted to reference recordings (plan 6.3).
+    return {"Djent", "MetalSolo", "RockChords", "RockSolo", "Jazz"};
 }
 
 std::vector<std::string> GuitarSuiteEditor::availablePedals()

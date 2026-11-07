@@ -1,0 +1,90 @@
+{
+  "format": "GuitarSuitePreset",
+  "inputTrimDb": 0.0,
+  "name": "RockSolo",
+  "pedals": [
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "attack": 2.0,
+        "release": 150.0,
+        "threshold": -54.0
+      },
+      "type": "pedal.noisegate"
+    },
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "drive": 8.25,
+        "level": 0.0,
+        "tone": 1.0
+      },
+      "type": "pedal.overdrive"
+    },
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "bass": 0.0,
+        "channel": 1.0,
+        "drive": 21.0,
+        "master": -3.9,
+        "mid": -4.5,
+        "presence": 0.75,
+        "resonance": 0.3499999940395355,
+        "treble": 4.0
+      },
+      "type": "pedal.amp"
+    },
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "level": 0.0,
+        "mix": 1.0,
+        "model": 3.0
+      },
+      "type": "pedal.cabinet"
+    },
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "highfreq": 3200.0,
+        "highgain": -6.5,
+        "highq": 0.699999988079071,
+        "level": 0.0,
+        "lowfreq": 315.0,
+        "lowgain": -8.0,
+        "lowq": 0.699999988079071,
+        "midfreq": 350.0,
+        "midgain": -6.5,
+        "midq": 0.8999999761581421
+      },
+      "type": "pedal.parametriceq"
+    },
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "feedback": 0.2800000011920929,
+        "mix": 0.15000000596046448,
+        "time": 420.0
+      },
+      "type": "pedal.delay"
+    },
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "damping": 0.4000000059604645,
+        "mix": 0.11999999731779099,
+        "room": 0.6000000238418579
+      },
+      "type": "pedal.reverb"
+    }
+  ],
+  "version": 1
+}

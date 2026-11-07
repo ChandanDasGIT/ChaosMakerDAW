@@ -1,0 +1,90 @@
+{
+  "format": "GuitarSuitePreset",
+  "inputTrimDb": 0.0,
+  "name": "MetalSolo",
+  "pedals": [
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "attack": 2.0,
+        "release": 150.0,
+        "threshold": -52.0
+      },
+      "type": "pedal.noisegate"
+    },
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "drive": 18.0,
+        "level": 0.0,
+        "tone": 1.0
+      },
+      "type": "pedal.overdrive"
+    },
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "bass": -1.0,
+        "channel": 2.0,
+        "drive": 32.0,
+        "master": -12.2,
+        "mid": 2.75,
+        "presence": 0.5,
+        "resonance": 0.8999999761581421,
+        "treble": 0.0
+      },
+      "type": "pedal.amp"
+    },
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "level": 0.0,
+        "mix": 1.0,
+        "model": 3.0
+      },
+      "type": "pedal.cabinet"
+    },
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "highfreq": 3200.0,
+        "highgain": -6.0,
+        "highq": 0.699999988079071,
+        "level": 0.0,
+        "lowfreq": 330.0,
+        "lowgain": -6.0,
+        "lowq": 0.699999988079071,
+        "midfreq": 650.0,
+        "midgain": -9.0,
+        "midq": 0.8999999761581421
+      },
+      "type": "pedal.parametriceq"
+    },
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "feedback": 0.30000001192092896,
+        "mix": 0.18000000715255737,
+        "time": 380.0
+      },
+      "type": "pedal.delay"
+    },
+    {
+      "bypassed": false,
+      "irPath": "",
+      "parameters": {
+        "damping": 0.4000000059604645,
+        "mix": 0.15000000596046448,
+        "room": 0.6000000238418579
+      },
+      "type": "pedal.reverb"
+    }
+  ],
+  "version": 1
+}

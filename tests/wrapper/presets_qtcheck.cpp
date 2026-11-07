@@ -140,9 +140,10 @@ TEST(qtpresets, parametric_eq_fuzz_and_phaser_restore_controls_order_and_bypass)
     CHECK(parameter(model,2,"midfreq")==1200);CHECK(parameter(model,2,"midgain")==-4);
     CHECK(parameter(model,2,"midq")==2);CHECK(parameter(model,2,"level")==-3);
 }
-TEST(qtpresets, factory_djent_and_jazz_apply_exactly_their_declared_chains) {
+TEST(qtpresets, factory_presets_apply_exactly_their_declared_chains) {
     Fixture fixture; GuitarSuiteModel model;
-    const QStringList names{QStringLiteral("Djent"),QStringLiteral("Jazz")};
+    const QStringList names{QStringLiteral("Djent"),QStringLiteral("MetalSolo"),QStringLiteral("RockChords"),
+                            QStringLiteral("RockSolo"),QStringLiteral("Jazz")};
     CHECK(model.factoryPresetNames()==names);
     int published=0;
     model.setPublisher([&](auto){++published;});
