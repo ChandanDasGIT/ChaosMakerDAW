@@ -2,6 +2,9 @@
 #include "testsignals.h"
 #include "instruments/guitar/plugins/crunch/crunch.h"
 #include "instruments/guitar/plugins/distortion/distortion.h"
+#include "instruments/guitar/plugins/overdrive/overdrive.h"
+#include "dsp/fft.h"
+#include <complex>
 #include "instruments/guitar/plugins/guitarsuite/guitarsuite.h"
 #include "engine/audioengine.h"
 #include <memory>
@@ -15,6 +18,16 @@ double tailRms(const std::vector<float>& audio) {
     return testsignals::rmsDb({audio.begin() + audio.size()/2, audio.end()});
 }
 void process(AudioEngine& engine, const AudioIO& io) noexcept RT_SAFE { engine.renderBlock(io); }
+// Energy (dB) between lo and hi Hz, from one 16384-point FFT over the end of the signal.
+double bandDb(const std::vector<float>& x, double lo, double hi) {
+    const int n = 16384; Fft fft(n); std::vector<std::complex<double>> bins(n);
+    const std::size_t start = x.size() - std::size_t(n);
+    for (int i = 0; i < n; ++i) bins[std::size_t(i)] = {x[start + std::size_t(i)] * (0.5 - 0.5 * std::cos(testsignals::kTwoPi * i / n)), 0.0};
+    fft.forward(bins.data());
+    double sum = 0;
+    for (int k = 1; k < n / 2; ++k) { const double hz = k * 48000.0 / n; if (hz >= lo && hz < hi) sum += std::norm(bins[std::size_t(k)]); }
+    return 10 * std::log10(sum + 1e-30);
+}
 }
 
 TEST(drives, crunch_and_distortion_have_distinct_saturation_and_touch_response) {
@@ -130,4 +143,32 @@ TEST(drives, live_monitor_processes_drive_pedals_without_recording_and_bypass_re
     for (int i = 0; i < 128; ++i) CHECK_NEAR(left[i],input[i],1e-5);
     arm.a = 0; CHECK(engine.post(arm)); process(engine,io);
     for (float sample : left) CHECK(sample == 0);
+}
+
+TEST(drives, overdrive_drives_the_mids_and_keeps_the_low_strings_clean) {
+    // Only the part above ~720 Hz is clipped (Tube Screamer style): a low E stays nearly clean
+    // while a note at 1 kHz with the same level is driven hard.
+    Overdrive overdrive; set(overdrive, "drive", 24);
+    const auto low = testsignals::render(overdrive, testsignals::sine(82.4, -14, 48000), 128);
+    const auto high = testsignals::render(overdrive, testsignals::sine(1000, -14, 48000), 128);
+    const double lowDistortion = bandDb(low, 150, 6000) - bandDb(low, 70, 95);
+    const double highDistortion = bandDb(high, 1500, 12000) - bandDb(high, 900, 1100);
+    CHECK(lowDistortion < -25);
+    CHECK(highDistortion > lowDistortion + 15);
+}
+
+TEST(drives, overdrive_tone_is_a_wide_treble_shelf_and_level_is_exact) {
+    Overdrive overdrive; set(overdrive, "drive", 0);
+    const auto input = testsignals::sine(5000, -40, 24000);
+    set(overdrive, "tone", 0); const double dark = tailRms(testsignals::render(overdrive, input, 128));
+    set(overdrive, "tone", 1); const double bright = tailRms(testsignals::render(overdrive, input, 128));
+    CHECK(bright > dark + 12);
+    set(overdrive, "level", -12);
+    const double before = tailRms(testsignals::render(overdrive, input, 128));
+    set(overdrive, "level", -18);
+    CHECK_NEAR(tailRms(testsignals::render(overdrive, input, 128)), before - 6, 0.01);
+    // Block size never changes the result.
+    set(overdrive, "drive", 20);
+    const auto music = testsignals::sine(330, -16, 12000);
+    CHECK(testsignals::render(overdrive, music, 37) == testsignals::render(overdrive, music, 128));
 }

@@ -13,7 +13,8 @@ Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Ph
 Phase 4 done (4.4 not needed). Track list minimum width settled: chips wrap (see 4.5).
 Phase 5 done (5.1–5.3).
 Next: Phase 6 (user requests). 6.1, 6.2 (Chaos EQ), 6.4, 6.5, 6.6 done. Left: 6.3 (guitar
-suite sound), in progress: steps 1-2 done, next is step 3 (drive pedals). After 6.3 the user
+suite sound), in progress: steps 1-2 done, step 3 (drive pedals) done but not committed until
+the user has listened to renders/drive-before-* vs drive-after-*. After 6.3 the user
 wants a song's guitar tone analysed and a matching GuitarSuite preset made.
 Local-only material (in .gitignore) lives in local-reference/: q3.jpg, sampleGuitarRaw.wav (dry
 DI), "Modern Boutique 4x12" IRs (48 kHz), renders/ (fxrender output).  Added 2026-11-07: 6.4 stop-at-end setting (done),
@@ -541,7 +542,15 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
                smoother v3 was tried (low cut 140 Hz, +4 dB boost, 9.5 kHz treble loss,
                -11 dB scoop); the user preferred v1 by ear, so v1 is kept. Solo DI
                (soloGuitarRaw.wav) crest: old amp 4.5 dB, v1 7.8.
-         [ ] 3 Drive pedals: own pre-clip voicing, asymmetric clipping, tighter lows.
+         [x] 3 Drive pedals reworked, same ids/controls/latency. Shared dsp: pedalfilter.h (the
+               amp's filter helper, moved), drivestage.h (uneven clipping + bias shift).
+               Overdrive: only >720 Hz is clipped and summed with the clean signal (TS mid
+               hump), tone = treble shelf. Crunch: low cut + presence push, one touch-
+               sensitive stage, fixed -5 dB scoop @350, Body = exact low shelf. Distortion:
+               Tight = 70-400 Hz 12 dB/oct low cut + bite push, two stages with treble loss,
+               fixed -8 dB scoop @320, exact Mid band. Fuzz: starved sputtery stage + sustain
+               stage, Big-Muff-style tone blend. Solo crest: OD 8.1->8.6, crunch 5.1->5.6,
+               distortion 5.0->6.4, fuzz 4.4->6.1. Tests: drives (2 new for Overdrive).
          [ ] 4 Noise gate check at high gain (DI noise floor).
          [ ] 5 Built-in cabinet models when no IR is loaded.
          [ ] 6 Merge guitar dsp/radix2fft.h (pitch shifter) into backend/dsp/fft.

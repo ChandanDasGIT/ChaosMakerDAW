@@ -10,46 +10,61 @@ Crunch::Crunch() : controls{{
 void Crunch::prepare(double sampleRate, int) {
     rate = std::max(sampleRate, 1000.0);
     for (auto& smoother : smoothers) smoother.prepare(rate, 20);
-    for (auto& state : shapeState) state.dc.prepare(rate * 4);
+    for (auto& state : shapeState) {
+        state.stage.positiveKnee = 1.35f;   // uneven, like a single tube stage
+        state.stage.negativeKnee = 0.8f;
+        state.stage.conduction = 0.5f;
+        state.stage.biasDepth = 0.6f;
+        state.stage.prepare(rate * 4, 2.0f, 50.0f);
+    }
+    lowCut.set({eqband::Shape::LowCut, 80.0, 0.0, eqband::DefaultQ, eqband::Slope::Db6}, rate);
+    presence.set({eqband::Shape::Bell, 1100.0, 3.0, 0.7, eqband::Slope::Db12}, rate);
+    scoop.set({eqband::Shape::Bell, 350.0, -5.0, 0.6, eqband::Slope::Db12}, rate);
+    rolloff.set({eqband::Shape::HighCut, 9000.0, 0.0, eqband::DefaultQ, eqband::Slope::Db12}, rate);
     reset();
 }
 
 void Crunch::reset() noexcept {
     for (std::size_t i = 0; i < controls.size(); ++i) smoothers[i].reset(controls[i]->get());
-    for (auto& state : shapeState) state.dc.reset();
-    previousInput.fill(0); highpass.fill(0); body.fill(0); tone.fill(0);
+    for (auto& state : shapeState) state.stage.reset();
+    for (auto* f : {&lowCut, &presence, &scoop, &bodyShelf, &toneShelf, &rolloff}) f->reset();
     oversampler.reset();
+    frameCounter = 0;
+    appliedTone = -1; appliedBody = -100;
+    refresh(controls[1]->get(), controls[2]->get());
+}
+
+void Crunch::refresh(float tone, float body) noexcept {
+    if (tone != appliedTone) {
+        appliedTone = tone;
+        toneShelf.set({eqband::Shape::HighShelf, 2200.0, -12.0 + 18.0 * tone, eqband::DefaultQ, eqband::Slope::Db12}, rate);
+    }
+    if (body != appliedBody) {
+        appliedBody = body;
+        bodyShelf.set({eqband::Shape::LowShelf, 200.0, body, eqband::DefaultQ, eqband::Slope::Db12}, rate);
+    }
 }
 
 float Crunch::shape(float input, void* user) noexcept {
     auto& state = *static_cast<ShapeState*>(user);
-    const float driven = input * state.drive;
-    const float asymmetric = driven * (driven < 0 ? 1.25f : 1.0f);
-    return state.dc.process((2.0f / pedal::pi) * std::atan(asymmetric));
+    return state.stage.process(input * state.drive);
 }
 
 void Crunch::process(ProcessContext& context) noexcept {
-    const float highpassPole = std::exp(-2 * pedal::pi * 70 / float(rate));
-    const float bodyCoefficient = 1 - std::exp(-2 * pedal::pi * 220 / float(rate));
     for (int i = 0; i < context.audio.frames; ++i) {
         std::array<float, 4> values;
         for (std::size_t j = 0; j < values.size(); ++j)
             values[j] = smoothers[j].next(controls[j]->get());
+        if (frameCounter++ % RefreshFrames == 0) refresh(values[1], values[2]);
         const float drive = pedal::gain(values[0]);
-        const float bodyGain = pedal::gain(values[2]);
         const float level = pedal::gain(values[3]);
-        const float cutoff = std::min(1200.0f * std::pow(8.0f, values[1]), float(rate * 0.4));
-        const float toneCoefficient = 1 - std::exp(-2 * pedal::pi * cutoff / float(rate));
         for (int c = 0; c < std::min(context.audio.channelCount, 2); ++c) {
             float& sample = context.audio.channel(c)[i];
-            const float filtered = highpassPole * (highpass[c] + sample - previousInput[c]);
-            previousInput[c] = sample; highpass[c] = filtered;
+            float y = presence.run(c, lowCut.run(c, sample));
             shapeState[c].drive = drive;
-            const float clipped = oversampler.process(filtered, c, &Crunch::shape, &shapeState[c]);
-            body[c] += bodyCoefficient * (clipped - body[c]);
-            const float voiced = clipped + (bodyGain - 1) * body[c];
-            tone[c] += toneCoefficient * (voiced - tone[c]);
-            sample = tone[c] * level;
+            y = oversampler.process(y, c, &Crunch::shape, &shapeState[c]);
+            y = rolloff.run(c, toneShelf.run(c, bodyShelf.run(c, scoop.run(c, y))));
+            sample = y * level;
         }
     }
 }

@@ -13,75 +13,67 @@ Distortion::Distortion() : controls{{
 void Distortion::prepare(double sampleRate, int) {
     rate = std::max(sampleRate, 1000.0);
     for (auto& smoother : smoothers) smoother.prepare(rate, 20);
-    for (auto& state : shapeState) state.dc.prepare(rate * 4);
-
-    // Constant for a given sample rate: compute once here, not per block.
-    const float r = float(rate);
-    lowCoefficient = 1 - std::exp(-2 * pedal::pi * 200 / r);
-    highCoefficient = 1 - std::exp(-2 * pedal::pi * 2800 / r);
-    outputCoefficient = 1 - std::exp(-2 * pedal::pi * float(std::min(8500.0, rate * 0.4)) / r);
+    const double oversampled = rate * 4;
+    for (auto& state : shapeState) {
+        state.first.positiveKnee = 1.2f;  state.first.negativeKnee = 0.85f;
+        state.first.conduction = 0.6f;    state.first.biasDepth = 0.4f;
+        state.first.prepare(oversampled, 2.0f, 40.0f);
+        state.second.positiveKnee = 1.0f; state.second.negativeKnee = 1.0f;
+        state.second.conduction = 0.8f;   state.second.biasDepth = 0.2f;
+        state.second.prepare(oversampled, 2.0f, 40.0f);
+        state.trebleCoefficient = float(1.0 - std::exp(-2.0 * 3.14159265358979 * 7000.0 / oversampled));
+    }
+    bite.set({eqband::Shape::Bell, 1400.0, 4.0, 0.8, eqband::Slope::Db12}, rate);
+    scoop.set({eqband::Shape::Bell, 320.0, -8.0, 0.6, eqband::Slope::Db12}, rate);
+    rolloff.set({eqband::Shape::HighCut, 8000.0, 0.0, eqband::DefaultQ, eqband::Slope::Db12}, rate);
     reset();
 }
 
 void Distortion::reset() noexcept {
-    for (std::size_t i = 0; i < controls.size(); ++i) smoothers[i].reset(controls[i]->get());
-    for (auto& state : shapeState) state.dc.reset();
-    previousInput.fill(0); highpass.fill(0); low.fill(0); high.fill(0);
-    mid1.fill(0); mid2.fill(0); outputLowpass.fill(0); oversampler.reset();
-    controlCounter = 0; // forces a coefficient refresh on the first sample
+    std::array<float, 7> values{};
+    for (std::size_t i = 0; i < controls.size(); ++i) { values[i] = controls[i]->get(); smoothers[i].reset(values[i]); }
+    for (auto& state : shapeState) { state.first.reset(); state.second.reset(); state.treble = 0; }
+    for (auto* f : {&tight, &bite, &scoop, &bass, &mid, &treble, &rolloff}) f->reset();
+    oversampler.reset();
+    frameCounter = 0;
+    applied.fill(-1e9f);
+    refresh(values);
 }
 
-// Asymmetric soft clipper: tanh(x + bias) - tanh(bias).
-// Smooth everywhere (no corner), so far less aliasing than a hard clamp;
-// the bias adds even harmonics. The DC blocker removes the offset it creates.
+// Rebuilds the filters whose controls moved (drive and level are applied per sample).
+void Distortion::refresh(const std::array<float, 7>& v) noexcept {
+    using eqband::Shape; using eqband::Slope;
+    if (v[1] != applied[1]) tight.set({Shape::LowCut, 70.0 + 330.0 * v[1], 0.0, eqband::DefaultQ, Slope::Db12}, rate);
+    if (v[2] != applied[2]) bass.set({Shape::LowShelf, 120.0, v[2], eqband::DefaultQ, Slope::Db12}, rate);
+    if (v[3] != applied[3] || v[4] != applied[4]) mid.set({Shape::Bell, v[4], v[3], 0.7, Slope::Db12}, rate);
+    if (v[5] != applied[5]) treble.set({Shape::HighShelf, 2800.0, v[5], eqband::DefaultQ, Slope::Db12}, rate);
+    applied = v;
+}
+
+// Two stages: uneven, then a harder symmetric one, with treble loss between them.
 float Distortion::shape(float input, void* user) noexcept {
     auto& state = *static_cast<ShapeState*>(user);
-    static const float biasOffset = std::tanh(kBias);
-    const float clipped = std::tanh(input * state.drive * 0.6f + kBias) - biasOffset;
-    return state.dc.process(clipped);
-}
-
-void Distortion::updateCoefficients(const std::array<float, 7>& values) noexcept {
-    drive = pedal::gain(values[0]);
-    highpassPole = std::exp(-2 * pedal::pi * (70 + values[1] * 180) / float(rate));
-    bass = pedal::gain(values[2]);
-    mids = pedal::gain(values[3]);
-    treble = pedal::gain(values[5]);
-    level = pedal::gain(values[6]);
-    // TPT state-variable band-pass forms a peaking mid EQ: unity when Mids=0 dB.
-    constexpr float k = 1.4f;
-    const float frequency = std::min(values[4], float(rate * 0.4));
-    g = std::tan(pedal::pi * frequency / float(rate));
-    a = 1 / (1 + g * (g + k));
+    const float first = state.first.process(input * state.stageGain);
+    state.treble += state.trebleCoefficient * (first - state.treble);
+    return state.second.process(state.treble * state.stageGain);
 }
 
 void Distortion::process(ProcessContext& context) noexcept {
-    constexpr float k = 1.4f;
     const int channels = std::min(context.audio.channelCount, 2);
     for (int i = 0; i < context.audio.frames; ++i) {
-        // Smoothers advance every sample so their ramps stay accurate.
         std::array<float, 7> values;
         for (std::size_t j = 0; j < values.size(); ++j)
             values[j] = smoothers[j].next(controls[j]->get());
-        // The expensive derived math runs only every kControlInterval samples.
-        if (controlCounter == 0) updateCoefficients(values);
-        if (++controlCounter >= kControlInterval) controlCounter = 0;
-
+        if (frameCounter++ % RefreshFrames == 0) refresh(values);
+        const float stageGain = std::sqrt(pedal::gain(values[0]));
+        const float level = pedal::gain(values[6]);
         for (int c = 0; c < channels; ++c) {
             float& sample = context.audio.channel(c)[i];
-            const float filtered = highpassPole * (highpass[c] + sample - previousInput[c]);
-            previousInput[c] = sample; highpass[c] = filtered;
-            shapeState[c].drive = drive;
-            const float clipped = oversampler.process(filtered, c, &Distortion::shape, &shapeState[c]);
-            low[c] += lowCoefficient * (clipped - low[c]);
-            high[c] += highCoefficient * (clipped - high[c]);
-            const float voiced = clipped + (bass - 1) * low[c] + (treble - 1) * (clipped - high[c]);
-            const float v1 = a * (mid1[c] + g * (voiced - mid2[c]));
-            const float v2 = mid2[c] + g * v1;
-            mid1[c] = 2 * v1 - mid1[c]; mid2[c] = 2 * v2 - mid2[c];
-            const float equalized = voiced + (mids - 1) * k * v1;
-            outputLowpass[c] += outputCoefficient * (equalized - outputLowpass[c]);
-            sample = outputLowpass[c] * level;
+            float y = bite.run(c, tight.run(c, sample));
+            shapeState[c].stageGain = stageGain;
+            y = oversampler.process(y, c, &Distortion::shape, &shapeState[c]);
+            y = rolloff.run(c, treble.run(c, mid.run(c, bass.run(c, scoop.run(c, y)))));
+            sample = y * level;
         }
     }
 }
