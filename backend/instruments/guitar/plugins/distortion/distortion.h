@@ -1,13 +1,19 @@
 #pragma once
-#include "instruments/guitar/dsp/dcblocker.h"
+#include "instruments/guitar/dsp/drivestage.h"
 #include "instruments/guitar/dsp/oversampler4x.h"
 #include "instruments/guitar/dsp/pedalcontrols.h"
+#include "instruments/guitar/dsp/pedalfilter.h"
 
-// Latency of the 4x oversampler path, in samples at the host rate.
-// Verified by distortion_latency_test.cpp: re-run it whenever the oversampler filters change.
+// Latency of the single 4x oversampler pass, in samples at the host rate (the same value the
+// amp and crunch report for one pass).
 constexpr int kDistortionLatencySamples = 11;
 
-// Tight high-gain clipping with post-distortion EQ and a sweepable mid band.
+// Tight high-gain distortion (reworked in plan 6.3). Tight is a steep low cut before clipping
+// (70-400 Hz), plus a fixed upper-mid push for bite. Two clipping stages run in the same 4x
+// pass with treble loss between them, which is smoother than one hard stage. After clipping:
+// a fixed low-mid scoop (clipping regenerates the mud the low cut removed), bass and treble
+// shelves, a peaking Mid band at Mid frequency (exact gain), a top-end
+// roll-off and Level (a pure output gain).
 class Distortion final : public Processor {
 public:
     Distortion();
@@ -17,26 +23,19 @@ public:
     void reset() noexcept override;
     void process(ProcessContext& context) noexcept override;
 private:
-    struct ShapeState { float drive = 1; DCBlocker dc; };
+    static constexpr int RefreshFrames = 16;
+    struct ShapeState {
+        float stageGain = 1, trebleCoefficient = 0.5f, treble = 0;
+        DriveStage first, second;
+    };
     static float shape(float input, void* state) noexcept;
-    void updateCoefficients(const std::array<float, 7>& values) noexcept;
-
-    // Derived coefficients (tan/exp/pow) are refreshed every kControlInterval samples.
-    // The 20 ms parameter smoothers hide the steps.
-    static constexpr int kControlInterval = 16;
-    // Small input bias gives asymmetric clipping (even harmonics) without a hard corner.
-    static constexpr float kBias = 0.2f;
-
+    void refresh(const std::array<float, 7>& values) noexcept;
     std::array<Parameter*, 7> controls;
     std::array<Smoother, 7> smoothers;
     std::array<ShapeState, 2> shapeState;
-    std::array<float, 2> previousInput{}, highpass{}, low{}, high{}, mid1{}, mid2{}, outputLowpass{};
+    PedalFilter tight, bite, scoop, bass, mid, treble, rolloff;
+    std::array<float, 7> applied{};
     Oversampler4x oversampler;
+    long long frameCounter = 0;
     double rate = 48000;
-
-    // Fixed per sample rate (set in prepare).
-    float lowCoefficient = 0, highCoefficient = 0, outputCoefficient = 0;
-    // Cached control-rate values.
-    float drive = 1, highpassPole = 0, bass = 1, mids = 1, treble = 1, level = 1, g = 0, a = 1;
-    int controlCounter = 0;
 };

@@ -61,22 +61,6 @@ Amp::Amp() : controls{{
     &addParameter("resonance","Resonance",0,1,0.3f)
 }} {}
 
-float Amp::Filter::run(int channel, float x) noexcept
-{
-    if (!active) return x;
-    double y = x;
-    auto& s = state[std::size_t(channel)];
-    for (int k = 0; k < design.sectionCount; ++k)
-        y = biquad::process(design.sections[std::size_t(k)], s[std::size_t(k)], y);
-    return float(y);
-}
-
-void Amp::Filter::set(const eqband::Settings& settings, double rate) noexcept
-{
-    design = eqband::design(settings, rate);
-    active = true;
-}
-
 void Amp::prepare(double sampleRate,int) {
     rate=std::max(sampleRate,1000.0);
     for(auto& smoother:smoothers) smoother.prepare(rate,20);
@@ -87,7 +71,7 @@ void Amp::reset() noexcept {
     std::array<float, ParameterCount> values{};
     for(std::size_t i=0;i<controls.size();++i) { values[i]=controls[i]->get(); smoothers[i].reset(values[i]); }
     for(auto* f:{&inputCut,&tight,&push,&bright,&scoop,&bass,&mid,&treble,&presence,&resonance,&outputCut})
-        for(auto& channel:f->state) channel={};
+        f->reset();
     for(auto& p:preamps) { p.bias={}; p.couplingIn={}; p.couplingOut={}; p.treble={}; }
     for(auto& p:powers) p.envelope=0;
     preampOversampler.reset(); powerOversampler.reset();

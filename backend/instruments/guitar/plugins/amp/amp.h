@@ -1,7 +1,6 @@
 #pragma once
-#include "dsp/biquad.h"
-#include "dsp/eqbanddesign.h"
 #include "instruments/guitar/dsp/pedalcontrols.h"
+#include "instruments/guitar/dsp/pedalfilter.h"
 #include "instruments/guitar/dsp/oversampler4x.h"
 
 // Guitar amp (rebuilt in plan 6.3). Three channels share one signal path:
@@ -30,15 +29,6 @@ private:
     static constexpr int ParameterCount = 8;  // drive bass mid treble presence master channel resonance
     static constexpr int RefreshFrames = 16;
 
-    // A linear filter (up to four biquads) with its own state per channel.
-    struct Filter {
-        eqband::Design design;
-        std::array<std::array<biquad::State, eqband::MaxSections>, 2> state{};
-        bool active = false;
-        float run(int channel, float x) noexcept;
-        void set(const eqband::Settings& settings, double rate) noexcept;
-    };
-
     // Preamp state for one channel, used inside the oversampler (4x rate).
     struct Preamp {
         int stages = 2;
@@ -61,7 +51,7 @@ private:
     std::array<Smoother, ParameterCount> smoothers;
     std::array<float, ParameterCount> applied{};   // values the filters were last built from
     int appliedChannel = -1;
-    Filter inputCut, tight, push, bright, scoop, bass, mid, treble, presence, resonance, outputCut;
+    PedalFilter inputCut, tight, push, bright, scoop, bass, mid, treble, presence, resonance, outputCut;
     std::array<Preamp, 2> preamps;
     std::array<Power, 2> powers;
     Oversampler4x preampOversampler, powerOversampler;
