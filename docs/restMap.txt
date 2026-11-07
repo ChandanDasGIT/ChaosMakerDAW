@@ -41,7 +41,7 @@ B. CHECKS IN THE REAL APP (need the user; JACK/hardware)
 [?] B7  Listen to Chaos EQ on real audio (solo, auto gain, stereo placement, analyzer).
 [?] B8  Built-in cabinet models in the app (renders in local-reference/renders/cab-*.wav).
 [?] B9  Listen to the harmonium (C7): renders in local-reference/renders/harmonium-*.wav, then
-        in the app (Harmonium track, INST button). Indian: tone balance already measured
+        in the app (Harmonium track, FX → Harmonium). Indian: tone balance already measured
         within ~3 dB of the two references in local-reference/harmonium/; Western: no
         reference, judge by ear. Note what to change (reeds, beating, bellows, case).
 
@@ -90,7 +90,8 @@ decoder (C4) and the piano (C5).
         reeds, drones) and Western reed organ (Bourdon 16', Diapason 8', Dulciana 8',
         Principal 4', Vox Humana tremolo). Track type "Harmonium" (instrumentfactory maps
         it), settings saved per track, edits reach the engine without a playback rebuild.
-        UI: INST chip on the track card opens HarmoniumEditor.qml. Tests: backendtests
+        UI: the Harmonium page in the track's FX panel (fixed, like GuitarSuite; each instrument
+        names its page in InstrumentDefinition::page). Tests: backendtests
         harmonium, harmoniumjson; wrappertests qtharmonium; transport_ui harmonium_panel_*.
         Worst case (32 keys + 4 drones, all ranks) ~2 % of one core.
 [ ] C8  Credits: the user's rule (2026-11-07): no third-party credit or attribution of any

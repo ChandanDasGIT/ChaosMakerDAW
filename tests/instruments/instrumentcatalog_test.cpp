@@ -44,3 +44,11 @@ TEST(instrumentcatalog, only_existing_live_guitar_variants_offer_guitar_processi
         }
     }
 }
+
+TEST(instrumentcatalog, instruments_with_controls_name_their_fx_page)
+{
+    CHECK(instrumentcatalog::find("Electric Guitar")->page == "guitarsuite");
+    CHECK(instrumentcatalog::find("Acoustic Guitar")->page == "guitarsuite");
+    CHECK(instrumentcatalog::find("Harmonium")->page == "harmonium");
+    for (const char* id : {"Piano", "Strings", "Drums"}) CHECK(instrumentcatalog::find(id)->page.empty());
+}

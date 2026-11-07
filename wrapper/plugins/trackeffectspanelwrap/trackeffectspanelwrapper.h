@@ -17,6 +17,7 @@ class TrackEffectsPanelWrapper : public QObject {
     Q_PROPERTY(bool hasLiveInput READ hasLiveInput WRITE setHasLiveInput NOTIFY trackChanged)
     Q_PROPERTY(bool recordDry READ recordDry WRITE setRecordDry NOTIFY recordDryChanged)
     Q_PROPERTY(bool supportsGuitarSuite READ supportsGuitarSuite NOTIFY capabilitiesChanged)
+    Q_PROPERTY(bool supportsHarmonium READ supportsHarmonium NOTIFY capabilitiesChanged)
     Q_PROPERTY(QString selectedEffect READ selectedEffect WRITE setSelectedEffect NOTIFY selectedEffectChanged)
     // The track's chain as the TrackListWrapper "effects" role gives it ([{id, type, ...}]).
     Q_PROPERTY(QVariantList chain READ chain WRITE setChain NOTIFY capabilitiesChanged)
@@ -42,6 +43,7 @@ public:
     void setRecordDry(bool dry);
 
     bool supportsGuitarSuite() const { return m_panel.supportsGuitarSuite(); }
+    bool supportsHarmonium() const { return m_panel.supportsHarmonium(); }
     QString selectedEffect() const { return QString::fromStdString(m_panel.selectedEffect()); }
     void setSelectedEffect(const QString& key);
 

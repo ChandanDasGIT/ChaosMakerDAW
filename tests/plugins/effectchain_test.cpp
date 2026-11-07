@@ -19,6 +19,7 @@ TEST(effectchain, only_instrument_tracks_start_with_their_instrument_fx)
     using List = std::vector<std::string>;
     CHECK(effectchain::initialEffects("Electric Guitar") == List{"guitarsuite"});
     CHECK(effectchain::initialEffects("Acoustic Guitar") == List{"guitarsuite"});
+    CHECK(effectchain::initialEffects("Harmonium") == List{"harmonium"});   // its page, like GuitarSuite
     for (const char* type : {"Vocal", "Audio", "Instrument", "Piano", "Strings", "Drums", "Unknown"})
         CHECK(effectchain::initialEffects(type).empty());
 }
@@ -85,4 +86,22 @@ TEST(effectchain, project_adds_removes_and_reorders_track_effects_without_undo)
     project.undo();
     CHECK(project.findTrack(vocalId));
     CHECK(types(*project.findTrack(vocalId)) == std::vector<std::string>{"eq"});
+}
+
+TEST(effectchain, harmonium_page_is_fixed_and_comes_back_on_older_files)
+{
+    std::vector<TrackEffectSlot> chain;
+    CHECK(!effectchain::canAdd(chain, "harmonium"));      // only placed on Harmonium tracks
+    CHECK(!effectchain::canRemove("harmonium"));
+    const auto* page = effectchain::find("harmonium");
+    CHECK(page && page->title == "Harmonium");
+
+    Project project;
+    auto& track = project.addTrack(TrackKind::Instrument, "Harmonium", "Harmonium");
+    CHECK(types(track) == (std::vector<std::string>{"harmonium"}));
+    CHECK(project.addTrackEffect(track.id, "eq") > 0);
+    // A file saved before the page existed lists only its effects: the page goes back in front.
+    CHECK(project.setTrackEffects(track.id, {"eq"}));
+    CHECK(types(track) == (std::vector<std::string>{"harmonium", "eq"}));
+    CHECK(!project.setTrackEffects(track.id, {"guitarsuite"}));   // not this instrument's page
 }

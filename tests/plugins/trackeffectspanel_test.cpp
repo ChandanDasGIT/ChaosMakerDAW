@@ -30,8 +30,18 @@ TEST(trackeffectspanel, state_and_record_mode_description) {
     panel.setTrackInfo(2, "Vocal Track", "Vocal", true, true);
     panel.setChain({});
     CHECK(!panel.supportsGuitarSuite());
+    CHECK(!panel.supportsHarmonium());
     CHECK(panel.selectedEffect().empty());
     panel.setSelectedEffect("guitarsuite");
     CHECK(panel.selectedEffect().empty());
     CHECK(panel.currentRecordModeDescription() == "Dry recording · current effects are applied during playback");
+}
+
+TEST(trackeffectspanel, harmonium_track_opens_on_its_harmonium_page) {
+    TrackEffectsPanel panel;
+    panel.setTrackInfo(3, "Harmonium", "Harmonium", false, false);
+    panel.setChain({"harmonium", "chaoseq"});
+    CHECK(panel.supportsHarmonium());
+    CHECK(!panel.supportsGuitarSuite());
+    CHECK(panel.selectedEffect() == "harmonium");
 }

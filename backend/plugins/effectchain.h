@@ -20,11 +20,14 @@ struct EffectDefinition {
 };
 
 // Rules for which effects a track has and may change. No track starts with effects except an
-// instrument track, which starts with its instrument's own FX (guitars: GuitarSuite).
+// instrument track, which starts with its instrument's own page (guitars: GuitarSuite,
+// harmonium: Harmonium; InstrumentDefinition::page).
 namespace effectchain {
 inline constexpr std::string_view Eq = "eq";
 inline constexpr std::string_view ChaosEq = "chaoseq";   // plan 6.2
 inline constexpr std::string_view GuitarSuite = "guitarsuite";
+// The harmonium's controls. A page only: the instrument itself plays first, before the effects.
+inline constexpr std::string_view Harmonium = "harmonium";
 
 // Every effect type, in the order an "Add FX" picker lists them.
 std::span<const EffectDefinition> effects();
