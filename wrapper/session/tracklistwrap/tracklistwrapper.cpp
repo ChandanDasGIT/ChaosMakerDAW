@@ -135,6 +135,7 @@ QVariant TrackListWrapper::data(const QModelIndex& index, int role) const
                 {QStringLiteral("id"), slot.id},
                 {QStringLiteral("type"), QString::fromStdString(slot.type)},
                 {QStringLiteral("title"), effect ? QString::fromUtf8(effect->title.data(), qsizetype(effect->title.size())) : QString()},
+                {QStringLiteral("subtitle"), effect ? QString::fromUtf8(effect->subtitle.data(), qsizetype(effect->subtitle.size())) : QString()},
                 {QStringLiteral("removable"), effectchain::canRemove(slot.type)}});
         }
         return result;

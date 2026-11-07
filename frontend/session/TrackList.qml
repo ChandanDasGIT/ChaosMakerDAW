@@ -103,6 +103,7 @@ Rectangle {
                     required property bool recordDry
                     required property bool recordsWithFx
                     required property var eqBands
+                    required property var effects
                     required property var clips
                     property bool renaming: false
                     readonly property bool isSelected: !!root.trackModel && root.trackModel.selectedTrackId === trackCard.trackId
@@ -366,11 +367,12 @@ Rectangle {
         inputPopup.card = card
         inputPopup.open()
     }
-    // The FX panel keeps the page (EQ or pedals) last shown for each track.
+    // The FX panel keeps the effect last shown for each track.
     function openEffects(card) {
         rememberEffectsPage()
         fxPopup.card = card
-        fxPopup.selectedEffect = effectsPageByTrack[card.trackId] ?? "eq"
+        // A track opened for the first time shows its chain's first effect (backend rule).
+        fxPopup.selectedEffect = effectsPageByTrack[card.trackId] ?? ""
         fxPopup.open()
     }
     function rememberEffectsPage() {
@@ -452,6 +454,7 @@ Rectangle {
         trackName: card ? card.name : ""
         trackType: card ? card.trackType : ""
         eqBands: card ? card.eqBands : []
+        effects: card ? card.effects : []
         hasLiveInput: card ? card.hasLiveInput : true
         recordDry: card ? card.recordDry : false
     }

@@ -1,27 +1,12 @@
 #include "trackeffectspanel.h"
-#include "instruments/instrumentcatalog.h"
+#include "plugins/effectchain.h"
 
-bool TrackEffectsPanel::checkGuitarSuiteSupport(std::string_view trackType, bool hasLiveInput)
-{
-    if (!hasLiveInput) {
-        return false;
-    }
-    if (trackType == "Vocal") {
-        return false;
-    }
-    const auto* inst = instrumentcatalog::find(trackType);
-    if (inst) {
-        return inst->supportsGuitarSuite;
-    }
-    return hasLiveInput && trackType != "Vocal";
-}
+#include <algorithm>
 
-std::string TrackEffectsPanel::validateSelectedEffect(std::string_view effectKey, bool supportsGuitarSuite)
+std::string TrackEffectsPanel::validateSelectedEffect(std::string_view effectKey, std::span<const std::string> chain)
 {
-    if (effectKey == "pedals" && supportsGuitarSuite) {
-        return "pedals";
-    }
-    return "eq";
+    if (std::find(chain.begin(), chain.end(), effectKey) != chain.end()) return std::string(effectKey);
+    return chain.empty() ? std::string() : chain.front();
 }
 
 std::string TrackEffectsPanel::recordModeDescription(bool recordDry)
@@ -31,24 +16,14 @@ std::string TrackEffectsPanel::recordModeDescription(bool recordDry)
         : "Print FX · effects are baked into new recordings";
 }
 
-std::vector<EffectEntry> TrackEffectsPanel::availableEntries(bool supportsGuitarSuite)
-{
-    std::vector<EffectEntry> entries;
-    entries.push_back({"eq", "Equalizer", "10-band tone shaping", true});
-    if (supportsGuitarSuite) {
-        entries.push_back({"pedals", "GuitarSuite", "Pedals and signal chain", true});
-    }
-    return entries;
-}
-
 bool TrackEffectsPanel::supportsGuitarSuite() const
 {
-    return checkGuitarSuiteSupport(m_trackType, m_hasLiveInput);
+    return std::find(m_chain.begin(), m_chain.end(), effectchain::GuitarSuite) != m_chain.end();
 }
 
 void TrackEffectsPanel::setSelectedEffect(std::string_view key)
 {
-    m_selectedEffect = validateSelectedEffect(key, supportsGuitarSuite());
+    m_selectedEffect = validateSelectedEffect(key, m_chain);
 }
 
 void TrackEffectsPanel::setTrackInfo(
@@ -63,12 +38,12 @@ void TrackEffectsPanel::setTrackInfo(
     m_trackType = std::move(trackType);
     m_hasLiveInput = hasLiveInput;
     m_recordDry = recordDry;
-    m_selectedEffect = validateSelectedEffect(m_selectedEffect, supportsGuitarSuite());
 }
 
-std::vector<EffectEntry> TrackEffectsPanel::effectEntries() const
+void TrackEffectsPanel::setChain(std::vector<std::string> chain)
 {
-    return availableEntries(supportsGuitarSuite());
+    m_chain = std::move(chain);
+    m_selectedEffect = validateSelectedEffect(m_selectedEffect, m_chain);
 }
 
 std::string TrackEffectsPanel::currentRecordModeDescription() const

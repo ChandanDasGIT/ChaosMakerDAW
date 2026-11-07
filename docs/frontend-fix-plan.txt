@@ -12,9 +12,9 @@ RESUME HERE (last updated 2026-11-07)
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
 Phase 4 done (4.4 not needed). Track list minimum width settled: chips wrap (see 4.5).
 Phase 5 done (5.1–5.3).
-Next: Phase 6 (user requests). 6.1 steps 1-4 done; next is step 5 (FX panel: chain,
-"Add FX" picker, remove, drag to reorder). Added 2026-11-07: 6.4 stop-at-end setting (done),
-6.5 time readout with 2 digits (done).
+Next: Phase 6 (user requests). 6.1 done; next is 6.6 (default recording mode, Dry),
+then 6.2 and 6.3. Added 2026-11-07: 6.4 stop-at-end setting (done),
+6.5 time readout with 2 digits (done), 6.6 default recording mode (Dry).
 
 Decisions made by the user (keep to them):
 - Mixer: track strips have NO track volume fader. Each strip's vertical fader is clip gain
@@ -412,7 +412,7 @@ PHASE 5 — Performance
 
 PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
 -------------------------------------------------------------------
-[ ] 6.1  FX per track type, chosen by the user. Today the FX panel always lists the
+[x] 6.1  FX per track type, chosen by the user. Today the FX panel always lists the
          10-band EQ (built into every track: Track::eqGainDb, always run by the engine)
          plus GuitarSuite when supported. Wanted: a guitar track (electric or acoustic)
          opens with GuitarSuite, and the user picks which other FX to add.
@@ -448,8 +448,14 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
                "effects" ([{id, type, title, removable}]), addTrackEffect / removeTrackEffect /
                moveTrackEffect, addableEffects(trackId) for the picker; backend TrackList
                refuses edits on a recording track. Changes reach the engine via projectChanged.
-         [ ] 5 FX panel: show the chain, "Add FX" picker, remove (not GuitarSuite), drag to
-               reorder.
+         [x] 5 FX panel (user chose the chain sidebar): the sidebar lists the chain top to
+               bottom; click to edit, drag the grip to reorder, remove button (not on
+               GuitarSuite), "+ Add FX" picker; empty chain shows hints. The search box went
+               away. TrackEffectsPanel (backend) selects within the chain: first effect when
+               none chosen, "" for an empty chain. Page keys are effect types ("eq",
+               "guitarsuite"; "pedals" is gone).
+               Also fixed: the 5.2 main-window UI test left the harness window unfocused, so
+               the colour-picker test failed in full-suite runs; it now hands focus back.
 [ ] 6.2  A professional parametric EQ plugin in the spirit of FabFilter Pro-Q 3 (our own
          design and name, not a copy of its look or branding). Interactive curve with
          draggable band nodes, many band shapes (bell, shelves, cuts with slopes, notch,
@@ -477,6 +483,10 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
          Formatters: backend/core/valueformat.cpp (elapsed time) and
          backend/engine/playbackcontrols.cpp:244; check every readout using them
          (transport bar, status strip, etc.) and their tests.
+[ ] 6.6  Preference: default recording mode for new tracks, "Print FX" or "Dry · editable
+         FX" (user request 2026-11-07); the default is Dry. Today Project::addTrack sets
+         recordDry only for "Audio" tracks. Saved in AppSettings, shown in Preferences;
+         each track can still be switched in its FX panel.
 
 Suggested order: 1.1 → 1.2 → 1.4 → 1.9 → 1.8 → 1.3 → 1.5 → 1.6/1.7, then Phase 2
 (2.1 together with 1.3), then Phases 3–5.
