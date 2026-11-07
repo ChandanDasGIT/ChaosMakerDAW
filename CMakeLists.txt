@@ -183,6 +183,9 @@ if(DAW_BUILD_APP)
                 PREFIX "/GuitarSuitePresets"
                 BASE "${CMAKE_CURRENT_LIST_DIR}/resources/presets/guitarsuite"
                 FILES resources/presets/guitarsuite/Djent.gspreset
+                      resources/presets/guitarsuite/MetalSolo.gspreset
+                      resources/presets/guitarsuite/RockChords.gspreset
+                      resources/presets/guitarsuite/RockSolo.gspreset
                       resources/presets/guitarsuite/Jazz.gspreset)
         endif()
     endforeach()
