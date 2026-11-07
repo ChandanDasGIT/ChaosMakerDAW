@@ -21,6 +21,15 @@ Fft::Fft(int size)
     }
 }
 
+void Fft::inverse(std::complex<double>* data) const noexcept
+{
+    // conj(FFT(conj(x))) / N is the inverse transform.
+    for (int i = 0; i < m_size; ++i) data[i] = std::conj(data[i]);
+    forward(data);
+    const double scale = 1.0 / m_size;
+    for (int i = 0; i < m_size; ++i) data[i] = std::conj(data[i]) * scale;
+}
+
 void Fft::forward(std::complex<double>* data) const noexcept
 {
     for (int i = 0; i < m_size; ++i) {

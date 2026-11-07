@@ -44,6 +44,19 @@ TEST(fft, matches_the_textbook_dft)
     }
 }
 
+TEST(fft, inverse_undoes_forward)
+{
+    Fft fft(1024);
+    std::vector<std::complex<double>> x(1024);
+    for (std::size_t i = 0; i < x.size(); ++i) x[i] = {std::sin(0.37 * double(i)), std::cos(0.11 * double(i)) * 0.5};
+    auto y = x;
+    fft.forward(y.data());
+    fft.inverse(y.data());
+    double worst = 0.0;
+    for (std::size_t i = 0; i < x.size(); ++i) worst = std::max(worst, std::abs(y[i] - x[i]));
+    CHECK(worst < 1e-12);
+}
+
 TEST(fft, impulse_is_flat_and_a_sine_lands_in_its_bin)
 {
     Fft fft(32);
