@@ -88,9 +88,16 @@ decoder (C4) and the piano (C5).
         Tuning step 1 done 2026-11-08: the Indian reed is a free-reed air-puff model (lopsided
         Hann pulse, derivative radiated; puff width 0.30 at full air, 0.55 at low air), fitted
         to single notes of the references; the old flat overtone stack was the buzz.
-        TUNING STEP 2, NEXT: calm the roughness: per-key detune scatter +-1.5 -> ~0.5 cent,
-        softer drone brightness, check the case reflections (2.9-6.9 ms taps on the dry sound
+        TUNING STEP 2: calm the roughness. 2a done 2026-11-08 (the user liked it): per-key
+        detune scatter +-1.5 -> +-0.5 cent (reedvoice.cpp; start phases unchanged). NEXT: 2b
+        softer drone brightness, 2c check the case reflections (2.9-6.9 ms taps on the dry sound
         can sound hollow on a bright tone). A short A/B render for the user after each change.
+        SUSTAIN, added 2026-11-08 (the user's idea): a released key keeps ringing, full level for
+        half of Settings::sustainSeconds, then fades to silence over sustainSeconds; the next key
+        cuts the tail (20 ms). A key let go while a newer key (>80 ms newer) is held ends at once
+        (legato), so a chord let go note by note still sustains. Default 1.5 s on new tracks
+        (the user's choice); files saved before it load with 0 (plain release). Slider "Sustain"
+        on the Harmonium page (0 = Off, up to 4 s). Waiting for the user's test in the app.
         backend/instruments/harmonium/: reedwave (band-limited reed tables, soft/full air),
         reedvoice (one key, all ranks, stops fade on held keys), harmonium (Processor: bellows
         with pumping and reservoir sag, pressure -> level/brightness/flatness, breathy attack,

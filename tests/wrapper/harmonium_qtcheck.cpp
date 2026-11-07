@@ -117,6 +117,12 @@ TEST(qtharmonium, wrapper_edits_the_track_and_follows_other_panels)
     a.setTranspose(99);
     CHECK(a.transpose() == harmonium::MaxTranspose);
 
+    CHECK(a.sustain() == 1.5 && a.maxSustain() == harmonium::MaxSustainSeconds);
+    a.setSustain(0.5);
+    CHECK(tracks.harmonium(id)->sustainSeconds == 0.5 && b.sustain() == 0.5);
+    a.setSustain(-3.0);                                          // clamped to what is stored
+    CHECK(a.sustain() == 0.0);
+
     CHECK(a.setDrone(0, 48) && a.setDrone(3, 55));
     CHECK(!a.setDrone(4, 50) && !a.setDrone(1, 128) && !a.setDrone(1, -2));
     CHECK(a.drones() == QVariantList({48, -1, -1, 55}));
@@ -191,6 +197,15 @@ TEST(qtharmonium, mon_lets_a_midi_keyboard_play_the_harmonium)
     keyboard->midi.add({0, 0x90, 60, 100});                      // transport stopped
     CHECK(keyboard->play(40) > 1e-3f);                           // the harmonium sounds
     keyboard->midi.add({0, 0x80, 60, 0});
+    keyboard->play(150);
+    CHECK(keyboard->play(10) > 1e-3f);                           // a new track sustains the key
+
+    HarmoniumWrapper panel;
+    panel.setTrackModel(&tracks); panel.setTrackId(harmonium);
+    panel.setSustain(0.0);                                       // a plain harmonium
+    keyboard->midi.add({0, 0x90, 62, 100});                      // the next key cuts the tail
+    CHECK(keyboard->play(40) > 1e-3f);
+    keyboard->midi.add({0, 0x80, 62, 0});
     keyboard->play(150);                                         // the reed rings out (~0.28 s to -80 dB)
     CHECK(keyboard->play(10) < 1e-4f);                           // and stops with the key
 

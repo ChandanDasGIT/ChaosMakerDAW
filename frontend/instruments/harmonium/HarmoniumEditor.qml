@@ -220,6 +220,16 @@ Item {
                         onMoved: v => bridge.keyClick = v
                     }
                     ValueSlider {
+                        objectName: "harmoniumSustain"
+                        label: "Sustain"
+                        valueText: value < 0.05 ? "Off" : value.toFixed(1) + " s"
+                        to: bridge.maxSustain
+                        stepSize: 0.1
+                        value: bridge.sustain
+                        tooltip: "A key you let go keeps ringing, then fades. The next key cuts it."
+                        onMoved: v => bridge.sustain = v
+                    }
+                    ValueSlider {
                         objectName: "harmoniumVolume"
                         label: "Volume"
                         valueText: (value > 0 ? "+" : "") + value.toFixed(1) + " dB"

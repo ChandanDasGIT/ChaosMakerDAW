@@ -16,6 +16,8 @@
 //               sags a little when many reeds play. More air: louder, brighter, a little flat.
 //   stops       open and close their reed set on held keys too, in about 15 ms
 //   drones      up to four keys that sound until the drone is turned off
+//   sustain     a released key keeps ringing (Settings::sustainSeconds) unless the player has
+//               already moved on to a newer key; the next key pressed cuts the tail
 //   transpose   the scale changer: moves every key, drones included
 //   output      added to the buffer: channels 0 and 1 get the stereo mix, a mono buffer the sum
 //
@@ -46,6 +48,7 @@ private:
     void handle(const MidiEvent& event) noexcept;
     void noteOn(int key) noexcept;
     void noteOff(int key) noexcept;
+    bool movedOn(std::size_t voice) const noexcept;
     void allNotesOff() noexcept;
     void allSoundOff() noexcept;
     harmonium::ReedVoice* voiceFor(int key) noexcept;
@@ -61,13 +64,15 @@ private:
     struct Params {
         Parameter *style, *bass, *male, *female, *bourdon16, *diapason8, *dulciana8, *principal4,
                   *voxHumana, *bellows, *pumping, *beating, *airNoise, *keyClick, *caseResonance,
-                  *transpose, *volume;
+                  *transpose, *volume, *sustain;
         std::array<Parameter*, harmonium::DroneCount> drones;
     } m_p{};
 
     double m_sampleRate = 48000.0;
     std::array<harmonium::ReedVoice, PoolSize> m_voices{};
     std::array<std::uint64_t, PoolSize> m_started{};
+    std::array<std::uint64_t, PoolSize> m_startFrame{};      // when each key went down
+    std::uint64_t m_now = 0;                                // frames rendered since reset
     std::array<harmonium::ReedVoice, harmonium::DroneCount> m_drones{};
     std::uint64_t m_clock = 0;
 

@@ -45,7 +45,7 @@ json toJson(const harmonium::Settings& s)
                          {"voxHumana", s.western.voxHumana}}},
             {"bellows", s.bellows}, {"pumping", s.pumping}, {"beating", s.beatingCents},
             {"airNoise", s.airNoise}, {"keyClick", s.keyClick}, {"case", s.caseResonance},
-            {"transpose", s.transpose}, {"volume", s.volumeDb},
+            {"sustain", s.sustainSeconds}, {"transpose", s.transpose}, {"volume", s.volumeDb},
             {"drones", json(s.drones)}};
 }
 
@@ -54,6 +54,7 @@ bool fromJson(const json& j, harmonium::Settings& settings, std::string& error)
     error = "Invalid harmonium settings.";
     if (!j.is_object()) return false;
     harmonium::Settings r;
+    r.sustainSeconds = 0.0;      // files from before sustain existed play as they always did
 
     if (j.contains("style")) {
         if (!j["style"].is_string() || !harmonium::styleFromName(j["style"].get<std::string>(), r.style)) return false;
@@ -74,6 +75,7 @@ bool fromJson(const json& j, harmonium::Settings& settings, std::string& error)
         || !number(j, "beating", 0.0, harmonium::MaxBeatingCents, r.beatingCents)
         || !number(j, "airNoise", 0.0, 1.0, r.airNoise) || !number(j, "keyClick", 0.0, 1.0, r.keyClick)
         || !number(j, "case", 0.0, 1.0, r.caseResonance)
+        || !number(j, "sustain", 0.0, harmonium::MaxSustainSeconds, r.sustainSeconds)
         || !number(j, "volume", harmonium::MinVolumeDb, harmonium::MaxVolumeDb, r.volumeDb))
         return false;
 

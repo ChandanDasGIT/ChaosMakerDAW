@@ -34,6 +34,7 @@ class HarmoniumWrapper : public QObject {
     Q_PROPERTY(double airNoise READ airNoise WRITE setAirNoise NOTIFY settingsChanged)      // 0..1
     Q_PROPERTY(double keyClick READ keyClick WRITE setKeyClick NOTIFY settingsChanged)      // 0..1
     Q_PROPERTY(double caseResonance READ caseResonance WRITE setCaseResonance NOTIFY settingsChanged)
+    Q_PROPERTY(double sustain READ sustain WRITE setSustain NOTIFY settingsChanged)         // seconds
     Q_PROPERTY(int transpose READ transpose WRITE setTranspose NOTIFY settingsChanged)      // semitones
     Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY settingsChanged)            // dB
     Q_PROPERTY(QVariantList drones READ drones NOTIFY settingsChanged)  // 4 MIDI keys, -1 = off
@@ -42,6 +43,7 @@ class HarmoniumWrapper : public QObject {
     Q_PROPERTY(int droneCount READ droneCount CONSTANT)
     Q_PROPERTY(int maxTranspose READ maxTranspose CONSTANT)
     Q_PROPERTY(double maxBeating READ maxBeating CONSTANT)
+    Q_PROPERTY(double maxSustain READ maxSustain CONSTANT)
     Q_PROPERTY(double minVolume READ minVolume CONSTANT)
     Q_PROPERTY(double maxVolume READ maxVolume CONSTANT)
 
@@ -84,6 +86,8 @@ public:
     void setKeyClick(double v) { edit([v](auto& s) { s.keyClick = v; }); }
     double caseResonance() const { return m_s.caseResonance; }
     void setCaseResonance(double v) { edit([v](auto& s) { s.caseResonance = v; }); }
+    double sustain() const { return m_s.sustainSeconds; }
+    void setSustain(double v) { edit([v](auto& s) { s.sustainSeconds = v; }); }
     int transpose() const { return m_s.transpose; }
     void setTranspose(int v) { edit([v](auto& s) { s.transpose = v; }); }
     double volume() const { return m_s.volumeDb; }
@@ -94,6 +98,7 @@ public:
     int droneCount() const { return harmonium::DroneCount; }
     int maxTranspose() const { return harmonium::MaxTranspose; }
     double maxBeating() const { return harmonium::MaxBeatingCents; }
+    double maxSustain() const { return harmonium::MaxSustainSeconds; }
     double minVolume() const { return harmonium::MinVolumeDb; }
     double maxVolume() const { return harmonium::MaxVolumeDb; }
 

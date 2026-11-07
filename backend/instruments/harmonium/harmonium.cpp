@@ -53,6 +53,7 @@ Harmonium::Harmonium()
     for (int i = 0; i < DroneCount; ++i)
         m_p.drones[std::size_t(i)] = &addParameter("drone" + std::to_string(i + 1),
                                                    "Drone " + std::to_string(i + 1), -1, 127, -1);
+    m_p.sustain = &addParameter("sustain", "Sustain", 0, float(MaxSustainSeconds), float(d.sustainSeconds), "s");
     prepare(48000.0, 1024);
 }
 
@@ -68,6 +69,7 @@ void Harmonium::setSettings(const Settings& input) noexcept
     m_p.beating->set(float(s.beatingCents)); m_p.airNoise->set(float(s.airNoise));
     m_p.keyClick->set(float(s.keyClick)); m_p.caseResonance->set(float(s.caseResonance));
     m_p.transpose->set(float(s.transpose)); m_p.volume->set(float(s.volumeDb));
+    m_p.sustain->set(float(s.sustainSeconds));
     for (int i = 0; i < DroneCount; ++i) m_p.drones[std::size_t(i)]->set(float(s.drones[std::size_t(i)]));
 }
 
@@ -81,6 +83,7 @@ Settings Harmonium::settings() const noexcept
     s.beatingCents = m_p.beating->get(); s.airNoise = m_p.airNoise->get();
     s.keyClick = m_p.keyClick->get(); s.caseResonance = m_p.caseResonance->get();
     s.transpose = int(std::lround(m_p.transpose->get())); s.volumeDb = m_p.volume->get();
+    s.sustainSeconds = m_p.sustain->get();
     for (int i = 0; i < DroneCount; ++i) s.drones[std::size_t(i)] = int(std::lround(m_p.drones[std::size_t(i)]->get()));
     return s;
 }
@@ -105,7 +108,9 @@ void Harmonium::reset() noexcept
     for (auto& v : m_voices) v.stop();
     for (auto& v : m_drones) v.stop();
     m_started.fill(0);
+    m_startFrame.fill(0);
     m_clock = 0;
+    m_now = 0;
     m_expression = m_breath = 1.0f;
     m_pressure = m_pressureTarget = 0.0f;
     m_pumpPhase = m_tremoloPhase = 0.0;
@@ -251,22 +256,45 @@ void Harmonium::noteOn(int key) noexcept
     auto* voice = voiceFor(key);
     if (!voice || voice->soundingKey() != sounding) voice = freeVoice();
     if (!voice) return;
+    for (auto& v : m_voices)                                // playing on ends the sustain tails
+        if (&v != voice) v.cutTail();
     voice->start(key, sounding, m_ranks, m_sampleRate, attackSeconds(sounding));
-    m_started[std::size_t(voice - m_voices.data())] = ++m_clock;
+    const auto index = std::size_t(voice - m_voices.data());
+    m_started[index] = ++m_clock;
+    m_startFrame[index] = m_now;
     m_click = std::min(m_click + 1.0f, 2.0f);
+}
+
+// The player has moved on from a key when a newer one is held. Keys of one chord go down within
+// a short window of each other, so letting go of a chord note by note still sustains.
+bool Harmonium::movedOn(std::size_t voice) const noexcept
+{
+    const auto window = std::uint64_t(0.08 * m_sampleRate);
+    for (std::size_t j = 0; j < m_voices.size(); ++j) {
+        const auto& v = m_voices[j];
+        if (j != voice && v.active() && !v.releasing() && m_startFrame[j] > m_startFrame[voice] + window)
+            return true;
+    }
+    return false;
 }
 
 void Harmonium::noteOff(int key) noexcept
 {
+    const double sustain = m_p.sustain->get();
     bool released = false;
-    for (auto& v : m_voices)
-        if (v.active() && !v.releasing() && v.inputKey() == key) { v.release(); released = true; }
+    for (std::size_t i = 0; i < m_voices.size(); ++i) {
+        auto& v = m_voices[i];
+        if (!v.active() || v.releasing() || v.inputKey() != key) continue;
+        if (sustain > 0.01 && !movedOn(i)) v.sustain(0.5 * sustain, sustain);
+        else v.release();
+        released = true;
+    }
     if (released) m_click = std::min(m_click + 0.5f, 2.0f);     // the key coming back up
 }
 
 void Harmonium::allNotesOff() noexcept
 {
-    for (auto& v : m_voices) v.release();
+    for (auto& v : m_voices) { v.release(); v.cutTail(); }
 }
 
 void Harmonium::allSoundOff() noexcept
@@ -356,6 +384,7 @@ void Harmonium::renderRange(const AudioView& audio, int start, int end) noexcept
         const int frames = std::min(Block, end - start);
         std::array<float, Block> l{}, r{};
         renderBlock(l.data(), r.data(), frames);
+        m_now += std::uint64_t(frames);
         if (audio.channelCount == 1) {
             for (int i = 0; i < frames; ++i) audio.channel(0)[start + i] += 0.5f * (l[std::size_t(i)] + r[std::size_t(i)]);
         } else {
