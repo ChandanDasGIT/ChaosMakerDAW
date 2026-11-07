@@ -12,8 +12,8 @@ RESUME HERE (last updated 2026-11-07)
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
 Phase 4 done (4.4 not needed). Track list minimum width settled: chips wrap (see 4.5).
 Phase 5 done (5.1–5.3).
-Next: Phase 6 (user requests). 6.1 decisions recorded; implementation next, starting with
-step 1 (backend per-track effect list). Added 2026-11-07: 6.4 stop-at-end setting (done),
+Next: Phase 6 (user requests). 6.1 step 1 done; next is step 2 (engine builds the chain
+from the list). Added 2026-11-07: 6.4 stop-at-end setting (done),
 6.5 time readout with 2 digits (done).
 
 Decisions made by the user (keep to them):
@@ -431,6 +431,17 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
          - The user reorders effects freely; the chain runs top to bottom.
          - No undo for FX add / remove / reorder; changes apply immediately.
          - Old projects: keep the EQ on a track when its bands are not flat (from above).
+         Steps:
+         [x] 1 Backend model: Track::effects (ordered TrackEffectSlot list) and the rules in
+               backend/plugins/effectchain (initial FX per track type, EQ addable once,
+               GuitarSuite fixed and never added); Project add/remove/move, no undo.
+         [ ] 2 Engine: build each track's processing chain from the list (EQ runs only when
+               on the chain).
+         [ ] 3 Save/load the list in project and session files; old projects keep a non-flat
+               EQ, guitar tracks always get GuitarSuite.
+         [ ] 4 Wrapper: expose the list and add/remove/move to QML.
+         [ ] 5 FX panel: show the chain, "Add FX" picker, remove (not GuitarSuite), drag to
+               reorder.
 [ ] 6.2  A professional parametric EQ plugin in the spirit of FabFilter Pro-Q 3 (our own
          design and name, not a copy of its look or branding). Interactive curve with
          draggable band nodes, many band shapes (bell, shelves, cuts with slopes, notch,
