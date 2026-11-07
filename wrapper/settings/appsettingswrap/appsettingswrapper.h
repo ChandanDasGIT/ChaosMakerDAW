@@ -12,6 +12,9 @@ class AppSettingsWrapper : public QObject {
     // "Restore session on startup" is owned by EngineController (it applies the setting);
     // this wrapper does not keep a second copy of it.
     Q_PROPERTY(QString pianoRollPresentation READ pianoRollPresentation WRITE setPianoRollPresentation NOTIFY pianoRollPresentationChanged)
+    // Recording mode new tracks start with: "dry" (default) or "print" (plan 6.6)
+    Q_PROPERTY(QString defaultRecordMode READ defaultRecordMode WRITE setDefaultRecordMode NOTIFY defaultRecordModeChanged)
+    Q_PROPERTY(bool recordDryByDefault READ recordDryByDefault NOTIFY defaultRecordModeChanged)
     Q_PROPERTY(QString defaultProjectDirectory READ defaultProjectDirectory WRITE setDefaultProjectDirectory NOTIFY defaultProjectDirectoryChanged)
     Q_PROPERTY(bool autoSaveEnabled READ autoSaveEnabled WRITE setAutoSaveEnabled NOTIFY autoSaveChanged)
     Q_PROPERTY(int autoSaveIntervalSeconds READ autoSaveIntervalSeconds WRITE setAutoSaveIntervalSeconds NOTIFY autoSaveChanged)
@@ -29,6 +32,10 @@ public:
 
     QString pianoRollPresentation() const;
     void setPianoRollPresentation(const QString& presentation);
+
+    QString defaultRecordMode() const { return QString::fromStdString(m_settings.defaultRecordMode()); }
+    void setDefaultRecordMode(const QString& mode);
+    bool recordDryByDefault() const noexcept { return m_settings.recordDryByDefault(); }
 
     QString defaultProjectDirectory() const;
     void setDefaultProjectDirectory(const QString& path);
@@ -55,6 +62,7 @@ public:
 
 signals:
     void pianoRollPresentationChanged();
+    void defaultRecordModeChanged();
     void defaultProjectDirectoryChanged();
     void autoSaveChanged();
     void layoutSizesChanged();

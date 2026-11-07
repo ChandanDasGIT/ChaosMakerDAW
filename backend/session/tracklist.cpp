@@ -80,7 +80,9 @@ void TrackList::replaceDocument(Project project, AudioMap audio, MediaPaths path
 
 void TrackList::adoptDocument(TrackList&& candidate)
 {
+    const auto newTrackRecordDry = m_newTrackRecordDry; // an app preference, not part of the document
     *this = std::move(candidate);
+    m_newTrackRecordDry = newTrackRecordDry;
     m_recordingTracks.clear();
     m_project.clearHistory();
 }
@@ -101,28 +103,33 @@ std::vector<TrackList::TrackChoice> TrackList::instrumentChoices()
 bool TrackList::isInstrumentType(const std::string& type) { return instrumentcatalog::find(type); }
 bool TrackList::canAddChoice(const std::string& id) const { return id == "Vocal" || isInstrumentType(id); }
 int TrackList::addTrackChoice(const std::string& id) { return id == "Vocal" ? addVocalTrack() : addInstrumentTrackOfType(id); }
+int TrackList::startTrack(Track& track)
+{
+    if (m_newTrackRecordDry) track.recordDry = *m_newTrackRecordDry;
+    return track.id;
+}
 int TrackList::addAudioTrack()
 {
-    const int id = m_project.addTrack(TrackKind::Audio, "Audio " + std::to_string(m_nextAudioNumber++), "Audio").id;
+    const int id = startTrack(m_project.addTrack(TrackKind::Audio, "Audio " + std::to_string(m_nextAudioNumber++), "Audio"));
     if (m_selectedTrackId < 0) m_selectedTrackId = id;
     return id;
 }
 int TrackList::addVocalTrack()
 {
-    const int id = m_project.addTrack(TrackKind::Audio, "Vocal " + std::to_string(m_nextVocalNumber++), "Vocal").id;
+    const int id = startTrack(m_project.addTrack(TrackKind::Audio, "Vocal " + std::to_string(m_nextVocalNumber++), "Vocal"));
     if (m_selectedTrackId < 0) m_selectedTrackId = id;
     return id;
 }
 int TrackList::addInstrumentTrack()
 {
-    const int id = m_project.addTrack(TrackKind::Instrument, "Instrument " + std::to_string(m_nextInstrumentNumber++), "Instrument").id;
+    const int id = startTrack(m_project.addTrack(TrackKind::Instrument, "Instrument " + std::to_string(m_nextInstrumentNumber++), "Instrument"));
     if (m_selectedTrackId < 0) m_selectedTrackId = id;
     return id;
 }
 int TrackList::addInstrumentTrackOfType(const std::string& type)
 {
     if (!isInstrumentType(type)) return -1;
-    const int id = m_project.addTrack(TrackKind::Instrument, type + ' ' + std::to_string(++m_instrumentNumbers[type]), type).id;
+    const int id = startTrack(m_project.addTrack(TrackKind::Instrument, type + ' ' + std::to_string(++m_instrumentNumbers[type]), type));
     if (m_selectedTrackId < 0) m_selectedTrackId = id;
     return id;
 }

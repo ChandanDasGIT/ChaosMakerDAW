@@ -423,6 +423,14 @@ bool TrackListWrapper::setEqBand(int id, int band, double gain)
     return change.accepted;
 }
 
+void TrackListWrapper::setNewTrackRecordDry(bool dry)
+{
+    m_state.setNewTrackRecordDry(dry);
+    if (m_newTrackRecordDry == dry) return;
+    m_newTrackRecordDry = dry;
+    emit newTrackRecordDryChanged();
+}
+
 int TrackListWrapper::addTrackEffect(int trackId, const QString& type)
 {
     const int id = m_state.addTrackEffect(trackId, type.toStdString());

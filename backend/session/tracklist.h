@@ -92,6 +92,10 @@ public:
     Change setPan(int id, double pan);
     Change setStripWidth(int id, double width);
     Change setEqBand(int id, int band, double gainDb);
+    // Recording mode for tracks the user adds from now on (the "default recording mode"
+    // preference); unset keeps Project's rule (dry only for plain Audio tracks). Loaded tracks
+    // keep their saved mode.
+    void setNewTrackRecordDry(std::optional<bool> dry) { m_newTrackRecordDry = dry; }
     // Insert effects (plan 6.1); refused on a track that is recording. Not undoable.
     int addTrackEffect(int trackId, const std::string& type); // new effect id, or -1
     Change removeTrackEffect(int trackId, int effectId);
@@ -160,6 +164,8 @@ private:
     AudioMap m_audio;
     MediaPaths m_mediaPaths;
     std::unordered_set<int> m_recordingTracks;
+    std::optional<bool> m_newTrackRecordDry;
+    int startTrack(Track& track); // applies new-track defaults, returns the id
     std::vector<ClipboardClip> m_clipboard;
     int m_selectedTrackId = -1;
     int m_selectedClipId = -1;

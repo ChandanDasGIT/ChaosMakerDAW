@@ -343,3 +343,25 @@ TEST(tracklist, set_strip_width_clamps_to_the_mixer_limits)
     CHECK(!tracks.setStripWidth(id, std::numeric_limits<double>::infinity()).accepted);
     CHECK(!tracks.setStripWidth(id + 50, 120.0).accepted);
 }
+
+TEST(tracklist, new_tracks_follow_the_default_record_mode_and_loaded_tracks_keep_theirs)
+{
+    TrackList tracks;
+    // No preference set: Project's rule (dry only for plain Audio tracks).
+    CHECK(!tracks.project().findTrack(tracks.addVocalTrack())->recordDry);
+    CHECK(tracks.project().findTrack(tracks.addAudioTrack())->recordDry);
+    // The preference applies to every track the user adds from now on.
+    tracks.setNewTrackRecordDry(true);
+    const int vocal = tracks.addVocalTrack(), guitar = tracks.addInstrumentTrackOfType("Electric Guitar");
+    CHECK(tracks.project().findTrack(vocal)->recordDry && tracks.project().findTrack(guitar)->recordDry);
+    tracks.setNewTrackRecordDry(false);
+    CHECK(!tracks.project().findTrack(tracks.addAudioTrack())->recordDry);
+    CHECK(tracks.project().findTrack(vocal)->recordDry);           // existing tracks keep their mode
+    // Opening another document keeps the preference (it is not part of the document).
+    tracks.setNewTrackRecordDry(true);
+    TrackList other;
+    const int saved = other.addVocalTrack();                       // saved in Print mode
+    tracks.adoptDocument(std::move(other));
+    CHECK(!tracks.project().findTrack(saved)->recordDry);
+    CHECK(tracks.project().findTrack(tracks.addVocalTrack())->recordDry);
+}

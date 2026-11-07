@@ -15,7 +15,11 @@ Window {
     palette.toolTipBase: Theme.tooltipBg
     palette.toolTipText: Theme.tooltipText
 
-    TrackListWrapper { id: trackModel }
+    TrackListWrapper {
+        id: trackModel
+        // New tracks start in the recording mode chosen in Preferences (plan 6.6).
+        newTrackRecordDry: window.layoutSettings.recordDryByDefault
+    }
 
     property int activePianoRollTrackId: -1
     property int activePianoRollClipId: -1

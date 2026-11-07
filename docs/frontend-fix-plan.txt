@@ -12,8 +12,8 @@ RESUME HERE (last updated 2026-11-07)
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
 Phase 4 done (4.4 not needed). Track list minimum width settled: chips wrap (see 4.5).
 Phase 5 done (5.1–5.3).
-Next: Phase 6 (user requests). 6.1 done; next is 6.6 (default recording mode, Dry),
-then 6.2 and 6.3. Added 2026-11-07: 6.4 stop-at-end setting (done),
+Next: Phase 6 (user requests). 6.1, 6.4, 6.5, 6.6 done; next are 6.2 (pro EQ) and
+6.3 (guitar suite sound), both need questions answered first. Added 2026-11-07: 6.4 stop-at-end setting (done),
 6.5 time readout with 2 digits (done), 6.6 default recording mode (Dry).
 
 Decisions made by the user (keep to them):
@@ -483,10 +483,13 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
          Formatters: backend/core/valueformat.cpp (elapsed time) and
          backend/engine/playbackcontrols.cpp:244; check every readout using them
          (transport bar, status strip, etc.) and their tests.
-[ ] 6.6  Preference: default recording mode for new tracks, "Print FX" or "Dry · editable
-         FX" (user request 2026-11-07); the default is Dry. Today Project::addTrack sets
-         recordDry only for "Audio" tracks. Saved in AppSettings, shown in Preferences;
-         each track can still be switched in its FX panel.
+[x] 6.6  Preference: default recording mode for new tracks, "Print FX" or "Dry · editable
+         FX" (user request 2026-11-07); the default is Dry.
+         Done: AppSettings "recording/defaultMode" ("dry" default, or "print"); Preferences >
+         Recording radio buttons; Main.qml binds TrackListWrapper.newTrackRecordDry to it and
+         the backend TrackList applies it to tracks the user adds (kept across opening a
+         project). Loaded tracks keep their saved mode; each track can still be switched in
+         its FX panel. Without the binding (tests) the old rule stays: dry only for Audio.
 
 Suggested order: 1.1 → 1.2 → 1.4 → 1.9 → 1.8 → 1.3 → 1.5 → 1.6/1.7, then Phase 2
 (2.1 together with 1.3), then Phases 3–5.

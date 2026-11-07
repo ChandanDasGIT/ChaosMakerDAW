@@ -146,3 +146,25 @@ TEST(appsettings, layout_sizes_default_clamp_and_round_trip)
     loaded.resetToDefaults();
     CHECK(loaded.trackListWidth() == 230.0 && loaded.mixerHeight() == 180.0 && loaded.pianoRollDockHeight() == 380.0);
 }
+
+TEST(appsettings, default_record_mode_is_dry_validated_and_round_trips)
+{
+    AppSettings settings;
+    CHECK(settings.defaultRecordMode() == "dry");                 // user choice: Dry by default
+    CHECK(settings.recordDryByDefault());
+    settings.setDefaultRecordMode("print");
+    CHECK(settings.defaultRecordMode() == "print" && !settings.recordDryByDefault());
+    settings.setDefaultRecordMode("wet");                         // unknown: ignored
+    CHECK(settings.defaultRecordMode() == "print");
+    CHECK(settings.exportValue(AppSettings::KeyDefaultRecordMode) == "print");
+
+    AppSettings loaded;
+    CHECK(loaded.deserialize(settings.serialize()));
+    CHECK(loaded.defaultRecordMode() == "print");
+    loaded.importValue(AppSettings::KeyDefaultRecordMode, " dry ");
+    CHECK(loaded.defaultRecordMode() == "dry");
+    loaded.importValue(AppSettings::KeyDefaultRecordMode, "nonsense");
+    CHECK(loaded.defaultRecordMode() == "dry");
+    settings.resetToDefaults();
+    CHECK(settings.defaultRecordMode() == "dry");
+}

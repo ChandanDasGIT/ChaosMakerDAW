@@ -32,6 +32,9 @@ class TrackListWrapper : public QAbstractListModel {
     Q_PROPERTY(QString cleanMonitorInput READ cleanMonitorInput NOTIFY cleanMonitorInputChanged)
     Q_PROPERTY(double cleanMonitorGain READ cleanMonitorGain NOTIFY cleanMonitorGainChanged)
     Q_PROPERTY(QVariantList cleanMonitorEqBands READ cleanMonitorEqBands NOTIFY cleanMonitorEqChanged)
+    // Recording mode for tracks added from now on, bound to the "default recording mode"
+    // preference (plan 6.6). Not set: dry only for plain Audio tracks.
+    Q_PROPERTY(bool newTrackRecordDry READ newTrackRecordDry WRITE setNewTrackRecordDry NOTIFY newTrackRecordDryChanged)
     Q_PROPERTY(double masterVolume READ masterVolume WRITE setMasterVolume NOTIFY masterVolumeChanged)
     Q_PROPERTY(bool masterMuted READ masterMuted WRITE setMasterMuted NOTIFY masterMutedChanged)
 
@@ -127,6 +130,8 @@ public:
     QVariantList cleanMonitorEqBands() const;
     Q_INVOKABLE bool setEqBand(int trackId, int band, double gainDb);
     Q_INVOKABLE bool resetTrackEq(int trackId);
+    bool newTrackRecordDry() const { return m_newTrackRecordDry; }
+    void setNewTrackRecordDry(bool dry);
     // Insert effects (plan 6.1). Rules live in the backend (effectchain); not undoable.
     Q_INVOKABLE int addTrackEffect(int trackId, const QString& type); // new effect id, or -1
     Q_INVOKABLE bool removeTrackEffect(int trackId, int effectId);
@@ -185,6 +190,7 @@ signals:
     void cleanMonitorInputChanged();
     void cleanMonitorGainChanged(double gain);
     void cleanMonitorEqChanged();
+    void newTrackRecordDryChanged();
     void masterVolumeChanged();
     void masterMutedChanged();
 
@@ -206,6 +212,7 @@ private:
     TrackList m_state;
     // These aliases keep the batch-6 serialization/snapshot adapters on the same backend state.
     Project& m_project = m_state.project();
+    bool m_newTrackRecordDry = false;
     TrackList::AudioMap& m_audio = m_state.audio();
     TrackList::MediaPaths& m_mediaPaths = m_state.mediaPaths();
     int m_notifiedTrackId = -1;

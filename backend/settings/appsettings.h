@@ -13,6 +13,7 @@ public:
     static constexpr const char* KeyAutoSaveEnabled = "autosave/enabled";
     static constexpr const char* KeyAutoSaveInterval = "autosave/intervalSeconds";
     static constexpr const char* KeyPianoRollPresentation = "ui/pianoRollPresentation";
+    static constexpr const char* KeyDefaultRecordMode = "recording/defaultMode";
     static constexpr const char* KeyTrackListWidth = "ui/trackListWidth";
     static constexpr const char* KeyMixerHeight = "ui/mixerHeight";
     static constexpr const char* KeyPianoRollDockHeight = "ui/pianoRollDockHeight";
@@ -34,6 +35,11 @@ public:
     // Piano roll presentation ("dock" or "window")
     const std::string& pianoRollPresentation() const noexcept { return m_pianoRollPresentation; }
     void setPianoRollPresentation(std::string presentation) noexcept;
+
+    // Recording mode new tracks start with: "dry" (editable FX, the default) or "print"
+    const std::string& defaultRecordMode() const noexcept { return m_defaultRecordMode; }
+    void setDefaultRecordMode(std::string mode) noexcept;
+    bool recordDryByDefault() const noexcept { return m_defaultRecordMode == "dry"; }
 
     // Layout sizes, kept between sessions
     double trackListWidth() const noexcept { return m_trackListWidth; }
@@ -76,6 +82,7 @@ public:
 private:
     bool m_restoreSessionOnStartup = false;
     std::string m_pianoRollPresentation = "dock";
+    std::string m_defaultRecordMode = "dry";
     double m_trackListWidth = TrackListWidthLimits.fallback;
     double m_mixerHeight = MixerHeightLimits.fallback;
     double m_pianoRollDockHeight = PianoRollDockHeightLimits.fallback;
