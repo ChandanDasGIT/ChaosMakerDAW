@@ -24,7 +24,8 @@ void AppSettingsWrapper::loadFromPlatform()
         m_settings.importValue(AppSettings::KeyPianoRollPresentation,
                                qs.value(QStringLiteral("ui/pianoRollPresentation")).toString().toStdString());
     }
-    for (const char* key : {AppSettings::KeyTrackListWidth, AppSettings::KeyMixerHeight, AppSettings::KeyPianoRollDockHeight}) {
+    for (const char* key : {AppSettings::KeyTrackListWidth, AppSettings::KeyMixerHeight, AppSettings::KeyPianoRollDockHeight,
+                            AppSettings::KeyDefaultRecordMode}) {
         const QString name = QString::fromLatin1(key);
         if (qs.contains(name)) m_settings.importValue(key, qs.value(name).toString().toStdString());
     }
@@ -57,7 +58,8 @@ void AppSettingsWrapper::saveToPlatform()
     qs.setValue(QStringLiteral("paths/defaultProjectDirectory"), QString::fromStdString(m_settings.defaultProjectDirectory()));
     qs.setValue(QStringLiteral("autosave/enabled"), m_settings.autoSaveEnabled());
     qs.setValue(QStringLiteral("autosave/intervalSeconds"), m_settings.autoSaveIntervalSeconds());
-    for (const char* key : {AppSettings::KeyTrackListWidth, AppSettings::KeyMixerHeight, AppSettings::KeyPianoRollDockHeight})
+    for (const char* key : {AppSettings::KeyTrackListWidth, AppSettings::KeyMixerHeight, AppSettings::KeyPianoRollDockHeight,
+                            AppSettings::KeyDefaultRecordMode})
         qs.setValue(QString::fromLatin1(key), QString::fromStdString(m_settings.exportValue(key)));
     qs.sync();
 }
@@ -75,6 +77,16 @@ void AppSettingsWrapper::setPianoRollPresentation(const QString& presentation)
         emit pianoRollPresentationChanged();
         emit preferenceSaved(QString::fromLatin1(AppSettings::KeyPianoRollPresentation));
     }
+}
+
+void AppSettingsWrapper::setDefaultRecordMode(const QString& mode)
+{
+    if (m_settings.defaultRecordMode() == mode.toStdString()) return;
+    m_settings.setDefaultRecordMode(mode.toStdString());          // invalid modes are ignored
+    if (m_settings.defaultRecordMode() != mode.toStdString()) return;
+    saveValue(QString::fromLatin1(AppSettings::KeyDefaultRecordMode), mode);
+    emit defaultRecordModeChanged();
+    emit preferenceSaved(QString::fromLatin1(AppSettings::KeyDefaultRecordMode));
 }
 
 QString AppSettingsWrapper::defaultProjectDirectory() const

@@ -65,6 +65,11 @@ void AppSettings::setPianoRollPresentation(std::string presentation) noexcept {
         m_pianoRollPresentation = std::move(presentation);
 }
 
+void AppSettings::setDefaultRecordMode(std::string mode) noexcept {
+    if (mode == "dry" || mode == "print")
+        m_defaultRecordMode = std::move(mode);
+}
+
 double AppSettings::clampSize(double value, SizeLimits limits) noexcept {
     if (!std::isfinite(value)) return limits.fallback;
     return std::clamp(value, limits.min, limits.max);
@@ -100,6 +105,7 @@ bool AppSettings::setAutoSaveIntervalSeconds(int seconds) noexcept {
 void AppSettings::resetToDefaults() noexcept {
     m_restoreSessionOnStartup = false;
     m_pianoRollPresentation = "dock";
+    m_defaultRecordMode = "dry";
     m_trackListWidth = TrackListWidthLimits.fallback;
     m_mixerHeight = MixerHeightLimits.fallback;
     m_pianoRollDockHeight = PianoRollDockHeightLimits.fallback;
@@ -120,6 +126,8 @@ void AppSettings::importValue(std::string_view key, std::string_view value) {
         auto p = trim(value);
         if (p == "window" || p == "dock")
             m_pianoRollPresentation = std::move(p);
+    } else if (key == KeyDefaultRecordMode) {
+        setDefaultRecordMode(trim(value)); // anything but "dry"/"print" keeps the current mode
     } else if (key == KeyTrackListWidth || key == KeyMixerHeight || key == KeyPianoRollDockHeight) {
         double size = 0;
         if (!parseDouble(value, size)) return; // invalid text keeps the current size
@@ -149,6 +157,7 @@ std::string AppSettings::exportValue(std::string_view key) const {
     if (key == KeyPianoRollPresentation) {
         return m_pianoRollPresentation;
     }
+    if (key == KeyDefaultRecordMode) return m_defaultRecordMode;
     if (key == KeyTrackListWidth) return formatSize(m_trackListWidth);
     if (key == KeyMixerHeight) return formatSize(m_mixerHeight);
     if (key == KeyPianoRollDockHeight) return formatSize(m_pianoRollDockHeight);
@@ -168,6 +177,7 @@ std::string AppSettings::serialize() const {
     std::ostringstream ss;
     ss << KeyRestoreSessionOnStartup << "=" << (m_restoreSessionOnStartup ? "true" : "false") << "\n";
     ss << KeyPianoRollPresentation << "=" << m_pianoRollPresentation << "\n";
+    ss << KeyDefaultRecordMode << "=" << m_defaultRecordMode << "\n";
     ss << KeyTrackListWidth << "=" << formatSize(m_trackListWidth) << "\n";
     ss << KeyMixerHeight << "=" << formatSize(m_mixerHeight) << "\n";
     ss << KeyPianoRollDockHeight << "=" << formatSize(m_pianoRollDockHeight) << "\n";

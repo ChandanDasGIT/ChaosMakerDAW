@@ -140,6 +140,52 @@ ToolButton {
             }
 
             Text {
+                text: "Recording"
+                color: Theme.text
+                font.pixelSize: Theme.bodySize
+                font.bold: true
+            }
+
+            ColumnLayout {
+                spacing: 8
+                Text {
+                    text: "New tracks start in this mode; switch a track in its FX panel."
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.smallSize
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                }
+                RadioButton {
+                    id: recordDryRadio
+                    objectName: "defaultRecordModeDry"
+                    text: "Dry · editable FX"
+                    checked: appSettingsBridge.defaultRecordMode === "dry"
+                    onToggled: if (checked) appSettingsBridge.defaultRecordMode = "dry"
+                    contentItem: Text {
+                        text: recordDryRadio.text
+                        color: Theme.text
+                        font.pixelSize: Theme.bodySize
+                        leftPadding: recordDryRadio.indicator.width + 6
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+                RadioButton {
+                    id: recordPrintRadio
+                    objectName: "defaultRecordModePrint"
+                    text: "Print FX"
+                    checked: appSettingsBridge.defaultRecordMode === "print"
+                    onToggled: if (checked) appSettingsBridge.defaultRecordMode = "print"
+                    contentItem: Text {
+                        text: recordPrintRadio.text
+                        color: Theme.text
+                        font.pixelSize: Theme.bodySize
+                        leftPadding: recordPrintRadio.indicator.width + 6
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
+
+            Text {
                 text: "Piano Roll Display"
                 color: Theme.text
                 font.pixelSize: Theme.bodySize

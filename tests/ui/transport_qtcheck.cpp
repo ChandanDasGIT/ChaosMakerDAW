@@ -833,7 +833,7 @@ private slots:
         const auto restore=qScopeGuard([&] {
             settings->setPianoRollPresentation("dock"); controller->shutdownSession();
             // Hand focus back to the harness window: later tests check keyboard focus there.
-            created.reset(); window->requestActivate(); QTest::qWaitForWindowActive(window);
+            created.reset(); window->requestActivate(); [[maybe_unused]] const bool active=QTest::qWaitForWindowActive(window);
         });
         settings->setPianoRollPresentation("dock");
         auto* tracks=main->findChild<TrackListWrapper*>(); QVERIFY(tracks);
@@ -864,6 +864,45 @@ private slots:
         QTRY_VERIFY(window->isVisible()); QVERIFY(item(floating)); QVERIFY(!item(docked));
         QCOMPARE(item(floating)->property("clipId").toInt(),clip);
         window->close(); QTRY_VERIFY(!window->isVisible()); QVERIFY(item(floating));
+    }
+    void default_record_mode_is_a_preference_and_new_tracks_follow_it() {
+        // Preferences: two radio buttons, Dry checked by default; a click saves the choice.
+        auto* bridge=window->findChild<AppSettingsWrapper*>("appSettingsBridge"); QVERIFY(bridge);
+        const auto restoreBridge=qScopeGuard([&] { bridge->setDefaultRecordMode("dry"); });
+        QCOMPARE(bridge->defaultRecordMode(),QString("dry"));
+        auto* settings=visualItem(window->contentItem(),"settingsButton"); QVERIFY(settings); click(settings);
+        QQuickItem* preferences=nullptr;
+        QTRY_VERIFY((preferences=visualItem(window->contentItem(),"preferencesSetting"))); click(preferences);
+        QQuickItem* print=nullptr; QQuickItem* dry=nullptr;
+        QTRY_VERIFY((print=visualItem(window->contentItem(),"defaultRecordModePrint")) && print->isVisible());
+        dry=visualItem(window->contentItem(),"defaultRecordModeDry"); QVERIFY(dry);
+        QVERIFY(dry->property("checked").toBool()); QVERIFY(!print->property("checked").toBool());
+        click(print); QTRY_COMPARE(bridge->defaultRecordMode(),QString("print"));
+        QCOMPARE(QSettings().value("recording/defaultMode").toString(),QString("print"));
+        click(dry); QTRY_COMPARE(bridge->defaultRecordMode(),QString("dry"));
+        QCOMPARE(QSettings().value("recording/defaultMode").toString(),QString("dry"));
+        QMetaObject::invokeMethod(window->findChild<QObject*>("preferencesPopup"),"close");
+
+        // The main window binds its track list to the preference.
+        QTest::failOnWarning(QRegularExpression("^(?!This plugin does not support raise\\(\\)).*"));
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        QQmlComponent component(engine.get()); component.loadFromModule("TransportTests","Main");
+        std::unique_ptr<QObject> created(component.create()); QVERIFY2(created,qPrintable(component.errorString()));
+        auto* main=qobject_cast<QQuickWindow*>(created.get()); QVERIFY(main);
+        auto* mainSettings=qvariant_cast<AppSettingsWrapper*>(main->property("layoutSettings")); QVERIFY(mainSettings);
+        const auto restore=qScopeGuard([&] {
+            mainSettings->setDefaultRecordMode("dry"); controller->shutdownSession();
+            created.reset(); window->requestActivate(); [[maybe_unused]] const bool active=QTest::qWaitForWindowActive(window);
+        });
+        auto* tracks=main->findChild<TrackListWrapper*>(); QVERIFY(tracks);
+        QVERIFY(tracks->property("newTrackRecordDry").toBool());
+        const int dryVocal=tracks->addVocalTrack();
+        QVERIFY(tracks->project().findTrack(dryVocal)->recordDry);              // Dry by default
+        mainSettings->setDefaultRecordMode("print");
+        QVERIFY(!tracks->property("newTrackRecordDry").toBool());
+        const int printGuitar=tracks->addInstrumentTrackOfType("Electric Guitar");
+        QVERIFY(!tracks->project().findTrack(printGuitar)->recordDry);
+        QVERIFY(tracks->project().findTrack(dryVocal)->recordDry);              // existing tracks keep theirs
     }
     void track_card_chips_wrap_and_fit_at_the_narrowest_track_list() {
         TrackListWrapper tracks; const int id=tracks.addVocalTrack();
