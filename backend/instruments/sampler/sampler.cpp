@@ -6,7 +6,10 @@ Sampler::Sampler()
 {
     setPolyphony(64);
     prepare(48000.0, 1024);
+    setZones({});
 }
+
+Sampler::~Sampler() = default;
 
 void Sampler::prepare(double sampleRate, int maxFrames)
 {
@@ -28,7 +31,63 @@ void Sampler::setPolyphony(int polyphony)
 int Sampler::setZones(std::vector<SampleZone> zones)
 {
     reset();                                               // voices point into the old zones
-    return m_zones.setZones(std::move(zones));
+    auto map = std::make_unique<ZoneMap>();
+    const int dropped = map->setZones(std::move(zones));
+    std::lock_guard lock(m_ownedMutex);
+    m_pending.store(nullptr, std::memory_order_relaxed);
+    m_retired.store(nullptr, std::memory_order_relaxed);
+    m_retiring = nullptr;
+    m_owned.clear();
+    m_active = map.get();
+    m_owned.push_back(std::move(map));
+    return dropped;
+}
+
+int Sampler::stageZones(std::vector<SampleZone> zones)
+{
+    auto map = std::make_unique<ZoneMap>();
+    const int dropped = map->setZones(std::move(zones));
+    std::lock_guard lock(m_ownedMutex);
+    collectRetiredLocked();
+    ZoneMap* staged = map.get();
+    m_owned.push_back(std::move(map));
+    // A set still waiting was never taken by the audio thread: nothing plays from it.
+    if (ZoneMap* skipped = m_pending.exchange(staged, std::memory_order_acq_rel))
+        std::erase_if(m_owned, [skipped](const auto& owned) { return owned.get() == skipped; });
+    return dropped;
+}
+
+int Sampler::collectRetired()
+{
+    std::lock_guard lock(m_ownedMutex);
+    return collectRetiredLocked();
+}
+
+int Sampler::collectRetiredLocked()
+{
+    ZoneMap* done = m_retired.exchange(nullptr, std::memory_order_acq_rel);
+    if (!done) return 0;
+    std::erase_if(m_owned, [done](const auto& owned) { return owned.get() == done; });
+    return 1;
+}
+
+void Sampler::takeStagedZones() noexcept
+{
+    if (m_retiring && m_retired.load(std::memory_order_acquire) == nullptr) {
+        const bool used = std::any_of(m_voices.begin(), m_voices.end(), [this](const auto& voice) {
+            return voice.active() && m_retiring->holds(voice.zone());
+        });
+        if (!used) {
+            m_retired.store(const_cast<ZoneMap*>(m_retiring), std::memory_order_release);
+            m_retiring = nullptr;
+        }
+    }
+    if (m_retiring) return;                                // one change at a time
+    ZoneMap* next = m_pending.exchange(nullptr, std::memory_order_acq_rel);
+    if (!next) return;
+    for (auto& voice : m_voices) voice.fadeOut();
+    m_retiring = m_active;
+    m_active = next;
 }
 
 void Sampler::reset() noexcept
@@ -92,16 +151,17 @@ void Sampler::startZones(int key, int velocity, std::span<const int> zones) noex
 {
     // Choke first, for every starting zone, so layers of one note never choke each other.
     for (const int index : zones) {
-        const int group = m_zones.zone(index).group;
+        const int group = m_active->zone(index).group;
         if (group == 0) continue;
         for (auto& voice : m_voices)
             if (voice.active() && voice.zone() && voice.zone()->offBy == group) voice.fadeOut();
     }
     for (const int index : zones) {
+        if (m_active->zone(index).silent) continue;
         limitPolyphony();
         auto* voice = freeVoice();
         if (!voice) return;
-        voice->start(m_zones.zone(index), key, velocity, m_sampleRate);
+        voice->start(m_active->zone(index), key, velocity, m_sampleRate);
         m_started[std::size_t(voice - m_voices.data())] = ++m_clock;
     }
 }
@@ -113,7 +173,7 @@ void Sampler::noteOn(int key, int velocity) noexcept
     velocity = std::min(velocity, 127);
 
     std::array<int, maxZonesPerNote> found{};
-    const int count = m_zones.find(key, velocity, ZoneMap::Trigger::Attack, m_presses[std::size_t(key)], found);
+    const int count = m_active->find(key, velocity, ZoneMap::Trigger::Attack, m_presses[std::size_t(key)], found);
     ++m_presses[std::size_t(key)];
     m_velocity[std::size_t(key)] = velocity;
     m_held[std::size_t(key)] = true;
@@ -134,7 +194,7 @@ void Sampler::noteOff(int key) noexcept
 
     std::array<int, maxZonesPerNote> found{};
     const int velocity = m_velocity[std::size_t(key)];
-    const int count = m_zones.find(key, velocity, ZoneMap::Trigger::Release, m_releases[std::size_t(key)], found);
+    const int count = m_active->find(key, velocity, ZoneMap::Trigger::Release, m_releases[std::size_t(key)], found);
     if (count > 0) ++m_releases[std::size_t(key)];
     startZones(key, velocity, std::span<const int>(found.data(), std::size_t(count)));
 }
@@ -186,6 +246,7 @@ void Sampler::process(ProcessContext& context) noexcept
 {
     const auto& audio = context.audio;
     if (audio.frames <= 0 || audio.channelCount <= 0 || !audio.channels) return;
+    takeStagedZones();
 
     int frame = 0;
     if (context.midi) {

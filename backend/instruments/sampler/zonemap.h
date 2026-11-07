@@ -16,8 +16,14 @@ public:
     enum class Trigger { Attack, Release };            // note-on zones, or release-trigger zones
 
     // Keeps the playable zones in their original order and returns how many were dropped
-    // (no audio, empty key or velocity range, bad round-robin numbers).
+    // (no audio unless silent, empty key or velocity range, bad round-robin numbers).
     int setZones(std::vector<SampleZone> zones);
+
+    // Whether `zone` points into this map (a voice still playing one of its zones).
+    bool holds(const SampleZone* zone) const noexcept
+    {
+        return zone && !m_zones.empty() && zone >= m_zones.data() && zone < m_zones.data() + m_zones.size();
+    }
 
     // Writes the indices of the matching zones into out, in zone order, and returns how many
     // it wrote (at most out.size()). roundRobin counts earlier presses of this key: a zone
