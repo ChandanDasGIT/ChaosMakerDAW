@@ -11,7 +11,7 @@ RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
 Phase 4 done (4.4 not needed).
-Phase 5: 5.1, 5.2 done. Next: 5.3 (see below). Track list minimum width settled: chips wrap (see 4.5).
+Phase 5 done (5.1–5.3). Next: Phase 6 (see below). Track list minimum width settled: chips wrap (see 4.5).
 Then Phase 6 (user requests: FX per track type, pro EQ, guitar suite sound).
 
 Decisions made by the user (keep to them):
@@ -401,8 +401,11 @@ PHASE 5 — Performance
          (tool, zoom, grid) while they are the chosen presentation or still on screen.
          Main.qml is now in the UI test module; a test loads the real main window and
          fails on any QML warning.
-[ ] 5.3  Cache/throttle clipWaveform() calls made on every horizontal scroll frame
+[x] 5.3  Cache/throttle clipWaveform() calls made on every horizontal scroll frame
          (Timeline.qml:450-452).
+         Done: the waveform strip is two views wide and starts on a whole-view step, so it
+         just moves while scrolling; peaks are fetched once per view width scrolled (was
+         every frame: 300 fetches per 300 px). Clips off screen fetch nothing.
 
 
 PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
