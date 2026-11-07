@@ -14,7 +14,7 @@ Phase 4 done (4.4 not needed). Track list minimum width settled: chips wrap (see
 Phase 5 done (5.1–5.3).
 Next: Phase 6 (user requests). 6.1 decisions recorded; implementation next, starting with
 step 1 (backend per-track effect list). Added 2026-11-07: 6.4 stop-at-end setting (done),
-6.5 time readout with 2 digits.
+6.5 time readout with 2 digits (done).
 
 Decisions made by the user (keep to them):
 - Mixer: track strips have NO track volume fader. Each strip's vertical fader is clip gain
@@ -450,7 +450,10 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
          setting alone decides (user): on = playback and metronome stop at the end (one
          second after the last clip that can ring on); off = run until Stop/Pause. This
          replaces the "keep playing while the metronome is on" rule from 727442f.
-[ ] 6.5  Time readout: show hundredths, not milliseconds (user request 2026-11-07).
+[x] 6.5  Time readout: show hundredths, not milliseconds (user request 2026-11-07).
+         Done: both formatters print HH:MM:SS.cc, floored (never rounded up) with a tiny
+         tolerance so exact hundredths such as 0.29 s show as .29. The transport clock is
+         the only readout using them (valueformat::position has no app caller yet).
          HH:MM:SS.mmm becomes HH:MM:SS.cc (2 digits after the dot), e.g. "00:00:01.25".
          Formatters: backend/core/valueformat.cpp (elapsed time) and
          backend/engine/playbackcontrols.cpp:244; check every readout using them
