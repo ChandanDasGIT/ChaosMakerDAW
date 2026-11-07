@@ -32,6 +32,18 @@
 #include <QUuid>
 #include <QScopedValueRollback>
 
+namespace {
+
+// A new instrument for a track type, prepared before anything can run it.
+std::shared_ptr<Processor> preparedInstrument(const std::string& type, double rate, int frames)
+{
+    auto instrument = createInstrument(type);
+    if (instrument) instrument->prepare(rate, frames);
+    return instrument;
+}
+
+} // namespace
+
 EngineController::EngineController(QObject* parent)
     : EngineController(std::make_unique<JackAudioDevice>(), true, parent) {}
 
@@ -150,6 +162,12 @@ std::array<std::shared_ptr<ChaosEq>, 2> EngineController::chaosEqProcessors(int 
     return {it->second.chaosEq, it->second.playbackChaosEq};
 }
 
+std::shared_ptr<Processor> EngineController::trackInstrument(int trackId) const
+{
+    const auto it = m_trackEffects.find(trackId);
+    return it == m_trackEffects.end() ? nullptr : it->second.instrument;
+}
+
 EngineController* EngineController::instance()
 {
     static auto* controller = new EngineController(QCoreApplication::instance());
@@ -230,14 +248,8 @@ void EngineController::bindTrackEffects(int trackId, GuitarSuiteModel* model)
     fx.model->configure(rate, frames);
     if (m_project) {
         const auto* track = m_project->project().findTrack(trackId);
-        if (track && track->kind == TrackKind::Instrument) {
-            if (!fx.instrument) {
-                fx.instrument = createInstrument(track->type);
-            }
-            if (fx.instrument) {
-                fx.instrument->prepare(rate, frames);
-            }
-        }
+        if (track && track->kind == TrackKind::Instrument && !fx.instrument)
+            fx.instrument = preparedInstrument(track->type, rate, frames);
     }
     connect(fx.model, &GuitarSuiteModel::inputTrimDbChanged, this, [this, trackId] {
         auto& fx = m_trackEffects.at(trackId);
@@ -275,14 +287,10 @@ void EngineController::syncTrackEffects()
     const int frames = m_engine ? std::max(128, m_engine->latency().captureFrames) : 128;
     for (const auto& track : m_project->project().tracks()) {
         trackEffects(track->id);
+        // Only a new instrument is prepared: an existing one may be playing on the audio thread.
         if (track->kind == TrackKind::Instrument) {
             auto& fx = m_trackEffects[track->id];
-            if (!fx.instrument) {
-                fx.instrument = createInstrument(track->type);
-            }
-            if (fx.instrument) {
-                fx.instrument->prepare(rate, frames);
-            }
+            if (!fx.instrument) fx.instrument = preparedInstrument(track->type, rate, frames);
         }
     }
     SnapshotBuilder::syncTrackEq(m_project->project(), [this](int id) {
@@ -439,11 +447,13 @@ bool EngineController::setBufferSize(int frames)
         fx.chaosEq=std::make_shared<ChaosEq>(); fx.chaosEq->prepare(m_engine->sampleRate(),frames);
         fx.playbackChaosEq=std::make_shared<ChaosEq>(); fx.playbackChaosEq->prepare(m_engine->sampleRate(),frames);
         fx.model->configure(m_engine->sampleRate(), frames);
-        if (fx.instrument) {
-            fx.instrument->prepare(m_engine->sampleRate(), frames);
+        if (fx.instrument && m_project) {
+            if (const auto* track = m_project->project().findTrack(id))
+                fx.instrument = preparedInstrument(track->type, m_engine->sampleRate(), frames);
         }
     }
     syncTrackEffects();
+    publishPlayback();                                     // put the new processors on the audio thread
     emit bufferSizeChanged();
     updateAudioStatus();
     return true;
