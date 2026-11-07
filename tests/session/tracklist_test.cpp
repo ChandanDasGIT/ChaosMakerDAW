@@ -90,7 +90,10 @@ TEST(tracklist, monitored_track_gain_and_capabilities_come_from_shared_backend_s
     const int strings = tracks.addInstrumentTrackOfType("Strings");
     CHECK(tracks.project().findTrack(electric)->hasLiveInput());
     CHECK(!tracks.project().findTrack(strings)->hasLiveInput());
-    CHECK(!tracks.setMonitorEnabled(strings, true).accepted);
+    // Every instrument track can monitor: its live input is MIDI. It never takes the audio
+    // clean monitor, which follows the tracks with a live audio input.
+    CHECK(tracks.project().findTrack(strings)->canMonitor());
+    CHECK(tracks.setMonitorEnabled(strings, true).accepted);
     CHECK(tracks.setMonitorEnabled(vocal, true).accepted);
     CHECK(tracks.setVolume(vocal, 0.5).accepted);
     CHECK(tracks.setTrackInputPort(vocal, "mic").accepted);

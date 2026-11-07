@@ -100,6 +100,7 @@ Rectangle {
                     required property string inputPort
                     required property real volume
                     required property bool hasLiveInput
+                    required property bool canMonitor
                     required property bool recordDry
                     required property bool recordsWithFx
                     required property var eqBands
@@ -281,11 +282,13 @@ Rectangle {
                                     id: monitorButton
                                     objectName: "trackMonitorButton" + trackCard.trackId
                                     active: trackCard.monitorEnabled
-                                    enabled: trackCard.hasLiveInput
+                                    enabled: trackCard.canMonitor
                                     implicitWidth: 26; implicitHeight: chipFlow.chipHeight
                                     text: "MON"; textSize: Theme.microSize
                                     onClicked: root.trackModel.setMonitorEnabled(trackCard.trackId, !active)
-                                    tooltip: active ? "Disable live input monitoring" : "Monitor this track's input without arming recording"
+                                    tooltip: trackCard.hasLiveInput
+                                             ? (active ? "Disable live input monitoring" : "Monitor this track's input without arming recording")
+                                             : (active ? "Stop playing this instrument from MIDI" : "Play this instrument live from your MIDI keyboard")
                                 }
                                 ToggleChip {
                                     id: recordButton

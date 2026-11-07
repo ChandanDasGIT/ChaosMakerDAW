@@ -56,6 +56,9 @@ struct Track {
     std::vector<AudioClip> audioClips;
 
     bool hasLiveInput() const;
+    // MON is offered for a live audio input (guitar, vocal) and for every instrument track,
+    // whose live input is MIDI (a keyboard plays it).
+    bool canMonitor() const { return hasLiveInput() || kind == TrackKind::Instrument; }
     bool recordsWithFx() const { return hasLiveInput() && !recordDry; }
 };
 
