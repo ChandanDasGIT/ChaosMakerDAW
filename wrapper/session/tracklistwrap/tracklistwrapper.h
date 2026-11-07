@@ -54,7 +54,8 @@ public:
         RecordsWithFxRole,
         ColourRole,
         PanRole,
-        StripWidthRole
+        StripWidthRole,
+        EffectsRole   // insert effects in chain order: [{id, type, title, removable}] (plan 6.1)
     };
     Q_ENUM(Role)
 
@@ -126,6 +127,12 @@ public:
     QVariantList cleanMonitorEqBands() const;
     Q_INVOKABLE bool setEqBand(int trackId, int band, double gainDb);
     Q_INVOKABLE bool resetTrackEq(int trackId);
+    // Insert effects (plan 6.1). Rules live in the backend (effectchain); not undoable.
+    Q_INVOKABLE int addTrackEffect(int trackId, const QString& type); // new effect id, or -1
+    Q_INVOKABLE bool removeTrackEffect(int trackId, int effectId);
+    Q_INVOKABLE bool moveTrackEffect(int trackId, int effectId, int toIndex);
+    // What the "Add FX" picker offers for this track: [{type, title, subtitle}].
+    Q_INVOKABLE QVariantList addableEffects(int trackId) const;
     QStringList eqPresetNames() const;
     QString eqPresetError() const { return m_eqPresetError; }
     Q_INVOKABLE bool applyEqPreset(int trackId, int preset);

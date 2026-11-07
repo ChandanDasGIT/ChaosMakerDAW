@@ -92,6 +92,10 @@ public:
     Change setPan(int id, double pan);
     Change setStripWidth(int id, double width);
     Change setEqBand(int id, int band, double gainDb);
+    // Insert effects (plan 6.1); refused on a track that is recording. Not undoable.
+    int addTrackEffect(int trackId, const std::string& type); // new effect id, or -1
+    Change removeTrackEffect(int trackId, int effectId);
+    Change moveTrackEffect(int trackId, int effectId, int toIndex);
     double masterVolume() const noexcept { return m_project.masterVolume(); }
     Change setMasterVolume(double volume);
     bool masterMuted() const noexcept { return m_project.masterMuted(); }

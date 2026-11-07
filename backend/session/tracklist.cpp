@@ -226,6 +226,18 @@ TrackList::Change TrackList::setEqBand(int id, int band, double value)
 {
     return result(std::isfinite(value) && m_project.setTrackEqBand(id, band, static_cast<float>(value)));
 }
+int TrackList::addTrackEffect(int trackId, const std::string& type)
+{
+    return trackLocked(trackId) ? -1 : m_project.addTrackEffect(trackId, type);
+}
+TrackList::Change TrackList::removeTrackEffect(int trackId, int effectId)
+{
+    return trackLocked(trackId) ? Change{} : result(m_project.removeTrackEffect(trackId, effectId));
+}
+TrackList::Change TrackList::moveTrackEffect(int trackId, int effectId, int toIndex)
+{
+    return trackLocked(trackId) ? Change{} : result(m_project.moveTrackEffect(trackId, effectId, toIndex));
+}
 TrackList::Change TrackList::setMonitorEnabled(int id, bool value)
 {
     auto* track = m_project.findTrack(id);
