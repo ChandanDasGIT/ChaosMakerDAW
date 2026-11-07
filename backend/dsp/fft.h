@@ -13,6 +13,8 @@ public:
 
     // In place, data must hold size() values. No allocation.
     void forward(std::complex<double>* data) const noexcept;
+    // The inverse transform, scaled by 1/size(): inverse(forward(x)) == x. No allocation.
+    void inverse(std::complex<double>* data) const noexcept;
 
 private:
     int m_size = 2;

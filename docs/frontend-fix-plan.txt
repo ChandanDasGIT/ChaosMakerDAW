@@ -13,7 +13,7 @@ Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Ph
 Phase 4 done (4.4 not needed). Track list minimum width settled: chips wrap (see 4.5).
 Phase 5 done (5.1–5.3).
 Next: Phase 6 (user requests). 6.1, 6.2 (Chaos EQ), 6.4, 6.5, 6.6 done. Left: 6.3 (guitar
-suite sound), in progress: steps 1-5 done and committed. Tone-matching presets (user request):
+suite sound): done (steps 1-6 committed). Tone-matching presets (user request):
 djent chords preset for needGuitarStem done (local-reference/presets/, fitted by renders);
 next the user brings a song for a rock solo preset. Steps 4-6 after that. After 6.3 the user
 wants a song's guitar tone analysed and a matching GuitarSuite preset made.
@@ -510,7 +510,7 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
                UI test: chaos_eq_adds_drags_edits_and_removes_bands_on_the_curve.
                Known limit: bells above ~10 kHz are a little narrower than set (RBJ
                cramping near Nyquist); could be improved later.
-[ ] 6.3  Improve the guitar suite's sound quality (user request 2026-11-07).
+[x] 6.3  Improve the guitar suite's sound quality (user request 2026-11-07).
          Answered by the user (2026-11-07):
          - Source: a real guitar through the audio interface. Through the suite it "sounds
            like a synth, not a guitar".
@@ -579,7 +579,11 @@ PHASE 6 — User requests (added 2026-11-07, heavy, so done last)
                6.3 kHz. Models level-matched to each other. Note: the IR "tone balance" table
                measured earlier with fxrender --analyze was wrong for IRs (its Hann window
                hides an impulse at the start of the file). Tests: ampcab (1 new + updated).
-         [ ] 6 Merge guitar dsp/radix2fft.h (pitch shifter) into backend/dsp/fft.
+         [x] 6 Merged: backend/dsp/fft gained inverse() (conj trick, tested); PitchVoice uses
+               it and guitar dsp/radix2fft.h is gone. The FFT is now double precision, so the
+               phase vocoder's running phases differ slightly (samples differ ~-36 dB), but
+               the tone balance is the same within 0.7 dB in every band and the pitch tests
+               pass.
 
 [x] 6.4  Setting: stop playback at the end of the arrangement, on or off (user request
          2026-11-07).

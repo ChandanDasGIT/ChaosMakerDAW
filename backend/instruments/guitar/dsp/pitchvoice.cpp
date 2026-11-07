@@ -4,7 +4,6 @@
 
 namespace { constexpr double TwoPi=6.283185307179586; }
 void PitchVoice::prepare() noexcept {
-    fft.prepare();
     for(int i=0;i<Window;++i)window[i]=float(0.5-0.5*std::cos(TwoPi*i/Window));
     reset();
 }
@@ -23,7 +22,7 @@ float PitchVoice::process(float sample,float ratio) noexcept {
 void PitchVoice::render(float ratio) noexcept {
     ratio=std::clamp(ratio,0.5f,2.0f);
     for(int i=0;i<Window;++i)spectrum[i]=input[(writePosition+i)%Window]*window[i];
-    fft.transform(spectrum);
+    fft.forward(spectrum.data());
     magnitude.fill(0);frequency.fill(0);
     for(int bin=0;bin<Bins;++bin) {
         const double phase=std::arg(spectrum[bin]);
@@ -33,7 +32,7 @@ void PitchVoice::render(float ratio) noexcept {
         const double angularFrequency=(TwoPi*bin/Window+residual/Hop)*ratio;
         const int destination=int(std::lround(bin*ratio));
         if(destination>=Bins || angularFrequency<0 || angularFrequency>=TwoPi*0.5)continue;
-        const float amplitude=std::abs(spectrum[bin]);
+        const float amplitude=float(std::abs(spectrum[bin]));
         magnitude[destination]+=amplitude;
         frequency[destination]+=float(angularFrequency)*amplitude;
     }
@@ -41,13 +40,13 @@ void PitchVoice::render(float ratio) noexcept {
     for(int bin=0;bin<Bins;++bin) {
         if(magnitude[bin]>1e-12f) {
             synthesisPhase[bin]=std::remainder(synthesisPhase[bin]+Hop*double(frequency[bin])/magnitude[bin],TwoPi);
-            spectrum[bin]=std::polar(magnitude[bin],float(synthesisPhase[bin]));
+            spectrum[bin]=std::polar(double(magnitude[bin]),synthesisPhase[bin]);
         }
         if(bin==0 || bin==Window/2)spectrum[bin]={spectrum[bin].real(),0};
         else spectrum[Window-bin]=std::conj(spectrum[bin]);
     }
-    fft.transform(spectrum,true);
+    fft.inverse(spectrum.data());
     // Eight Hann windows overlap; their squared weights sum to three.
     for(int i=0;i<Window;++i)
-        output[(readPosition+i)%int(output.size())]+=spectrum[i].real()*window[i]/3.0f;
+        output[(readPosition+i)%int(output.size())]+=float(spectrum[i].real())*window[i]/3.0f;
 }
