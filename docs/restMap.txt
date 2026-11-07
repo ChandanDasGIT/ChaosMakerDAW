@@ -45,7 +45,9 @@ Every instrument track type (guitars, piano, strings, drums) plays through TestS
 backend/instruments/instrumentfactory.cpp maps all of them to it. The folders
 backend/instruments/{sfz,piano,drums,strings} are empty; sampler/ has only samplezone.h;
 tools/sfzcheck is empty.
-BUILD ORDER (the user, 2026-11-07): the shared sampler first, then drums, then the piano.
+BUILD ORDER (the user, 2026-11-07): the shared sampler first (C1, done), then the harmonium
+(C7: synthesis, needs no samples or SFZ), then the SFZ loader (C2), drums (C3), the FLAC
+decoder (C4) and the piano (C5).
 [x] C1  Sampler engine (hand-written): sample zones, key/velocity mapping, round robins, loop
         points, envelopes, release triggers, choke groups (e.g. closed hi-hat stops the open
         one), voice allocation with a fixed voice pool (no allocation on the audio thread).
@@ -72,13 +74,14 @@ BUILD ORDER (the user, 2026-11-07): the shared sampler first, then drums, then t
         Accurate-Salamander (WAV; CC-BY, so a credit is then required: see C8).
 [ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
         model), mapped in instrumentfactory.cpp.
-[ ] C7  Harmonium (synthesis, no samples needed): a new "Harmonium" instrument track type that
-        plays from the piano roll / MIDI. Model: free-reed tone (bright, nasal, rich overtones)
-        with a light wooden-case resonance; several reed sets per key with stops (bass reed,
-        octave-up reeds), tuned slightly apart for the typical beating; air pressure from a
-        bellows/expression control sets the level (soft breathy attack, air noise, swells, no
-        key-speed velocity); small key click; drone stops. Tune by ear with the user, and
-        against a reference recording if the user provides one (like the guitar presets).
+[ ] C7  NEXT (before C2, the user's choice). Harmonium (synthesis, no samples needed): a new
+        "Harmonium" instrument track type that plays from the piano roll / MIDI. Model:
+        free-reed tone (bright, nasal, rich overtones) with a light wooden-case resonance; several
+        reed sets per key with stops (bass reed, octave-up reeds), tuned slightly apart for
+        the typical beating; air pressure from a bellows/expression control sets the level
+        (soft breathy attack, air noise, swells, no key-speed velocity); small key click;
+        drone stops. Tune by ear with the user, and against a reference recording if the user
+        provides one (like the guitar presets).
 [ ] C8  Credits: the user's rule (2026-11-07): no third-party credit or attribution of any
         kind in the GitHub repo. So no courtesy credits, no "Third-party sounds" README
         section. The first choices need none (Gogodze Phu Vol II is CC0, Splendid is public
