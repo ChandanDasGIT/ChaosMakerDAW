@@ -40,3 +40,6 @@ compile_commands.json
 /initial-commit.txt
 /grep
 
+
+# Downloaded sample libraries (Gogodze Phu Vol II, Splendid Grand Piano, ...): large, never committed.
+/sample-kits/
