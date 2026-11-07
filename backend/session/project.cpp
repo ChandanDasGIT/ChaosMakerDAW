@@ -246,6 +246,28 @@ bool Project::moveTrackEffect(int trackId, int effectId, int toIndex)
     return true;
 }
 
+bool Project::setTrackEffects(int trackId, const std::vector<std::string>& types)
+{
+    auto* track = findTrack(trackId);
+    if (!track) return false;
+    const auto initial = effectchain::initialEffects(track->type);
+    const auto isInitial = [&initial](const std::string& type) {
+        return std::find(initial.begin(), initial.end(), type) != initial.end();
+    };
+    for (auto it = types.begin(); it != types.end(); ++it) {
+        const auto* effect = effectchain::find(*it);
+        const bool duplicate = std::find(types.begin(), it, *it) != it;
+        if (!effect || duplicate || (!effect->addable && !isInitial(*it))) return false;
+    }
+    std::vector<TrackEffectSlot> chain;
+    for (const auto& type : initial)   // fixed effects the file left out go back in front
+        if (!effectchain::canRemove(type) && std::find(types.begin(), types.end(), type) == types.end())
+            chain.push_back({m_nextEffectId++, type});
+    for (const auto& type : types) chain.push_back({m_nextEffectId++, type});
+    track->effects = std::move(chain);
+    return true;
+}
+
 int Project::addAudioClip(int trackId, AudioClip clip)
 {
     auto* track = findTrack(trackId);

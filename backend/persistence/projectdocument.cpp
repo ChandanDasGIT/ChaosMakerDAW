@@ -2,6 +2,7 @@
 #include "mixer/mixerpanel.h"
 #include "recording/takerecorder.h"
 #include <nlohmann/json.hpp>
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -80,6 +81,9 @@ std::string ProjectDocument::serialize(const Project& project,
         trackObj["input"] = track->inputPort;
         trackObj["recordDry"] = track->recordDry;
         trackObj["eq"] = eqJson;
+        json effectsList = json::array();
+        for (const auto& slot : track->effects) effectsList.push_back(slot.type);
+        trackObj["effects"] = std::move(effectsList);   // insert effects in chain order (plan 6.1)
         trackObj["clips"] = clipsJson;
         tracksJson.push_back(trackObj);
     }
@@ -242,6 +246,21 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             return false;
         }
 
+        // Optional: files without it (saved before plan 6.1) keep the track type's defaults.
+        if (item.contains("effects")) {
+            std::vector<std::string> types;
+            bool valid = item["effects"].is_array();
+            if (valid)
+                for (const auto& e : item["effects"]) {
+                    if (!e.is_string()) { valid = false; break; }
+                    types.push_back(e.get<std::string>());
+                }
+            if (!valid || !candidate.setTrackEffects(track.id, types)) {
+                error = "Invalid track effects.";
+                return false;
+            }
+        }
+
         for (int i = 0; i < 10; ++i) {
             const double gain = item["eq"][i].get<double>();
             if (gain < -12.0 || gain > 12.0) {
@@ -357,6 +376,13 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
         for (const auto& fxItem : doc["trackEffects"]) {
             effects.push_back(fxItem.dump());
         }
+    }
+    // A pedalboard only loads onto a track with GuitarSuite on its effect list; others (e.g.
+    // pedals saved on Audio tracks before plan 6.1) are dropped: an empty entry is skipped.
+    for (std::size_t i = 0; i < effects.size() && i < candidate.tracks().size(); ++i) {
+        const auto& chain = candidate.tracks()[i]->effects;
+        if (std::none_of(chain.begin(), chain.end(), [](const auto& s) { return s.type == effectchain::GuitarSuite; }))
+            effects[i].clear();
     }
 
     outContent.project = std::move(candidate);
