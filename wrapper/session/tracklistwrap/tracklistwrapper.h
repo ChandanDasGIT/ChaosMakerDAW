@@ -55,7 +55,7 @@ public:
         ColourRole,
         PanRole,
         StripWidthRole,
-        EffectsRole   // insert effects in chain order: [{id, type, title, removable}] (plan 6.1)
+        EffectsRole   // insert effects in chain order: [{id, type, title, subtitle, removable}] (plan 6.1)
     };
     Q_ENUM(Role)
 

@@ -1,39 +1,36 @@
 #pragma once
 
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
-struct EffectEntry {
-    std::string key;
-    std::string title;
-    std::string subtitle;
-    bool available = true;
-};
-
+// View state of a track's FX panel: which effect of the track's chain is shown (plan 6.1).
+// The chain itself (types in processing order) comes from the track; rules live in effectchain.
 class TrackEffectsPanel {
 public:
     TrackEffectsPanel() = default;
 
-    static bool checkGuitarSuiteSupport(std::string_view trackType, bool hasLiveInput);
-    static std::string validateSelectedEffect(std::string_view effectKey, bool supportsGuitarSuite);
+    // The key if it is on the chain, else the chain's first effect, else "" (empty chain).
+    static std::string validateSelectedEffect(std::string_view effectKey, std::span<const std::string> chain);
     static std::string recordModeDescription(bool recordDry);
-    static std::vector<EffectEntry> availableEntries(bool supportsGuitarSuite);
 
     int trackId() const { return m_trackId; }
     const std::string& trackName() const { return m_trackName; }
     const std::string& trackType() const { return m_trackType; }
     bool hasLiveInput() const { return m_hasLiveInput; }
     bool recordDry() const { return m_recordDry; }
+    const std::vector<std::string>& chain() const { return m_chain; }
+    // GuitarSuite's editor is shown only when GuitarSuite is on the chain.
     bool supportsGuitarSuite() const;
 
     const std::string& selectedEffect() const { return m_selectedEffect; }
     void setSelectedEffect(std::string_view key);
 
     void setTrackInfo(int trackId, std::string trackName, std::string trackType, bool hasLiveInput, bool recordDry);
+    void setChain(std::vector<std::string> chain);
     void setRecordDry(bool dry) { m_recordDry = dry; }
 
-    std::vector<EffectEntry> effectEntries() const;
     std::string currentRecordModeDescription() const;
 
 private:
@@ -42,5 +39,6 @@ private:
     std::string m_trackType;
     bool m_hasLiveInput = true;
     bool m_recordDry = false;
-    std::string m_selectedEffect = "eq";
+    std::vector<std::string> m_chain;
+    std::string m_selectedEffect;
 };

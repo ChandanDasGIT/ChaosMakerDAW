@@ -797,17 +797,19 @@ private slots:
         };
         openFx(a);
         QCOMPARE(panel->property("effectsModel").value<QObject*>(),controller->trackEffects(a));
-        auto* pedals=visualItem(window->contentItem(),"selectEffect_pedals"); QVERIFY(pedals); click(pedals);
-        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("pedals"));
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("guitarsuite")); // first on its chain
+        addEffectFromPicker("eq");
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("eq"));
         // The same panel serves every track; each track keeps its own page and pedalboard.
         QObject* const shared=panel;
         openFx(b); QCOMPARE(panel,shared);
-        QCOMPARE(panel->property("selectedEffect").toString(),QString("eq"));
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("guitarsuite"));
         QCOMPARE(panel->property("effectsModel").value<QObject*>(),controller->trackEffects(b));
         openFx(vocal); QCOMPARE(panel,shared); QVERIFY(!panel->property("supportsGuitarSuite").toBool());
+        QCOMPARE(panel->property("selectedEffect").toString(),QString());          // no effects yet
         QCOMPARE(panel->property("effectsModel").value<QObject*>(),static_cast<QObject*>(nullptr));
         openFx(a);
-        QCOMPARE(panel->property("selectedEffect").toString(),QString("pedals"));
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("eq"));
         QCOMPARE(panel->property("effectsModel").value<QObject*>(),controller->trackEffects(a));
         QVERIFY(visualObject(window->contentItem(),"trackGuitarSuiteEditor"+QString::number(a)));
         click(visualItem(window->contentItem(),"closeTrackEffects")); QTRY_VERIFY(!panel->property("visible").toBool());
@@ -828,7 +830,11 @@ private slots:
         std::unique_ptr<QObject> created(component.create()); QVERIFY2(created,qPrintable(component.errorString()));
         auto* main=qobject_cast<QQuickWindow*>(created.get()); QVERIFY(main);
         auto* settings=qvariant_cast<AppSettingsWrapper*>(main->property("layoutSettings")); QVERIFY(settings);
-        const auto restore=qScopeGuard([&] { settings->setPianoRollPresentation("dock"); controller->shutdownSession(); });
+        const auto restore=qScopeGuard([&] {
+            settings->setPianoRollPresentation("dock"); controller->shutdownSession();
+            // Hand focus back to the harness window: later tests check keyboard focus there.
+            created.reset(); window->requestActivate(); QTest::qWaitForWindowActive(window);
+        });
         settings->setPianoRollPresentation("dock");
         auto* tracks=main->findChild<TrackListWrapper*>(); QVERIFY(tracks);
         const int track=tracks->addInstrumentTrack(), clip=tracks->addClipAtBeat(track,0,4);
@@ -982,21 +988,39 @@ private slots:
         click(fxButton);
         auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(guitar)); QVERIFY(panel);
         QTRY_VERIFY(panel->property("visible").toBool());
-        auto* pedals=visualItem(window->contentItem(),"selectEffect_pedals"); QVERIFY(pedals); click(pedals);
-        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("pedals"));
+        // A guitar starts with GuitarSuite; its EQ is added from the picker.
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("guitarsuite"));
+        // Rows are rebuilt when the chain changes, so look them up each time.
+        const auto row=[&](const char* type) { return visualItem(window->contentItem(),QString("selectEffect_")+type); };
+        QVERIFY(row("guitarsuite"));
+        QVERIFY(!visualItem(window->contentItem(),"removeEffect_guitarsuite")->isVisible()); // fixed on guitars
+        addEffectFromPicker("eq");
+        QVERIFY(!visualItem(window->contentItem(),"addEffectButton")->isEnabled());           // nothing left to add
+        click(row("guitarsuite")); QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("guitarsuite"));
         QPointer<QQuickItem> dial=visualItem(window->contentItem(),"pedal.parametriceq.lowfreq"); QVERIFY(dial);
         const int id=guitarFx->data(guitarFx->index(0),GuitarSuiteModel::PedalIdRole).toInt();
         QVERIFY(guitarFx->setParameter(id,"lowfreq",300)); QTRY_COMPARE(dial->property("value").toDouble(),300.0);
-        auto* eq=visualItem(window->contentItem(),"selectEffect_eq"); QVERIFY(eq); click(eq);
+        QVERIFY(row("eq")); click(row("eq"));
         QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("eq"));
         QVERIFY(panel->property("visible").toBool()); QVERIFY(tracks.setEqBand(guitar,5,4));
         auto* band=visualItem(window->contentItem(),"trackEqBand5"); QVERIFY(band);
         QTRY_COMPARE(band->property("value").toDouble(),4.0);
-        click(pedals); QVERIFY(dial); QTRY_COMPARE(dial->property("value").toDouble(),300.0);
+        click(row("guitarsuite")); QVERIFY(dial); QTRY_COMPARE(dial->property("value").toDouble(),300.0);
         QCOMPARE(vocalFx->count(),0); QCOMPARE(tracks.project().findTrack(vocal)->eqGainDb[5],0.0f);
-        auto* search=visualItem(window->contentItem(),"effectSearch"); QVERIFY(search);
-        search->setProperty("text","guitar"); QTRY_VERIFY(!eq->isVisible()); QVERIFY(pedals->isVisible());
-        search->setProperty("text",""); QTRY_VERIFY(eq->isVisible());
+        // Drag the EQ's grip above GuitarSuite: the chain order (and the engine's) follows.
+        const auto order=[&] { QStringList types; for(const auto& slot:tracks.project().findTrack(guitar)->effects) types<<QString::fromStdString(slot.type); return types; };
+        QCOMPARE(order(),(QStringList{"guitarsuite","eq"}));
+        auto* grip=visualItem(window->contentItem(),"effectGrip_eq"); QVERIFY(grip);
+        const QPoint from=grip->mapToScene(QPointF(grip->width()/2,grip->height()/2)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,from);
+        for(int dy=6;dy<=62;dy+=8) QTest::mouseMove(window,from-QPoint(0,dy));
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,from-QPoint(0,62));
+        QTRY_COMPARE(order(),(QStringList{"eq","guitarsuite"}));
+        // Remove the EQ with its ×; the panel falls back to GuitarSuite.
+        click(visualItem(window->contentItem(),"removeEffect_eq"));
+        QTRY_COMPARE(order(),QStringList{"guitarsuite"});
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("guitarsuite"));
+        QVERIFY(visualItem(window->contentItem(),"addEffectButton")->isEnabled());
         // The FX workspace stays open while editing the transport.
         click(field); QTest::keyClick(window,Qt::Key_9); QTest::keyClick(window,Qt::Key_1); QTest::keyClick(window,Qt::Key_Return);
         QCOMPARE(controller->bpm(),91.0); QVERIFY(panel->property("visible").toBool());
@@ -1021,8 +1045,15 @@ private slots:
         auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(vocal)); QVERIFY(panel);
         QTRY_VERIFY(panel->property("visible").toBool());
         QVERIFY(!panel->property("supportsGuitarSuite").toBool());
-        QCOMPARE(panel->property("selectedEffect").toString(),QString("eq"));
-        QVERIFY(!visualItem(window->contentItem(),"selectEffect_pedals"));
+        // A vocal starts with no effects: both hints show until one is added.
+        QCOMPARE(panel->property("selectedEffect").toString(),QString());
+        QVERIFY(visualItem(window->contentItem(),"emptyChainHint")->isVisible());
+        QVERIFY(visualItem(window->contentItem(),"addEffectHint")->isVisible());
+        addEffectFromPicker("eq");
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("eq"));
+        QVERIFY(!visualItem(window->contentItem(),"emptyChainHint")->isVisible());
+        QVERIFY(!visualItem(window->contentItem(),"addEffect_guitarsuite"));   // never offered to a vocal
+        QVERIFY(!visualItem(window->contentItem(),"selectEffect_guitarsuite"));
         QVERIFY(!visualObject(window->contentItem(),"trackGuitarSuiteEditor"+QString::number(vocal)));
         auto* band=visualItem(window->contentItem(),"trackEqBand5"); QVERIFY(band); QVERIFY(band->isVisible());
         band->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Up);
@@ -1033,7 +1064,7 @@ private slots:
         QTRY_VERIFY(tracks.project().findTrack(vocal)->recordDry);
         QTest::keyClick(window,Qt::Key_Up); QTRY_VERIFY(!tracks.project().findTrack(vocal)->recordDry);
         // Unsupported navigation cannot reveal the pedal page, including after reopen.
-        panel->setProperty("selectedEffect","pedals");
+        panel->setProperty("selectedEffect","guitarsuite");
         QCOMPARE(panel->property("selectedEffect").toString(),QString("eq"));
         auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
         QTRY_VERIFY(!panel->property("visible").toBool()); click(fx); QTRY_VERIFY(panel->property("visible").toBool());
@@ -2950,6 +2981,14 @@ private:
     }
     void click(QQuickItem* item) {
         QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,item->mapToScene(QPointF(item->width()/2,item->height()/2)).toPoint());
+    }
+    // Adds an effect through the open FX panel's "+ Add FX" picker, as a user would.
+    void addEffectFromPicker(const QString& type) {
+        auto* add=visualItem(window->contentItem(),"addEffectButton"); QVERIFY(add); QVERIFY(add->isEnabled()); click(add);
+        QQuickItem* choice=nullptr;
+        QTRY_VERIFY((choice=visualItem(window->contentItem(),"addEffect_"+type)) && choice->isVisible());
+        click(choice);
+        QTRY_VERIFY(visualItem(window->contentItem(),"selectEffect_"+type));
     }
     std::unique_ptr<QQmlApplicationEngine> engine;
     QQuickWindow* window=nullptr;QQuickItem* field=nullptr;QObject* bar=nullptr;

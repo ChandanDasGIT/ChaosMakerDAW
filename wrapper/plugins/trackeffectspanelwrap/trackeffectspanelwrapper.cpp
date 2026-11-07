@@ -7,24 +7,25 @@ TrackEffectsPanelWrapper::TrackEffectsPanelWrapper(QObject* parent)
 
 void TrackEffectsPanelWrapper::updateTrackInfo()
 {
-    const bool prevGuitar = m_panel.supportsGuitarSuite();
-    const std::string prevSelected = m_panel.selectedEffect();
-
     m_panel.setTrackInfo(
         m_stagedTrackId,
         m_stagedTrackName.toStdString(),
         m_stagedTrackType.toStdString(),
         m_stagedHasLiveInput,
         m_stagedRecordDry);
-
     emit trackChanged();
+}
 
-    if (m_panel.supportsGuitarSuite() != prevGuitar) {
-        emit capabilitiesChanged();
-    }
-    if (m_panel.selectedEffect() != prevSelected) {
-        emit selectedEffectChanged();
-    }
+void TrackEffectsPanelWrapper::setChain(const QVariantList& chain)
+{
+    if (m_stagedChain == chain) return;
+    m_stagedChain = chain;
+    const std::string prevSelected = m_panel.selectedEffect();
+    std::vector<std::string> types;
+    for (const auto& entry : chain) types.push_back(entry.toMap().value(QStringLiteral("type")).toString().toStdString());
+    m_panel.setChain(std::move(types));
+    emit capabilitiesChanged();
+    if (m_panel.selectedEffect() != prevSelected) emit selectedEffectChanged();
 }
 
 void TrackEffectsPanelWrapper::setTrackId(int id)
@@ -75,20 +76,6 @@ void TrackEffectsPanelWrapper::setSelectedEffect(const QString& key)
 void TrackEffectsPanelWrapper::selectEffect(const QString& key)
 {
     setSelectedEffect(key);
-}
-
-QVariantList TrackEffectsPanelWrapper::effectEntries() const
-{
-    QVariantList list;
-    for (const auto& entry : m_panel.effectEntries()) {
-        list.push_back(QVariantMap{
-            {QStringLiteral("key"), QString::fromStdString(entry.key)},
-            {QStringLiteral("title"), QString::fromStdString(entry.title)},
-            {QStringLiteral("subtitle"), QString::fromStdString(entry.subtitle)},
-            {QStringLiteral("available"), entry.available}
-        });
-    }
-    return list;
 }
 
 QString TrackEffectsPanelWrapper::recordModeDescription() const
