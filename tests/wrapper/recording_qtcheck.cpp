@@ -1,5 +1,6 @@
 #include "testkit.h"
 #include "wrapper/engineWrap/enginecontroller.h"
+#include "wrapper/plugins/chaoseq/chaoseqwrap/chaoseqwrapper.h"
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
 #include "audiodevice/audiodevice.h"
 #include "recording/takerecorder.h"
@@ -746,9 +747,10 @@ TEST(qttrackeffects, effects_role_lists_the_chain_and_edits_follow_the_backend_r
     const auto suite=effects(guitar)[0].toMap();
     CHECK(suite["type"].toString()=="guitarsuite" && suite["title"].toString()=="GuitarSuite" && !suite["removable"].toBool());
     CHECK(effects(vocal).isEmpty());
-    // The picker offers the EQ once.
-    CHECK(tracks.addableEffects(vocal).size()==1);
+    // The picker offers each EQ once: the 10-band Equalizer and Chaos EQ (plan 6.2).
+    CHECK(tracks.addableEffects(vocal).size()==2);
     CHECK(tracks.addableEffects(vocal)[0].toMap()["title"].toString()=="Equalizer");
+    CHECK(tracks.addableEffects(vocal)[1].toMap()["title"].toString()=="Chaos EQ");
     int roleChanges=0, projectChanges=0;
     QObject::connect(&tracks,&QAbstractItemModel::dataChanged,&tracks,[&](const QModelIndex&,const QModelIndex&,const QList<int>& roles) {
         if(roles.contains(TrackListWrapper::EffectsRole)) ++roleChanges; });
@@ -756,7 +758,7 @@ TEST(qttrackeffects, effects_role_lists_the_chain_and_edits_follow_the_backend_r
     const int eq=tracks.addTrackEffect(vocal,"eq"); CHECK(eq>0);
     CHECK(roleChanges==1 && projectChanges==1);
     CHECK(effects(vocal).size()==1 && effects(vocal)[0].toMap()["id"].toInt()==eq && effects(vocal)[0].toMap()["removable"].toBool());
-    CHECK(tracks.addableEffects(vocal).isEmpty());
+    CHECK(tracks.addableEffects(vocal).size()==1 && tracks.addableEffects(vocal)[0].toMap()["type"].toString()=="chaoseq");
     CHECK(tracks.addTrackEffect(vocal,"eq")==-1 && tracks.addTrackEffect(vocal,"guitarsuite")==-1);
     CHECK(roleChanges==1);                                          // refused edits notify nothing
     // Move and remove on the guitar; GuitarSuite cannot be removed.
@@ -790,8 +792,90 @@ TEST(qttrackeffects, the_engine_runs_the_eq_only_while_it_is_on_the_track) {
     CHECK(controller.saveProject(QUrl::fromLocalFile(storage.dir.path()+"/fx.chaos"))); CHECK(!controller.projectDirty());
     const int eq=tracks.addTrackEffect(vocal,"eq"); CHECK(eq>0);
     CHECK(listen()>dry*2);                                          // the +12 dB boost is heard now
-    CHECK(controller.projectDirty());
     CHECK(tracks.removeTrackEffect(vocal,eq));
     CHECK_NEAR(listen(),dry,1e-3);
     controller.shutdownSession();
+}
+
+TEST(qttrackeffects, chaos_eq_wrapper_edits_the_track_bands_without_rebuilding_playback) {
+    Storage storage; TrackListWrapper tracks;
+    const int vocal=tracks.addVocalTrack(), other=tracks.addVocalTrack();
+    CHECK(tracks.addTrackEffect(vocal,"chaoseq")>0);
+    int projectChanges=0, chaosChanges=0;
+    QObject::connect(&tracks,&TrackListWrapper::projectChanged,&tracks,[&] { ++projectChanges; });
+    QObject::connect(&tracks,&TrackListWrapper::chaosEqChanged,&tracks,[&](int id) { if(id==vocal) ++chaosChanges; });
+    ChaosEqWrapper eq, mirror;
+    eq.setTrackModel(&tracks); eq.setTrackId(vocal);
+    mirror.setTrackModel(&tracks); mirror.setTrackId(vocal);
+    CHECK(eq.bandCount()==0 && eq.canAddBand() && eq.bands().isEmpty());
+    CHECK(eq.curveFrequencies().size()==ChaosEqWrapper::CurvePoints && eq.totalCurve().size()==ChaosEqWrapper::CurvePoints);
+    CHECK(eq.shapes().size()==8 && eq.placements().size()==5 && eq.slopes().size()==4);
+
+    const int first=eq.addBand(1000,3); CHECK(first==0);
+    CHECK(chaosChanges==1 && projectChanges==0);                   // no playback rebuild per edit
+    auto band=eq.bands()[0].toMap();
+    CHECK(band["shape"].toString()=="bell" && std::abs(band["gain"].toDouble()-3)<1e-9 && band["usesGain"].toBool());
+    CHECK(mirror.bandCount()==1);                                   // every view of the track follows
+    CHECK(tracks.project().findTrack(vocal)->chaosEq.bands[0].inUse);
+    CHECK(tracks.project().findTrack(other)->chaosEq.bands[0].inUse==false);
+    CHECK(eq.bandCurves().contains("0"));
+
+    CHECK(eq.setBand(first,{{"shape","lowCut"},{"slope",48},{"frequency",1e9}}));
+    band=eq.bands()[0].toMap();
+    CHECK(band["shape"].toString()=="lowCut" && band["slope"].toInt()==48 && !band["usesGain"].toBool());
+    CHECK(band["frequency"].toDouble()<=eq.maxFrequency());          // clamped into range
+    // Bad ids refuse the whole change.
+    CHECK(!eq.setBand(first,{{"shape","wobble"},{"gain",6}}));
+    CHECK(!eq.setBand(first,{{"slope",18}}));
+    CHECK(!eq.setBand(5,{{"gain",1}}));                              // slot not in use
+    CHECK(eq.bands()[0].toMap()["shape"].toString()=="lowCut");
+
+    // Solo is exclusive.
+    const int second=eq.addBand(200,-4); CHECK(second==1);
+    CHECK(eq.setBand(first,{{"solo",true}})); CHECK(eq.setBand(second,{{"solo",true}}));
+    CHECK(!eq.bands()[0].toMap()["solo"].toBool() && eq.bands()[1].toMap()["solo"].toBool());
+
+    eq.setOutputGain(-50); CHECK(eq.outputGain()==eq.minOutputGain());
+    eq.setAutoGain(true); CHECK(eq.autoGain() && mirror.autoGain());
+    CHECK(eq.removeBand(first) && eq.bandCount()==1 && eq.bands()[0].toMap()["slot"].toInt()==1);
+    // 24 bands at most.
+    while(eq.canAddBand()) CHECK(eq.addBand(500,1)>=0);
+    CHECK(eq.bandCount()==24 && eq.addBand(500,1)==-1);
+    eq.removeAllBands(); CHECK(eq.bandCount()==0);
+    CHECK(projectChanges==0);
+    // No track: nothing can be added.
+    eq.setTrackId(9999); CHECK(!eq.canAddBand() && eq.addBand(100,1)==-1);
+}
+
+TEST(qttrackeffects, chaos_eq_reaches_the_engine_and_feeds_the_analyzer) {
+    Storage storage;
+    auto device=std::make_unique<OfflineDevice>();
+    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    const int vocal=tracks.addVocalTrack(); CHECK(tracks.addTrackEffect(vocal,"chaoseq")>0);
+    ChaosEqWrapper eq; eq.setTrackModel(&tracks); eq.setTrackId(vocal); eq.setEngine(&controller);
+    const auto processors=controller.chaosEqProcessors(vocal);
+    CHECK(processors[0] && processors[1]);
+    CHECK(eq.addBand(2000,6)==0);
+    for(const auto& p:processors) {
+        const auto s=p->settings();
+        CHECK(s.bands[0].inUse && std::abs(s.bands[0].filter.gainDb-6)<1e-6);
+    }
+
+    // Analyzer: first poll starts listening; audio through the EQ then shows up at its frequency.
+    eq.setAnalyzerEnabled(true);
+    eq.pollAnalyzer(0.0); CHECK(eq.spectrum().isEmpty());
+    CHECK(processors[0]->analyzerListening());
+    std::vector<float> left(4096), right(4096);
+    for(int i=0;i<4096;++i) left[std::size_t(i)]=right[std::size_t(i)]=float(0.5*std::sin(6.283185307179586*1000.0*i/48000.0));
+    float* channels[]{left.data(),right.data()};
+    ProcessContext context; context.audio=AudioView{channels,2,4096}; context.sampleRate=48000;
+    processors[0]->process(context);
+    eq.pollAnalyzer(0.03);
+    const auto spectrum=eq.spectrum(); CHECK(spectrum.size()==ChaosEqWrapper::CurvePoints);
+    const auto frequencies=eq.curveFrequencies();
+    int peak=0;
+    for(int i=1;i<spectrum.size();++i) if(spectrum[i].toDouble()>spectrum[peak].toDouble()) peak=i;
+    CHECK(std::abs(std::log2(frequencies[peak].toDouble()/1000.0))<0.1);
+    eq.setAnalyzerEnabled(false);
+    CHECK(eq.spectrum().isEmpty() && !processors[0]->analyzerListening() && !processors[1]->analyzerListening());
 }

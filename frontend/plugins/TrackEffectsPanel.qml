@@ -260,7 +260,8 @@ Popup {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 currentIndex: root.selectedEffect === "eq" ? 0
-                            : root.selectedEffect === "guitarsuite" ? 1 : 2
+                            : root.selectedEffect === "guitarsuite" ? 1
+                            : root.selectedEffect === "chaoseq" ? 2 : 3
                 Tenbandeq {
                     trackModel: root.trackModel
                     trackId: root.trackId
@@ -282,6 +283,13 @@ Popup {
                         levels: EngineController.trackLevels[String(root.trackId)] ?? ({})
                         onClearClipsRequested: EngineController.clearTrackClips(root.trackId)
                     }
+                }
+                ChaosEqEditor {
+                    objectName: "trackChaosEq"
+                    trackModel: root.trackModel
+                    trackId: root.trackId
+                    trackName: root.trackName
+                    active: root.visible && root.selectedEffect === "chaoseq"
                 }
                 Item {
                     Text {

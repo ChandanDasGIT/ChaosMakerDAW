@@ -415,6 +415,19 @@ QVariantList TrackListWrapper::cleanMonitorEqBands() const
     return bands;
 }
 
+const chaoseq::Settings* TrackListWrapper::chaosEq(int trackId) const
+{
+    const auto* track = m_project.findTrack(trackId);
+    return track ? &track->chaosEq : nullptr;
+}
+
+bool TrackListWrapper::setChaosEq(int trackId, const chaoseq::Settings& settings)
+{
+    const auto change = m_state.setChaosEq(trackId, settings);
+    if (change.changed) emit chaosEqChanged(trackId);
+    return change.accepted;
+}
+
 bool TrackListWrapper::setEqBand(int id, int band, double gain)
 {
     const auto change = m_state.setEqBand(id, band, gain);

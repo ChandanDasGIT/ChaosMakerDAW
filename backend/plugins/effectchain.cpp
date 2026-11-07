@@ -5,8 +5,9 @@
 #include <array>
 
 namespace {
-constexpr std::array<EffectDefinition, 2> catalog{{
+constexpr std::array<EffectDefinition, 3> catalog{{
     {effectchain::Eq, "Equalizer", "10-band tone shaping", true, true},
+    {effectchain::ChaosEq, "Chaos EQ", "Parametric EQ, up to 24 bands", true, true},
     {effectchain::GuitarSuite, "GuitarSuite", "Pedals and signal chain", false, false},
 }};
 

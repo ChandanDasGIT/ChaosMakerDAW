@@ -29,10 +29,17 @@ TEST(effectchain, eq_is_added_once_and_guitarsuite_is_fixed)
     CHECK(effectchain::canAdd(chain, "eq"));
     CHECK(!effectchain::canAdd(chain, "guitarsuite"));   // only placed on guitar tracks at creation
     CHECK(!effectchain::canAdd(chain, "reverb"));        // unknown type
-    CHECK(effectchain::addableEffects(chain).size() == 1);
+    using Types = std::vector<std::string_view>;
+    CHECK(effectchain::addableEffects(chain) == (Types{"eq", "chaoseq"}));   // picker order
     chain.push_back({1, "eq"});
     CHECK(!effectchain::canAdd(chain, "eq"));            // one set of EQ bands per track
+    CHECK(effectchain::addableEffects(chain) == Types{"chaoseq"});
+    chain.push_back({2, "chaoseq"});                     // Chaos EQ sits beside the 10-band EQ
+    CHECK(!effectchain::canAdd(chain, "chaoseq"));
     CHECK(effectchain::addableEffects(chain).empty());
+    CHECK(effectchain::canRemove("chaoseq"));
+    const auto* chaos = effectchain::find("chaoseq");
+    CHECK(chaos && chaos->title == "Chaos EQ");
     CHECK(effectchain::canRemove("eq"));
     CHECK(!effectchain::canRemove("guitarsuite"));
     CHECK(!effectchain::canRemove("reverb"));

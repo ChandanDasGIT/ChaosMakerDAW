@@ -3,6 +3,7 @@
 #include "engine/enginesnapshot.h"
 #include "processor/trackinput.h"
 #include "plugins/eq/tenbandeq.h"
+#include "plugins/chaoseq/chaoseq.h"
 #include "session/project.h"
 #include "dsp/trackmeters.h"
 
@@ -27,6 +28,9 @@ public:
         // the track's effect list, at its place in the list.
         std::shared_ptr<TenBandEq> eq;
         std::shared_ptr<TenBandEq> playbackEq;
+        // Chaos EQ (plan 6.2), the same way: runs only when "chaoseq" is on the list.
+        std::shared_ptr<ChaosEq> chaosEq;
+        std::shared_ptr<ChaosEq> playbackChaosEq;
         std::shared_ptr<Processor> chain;
         std::shared_ptr<Processor> playbackChain;
         int inputChannel = -1;
@@ -69,7 +73,7 @@ public:
     using ChannelConnector = std::function<int(const std::string& source)>;
     using ErrorCallback = std::function<std::string()>;
 
-    // Synchronize EQ bands from project tracks to TrackInput processors
+    // Copy each track's EQ settings (10-band and Chaos EQ) into its EQ processors
     static void syncTrackEq(const Project& project, const MutableEffectResolver& effectLookup);
     static void syncTrackEq(const Project& project, std::unordered_map<int, TrackEffects>& effects);
 

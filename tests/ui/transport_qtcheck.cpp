@@ -1034,7 +1034,11 @@ private slots:
         QVERIFY(row("guitarsuite"));
         QVERIFY(!visualItem(window->contentItem(),"removeEffect_guitarsuite")->isVisible()); // fixed on guitars
         addEffectFromPicker("eq");
+        QVERIFY(visualItem(window->contentItem(),"addEffectButton")->isEnabled());            // Chaos EQ is still offered
+        addEffectFromPicker("chaoseq");
         QVERIFY(!visualItem(window->contentItem(),"addEffectButton")->isEnabled());           // nothing left to add
+        click(visualItem(window->contentItem(),"removeEffect_chaoseq"));
+        QTRY_VERIFY(!row("chaoseq"));
         click(row("guitarsuite")); QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("guitarsuite"));
         QPointer<QQuickItem> dial=visualItem(window->contentItem(),"pedal.parametriceq.lowfreq"); QVERIFY(dial);
         const int id=guitarFx->data(guitarFx->index(0),GuitarSuiteModel::PedalIdRole).toInt();
@@ -1113,6 +1117,63 @@ private slots:
         close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
         QTRY_VERIFY(!panel->property("visible").toBool()); click(arm);
         QVERIFY(!tracks.project().findTrack(vocal)->recordArmed);
+        list->setVisible(false); list->setProperty("trackModel",QVariant());
+    }
+    void chaos_eq_adds_drags_edits_and_removes_bands_on_the_curve() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks); const int vocal=tracks.addVocalTrack();
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QTest::qWait(30);
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(vocal)); QVERIFY(fx); click(fx);
+        auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(vocal)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        addEffectFromPicker("chaoseq");
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("chaoseq"));
+        const auto chaos=[&]() -> const chaoseq::Settings& { return tracks.project().findTrack(vocal)->chaosEq; };
+        auto* plot=visualItem(window->contentItem(),"chaosEqPlot"); QVERIFY(plot); QTRY_VERIFY(plot->isVisible());
+        QVERIFY(visualItem(window->contentItem(),"chaosEqNoSelection")->isVisible());
+        // Double-click above the 0 dB line, left of centre: a boosting bell appears there.
+        const QPoint at=plot->mapToScene(QPointF(plot->width()*0.4,plot->height()*0.3)).toPoint();
+        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,at);
+        QTRY_VERIFY(chaos().bands[0].inUse);
+        const double startHz=chaos().bands[0].filter.frequencyHz;
+        QCOMPARE(int(chaos().bands[0].filter.shape),int(eqband::Shape::Bell));
+        QVERIFY(chaos().bands[0].filter.gainDb>1.0);
+        QVERIFY(std::abs(std::log2(startHz/(20*std::pow(1000.0,0.4))))<0.1);
+        QTRY_VERIFY(visualItem(window->contentItem(),"chaosEqInspector")->isVisible());
+        // The engine's processors follow without a playback rebuild.
+        QTRY_VERIFY(controller->chaosEqProcessors(vocal)[0]->settings().bands[0].inUse);
+        // Drag the node right and down: higher frequency, less gain.
+        auto* node=visualItem(window->contentItem(),"chaosEqNode0"); QVERIFY(node); QTRY_VERIFY(node->isVisible());
+        const QPoint from=node->mapToScene(QPointF(node->width()/2,node->height()/2)).toPoint();
+        const double startGain=chaos().bands[0].filter.gainDb;
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,from);
+        for(int d=8;d<=80;d+=8) QTest::mouseMove(window,from+QPoint(d,d/4));
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,from+QPoint(80,20));
+        QTRY_VERIFY(chaos().bands[0].filter.frequencyHz>startHz*1.2);
+        QVERIFY(chaos().bands[0].filter.gainDb<startGain);
+        // Scroll on the node: narrower (higher Q).
+        const double startQ=chaos().bands[0].filter.q;
+        const QPointF mid=node->mapToScene(QPointF(node->width()/2,node->height()/2));
+        QWheelEvent wheel(mid,window->mapToGlobal(mid),QPoint(),QPoint(0,120),Qt::NoButton,Qt::NoModifier,Qt::NoScrollPhase,false);
+        QCoreApplication::sendEvent(window,&wheel); QCoreApplication::processEvents();
+        QTRY_VERIFY(chaos().bands[0].filter.q>startQ);
+        // Inspector buttons.
+        click(visualItem(window->contentItem(),"chaosEqBypass")); QTRY_VERIFY(chaos().bands[0].bypassed);
+        click(visualItem(window->contentItem(),"chaosEqBypass")); QTRY_VERIFY(!chaos().bands[0].bypassed);
+        click(visualItem(window->contentItem(),"chaosEqSolo")); QTRY_VERIFY(chaos().bands[0].solo);
+        click(visualItem(window->contentItem(),"chaosEqSolo")); QTRY_VERIFY(!chaos().bands[0].solo);
+        click(visualItem(window->contentItem(),"chaosEqAutoGain")); QTRY_VERIFY(chaos().autoGain);
+        QVERIFY(window->grabWindow().save("/tmp/chaosmaker-chaos-eq.png"));
+        // Select the node and press Delete: the band goes away.
+        click(node); QTest::keyClick(window,Qt::Key_Delete);
+        QTRY_VERIFY(!chaos().bands[0].inUse);
+        QTRY_VERIFY(visualItem(window->contentItem(),"chaosEqNoSelection")->isVisible());
+        auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!panel->property("visible").toBool());
+        // Closed: the analyzer stops listening.
+        QTRY_VERIFY(!controller->chaosEqProcessors(vocal)[0]->analyzerListening());
         list->setVisible(false); list->setProperty("trackModel",QVariant());
     }
     void double_click_empty_track_area_adds_vocals_without_interfering_with_renaming() {
@@ -3025,6 +3086,10 @@ private:
     void addEffectFromPicker(const QString& type) {
         auto* add=visualItem(window->contentItem(),"addEffectButton"); QVERIFY(add); QVERIFY(add->isEnabled()); click(add);
         QQuickItem* choice=nullptr;
+        QTRY_VERIFY((choice=visualItem(window->contentItem(),"addEffect_"+type)) && choice->isVisible());
+        // The picker's rows are rebuilt when the track or chain changes; let the list lay out
+        // (a frame) and look the row up again, or the click can land on a row's old position.
+        QTest::qWait(30);
         QTRY_VERIFY((choice=visualItem(window->contentItem(),"addEffect_"+type)) && choice->isVisible());
         click(choice);
         QTRY_VERIFY(visualItem(window->contentItem(),"selectEffect_"+type));

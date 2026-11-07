@@ -203,6 +203,14 @@ bool Project::setTrackStripWidth(int id, float width)
     return true;
 }
 
+bool Project::setTrackChaosEq(int id, const chaoseq::Settings& settings)
+{
+    auto* track = findTrack(id);
+    if (!track) return false;
+    track->chaosEq = chaoseq::sanitize(settings, m_tempo.sampleRate());
+    return true;
+}
+
 bool Project::setTrackEqBand(int id, int band, float gainDb)
 {
     auto* track = findTrack(id);

@@ -129,6 +129,10 @@ public:
     double cleanMonitorGain() const;
     QVariantList cleanMonitorEqBands() const;
     Q_INVOKABLE bool setEqBand(int trackId, int band, double gainDb);
+    // Chaos EQ (plan 6.2), for ChaosEqWrapper. A change emits chaosEqChanged, not dataChanged:
+    // the engine updates the track's EQ processors without rebuilding playback on every drag.
+    const chaoseq::Settings* chaosEq(int trackId) const;
+    bool setChaosEq(int trackId, const chaoseq::Settings& settings);
     Q_INVOKABLE bool resetTrackEq(int trackId);
     bool newTrackRecordDry() const { return m_newTrackRecordDry; }
     void setNewTrackRecordDry(bool dry);
@@ -182,6 +186,7 @@ signals:
     void clipboardChanged();
     void historyChanged();
     void projectChanged();
+    void chaosEqChanged(int trackId);
     void eqPresetErrorChanged();
     void countChanged();
     void contentEndBeatsChanged();

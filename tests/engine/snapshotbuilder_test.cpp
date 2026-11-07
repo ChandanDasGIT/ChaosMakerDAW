@@ -253,7 +253,14 @@ TEST(snapshotbuilder, sync_track_eq)
     fx.playbackInput->prepare(48000.0, 256);
     fx.eq = std::make_shared<TenBandEq>();
     fx.playbackEq = std::make_shared<TenBandEq>();
+    fx.chaosEq = std::make_shared<ChaosEq>();
+    fx.playbackChaosEq = std::make_shared<ChaosEq>();
     fxMap[t1.id] = fx;
+    chaoseq::Settings chaos;
+    chaos.bands[4] = {true, false, false, chaoseq::Placement::Mid,
+                      {eqband::Shape::HighShelf, 6000.0, -3.0, 1.0, eqband::Slope::Db24}};
+    chaos.outputGainDb = 2.0;
+    CHECK(project.setTrackChaosEq(t1.id, chaos));
 
     SnapshotBuilder::syncTrackEq(project, fxMap);
 
@@ -261,6 +268,14 @@ TEST(snapshotbuilder, sync_track_eq)
     for (int i = 0; i < 10; ++i) {
         CHECK_NEAR(fxMap[t1.id].eq->bandGain(i), t1.eqGainDb[i], 1e-6);
         CHECK_NEAR(fxMap[t1.id].playbackEq->bandGain(i), t1.eqGainDb[i], 1e-6);
+    }
+    // And both Chaos EQ instances carry its settings.
+    for (const auto& instance : {fxMap[t1.id].chaosEq, fxMap[t1.id].playbackChaosEq}) {
+        const auto s = instance->settings();
+        CHECK(chaoseq::bandsInUse(s) == 1 && s.bands[4].placement == chaoseq::Placement::Mid);
+        CHECK(s.bands[4].filter.shape == eqband::Shape::HighShelf);
+        CHECK_NEAR(s.bands[4].filter.gainDb, -3.0, 1e-6);
+        CHECK_NEAR(s.outputGainDb, 2.0, 1e-6);
     }
 }
 
@@ -282,6 +297,7 @@ TEST(snapshotbuilder, track_chains_follow_the_effect_list_in_order)
         auto& fx = fxMap[id];
         fx.input = std::make_shared<TrackInput>(); fx.playbackInput = std::make_shared<TrackInput>();
         fx.eq = std::make_shared<TenBandEq>(); fx.playbackEq = std::make_shared<TenBandEq>();
+        fx.chaosEq = std::make_shared<ChaosEq>(); fx.playbackChaosEq = std::make_shared<ChaosEq>();
         fx.chain = std::make_shared<DummyProcessor>(); fx.playbackChain = std::make_shared<DummyProcessor>();
     }
     const auto build = [&] {
@@ -312,6 +328,17 @@ TEST(snapshotbuilder, track_chains_follow_the_effect_list_in_order)
     CHECK(chains(*snap, guitar.id).first == (Chain{g.input.get(), g.eq.get(), g.chain.get()}));
     CHECK(chains(*snap, guitar.id).second == (Chain{g.playbackInput.get(), g.playbackEq.get(), g.playbackChain.get()}));
     CHECK(project.addTrackEffect(vocal.id, "eq") > 0);
+    snap = build();
+    CHECK(chains(*snap, vocal.id).first == (Chain{v.input.get(), v.eq.get()}));
+    // Chaos EQ runs beside the 10-band EQ, at its place in the list.
+    const int chaos = project.addTrackEffect(vocal.id, "chaoseq");
+    snap = build();
+    CHECK(chains(*snap, vocal.id).first == (Chain{v.input.get(), v.eq.get(), v.chaosEq.get()}));
+    CHECK(chains(*snap, vocal.id).second == (Chain{v.playbackInput.get(), v.playbackEq.get(), v.playbackChaosEq.get()}));
+    CHECK(project.moveTrackEffect(vocal.id, chaos, 0));
+    snap = build();
+    CHECK(chains(*snap, vocal.id).first == (Chain{v.input.get(), v.chaosEq.get(), v.eq.get()}));
+    CHECK(project.removeTrackEffect(vocal.id, chaos));
     snap = build();
     CHECK(chains(*snap, vocal.id).first == (Chain{v.input.get(), v.eq.get()}));
 }

@@ -23,6 +23,7 @@ struct EffectDefinition {
 // instrument track, which starts with its instrument's own FX (guitars: GuitarSuite).
 namespace effectchain {
 inline constexpr std::string_view Eq = "eq";
+inline constexpr std::string_view ChaosEq = "chaoseq";   // plan 6.2
 inline constexpr std::string_view GuitarSuite = "guitarsuite";
 
 // Every effect type, in the order an "Add FX" picker lists them.

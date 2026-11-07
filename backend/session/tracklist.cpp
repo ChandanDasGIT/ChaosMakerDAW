@@ -233,6 +233,10 @@ TrackList::Change TrackList::setEqBand(int id, int band, double value)
 {
     return result(std::isfinite(value) && m_project.setTrackEqBand(id, band, static_cast<float>(value)));
 }
+TrackList::Change TrackList::setChaosEq(int id, const chaoseq::Settings& settings)
+{
+    return result(m_project.setTrackChaosEq(id, settings));
+}
 int TrackList::addTrackEffect(int trackId, const std::string& type)
 {
     return trackLocked(trackId) ? -1 : m_project.addTrackEffect(trackId, type);

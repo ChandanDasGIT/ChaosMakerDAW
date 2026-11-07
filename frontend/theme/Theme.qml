@@ -83,6 +83,7 @@ QtObject {
     readonly property TransportColors transport: TransportColors {}
     readonly property GuitarSuiteColors guitarSuite: GuitarSuiteColors {}
     readonly property EffectsColors effects: EffectsColors {}
+    readonly property ChaosEqColors chaosEq: ChaosEqColors {}
 
     // ---- sizes ----
     readonly property int microSize:   9    // the smallest text allowed (tiny labels, chips)
