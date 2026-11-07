@@ -11,7 +11,7 @@ RESUME HERE (last updated 2026-11-06)
 -------------------------------------
 Done: Phase 1 (1.1–1.11) and Phase 2 (2.1–2.7), all committed and pushed. Phase 3 done (3.11 moved into 6.2).
 Phase 4 done (4.4 not needed).
-Phase 5: 5.1 done. Next: 5.2 (see below). Track list minimum width settled: chips wrap (see 4.5).
+Phase 5: 5.1, 5.2 done. Next: 5.3 (see below). Track list minimum width settled: chips wrap (see 4.5).
 Then Phase 6 (user requests: FX per track type, pro EQ, guitar suite sound).
 
 Decisions made by the user (keep to them):
@@ -395,8 +395,12 @@ PHASE 5 — Performance
          TrackList root; each takes the card that opened it (`card`), closes if that track
          is removed, and keeps the per-track objectNames. The FX panel remembers each
          track's page (EQ/pedals) and loads the pedalboard model only while open.
-[ ] 5.2  Load only the piano roll in use (docked or floating) with a Loader
+[x] 5.2  Load only the piano roll in use (docked or floating) with a Loader
          (Main.qml:217, 247).
+         Done: both views sit in Loaders, created the first time they are opened and kept
+         (tool, zoom, grid) while they are the chosen presentation or still on screen.
+         Main.qml is now in the UI test module; a test loads the real main window and
+         fails on any QML warning.
 [ ] 5.3  Cache/throttle clipWaveform() calls made on every horizontal scroll frame
          (Timeline.qml:450-452).
 

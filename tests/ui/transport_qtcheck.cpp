@@ -3,6 +3,7 @@
 #include "wrapper/settings/appsettingswrap/appsettingswrapper.h"
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
 #include <QQmlApplicationEngine>
+#include <QQmlComponent>
 #include <QQmlProperty>
 #include <QQuickItem>
 #include <QPointer>
@@ -798,6 +799,46 @@ private slots:
         QCOMPARE(input->property("trackName").toString(),QString::fromStdString(tracks.project().findTrack(vocal)->name));
         QMetaObject::invokeMethod(input,"close"); QTRY_VERIFY(!input->property("visible").toBool());
         controller->shutdownSession();
+    }
+    void piano_rolls_load_on_first_use_and_only_for_the_chosen_presentation() {
+        // The real main window: any QML warning (e.g. a broken binding) fails the test. The
+        // offscreen platform cannot raise windows; that warning is not about the QML.
+        QTest::failOnWarning(QRegularExpression("^(?!This plugin does not support raise\\(\\)).*"));
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        QQmlComponent component(engine.get()); component.loadFromModule("TransportTests","Main");
+        std::unique_ptr<QObject> created(component.create()); QVERIFY2(created,qPrintable(component.errorString()));
+        auto* main=qobject_cast<QQuickWindow*>(created.get()); QVERIFY(main);
+        auto* settings=qvariant_cast<AppSettingsWrapper*>(main->property("layoutSettings")); QVERIFY(settings);
+        const auto restore=qScopeGuard([&] { settings->setPianoRollPresentation("dock"); controller->shutdownSession(); });
+        settings->setPianoRollPresentation("dock");
+        auto* tracks=main->findChild<TrackListWrapper*>(); QVERIFY(tracks);
+        const int track=tracks->addInstrumentTrack(), clip=tracks->addClipAtBeat(track,0,4);
+        auto* docked=main->findChild<QObject*>("dockedPianoRollLoader"); QVERIFY(docked);
+        auto* floating=main->findChild<QObject*>("floatingPianoRollLoader"); QVERIFY(floating);
+        const auto item=[](QObject* loader) { return loader->property("item").value<QObject*>(); };
+        // Nothing is created at startup.
+        QVERIFY(!item(docked)); QVERIFY(!item(floating));
+        QVERIFY(QMetaObject::invokeMethod(main,"openPianoRoll",Q_ARG(QVariant,track),Q_ARG(QVariant,clip),
+                                          Q_ARG(QVariant,QString("Clip")),Q_ARG(QVariant,4.0)));
+        QObject* view=item(docked); QVERIFY(view); QVERIFY(!item(floating));
+        QCOMPARE(view->property("clipId").toInt(),clip);
+        QVERIFY(main->property("pianoRollMinimumDockHeight").toDouble()>0);
+        // Back to the mixer and again: the same view, its tool kept.
+        view->setProperty("activeTool","eraser");
+        QVERIFY(QMetaObject::invokeMethod(main,"togglePianoRoll")); QCOMPARE(main->property("pianoRollShown").toBool(),false);
+        QCOMPARE(item(docked),view);
+        QVERIFY(QMetaObject::invokeMethod(main,"togglePianoRoll")); QCOMPARE(main->property("pianoRollShown").toBool(),true);
+        QCOMPARE(item(docked),view); QCOMPARE(view->property("activeTool").toString(),QString("eraser"));
+        // Floating preference: the dock stays while still on screen, then unloads once hidden.
+        settings->setPianoRollPresentation("window");
+        QCOMPARE(item(docked),view);
+        QVERIFY(QMetaObject::invokeMethod(main,"togglePianoRoll"));
+        QTRY_VERIFY(!item(docked)); QVERIFY(!item(floating));
+        QVERIFY(QMetaObject::invokeMethod(main,"togglePianoRoll"));
+        auto* window=main->findChild<QQuickWindow*>("floatingPianoRollWindow"); QVERIFY(window);
+        QTRY_VERIFY(window->isVisible()); QVERIFY(item(floating)); QVERIFY(!item(docked));
+        QCOMPARE(item(floating)->property("clipId").toInt(),clip);
+        window->close(); QTRY_VERIFY(!window->isVisible()); QVERIFY(item(floating));
     }
     void track_card_chips_wrap_and_fit_at_the_narrowest_track_list() {
         TrackListWrapper tracks; const int id=tracks.addVocalTrack();

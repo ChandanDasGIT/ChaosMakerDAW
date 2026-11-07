@@ -156,7 +156,7 @@ if(DAW_BUILD_APP)
                       frontend/dsp/LevelMeter.qml
                       frontend/pianoroll/PianoRollView.qml frontend/pianoroll/PianoKeys.qml
                       frontend/pianoroll/PianoRollComboBox.qml frontend/pianoroll/VelocityLane.qml
-                      tests/ui/TransportHarness.qml
+                      tests/ui/TransportHarness.qml Main.qml
             SOURCES ${WRAPPER_SOURCES})
         target_include_directories(transporttests PRIVATE "${CMAKE_CURRENT_LIST_DIR}" ${WRAPPER_DIRS})
         # Source-tree checks (e.g. icons live only in frontend/icons/Icons.qml).
