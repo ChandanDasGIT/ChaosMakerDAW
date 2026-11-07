@@ -751,6 +751,34 @@ private slots:
         QCOMPARE(name(mute),QString("Mute disabled"));
         QVERIFY(tracks.setMuted(id,true)); QCOMPARE(name(mute),QString("Mute enabled"));
     }
+    void track_card_chips_wrap_and_fit_at_the_narrowest_track_list() {
+        TrackListWrapper tracks; const int id=tracks.addVocalTrack();
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        const qreal oldWidth=list->width();
+        const auto restore=qScopeGuard([&] { list->setVisible(false); list->setWidth(oldWidth); list->setProperty("trackModel",QVariant()); });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        const QString n=QString::number(id);
+        auto* accent=visualItem(list,"trackColourAccent"+n); QVERIFY(accent);
+        auto* card=accent->parentItem(); QVERIFY(card);
+        for(const qreal width:{340.0,180.0}) {
+            list->setWidth(width); QTest::qWait(30);
+            const QRectF cardRect=card->mapRectToScene(QRectF(0,0,card->width(),card->height()));
+            QList<QRectF> placed;
+            for(const char* stem:{"trackMuteButton","trackSoloButton","trackInputButton","trackMonitorButton",
+                                   "trackRecordButton","trackFxButton","trackRemoveButton","trackVolume"}) {
+                auto* item=visualItem(list,stem+n); QVERIFY2(item,stem);
+                const QRectF rect=item->mapRectToScene(QRectF(0,0,item->width(),item->height()));
+                const QString where=QString("%1 at %2 px: %3,%4 %5x%6").arg(stem).arg(width).arg(rect.x()).arg(rect.y()).arg(rect.width()).arg(rect.height());
+                QVERIFY2(item->isVisible() && rect.width()>0 && rect.height()>0,qPrintable(where));
+                QVERIFY2(cardRect.contains(rect),qPrintable(where+" outside card"));
+                for(const QRectF& other:placed) QVERIFY2(!other.intersects(rect),qPrintable(where+" overlaps"));
+                placed.append(rect);
+            }
+            // Mute (first) and remove share the top line; at 180 px FX drops to a second line.
+            QCOMPARE(placed[6].top(),placed[0].top());
+            QCOMPARE(placed[5].top()>placed[0].top(),width<200);
+        }
+    }
     void layout_sizes_are_saved_and_restored_between_sessions() {
         QSettings qs;
         const auto restore=qScopeGuard([&] {

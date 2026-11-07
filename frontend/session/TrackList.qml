@@ -233,67 +233,82 @@ Rectangle {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 2
-                            ToggleChip {
-                                id: muteButton
-                                objectName: "trackMuteButton" + trackCard.trackId
-                                active: trackCard.isMuted
-                                activeBg: Theme.muteBg; activeBorder: Theme.muteBorder; activeText: Theme.muteText
-                                text: "M"; implicitWidth: 22; implicitHeight: 24
-                                onClicked: root.trackModel.setMuted(trackCard.trackId, !active)
-                                tooltip: active ? "Mute enabled" : "Mute disabled"
+                            // At the narrowest track list the chips wrap onto a second, shorter line
+                            // so the card still fits its timeline lane; the remove button stays top right.
+                            Flow {
+                                id: chipFlow
+                                readonly property real oneLineWidth: muteButton.implicitWidth + soloButton.implicitWidth
+                                    + inputButton.implicitWidth + monitorButton.implicitWidth
+                                    + recordButton.implicitWidth + fxButton.implicitWidth + 5 * spacing
+                                readonly property bool wrapped: width < oneLineWidth
+                                readonly property real chipHeight: wrapped ? 18 : 24
+                                Layout.fillWidth: true
+                                Layout.alignment: Qt.AlignTop
+                                Layout.preferredHeight: implicitHeight
+                                spacing: 2
+                                ToggleChip {
+                                    id: muteButton
+                                    objectName: "trackMuteButton" + trackCard.trackId
+                                    active: trackCard.isMuted
+                                    activeBg: Theme.muteBg; activeBorder: Theme.muteBorder; activeText: Theme.muteText
+                                    text: "M"; implicitWidth: 22; implicitHeight: chipFlow.chipHeight
+                                    onClicked: root.trackModel.setMuted(trackCard.trackId, !active)
+                                    tooltip: active ? "Mute enabled" : "Mute disabled"
+                                }
+                                ToggleChip {
+                                    id: soloButton
+                                    objectName: "trackSoloButton" + trackCard.trackId
+                                    active: trackCard.isSolo
+                                    activeBg: Theme.soloBg; activeBorder: Theme.soloBorder; activeText: Theme.soloText
+                                    text: "S"; implicitWidth: 22; implicitHeight: chipFlow.chipHeight
+                                    onClicked: root.trackModel.setSolo(trackCard.trackId, !active)
+                                    tooltip: active ? "Solo enabled" : "Solo disabled"
+                                }
+                                ToggleChip {
+                                    id: inputButton
+                                    objectName: "trackInputButton" + trackCard.trackId
+                                    // Lit (accent text and border) once an input is chosen; still lightens on hover.
+                                    active: trackCard.inputPort.length > 0
+                                    activeBg: hovered ? Theme.chipHover : Theme.chip
+                                    hoverHighlight: true
+                                    text: "IN"; textSize: Theme.microSize
+                                    implicitWidth: 26; implicitHeight: chipFlow.chipHeight
+                                    onClicked: inputPopup.open()
+                                    tooltip: trackCard.inputPort.length > 0 ? trackCard.inputPort : "Choose this track's input"
+                                }
+                                ToggleChip {
+                                    id: monitorButton
+                                    objectName: "trackMonitorButton" + trackCard.trackId
+                                    active: trackCard.monitorEnabled
+                                    enabled: trackCard.hasLiveInput
+                                    implicitWidth: 26; implicitHeight: chipFlow.chipHeight
+                                    text: "MON"; textSize: Theme.microSize
+                                    onClicked: root.trackModel.setMonitorEnabled(trackCard.trackId, !active)
+                                    tooltip: active ? "Disable live input monitoring" : "Monitor this track's input without arming recording"
+                                }
+                                ToggleChip {
+                                    id: recordButton
+                                    objectName: "trackRecordButton" + trackCard.trackId
+                                    active: trackCard.isRecordArmed
+                                    activeBg: Theme.recordBg; activeBorder: Theme.record; activeText: Theme.textStrong
+                                    implicitWidth: 50; implicitHeight: chipFlow.chipHeight
+                                    text: active ? "REC ON" : "REC OFF"; textSize: Theme.microSize
+                                    onClicked: root.trackModel.setRecordArmed(trackCard.trackId, !active)
+                                    tooltip: active ? "Recording armed" : "Arm track for recording"
+                                }
+                                ToggleChip {
+                                    id: fxButton
+                                    objectName: "trackFxButton" + trackCard.trackId
+                                    hoverHighlight: true
+                                    text: "FX"; textSize: 9
+                                    implicitWidth: 28; implicitHeight: chipFlow.chipHeight
+                                    onClicked: fxPopup.open()
+                                    tooltip: "Browse track effects"
+                                }
                             }
-                            ToggleChip {
-                                id: soloButton
-                                objectName: "trackSoloButton" + trackCard.trackId
-                                active: trackCard.isSolo
-                                activeBg: Theme.soloBg; activeBorder: Theme.soloBorder; activeText: Theme.soloText
-                                text: "S"; implicitWidth: 22; implicitHeight: 24
-                                onClicked: root.trackModel.setSolo(trackCard.trackId, !active)
-                                tooltip: active ? "Solo enabled" : "Solo disabled"
-                            }
-                            ToggleChip {
-                                id: inputButton
-                                objectName: "trackInputButton" + trackCard.trackId
-                                // Lit (accent text and border) once an input is chosen; still lightens on hover.
-                                active: trackCard.inputPort.length > 0
-                                activeBg: hovered ? Theme.chipHover : Theme.chip
-                                hoverHighlight: true
-                                text: "IN"; textSize: Theme.microSize
-                                implicitWidth: 26; implicitHeight: 24
-                                onClicked: inputPopup.open()
-                                tooltip: trackCard.inputPort.length > 0 ? trackCard.inputPort : "Choose this track's input"
-                            }
-                            ToggleChip {
-                                objectName: "trackMonitorButton" + trackCard.trackId
-                                active: trackCard.monitorEnabled
-                                enabled: trackCard.hasLiveInput
-                                implicitWidth: 26; implicitHeight: 24
-                                text: "MON"; textSize: Theme.microSize
-                                onClicked: root.trackModel.setMonitorEnabled(trackCard.trackId, !active)
-                                tooltip: active ? "Disable live input monitoring" : "Monitor this track's input without arming recording"
-                            }
-                            ToggleChip {
-                                id: recordButton
-                                objectName: "trackRecordButton" + trackCard.trackId
-                                active: trackCard.isRecordArmed
-                                activeBg: Theme.recordBg; activeBorder: Theme.record; activeText: Theme.textStrong
-                                implicitWidth: 50; implicitHeight: 24
-                                text: active ? "REC ON" : "REC OFF"; textSize: Theme.microSize
-                                onClicked: root.trackModel.setRecordArmed(trackCard.trackId, !active)
-                                tooltip: active ? "Recording armed" : "Arm track for recording"
-                            }
-                            ToggleChip {
-                                id: fxButton
-                                objectName: "trackFxButton" + trackCard.trackId
-                                hoverHighlight: true
-                                text: "FX"; textSize: 9
-                                implicitWidth: 28; implicitHeight: 24
-                                onClicked: fxPopup.open()
-                                tooltip: "Browse track effects"
-                            }
-                            Item { Layout.fillWidth: true }
                             ToolButton {
                                 id: closeTrackButton
+                                Layout.alignment: Qt.AlignTop
                                 objectName: "trackRemoveButton" + trackCard.trackId
                                 text: Icons.close
                                 Accessible.name: "Remove track"
