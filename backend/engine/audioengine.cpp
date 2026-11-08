@@ -213,14 +213,7 @@ void AudioEngine::processInput(const AudioIO& io) noexcept
             if (m_liveMidiCount < static_cast<int>(m_liveMidiBatch.size())) {
                 m_liveMidiBatch[m_liveMidiCount++] = LiveMidiMessage{trackId, MidiEvent{0, status, key, vel}};
             }
-            if (auto* aud = findOrCreateAudition(trackId)) {
-                if ((status & 0xF0) == 0x90 && vel > 0) {
-                    aud->activeNotes++;
-                } else if ((status & 0xF0) == 0x80 || ((status & 0xF0) == 0x90 && vel == 0)) {
-                    if (aud->activeNotes > 0) aud->activeNotes--;
-                    aud->tailSamples = static_cast<int>(m_sampleRate * 2.0);
-                }
-            }
+            if (auto* aud = findOrCreateAudition(trackId)) aud->count(MidiEvent{0, status, key, vel}, m_sampleRate);
             break;
         }
         case EngineCommand::Type::SetStopAtEnd: m_stopAtEnd = command.a != 0; break;
@@ -236,7 +229,7 @@ void AudioEngine::processInput(const AudioIO& io) noexcept
             m_resetPlayback = true;
             m_playing = false;
             m_position = 0;
-            for (auto& a : m_liveAuditions) { a.activeNotes = 0; a.tailSamples = 0; }
+            for (auto& a : m_liveAuditions) { a.activeNotes = 0; a.tailSamples = 0; a.pedalDown = false; }
             break;
         case EngineCommand::Type::Seek:
             if (!m_recorder && !m_recordingGroup) { m_position = std::clamp<std::int64_t>(command.a, 0, INT64_MAX / 2); m_resetPlayback = true; cancelRingOut(); }
@@ -281,14 +274,7 @@ void AudioEngine::processInput(const AudioIO& io) noexcept
         for (const auto& t : currentSnap->tracks) {
             if (trackReceivesHwMidi(t, currentSnap)) {
                 for (const auto& ev : io.midiIn->events()) {
-                    if (auto* aud = findOrCreateAudition(t.trackId)) {
-                        if ((ev.status & 0xF0) == 0x90 && ev.data2 > 0) {
-                            aud->activeNotes++;
-                        } else if ((ev.status & 0xF0) == 0x80 || ((ev.status & 0xF0) == 0x90 && ev.data2 == 0)) {
-                            if (aud->activeNotes > 0) aud->activeNotes--;
-                            aud->tailSamples = static_cast<int>(m_sampleRate * 2.0);
-                        }
-                    }
+                    if (auto* aud = findOrCreateAudition(t.trackId)) aud->count(ev, m_sampleRate);
                 }
             }
         }
@@ -460,10 +446,11 @@ AudioEngine::LiveTrackAudition* AudioEngine::findOrCreateAudition(int trackId) n
         if (a.trackId == trackId) return &a;
     }
     for (auto& a : m_liveAuditions) {
-        if (a.activeNotes == 0 && a.tailSamples <= 0) {
+        if (!a.busy()) {
             a.trackId = trackId;
             a.activeNotes = 0;
             a.tailSamples = 0;
+            a.pedalDown = false;
             return &a;
         }
     }
@@ -476,7 +463,7 @@ AudioEngine::LiveTrackAudition* AudioEngine::findAudition(int trackId) noexcept
         if (a.trackId == trackId) return &a;
     }
     for (auto& a : m_liveAuditions) {
-        if (a.trackId < 0 && (a.activeNotes > 0 || a.tailSamples > 0)) return &a;
+        if (a.trackId < 0 && a.busy()) return &a;
     }
     return nullptr;
 }
@@ -484,7 +471,7 @@ AudioEngine::LiveTrackAudition* AudioEngine::findAudition(int trackId) noexcept
 bool AudioEngine::isAuditionActive(int trackId) const noexcept
 {
     for (const auto& a : m_liveAuditions) {
-        if ((a.trackId < 0 || a.trackId == trackId) && (a.activeNotes > 0 || a.tailSamples > 0)) {
+        if ((a.trackId < 0 || a.trackId == trackId) && a.busy()) {
             return true;
         }
     }
@@ -494,7 +481,7 @@ bool AudioEngine::isAuditionActive(int trackId) const noexcept
 bool AudioEngine::anyAuditionActive() const noexcept
 {
     for (const auto& a : m_liveAuditions) {
-        if (a.activeNotes > 0 || a.tailSamples > 0) return true;
+        if (a.busy()) return true;
     }
     return false;
 }
@@ -663,7 +650,7 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
         m_endNoteOffs = false;                              // sent to every track in this block
         if (!m_playing) {
             for (auto& aud : m_liveAuditions) {
-                if (aud.activeNotes == 0 && aud.tailSamples > 0) {
+                if (!aud.held() && aud.tailSamples > 0) {
                     aud.tailSamples = std::max(0, aud.tailSamples - count);
                 }
             }
@@ -830,7 +817,7 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
         m_endNoteOffs = false;                              // sent to every track in this block
         if (!m_playing) {
             for (auto& aud : m_liveAuditions) {
-                if (aud.activeNotes == 0 && aud.tailSamples > 0) {
+                if (!aud.held() && aud.tailSamples > 0) {
                     aud.tailSamples = std::max(0, aud.tailSamples - count);
                 }
             }

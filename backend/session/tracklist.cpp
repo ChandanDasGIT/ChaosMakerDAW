@@ -268,6 +268,11 @@ TrackList::Change TrackList::setElectroDrums(int id, const electrodrums::Setting
 {
     return result(m_project.setTrackElectroDrums(id, settings));
 }
+
+TrackList::Change TrackList::setPiano(int id, const piano::Settings& settings)
+{
+    return result(m_project.setTrackPiano(id, settings));
+}
 int TrackList::addTrackEffect(int trackId, const std::string& type)
 {
     return trackLocked(trackId) ? -1 : m_project.addTrackEffect(trackId, type);

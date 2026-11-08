@@ -7,6 +7,7 @@
 #include "plugins/chaoseq/chaoseqsettings.h"
 #include "instruments/drums/drumkitsettings.h"
 #include "instruments/electrodrums/electrosettings.h"
+#include "instruments/piano/pianosettings.h"
 #include "instruments/harmonium/harmoniumsettings.h"
 
 #include <cstdint>
@@ -57,6 +58,8 @@ struct Track {
     drumkit::Settings drumkit;
     // Electronic Drums tracks: style, each drum's tune / decay / level, volume.
     electrodrums::Settings electrodrums;
+    // Piano tracks: volume, release, resonance, velocity, brightness, scale changer.
+    piano::Settings piano;
     // Insert effects in processing order (plan 6.1); rules in effectchain.
     std::vector<TrackEffectSlot> effects;
     std::vector<AudioClip> audioClips;
@@ -67,7 +70,7 @@ struct Track {
     bool canMonitor() const { return hasLiveInput() || kind == TrackKind::Instrument; }
     bool recordsWithFx() const { return hasLiveInput() && !recordDry; }
     // Semitones the track's instrument moves every note it is sent (a scale changer): a played
-    // C4 sounds C4 + keyShift(). The harmonium's scale changer today; 0 for every other track.
+    // C4 sounds C4 + keyShift(). The harmonium's and the piano's scale changers; 0 elsewhere.
     int keyShift() const;
 };
 
@@ -95,6 +98,7 @@ public:
     bool setTrackHarmonium(int id, const harmonium::Settings& settings);
     bool setTrackDrumKit(int id, const drumkit::Settings& settings);   // the same way
     bool setTrackElectroDrums(int id, const electrodrums::Settings& settings);   // and again
+    bool setTrackPiano(int id, const piano::Settings& settings);
     // Insert effects. Not undoable by design (the user removes an effect by hand); undoing a
     // track removal still brings the track back with its effects.
     int addTrackEffect(int trackId, const std::string& type); // new effect id, or -1

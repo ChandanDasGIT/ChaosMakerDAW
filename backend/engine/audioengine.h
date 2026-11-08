@@ -132,6 +132,25 @@ private:
         int trackId = -1;
         int activeNotes = 0;
         int tailSamples = 0;
+        bool pedalDown = false;            // the sustain pedal (CC 64) holds notes like a key
+        bool held() const noexcept { return activeNotes > 0 || pedalDown; }
+        bool busy() const noexcept { return held() || tailSamples > 0; }
+        // Counts one live event: keys and the pedal keep the track playing, letting go of the
+        // last starts a two-second tail.
+        void count(const MidiEvent& event, double sampleRate) noexcept
+        {
+            const int type = event.status & 0xF0;
+            if (type == 0x90 && event.data2 > 0) {
+                activeNotes++;
+            } else if (type == 0x80 || type == 0x90) {
+                if (activeNotes > 0) activeNotes--;
+                tailSamples = static_cast<int>(sampleRate * 2.0);
+            } else if (type == 0xB0 && event.data1 == 64) {
+                const bool down = event.data2 >= 64;
+                if (pedalDown && !down) tailSamples = static_cast<int>(sampleRate * 2.0);
+                pedalDown = down;
+            }
+        }
     };
     std::array<LiveMidiMessage, 64> m_liveMidiBatch{};
     int m_liveMidiCount = 0;
