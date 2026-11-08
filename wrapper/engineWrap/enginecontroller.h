@@ -179,6 +179,9 @@ public:
     Q_INVOKABLE bool setCleanMonitorInput(const QString& port);
     Q_INVOKABLE void sendLiveNoteOn(int trackId, int note, int velocity = 100);
     Q_INVOKABLE void sendLiveNoteOff(int trackId, int note);
+    // A controller change to the track's instrument, as a MIDI keyboard would send it (the
+    // piano page's sustain pedal: 64).
+    Q_INVOKABLE void sendLiveControl(int trackId, int controller, int value);
     QStringList midiInputPorts() const;
     QString connectedMidiPort() const;
     Q_INVOKABLE bool connectMidiInput(const QString& portName);

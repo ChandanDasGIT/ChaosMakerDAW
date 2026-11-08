@@ -71,6 +71,7 @@ TrackListWrapper::TrackListWrapper(QObject* parent)
     // The selected track's key shift follows a new selection, its harmonium settings and loads.
     connect(this, &TrackListWrapper::selectedTrackChanged, this, &TrackListWrapper::syncKeyShift);
     connect(this, &TrackListWrapper::harmoniumChanged, this, &TrackListWrapper::syncKeyShift);
+    connect(this, &TrackListWrapper::pianoChanged, this, &TrackListWrapper::syncKeyShift);
     connect(this, &TrackListWrapper::projectChanged, this, &TrackListWrapper::syncKeyShift);
 }
 
@@ -461,6 +462,21 @@ bool TrackListWrapper::setDrumKit(int trackId, const drumkit::Settings& settings
     const auto before = *drumKit(trackId);
     const auto change = m_state.setDrumKit(trackId, settings);
     if (change.accepted && !(before == *drumKit(trackId))) emit drumKitChanged(trackId);
+    return change.accepted;
+}
+
+const piano::Settings* TrackListWrapper::piano(int trackId) const
+{
+    const auto* track = m_project.findTrack(trackId);
+    return track && track->type == "Piano" ? &track->piano : nullptr;
+}
+
+bool TrackListWrapper::setPiano(int trackId, const piano::Settings& settings)
+{
+    if (!piano(trackId)) return false;
+    const auto before = *piano(trackId);
+    const auto change = m_state.setPiano(trackId, settings);
+    if (change.accepted && !(before == *piano(trackId))) emit pianoChanged(trackId);
     return change.accepted;
 }
 

@@ -224,8 +224,17 @@ decoder (C4) and the piano (C5).
         unchanged (its regions use none of it; its high-pass is still "not yet", see C3b).
         Tests: sampler (hold, low-pass, note polyphony, live zones, pedal release, sustain
         hold, MIDI CC), sfzloader (piano opcodes, the real map when present). 3 the piano instrument
-        (shared library, Piano tracks, settings + json + wrapper, transpose); 4 the drawn FX
-        page; 5 renders, then the user plays it.
+        (shared library, Piano tracks, settings + json + wrapper, transpose) DONE 2026-11-08:
+        backend/instruments/piano (Settings: volume, release CC72, resonance CC70, velocity
+        CC99, brightness = a low-pass from 1 kHz, transpose = scale changer in
+        Track::keyShift; Library shared like the drum kit's, 515 MB decoded, ~3 s to load;
+        TrimDb -6: a forte 5-note chord peaked 1.43, now 0.72; Piano keeps key / pedal
+        state for the page), persistence/pianojson ("piano" on Piano tracks), PianoWrapper
+        (settings, status, play / stop / setPedalDown, keysDown, pedal, struck),
+        EngineController::sendLiveControl; the engine's live audition counts the pedal as a
+        held key. Piano tracks no longer use TestSynth (two tests moved to Strings). The FX
+        page ("piano" in the catalog) comes with step 4. Possible later: keep samples as
+        16-bit to halve the memory. 4 the drawn FX page; 5 renders, then the user plays it.
 [ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
         model), mapped in instrumentfactory.cpp.
 [x] C7  Harmonium, built 2026-11-07 (before C2, the user's choice); tuning by ear is left (B9).

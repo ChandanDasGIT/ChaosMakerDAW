@@ -543,7 +543,7 @@ TEST(harmonium, mono_buffer_gets_the_sum_and_settings_round_trip)
 TEST(harmonium, harmonium_tracks_get_the_harmonium_and_their_settings_reach_it)
 {
     CHECK(createInstrument("Harmonium")->typeId() == "harmonium");
-    CHECK(createInstrument("Piano")->typeId() == "testsynth");     // the others are not built yet
+    CHECK(createInstrument("Strings")->typeId() == "testsynth");   // the others are not built yet
 
     Project project;
     auto& track = project.addTrack(TrackKind::Instrument, "Harmonium", "Harmonium");
@@ -564,7 +564,7 @@ TEST(harmonium, harmonium_tracks_get_the_harmonium_and_their_settings_reach_it)
     applied.airNoise = settings.airNoise; applied.keyClick = settings.keyClick;
     CHECK(applied == settings);
 
-    auto& piano = project.addTrack(TrackKind::Instrument, "Keys", "Piano");   // not touched
+    auto& piano = project.addTrack(TrackKind::Instrument, "Strings", "Strings");   // not touched
     effects[piano.id].instrument = createInstrument(piano.type);
     SnapshotBuilder::syncTrackEq(project, effects);
     CHECK(effects[piano.id].instrument->typeId() == "testsynth");

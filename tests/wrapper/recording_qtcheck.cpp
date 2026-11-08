@@ -887,7 +887,7 @@ TEST(qtrecording, instrument_is_prepared_once_and_replaced_when_the_buffer_chang
     Storage storage;
     auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
     EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
-    const int piano=tracks.addInstrumentTrackOfType("Piano");
+    const int piano=tracks.addInstrumentTrackOfType("Strings");   // still TestSynth, so its voices can be read
     const int audio=tracks.addAudioTrack();
     tick(); io->process();
     const auto first=controller.trackInstrument(piano);

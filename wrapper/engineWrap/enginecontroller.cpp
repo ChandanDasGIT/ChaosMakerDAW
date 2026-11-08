@@ -13,6 +13,7 @@
 #include "instruments/drums/drumkit.h"
 #include "instruments/electrodrums/electrodrums.h"
 #include "instruments/harmonium/harmonium.h"
+#include "instruments/piano/piano.h"
 #include "persistence/projectdocument.h"
 #include "processor/trackinput.h"
 
@@ -916,6 +917,16 @@ void EngineController::attachProject(TrackListWrapper* model) {
             static_cast<DrumKit&>(*it->second.instrument).setSettings(*settings);
         if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
     });
+    // Piano edits: the piano rebuilds its zones in the background; no playback rebuild.
+    connect(model, &TrackListWrapper::pianoChanged, this, [this](int trackId) {
+        if (!m_project) return;
+        const auto* settings = m_project->piano(trackId);
+        const auto it = m_trackEffects.find(trackId);
+        if (!settings || it == m_trackEffects.end()) return;
+        if (it->second.instrument && it->second.instrument->typeId() == "piano")
+            static_cast<Piano&>(*it->second.instrument).setSettings(*settings);
+        if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
+    });
     // Electronic drum edits: straight into the track's kit (atomic parameters); no rebuild.
     connect(model, &TrackListWrapper::electroDrumsChanged, this, [this](int trackId) {
         if (!m_project) return;
@@ -1241,6 +1252,15 @@ void EngineController::sendLiveNoteOff(int trackId, int note) {
     cmd.type = EngineCommand::Type::NoteFromUi;
     cmd.a = trackId;
     cmd.b = (std::int64_t(0x80) << 16) | (std::int64_t(note & 0x7F) << 8) | 0;
+    m_engine->post(cmd);
+}
+
+void EngineController::sendLiveControl(int trackId, int controller, int value) {
+    if (!m_engine || controller < 0 || controller > 127) return;
+    EngineCommand cmd;
+    cmd.type = EngineCommand::Type::NoteFromUi;
+    cmd.a = trackId;
+    cmd.b = (std::int64_t(0xB0) << 16) | (std::int64_t(controller & 0x7F) << 8) | std::clamp(value, 0, 127);
     m_engine->post(cmd);
 }
 

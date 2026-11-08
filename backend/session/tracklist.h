@@ -102,6 +102,7 @@ public:
     Change setHarmonium(int id, const harmonium::Settings& settings);
     Change setDrumKit(int id, const drumkit::Settings& settings);
     Change setElectroDrums(int id, const electrodrums::Settings& settings);
+    Change setPiano(int id, const piano::Settings& settings);
     // Recording mode for tracks the user adds from now on (the "default recording mode"
     // preference); unset keeps Project's rule (dry only for plain Audio tracks). Loaded tracks
     // keep their saved mode.

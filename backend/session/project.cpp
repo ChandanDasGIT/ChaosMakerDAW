@@ -17,6 +17,7 @@ bool Track::hasLiveInput() const
 int Track::keyShift() const
 {
     if (kind == TrackKind::Instrument && type == "Harmonium") return harmonium.transpose;
+    if (kind == TrackKind::Instrument && type == "Piano") return piano.transpose;
     return 0;
 }
 
@@ -238,6 +239,14 @@ bool Project::setTrackElectroDrums(int id, const electrodrums::Settings& setting
     auto* track = findTrack(id);
     if (!track) return false;
     track->electrodrums = electrodrums::sanitize(settings);
+    return true;
+}
+
+bool Project::setTrackPiano(int id, const piano::Settings& settings)
+{
+    auto* track = findTrack(id);
+    if (!track) return false;
+    track->piano = piano::sanitize(settings);
     return true;
 }
 

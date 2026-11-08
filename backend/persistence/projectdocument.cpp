@@ -2,6 +2,7 @@
 #include "chaoseqjson.h"
 #include "drumkitjson.h"
 #include "electrodrumsjson.h"
+#include "pianojson.h"
 #include "harmoniumjson.h"
 #include "mixer/mixerpanel.h"
 #include "recording/takerecorder.h"
@@ -90,6 +91,7 @@ std::string ProjectDocument::serialize(const Project& project,
         if (track->type == "Drums") trackObj["drumkit"] = drumkitjson::toJson(track->drumkit);
         if (track->type == "Electronic Drums")
             trackObj["electrodrums"] = electrodrumsjson::toJson(track->electrodrums);
+        if (track->type == "Piano") trackObj["piano"] = pianojson::toJson(track->piano);
         json effectsList = json::array();
         for (const auto& slot : track->effects) effectsList.push_back(slot.type);
         trackObj["effects"] = std::move(effectsList);   // insert effects in chain order (plan 6.1)
@@ -290,6 +292,11 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             electrodrums::Settings settings;
             if (!electrodrumsjson::fromJson(item["electrodrums"], settings, error)) return false;
             candidate.setTrackElectroDrums(track.id, settings);
+        }
+        if (item.contains("piano")) {
+            piano::Settings settings;
+            if (!pianojson::fromJson(item["piano"], settings, error)) return false;
+            candidate.setTrackPiano(track.id, settings);
         }
 
         for (int i = 0; i < 10; ++i) {
