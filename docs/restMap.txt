@@ -13,10 +13,78 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
                 [L] will do later (the user's choice; section H)   [-] dropped (the user)
 
 
-NEXT UP (the user, 2026-11-08/09): drum grooves (G1), FX chain export / import (G2), then
-the chord / arpeggio sequencer (G3 = F1). Plans first, one step at a time.
+NEXT UP (the user, 2026-11-09): G4 below, the Chords track's real variations. Start here when
+the user says "let's continue". Plans first, one step at a time.
 ------------------------------------------------------------------------------------------------
-[x] G1  DONE 2026-11-09 (uncommitted, waiting for the user's try): drum grooves on both drum
+[ ] G4  Chords track: real pattern and voicing variations (the user, 2026-11-09, after trying
+        G3: "not much useful. I asked for chord variations, not a ballad, a trash arpeggio and a
+        16-note arpeggio. The arpeggio just makes two notes repeat each other. It doesn't
+        change any rhythm according to the time signature.")
+        WHAT WENT WRONG (check first):
+        - Bug: rhythmpattern.cpp case 3 restarts the arpeggio index at every group start, and
+          in n/4 meters every beat is a group, so the hand only ever plays voicing notes 0 and
+          1 (two notes alternating). Case 4 is a fixed up-down in 16ths: no shape, no feel.
+        - The four modes are styles (Block / Ballad / Arpeggio / Arpeggio 16ths), not musical
+          variations, and apart from 6/8 and 7/8 grouping they barely change with the meter.
+        THE USER'S DECISIONS (2026-11-09):
+        - "Variations" = PATTERN variations + VOICING variations (not chord colours like Am7/Am9).
+        - Patterns are WRITTEN PER METER (not one shape with meter accents).
+        PLAN (each step approved and tested before the next; renders before the app):
+        1. Pattern library (backend/plugins/chordplayer/rhythmpattern.*, data-driven tables):
+           - Meter families, each with its own written patterns: 4/4 (and 2/4), 3/4, 6/8 (and
+             9/8, 12/8), 7/8 (2+2+3; and 5/8 = 3+2), 5/4 (3+2). Any other meter falls back to
+             the nearest family by pulse and grouping.
+           - Four patterns per meter (the Autoplay selector 1..4 becomes four musical
+             variations every chord can use), two bars long, bar 2 varied so it does not loop
+             identically. Proposed set, to be judged by ear:
+               1 Flowing   broken chord across two octaves over a held bass (4/4: 8ths,
+                           accents 3+3+2; 3/4: six 8ths up-and-over; 6/8: two rolling groups
+                           of three; 7/8: 2+2+3)
+               2 Pop       syncopated 16th arpeggio (4/4: 3+3+3+3+2+2), bass on 1 and the "and"
+                           of 2, chord tones in a shape, not up-and-down only
+               3 Comping   rhythmic chords with pushes and a moving bass (4/4: 1, 2&, 4 ...;
+                           3/4: oom-pah-pah with a pickup; 6/8: 1 3 4 6; 7/8: on the groups)
+               4 Ballad    rolled chord, low-to-high, then a slow top-line melody of chord tones
+           - Arpeggio steps name chord tones across the bar (root, 3rd, 5th, octave, 10th ...),
+             never restart per beat; a pattern spans up to two octaves above the voicing.
+           - Small fixed humanising (velocity accents per meter group, a few ms early/late on
+             weak 16ths, deterministic so recordings replay the same), the sustain pedal (CC 64)
+             changed on each chord for the flowing / ballad patterns, legato note lengths.
+           - Tests: every pattern stays inside its bar in every meter; an arpeggio bar uses at
+             least four different notes; bar 2 differs from bar 1; group starts carry the
+             accents; notes still land on the exact sample at any BPM.
+        2. Renders for the user BEFORE anything changes in the app: Am G F E at 100 / 120 BPM in
+           4/4, 3/4, 6/8, 7/8 and 5/4 for patterns 1..4 (renders/chords-v2/). The user picks,
+           rejects or asks for changes per pattern; repeat until liked.
+        3. Voicing variations (GarageBand strip segments): each strip's chord area splits into
+           three zones, high / middle / low = the same chord in a higher / middle / lower
+           register and inversion (voice-led within the zone); the bass zone stays below.
+           ChordPlayer gets a zone per press (three RightHand ranges); tests for each zone.
+           MIDI / KEYS: chords stay on the white keys C4..C5 (middle zone) and the bass on
+           C2..C3. TO CONFIRM WITH THE USER AT THE START OF THIS STEP: how MIDI reaches the
+           low / high zones. Proposal: zone keys on the black keys F#2 / G#2 / A#2 (low / middle
+           / high) set the zone for the presses that follow (recorded like any press). Adjacent
+           octaves cannot both carry eight strips without sharing a C, hence no octave mapping.
+        4. Page: the strips drawn with their three zones + bass; the Autoplay selector shows the
+           four pattern names (tooltips say how each plays in the project's meter); the piano
+           roll labels the zone keys. Recording and "Convert clip to piano notes" re-checked
+           with zones and the new patterns (wrappertests qtchords, transport_ui chords test).
+        5. The user plays it; restMap and renders updated.
+        FILES: edit backend/plugins/chordplayer/rhythmpattern.h/.cpp (rewrite), chordplayer.h/
+        .cpp (zones, pedal, humanising), chordsettings.h/.cpp (pattern names), wrapper/plugins/
+        chordplayer/chordswrap/chordswrapper.*, frontend/plugins/chordplayer/ChordStrips.qml
+        and ChordsEditor.qml, wrapper/pianorollwrap/pianorollwrapper.cpp (zone key labels),
+        tests/plugins/chordplayer_test.cpp, tests/wrapper/chords_qtcheck.cpp, tests/ui/
+        transport_qtcheck.cpp. Saved projects: autoplay 1..4 keep their numbers (they now
+        name the new patterns); no file format change unless zones need saving (they don't:
+        a zone is per press).
+        STILL OPEN BEFORE G4 (the user decides): commit / push. Local commits not pushed:
+        63fec35, 72e6e1c (grooves). Uncommitted: G2 (FX chains, .chaosfx) and G3 (Chords track).
+
+Earlier NEXT UP (2026-11-08/09): drum grooves (G1), FX chain export / import (G2), then the
+chord / arpeggio sequencer (G3 = F1).
+------------------------------------------------------------------------------------------------
+[x] G1  DONE 2026-11-09 (committed in 63fec35): drum grooves on both drum
         pages (Drums and Electronic Drums). The user: "beats/grooves that adjust to each kit and
         the project's BPM", two each for 3/4, 4/4 and 7/8, and grooves of one's own.
         - backend/instruments/drums/grooves/drumgroove: Groove (meter, bars, notes in quarter-note
@@ -34,11 +102,45 @@ the chord / arpeggio sequencer (G3 = F1). Plans first, one step at a time.
         - Renders (both kits, 4 bars each): renders/drum-grooves/ (git-ignored).
         Tests: backendtests drumgroove; wrappertests qtdrumgroove; transport_ui
         drum_pages_offer_grooves_that_go_on_the_track_and_save_from_a_clip.
-[ ] G2  Export / import FX chains (plan approved 2026-11-08: "Export chain..." / "Import chain..."
-        in the FX window; a .chain file with every effect and setting in order; import REPLACES
-        the chain, skips effects the track type can't take and says which; effect edits are not
-        on the undo list, so import asks first).
-[ ] G3  Chord / arpeggio sequencer (= F1 below); a detailed plan first.
+[x] G2  DONE 2026-11-09 (uncommitted, waiting for the user's try): FX chain export / import (.chaosfx).
+        - backend/persistence/effectchainjson (persistence::chainjson): the .chaosfx file
+          ({"format": "ChaosMakerChain", "version": 1, "trackType", "effects": [{type, settings}]}),
+          capture() (the chain in order with every setting; GuitarSuite's pedalboard is its
+          preset JSON, passed in from the Qt side) and planImport(): the chain is REPLACED; EQ /
+          Chaos EQ come in the file's order; an instrument page (GuitarSuite, Harmonium, Drums,
+          Electronic Drums, Piano) applies only to the same instrument, else it is skipped and
+          named; the track's own pages stay first. Settings that do not read: nothing changes.
+        - EngineController previewEffectChain / importEffectChain / exportEffectChain (it holds
+          both the tracks and each track's GuitarSuite model; the plan said TrackListWrapper).
+        - FX window header: "Export chain..." / "Import chain..." (file dialogs inside the
+          window); import shows what comes, what is skipped and "can't be undone", then Replace.
+          A spacer now keeps the header's controls together on the right.
+        Tests: backendtests effectchainjson; wrappertests qteffectchain; transport_ui
+        fx_window_exports_a_chain_and_imports_it_onto_another_track_after_asking.
+[x] G3  DONE 2026-11-09 (uncommitted, waiting for the user's try) = F1: the Chords track,
+        GarageBand Smart Keyboard style (the user's local-reference/GarageBand.jpg).
+        - Track type "Chords" beside Vocal and Instrument in the picker (catalog ownKind);
+          pages: "chords" (strips) then "piano" (catalog extraPage); plays the Splendid Grand
+          through ChordsInstrument = ChordPlayer in front of Piano (backend/instruments/chords).
+        - backend/plugins/chordplayer: chordsymbol (names, key / degree, Roman tokens, eight
+          progressions), chordvoicer (voice-led right hand, no heap core for the audio thread,
+          bass), rhythmpattern (autoplay 1 Block, 2 Ballad, 3 Arpeggio, 4 Arpeggio 16ths; 3/4
+          oom-pah-pah, 6/8 rolling, 7/8 2+2+3), chordplayer (sample-exact, follows BPM and meter,
+          latches; same strip again stops; own clock while stopped; ends on transport start /
+          stop / jump / all-notes-off), chordsettings, chordrender (Convert to notes).
+        - Strips play as MIDI on fixed keys: chords = white keys C4..C5, bass = white keys C2..C3
+          (the user had been told C3..C4 for bass; moved so it does not share C4). So strips,
+          KEYS, a MIDI keyboard and recording all work alike; a take records the presses and
+          plays back through autoplay (the user's choice 1a); "Convert clip to piano notes"
+          makes a Piano track. Piano roll names the trigger keys ("3 · F", "Bass 3 · F").
+        - Engine: Processor::keepsRunning() so a latched autoplay plays with the transport stopped.
+        - Saved: project "chords" (persistence/chordsjson) and the piano settings; FX chains too.
+        - Renders: renders/chords/ (Am G F E, 120 BPM, 4/4 3/4 6/8 x autoplay 1-4).
+        Known limits: starting playback mid-chord stays silent until the next press in the
+        clip; the piano page's drawn keys on a Chords track play strips on the trigger keys.
+        Tests: backendtests chordsymbol, chordvoicer, chordplayer, chordsjson, audioengine_midi
+        (keepsRunning); wrappertests qtchords; transport_ui
+        chords_track_is_a_kind_of_its_own_and_its_page_has_eight_strips.
 
 Earlier NEXT UP (2026-11-08): UI polish across the app.
 ------------------------------------------------------------------------------------------------
@@ -77,6 +179,9 @@ Earlier NEXT UP (2026-11-08): UI polish across the app.
         ('settings().indian.female'). drum_kit_lives_in_fx_* fails on a cold first run only.
         They look like window activation / FX window size timing; their later slider checks
         never run, so fix them before relying on them.
+        2026-11-09: in long ordered runs window activation fails at random here (different
+        tests each run, e.g. the picker test, floating_windows_*, close_buttons_*); each
+        passes alone or in short runs.
 
 Earlier NEXT UP (2026-11-08 night), all closed:
 ------------------------------------------------------------------------------------------------
@@ -490,7 +595,7 @@ the piano) and is reused here.
 
 F. LATER ROADMAP PHASES — from docs/roadmap.txt
 ------------------------------------------------
-[ ] F1  Phase 12: Auto chord player — chord input and rhythm-pattern playback, wrapper, UI,
+[x] F1  DONE 2026-11-09 as G3 (the Chords track, see the top). Phase 12: Auto chord player — chord input and rhythm-pattern playback, wrapper, UI,
         tests (backend/plugins/chordplayer has only rhythmpattern.h).
 [ ] F2  Phase 13: Export and finish — offline render of the whole song (backend/render is
         empty), export controls, final verification.
