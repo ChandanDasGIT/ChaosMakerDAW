@@ -7,8 +7,8 @@
 
 TEST(instrumentcatalog, existing_track_type_ids_names_and_choice_order_are_preserved)
 {
-    constexpr std::array<std::string_view, 6> expected{
-        "Piano", "Acoustic Guitar", "Electric Guitar", "Strings", "Drums", "Harmonium"
+    constexpr std::array<std::string_view, 7> expected{
+        "Piano", "Acoustic Guitar", "Electric Guitar", "Strings", "Drums", "Harmonium", "Electronic Drums"
     };
     const auto entries = instrumentcatalog::instruments();
     CHECK(entries.size() == expected.size());
@@ -51,5 +51,32 @@ TEST(instrumentcatalog, instruments_with_controls_name_their_fx_page)
     CHECK(instrumentcatalog::find("Acoustic Guitar")->page == "guitarsuite");
     CHECK(instrumentcatalog::find("Harmonium")->page == "harmonium");
     CHECK(instrumentcatalog::find("Drums")->page == "drumkit");
+    CHECK(instrumentcatalog::find("Electronic Drums")->page == "electrodrums");
     for (const char* id : {"Piano", "Strings"}) CHECK(instrumentcatalog::find(id)->page.empty());
+}
+
+TEST(instrumentcatalog, drum_kits_name_their_keys_from_their_own_maps)
+{
+    CHECK(instrumentcatalog::isDrumKit("Drums") && instrumentcatalog::isDrumKit("Electronic Drums"));
+    CHECK(!instrumentcatalog::isDrumKit("Piano") && !instrumentcatalog::isDrumKit("Harmonium"));
+    CHECK(instrumentcatalog::drumName("Drums", 60) == "Kick");
+    CHECK(instrumentcatalog::drumName("Electronic Drums", 60) == "Kick");
+    CHECK(instrumentcatalog::drumName("Drums", 63).empty());              // no clap in the acoustic kit
+    CHECK(instrumentcatalog::drumName("Electronic Drums", 63) == "Clap");
+    CHECK(instrumentcatalog::drumName("Electronic Drums", 73) == "Crash");
+    CHECK(instrumentcatalog::drumName("Piano", 60).empty());
+}
+
+TEST(instrumentcatalog, guitars_and_drums_are_grouped_by_kind)
+{
+    const auto kind = [](std::string_view id) {
+        const auto* e = instrumentcatalog::find(id);
+        return e ? std::pair{e->group, e->variant} : std::pair<std::string_view, std::string_view>{};
+    };
+    CHECK(kind("Acoustic Guitar") == (std::pair<std::string_view, std::string_view>{"Guitar", "Acoustic"}));
+    CHECK(kind("Electric Guitar") == (std::pair<std::string_view, std::string_view>{"Guitar", "Electric"}));
+    CHECK(kind("Drums") == (std::pair<std::string_view, std::string_view>{"Drums", "Acoustic"}));
+    CHECK(kind("Electronic Drums") == (std::pair<std::string_view, std::string_view>{"Drums", "Electronic"}));
+    for (const char* id : {"Piano", "Strings", "Harmonium"})
+        CHECK(kind(id) == (std::pair<std::string_view, std::string_view>{"", ""}));
 }

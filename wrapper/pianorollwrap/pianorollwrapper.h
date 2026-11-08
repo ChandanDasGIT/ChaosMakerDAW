@@ -35,6 +35,9 @@ class PianoRollWrapper : public QObject {
     Q_PROPERTY(QString trackColour READ trackColour NOTIFY trackColourChanged)
     // A Drums track's clip: the keys the kit plays are labelled with its parts (backend drummap).
     Q_PROPERTY(bool drumMode READ drumMode NOTIFY bindingChanged)
+    // Which drum kit names the keys (the track type, "" for other tracks): the labels follow it
+    // from one kit to the other, where drumMode stays true.
+    Q_PROPERTY(QString drumKit READ drumKit NOTIFY bindingChanged)
     // Grid and snapping (backend PianoRollGrid). Settings use the menu names below.
     Q_PROPERTY(QString gridDivision READ gridDivision WRITE setGridDivision NOTIFY gridChanged)
     Q_PROPERTY(QString gridStyle READ gridStyle WRITE setGridStyle NOTIFY gridChanged)
@@ -71,6 +74,7 @@ public:
     double beatUnit() const;
     QString trackColour() const;
     bool drumMode() const;
+    QString drumKit() const;
     // Clip-relative beat as "bar.beat.hundredths" in the project meter.
     Q_INVOKABLE QString positionLabel(double beat) const;
 

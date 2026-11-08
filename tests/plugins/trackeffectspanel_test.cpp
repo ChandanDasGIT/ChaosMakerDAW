@@ -46,6 +46,15 @@ TEST(trackeffectspanel, drums_track_opens_on_its_drum_kit_page) {
     CHECK(panel.selectedEffect() == "drumkit");
 }
 
+TEST(trackeffectspanel, electronic_drums_track_opens_on_its_own_page) {
+    TrackEffectsPanel panel;
+    panel.setTrackInfo(5, "Beats", "Electronic Drums", false, false);
+    panel.setChain({"electrodrums", "eq"});
+    CHECK(panel.supportsElectroDrums());
+    CHECK(!panel.supportsDrumKit() && !panel.supportsHarmonium() && !panel.supportsGuitarSuite());
+    CHECK(panel.selectedEffect() == "electrodrums");
+}
+
 TEST(trackeffectspanel, harmonium_track_opens_on_its_harmonium_page) {
     TrackEffectsPanel panel;
     panel.setTrackInfo(3, "Harmonium", "Harmonium", false, false);

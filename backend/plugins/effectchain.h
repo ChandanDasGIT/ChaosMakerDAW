@@ -30,6 +30,8 @@ inline constexpr std::string_view GuitarSuite = "guitarsuite";
 inline constexpr std::string_view Harmonium = "harmonium";
 // The acoustic drum kit's controls (room, levels, character), a page like the harmonium's.
 inline constexpr std::string_view DrumKit = "drumkit";
+// The electronic drum kit's controls (style, per-drum tune / decay / level), the same way.
+inline constexpr std::string_view ElectroDrums = "electrodrums";
 
 // Every effect type, in the order an "Add FX" picker lists them.
 std::span<const EffectDefinition> effects();

@@ -11,6 +11,7 @@
 #include "instruments/guitar/plugins/guitarsuite/guitarsuite.h"
 #include "instruments/instrumentfactory.h"
 #include "instruments/drums/drumkit.h"
+#include "instruments/electrodrums/electrodrums.h"
 #include "instruments/harmonium/harmonium.h"
 #include "persistence/projectdocument.h"
 #include "processor/trackinput.h"
@@ -913,6 +914,16 @@ void EngineController::attachProject(TrackListWrapper* model) {
         if (!settings || it == m_trackEffects.end()) return;
         if (it->second.instrument && it->second.instrument->typeId() == "drumkit")
             static_cast<DrumKit&>(*it->second.instrument).setSettings(*settings);
+        if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
+    });
+    // Electronic drum edits: straight into the track's kit (atomic parameters); no rebuild.
+    connect(model, &TrackListWrapper::electroDrumsChanged, this, [this](int trackId) {
+        if (!m_project) return;
+        const auto* settings = m_project->electroDrums(trackId);
+        const auto it = m_trackEffects.find(trackId);
+        if (!settings || it == m_trackEffects.end()) return;
+        if (it->second.instrument && it->second.instrument->typeId() == "electrodrums")
+            static_cast<ElectroDrums&>(*it->second.instrument).setSettings(*settings);
         if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
     });
     refreshProject();

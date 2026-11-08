@@ -95,8 +95,26 @@ std::vector<TrackList::TrackChoice> TrackList::trackChoices()
 std::vector<TrackList::TrackChoice> TrackList::instrumentChoices()
 {
     std::vector<TrackChoice> choices;
+    for (const auto& entry : instrumentcatalog::instruments()) {
+        if (entry.group.empty()) {
+            choices.push_back({std::string(entry.id), std::string(entry.name), false});
+            continue;
+        }
+        const std::string id = std::string(GroupPrefix) + std::string(entry.group);
+        const bool listed = std::any_of(choices.begin(), choices.end(), [&id](const auto& c) { return c.id == id; });
+        if (!listed) choices.push_back({id, std::string(entry.group), true});
+    }
+    return choices;
+}
+
+std::vector<TrackList::TrackChoice> TrackList::variantChoices(const std::string& group)
+{
+    std::string_view name = group;
+    if (name.starts_with(GroupPrefix)) name.remove_prefix(GroupPrefix.size());
+    std::vector<TrackChoice> choices;
+    if (name.empty()) return choices;
     for (const auto& entry : instrumentcatalog::instruments())
-        choices.push_back({std::string(entry.id), std::string(entry.name), false});
+        if (entry.group == name) choices.push_back({std::string(entry.id), std::string(entry.variant), false});
     return choices;
 }
 
@@ -244,6 +262,11 @@ TrackList::Change TrackList::setHarmonium(int id, const harmonium::Settings& set
 TrackList::Change TrackList::setDrumKit(int id, const drumkit::Settings& settings)
 {
     return result(m_project.setTrackDrumKit(id, settings));
+}
+
+TrackList::Change TrackList::setElectroDrums(int id, const electrodrums::Settings& settings)
+{
+    return result(m_project.setTrackElectroDrums(id, settings));
 }
 int TrackList::addTrackEffect(int trackId, const std::string& type)
 {

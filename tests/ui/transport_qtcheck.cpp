@@ -1362,6 +1362,68 @@ private slots:
         auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
         QTRY_VERIFY(!panel->property("visible").toBool());
     }
+    void electronic_drums_live_in_fx_and_the_drawn_machine_plays_and_edits() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int e=tracks.addInstrumentTrackOfType("Electronic Drums");
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        const auto restore=qScopeGuard([&] {
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+        });
+        QTest::qWait(30);
+        const auto settings=[&]{ return tracks.project().findTrack(e)->electrodrums; };
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(e)); QVERIFY(fx); click(fx);
+        auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(e)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("electrodrums"));   // opens on its page
+        QVERIFY(panel->property("supportsElectroDrums").toBool());
+        QVERIFY(!panel->property("supportsDrumKit").toBool());
+        QVERIFY(!visualItem(window->contentItem(),"removeEffect_electrodrums")->isVisible());   // fixed
+
+        auto* picture=visualItem(window->contentItem(),"electroDrumsPicture"); QVERIFY(picture);
+        QTRY_VERIFY(picture->isVisible()); QVERIFY(picture->height()>100);
+        auto* bridge=visualObject(window->contentItem(),"electroDrumsBridge"); QVERIFY(bridge);
+        QSignalSpy played(bridge,SIGNAL(played(int,int)));
+
+        // Sixteen pads; the middle of a pad hits hard and picks its drum for the knobs.
+        for (int key : {55,56,57,60,61,62,63,64,65,66,67,68,69,70,73,75})
+            QVERIFY2(visualItem(picture,"electroPad_"+QString::number(key)),qPrintable(QString::number(key)));
+        auto* clap=visualItem(picture,"electroPad_63"); QVERIFY(clap); click(clap);
+        QTRY_COMPARE(played.count(),1);
+        QCOMPARE(played[0][0].toInt(),63); QVERIFY(played[0][1].toInt()>=120);
+        auto* selected=visualItem(window->contentItem(),"electroDrumsSelected"); QVERIFY(selected);
+        QTRY_COMPARE(selected->property("text").toString(),QString("CLAP"));
+
+        // The knobs edit the picked drum only.
+        auto* level=visualItem(window->contentItem(),"electroDrumsLevel"); QVERIFY(level);
+        QQuickItem* slider=nullptr;
+        for (auto* child : level->findChildren<QQuickItem*>()) if (child->inherits("QQuickSlider")) slider=child;
+        QVERIFY(slider);
+        slider->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Left);
+        QTRY_VERIFY(settings().drum(electrodrums::Drum::Clap).levelDb<0.0);
+        QCOMPARE(settings().drum(electrodrums::Drum::Kick).levelDb,0.0);
+
+        // A style button lights and sets the style; the display shows it.
+        auto* style909=visualItem(picture,"electroStyle_909"); QVERIFY(style909); click(style909);
+        QTRY_VERIFY(settings().style==electrodrums::Style::Style909);
+        auto* display=visualItem(picture,"electroDisplayStyle"); QVERIFY(display);
+        QTRY_COMPARE(display->property("text").toString(),QString("909"));
+
+        // The volume knob: dragging up turns it up.
+        auto* knob=visualItem(picture,"electroVolumeKnob"); QVERIFY(knob);
+        const QPoint from=knob->mapToScene(QPointF(knob->width()/2,knob->height()/2)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,from);
+        QTest::mouseMove(window,from-QPoint(0,10)); QTest::mouseMove(window,from-QPoint(0,30));
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,from-QPoint(0,30));
+        QTRY_VERIFY(settings().volumeDb>0.0);
+        QVERIFY(window->grabWindow().save("/tmp/chaosmaker-electrodrums-page.png"));
+
+        auto* reset=visualItem(window->contentItem(),"electroDrumsReset"); QVERIFY(reset);
+        click(reset); QTRY_VERIFY(settings()==electrodrums::Settings{});
+        auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!panel->property("visible").toBool());
+    }
     void harmonium_lives_in_fx_like_guitarsuite_and_edits_its_settings() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks);
@@ -1636,6 +1698,9 @@ private slots:
         QTest::qWait(20);
         auto* add = visualItem(list, "addTrackButton"); QVERIFY(add); click(add); QTest::qWait(20);
         auto* instrument = visualItem(window->contentItem(), "trackChoice_Instrument"); QVERIFY(instrument); click(instrument); QTest::qWait(20);
+        QVERIFY(!visualItem(window->contentItem(), "trackChoice_Electric Guitar"));   // inside Guitar now
+        auto* guitar = visualItem(window->contentItem(), "trackChoice_group:Guitar"); QVERIFY(guitar); click(guitar); QTest::qWait(20);
+        QVERIFY(visualItem(window->contentItem(), "trackChoice_Acoustic Guitar"));
         auto* electric = visualItem(window->contentItem(), "trackChoice_Electric Guitar"); QVERIFY(electric); click(electric);
         QTRY_COMPARE(tracks.count(), 1);
         QCOMPARE(tracks.project().tracks()[0]->type, std::string("Electric Guitar"));
@@ -1647,6 +1712,21 @@ private slots:
         QTRY_COMPARE(tracks.count(), 2);
         QCOMPARE(tracks.project().tracks()[1]->type, std::string("Vocal"));
         QCOMPARE(tracks.project().tracks()[1]->name, std::string("Vocal 1"));
+
+        // Drums > Electronic; the back arrow steps back one screen at a time.
+        QTRY_VERIFY(!popup->property("visible").toBool()); click(add); QTest::qWait(20);
+        instrument = visualItem(window->contentItem(), "trackChoice_Instrument"); QVERIFY(instrument); click(instrument); QTest::qWait(20);
+        auto* drums = visualItem(window->contentItem(), "trackChoice_group:Drums"); QVERIFY(drums); click(drums); QTest::qWait(20);
+        QCOMPARE(popup->property("addTrackStage").toString(), QString("variant"));
+        auto* back = visualItem(window->contentItem(), "addTrackBack"); QVERIFY(back); click(back); QTest::qWait(20);
+        QCOMPARE(popup->property("addTrackStage").toString(), QString("instrument"));
+        drums = visualItem(window->contentItem(), "trackChoice_group:Drums"); QVERIFY(drums); click(drums); QTest::qWait(20);
+        QVERIFY(visualItem(window->contentItem(), "trackChoice_Drums"));
+        auto* electronic = visualItem(window->contentItem(), "trackChoice_Electronic Drums"); QVERIFY(electronic); click(electronic);
+        QTRY_COMPARE(tracks.count(), 3);
+        QCOMPARE(tracks.project().tracks()[2]->type, std::string("Electronic Drums"));
+        QTRY_VERIFY(!popup->property("visible").toBool());
+        QCOMPARE(popup->property("addTrackStage").toString(), QString("kind"));
     }
     void track_names_edit_inline_commit_cancel_and_update_mixer_and_fx() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
@@ -3060,6 +3140,35 @@ private slots:
         QTRY_VERIFY(!backend->property("drumMode").toBool());
         QCOMPARE(keys->width(),90.0);
         QVERIFY(!label(60)->isVisible());                           // no part names on other instruments
+    }
+    void piano_roll_names_the_electronic_kit_parts() {
+        TrackListWrapper tracks;
+        const int electro=tracks.addInstrumentTrackOfType("Electronic Drums"), drums=tracks.addInstrumentTrackOfType("Drums");
+        const int electroClip=tracks.addClipAtBeat(electro,0,4), drumClip=tracks.addClipAtBeat(drums,0,4);
+        QVERIFY(electroClip>0 && drumClip>0);
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* backend=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(backend);
+        const auto restore=qScopeGuard([&] {
+            roll->setVisible(false); roll->setProperty("clipId",-1); roll->setProperty("trackId",-1);
+            roll->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+        });
+        roll->setProperty("trackModel",QVariant::fromValue(&tracks));
+        roll->setProperty("trackId",electro); roll->setProperty("clipId",electroClip);
+        roll->setVisible(true);
+        QTRY_VERIFY(backend->property("drumMode").toBool());
+        const auto label=[&](int note) { return visualItem(roll,"drumKeyLabel"+QString::number(note)); };
+        QVERIFY(label(60)); QTRY_VERIFY(label(60)->isVisible());
+        QCOMPARE(label(60)->property("text").toString(),QString("Kick"));
+        QCOMPARE(label(63)->property("text").toString(),QString("Clap"));
+        QCOMPARE(label(73)->property("text").toString(),QString("Crash"));
+        QCOMPARE(label(75)->property("text").toString(),QString("Ride"));
+        QVERIFY(label(73)->isVisible());
+        // Straight to the acoustic kit (both are drum tracks): its own names, no clap or crash.
+        roll->setProperty("trackId",drums); roll->setProperty("clipId",drumClip);
+        QTRY_VERIFY(!label(73)->isVisible());
+        QVERIFY(!label(63)->isVisible());
+        QCOMPARE(label(60)->property("text").toString(),QString("Kick"));
+        QCOMPARE(label(64)->property("text").toString(),QString("Snare edge"));
     }
     void piano_roll_shows_no_placeholder_controls() {
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);

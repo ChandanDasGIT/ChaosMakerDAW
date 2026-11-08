@@ -233,6 +233,14 @@ bool Project::setTrackDrumKit(int id, const drumkit::Settings& settings)
     return true;
 }
 
+bool Project::setTrackElectroDrums(int id, const electrodrums::Settings& settings)
+{
+    auto* track = findTrack(id);
+    if (!track) return false;
+    track->electrodrums = electrodrums::sanitize(settings);
+    return true;
+}
+
 bool Project::setTrackEqBand(int id, int band, float gainDb)
 {
     auto* track = findTrack(id);
