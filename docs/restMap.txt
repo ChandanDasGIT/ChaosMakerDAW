@@ -13,15 +13,41 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
                 [L] will do later (the user's choice; section H)   [-] dropped (the user)
 
 
-NEXT UP (the user, 2026-11-08): UI polish across the app. Plans are made and approved one
-step at a time (plan + files first). No restyle beyond what each item asks (no-redesign rule).
+NEXT UP (the user, 2026-11-08/09): drum grooves (G1), FX chain export / import (G2), then
+the chord / arpeggio sequencer (G3 = F1). Plans first, one step at a time.
 ------------------------------------------------------------------------------------------------
-[x] U1  DONE 2026-11-08 (uncommitted, waiting for the user's look): every cross is the shared
+[x] G1  DONE 2026-11-09 (uncommitted, waiting for the user's try): drum grooves on both drum
+        pages (Drums and Electronic Drums). The user: "beats/grooves that adjust to each kit and
+        the project's BPM", two each for 3/4, 4/4 and 7/8, and grooves of one's own.
+        - backend/instruments/drums/grooves/drumgroove: Groove (meter, bars, notes in quarter-note
+          beats on the shared drum keys, so the tempo and either kit just work; no cymbals: the
+          acoustic kit has none). Factory: Waltz A / B (3/4), Rock A / B (4/4), Groove A (2+2+3)
+          / Groove B (3+2+2) (7/8), two bars each. repeated() fills N bars; fromClip() makes a
+          groove of whole bars from a clip under the project meter.
+        - backend/persistence/drumgroovejson (.groove files) and groovestore (the user's grooves
+          in one folder; names unique ignoring case; factory ones fixed).
+        - TrackList::addPatternClipAtBeat: a clip with its notes in one undo step.
+        - wrapper DrumGrooveWrapper (folder = app data "grooves"); frontend GroovePanel.qml at the
+          bottom of both drum pages: chips per meter (project's first), bars 1/2/4/8, "Add to
+          track" (at the start of the playhead's bar), "Save selected clip as groove...",
+          Rename / Delete for the user's own, a note when the meter differs from the project's.
+        - Renders (both kits, 4 bars each): renders/drum-grooves/ (git-ignored).
+        Tests: backendtests drumgroove; wrappertests qtdrumgroove; transport_ui
+        drum_pages_offer_grooves_that_go_on_the_track_and_save_from_a_clip.
+[ ] G2  Export / import FX chains (plan approved 2026-11-08: "Export chain..." / "Import chain..."
+        in the FX window; a .chain file with every effect and setting in order; import REPLACES
+        the chain, skips effects the track type can't take and says which; effect edits are not
+        on the undo list, so import asks first).
+[ ] G3  Chord / arpeggio sequencer (= F1 below); a detailed plan first.
+
+Earlier NEXT UP (2026-11-08): UI polish across the app.
+------------------------------------------------------------------------------------------------
+[x] U1  DONE 2026-11-08 (committed in 07d51f8): every cross is the shared
         frontend/common/CloseButton.qml. Muted cross at rest; under the mouse a soft round
         backdrop (Theme.hoverOverlay) and a white cross; pressed a little darker. Remove buttons
         (track, effect, pedal) are `destructive`: red round backdrop (Theme.recordBg).
         Test: transporttests close_buttons_share_one_look_soft_round_on_hover_red_when_removing.
-[x] U2  DONE 2026-11-08 (uncommitted, waiting for the user's look): every slider is the shared
+[x] U2  DONE 2026-11-08 (committed in 07d51f8): every slider is the shared
         frontend/common/ThemedSlider.qml, after ProjectMusicPlayer's ThemedSlider: a 6 px rounded
         track filled to the value (white, accent under the mouse), a round handle 10 / 14 / 16 px
         (rest / hover / drag); vertical faders get a pill across the track. The handle's layout
@@ -29,7 +55,7 @@ step at a time (plan + files first). No restyle beyond what each item asks (no-r
         (and GuitarSuiteColors sliderTrack / handleBorder). controls_use_the_shared_themed_
         components now also bans plain Slider outside frontend/common/.
         Test: transporttests sliders_are_rounded_with_a_round_handle_and_a_pill_on_faders.
-[x] U2b DONE 2026-11-08 (the user: "still kinda basic"; uncommitted, waiting for the user's look):
+[x] U2b DONE 2026-11-08 (the user: "still kinda basic"; committed in 07d51f8):
         - A track's own sliders (track card VOL, mixer CLIP) are ThemedSlider with `tint` = the
           track colour: fill and handle ring in it, a little brighter under the mouse; a new
           colour follows at once.
@@ -39,7 +65,7 @@ step at a time (plan + files first). No restyle beyond what each item asks (no-r
           flat on vertical) with grip grooves and an indicator line (accent while dragged);
           brighter under the mouse; cap layout box still 13 px. Colours: Theme fader*.
         Test: transporttests desk_faders_have_a_slot_ticks_and_a_metal_cap (+ the slider test).
-[x] U3  DONE 2026-11-08 (uncommitted): the FX panel and the on-screen piano are windows of
+[x] U3  DONE 2026-11-08 (committed in 07d51f8): the FX panel and the on-screen piano are windows of
         their own and did not get Main.qml's tooltip palette, so they showed the system's black
         on yellow; both now set Theme.tooltipBg / tooltipText (thin light outline: Qt's own,
         the user is fine with it). Test: transporttests
