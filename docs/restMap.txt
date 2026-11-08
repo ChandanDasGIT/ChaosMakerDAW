@@ -191,15 +191,29 @@ decoder (C4) and the piano (C5).
         cymbals in our own code (crash 49, ride 51, maybe ride bell 53: inharmonic metallic
         oscillators + filtered noise, long darkening decay, velocity -> brightness), renders
         for the user first; if liked, they join the Drums track and the piano roll labels.
-[ ] C4  FLAC decoder, hand-written, in the app (backend, shared): the sampler loads the
-        Splendid piano with it, and audio import (E) reuses it later. Stream and frame
-        parsing, subframes (constant, verbatim, fixed and LPC prediction), Rice-coded
-        residuals, stereo decorrelation, 16/24-bit, MD5 check. Tests: decode reference
-        files and compare sample for sample with the same audio as WAV.
-[ ] C5  PIANO NEXT: Splendid Grand Piano (see C9) as the real "Piano" instrument, loaded
+[x] C4  DONE 2026-11-08: backend/audiofile/flacreader (hand-written) + md5. Stream and frame
+        parsing, constant / verbatim / fixed / LPC subframes, Rice residuals (both methods,
+        escapes), all stereo modes, wasted bits, 4-32 bit, CRC-8/16 and MD5 checked, ID3v2
+        skipped. The SFZ loader reads .flac samples with it. Tests (flacreader): fixtures in
+        tests/audiofile/data (made once with ffmpeg from a formula the test rebuilds, every
+        stereo mode, LPC order 32, fixed with odd block sizes, 24-bit mono; vendor tags
+        stripped) compared sample for sample, damage reported, and all 226 Splendid piano
+        files match their own MD5 (when sample-kits is present).
+        The user asked about ffmpeg in the app (2026-11-08): not now (from-scratch rule,
+        size, LGPL care). For compressed import later (E: MP3, AAC, Ogg) the suggested route
+        is Qt Multimedia's QAudioDecoder (Qt 6 runs FFmpeg underneath), not linking FFmpeg.
+[~] C5  PIANO NEXT: Splendid Grand Piano (see C9) as the real "Piano" instrument, loaded
         through the FLAC decoder. Sustain pedal, release, string resonance controls. Map the
         Piano track type. Listen with the user; if it disappoints, switch to the fallback
         Accurate-Salamander (WAV; CC-BY, so a credit is then required: see C8).
+        The user's decisions (2026-11-08): the piano gets a scale changer (transpose, like
+        the harmonium: add its case to Track::keyShift(), see N1b); the FX page is a drawn
+        grand seen from above, lid open, keys lighting as they play, a clickable pedal.
+        Steps (each approved and tested): 1 FLAC decoder (= C4, DONE); 2 sampler features
+        (sustain pedal CC 64 with half pedal, per-zone low-pass for the soft layer, one voice
+        per key, the pedal's string-resonance group, live release); 3 the piano instrument
+        (shared library, Piano tracks, settings + json + wrapper, transpose); 4 the drawn FX
+        page; 5 renders, then the user plays it.
 [ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
         model), mapped in instrumentfactory.cpp.
 [x] C7  Harmonium, built 2026-11-07 (before C2, the user's choice); tuning by ear is left (B9).

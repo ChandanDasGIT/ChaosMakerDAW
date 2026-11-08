@@ -30,6 +30,8 @@ compile_commands.json
 
 # Sample libraries and audio live outside the repo
 *.flac
+# ... except the FLAC decoder's small test files
+!tests/audiofile/data/*.flac
 
 # Private notes
 /1. planning/
