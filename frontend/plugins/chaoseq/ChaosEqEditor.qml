@@ -66,7 +66,7 @@ Item {
             Text { text: valueSlider.label; color: Theme.textMuted; font.pixelSize: Theme.captionSize; Layout.fillWidth: true }
             Text { text: valueSlider.valueText; color: Theme.text; font.pixelSize: Theme.smallSize }
         }
-        Slider {
+        HardwareSlider {
             Layout.fillWidth: true
             from: 0
             to: 1

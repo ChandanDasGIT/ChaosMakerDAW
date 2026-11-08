@@ -70,6 +70,10 @@ Window {
     minimumWidth: 640
     minimumHeight: 420
     color: Theme.popupBg
+    // A window of its own does not inherit the main window's palette: without these the
+    // tooltips fall back to the system's black on yellow.
+    palette.toolTipBase: Theme.tooltipBg
+    palette.toolTipText: Theme.tooltipText
 
     Shortcut {
         sequences: [StandardKey.Cancel]
@@ -102,14 +106,12 @@ Window {
                     ToolTip.visible: hovered
                     ToolTip.text: "Applies to new takes. Existing recordings keep their original mode."
                 }
-                ToolButton {
+                CloseButton {
                     objectName: "closeTrackEffects"
-                    text: Icons.close
+                    implicitWidth: 32; implicitHeight: 32; glyphSize: 22
                     Accessible.name: "Close effects"
+                    tooltip: "Close effects"
                     onClicked: root.close()
-                    contentItem: Text { text: Icons.close; color: Theme.text; font.pixelSize: 22; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                    ToolTip.visible: hovered
-                    ToolTip.text: "Close effects"
                 }
             }
         }
@@ -216,18 +218,15 @@ Window {
                                             Text { text: slot.modelData.title; color: Theme.text; font.pixelSize: 12; font.bold: true }
                                             Text { text: slot.modelData.subtitle; color: Theme.textMuted; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight }
                                         }
-                                        ToolButton {
+                                        CloseButton {
                                             id: removeEffect
                                             objectName: "removeEffect_" + slot.modelData.type
                                             visible: slot.modelData.removable
+                                            destructive: true
                                             implicitWidth: 22; implicitHeight: 22
                                             Accessible.name: "Remove " + slot.modelData.title
+                                            tooltip: "Remove " + slot.modelData.title
                                             onClicked: root.trackModel.removeTrackEffect(root.trackId, slot.modelData.id)
-                                            contentItem: Text { text: Icons.close; color: removeEffect.hovered ? Theme.textStrong : Theme.textMuted; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                            background: Rectangle { radius: 4; color: removeEffect.hovered ? Theme.recordBg : "transparent"; border.color: removeEffect.hovered ? Theme.record : "transparent" }
-                                            ToolTip.visible: hovered
-                                            ToolTip.text: "Remove " + slot.modelData.title
-                                            ToolTip.delay: 450
                                         }
                                     }
                                 }

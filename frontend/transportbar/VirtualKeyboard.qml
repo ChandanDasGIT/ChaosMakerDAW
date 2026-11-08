@@ -39,6 +39,10 @@ Window {
     minimumWidth: 620
     minimumHeight: 150
     color: Theme.panelBg
+    // A window of its own does not inherit the main window's palette: without these the
+    // tooltips fall back to the system's black on yellow.
+    palette.toolTipBase: Theme.tooltipBg
+    palette.toolTipText: Theme.tooltipText
 
     VirtualKeyboardWrapper {
         id: bridge

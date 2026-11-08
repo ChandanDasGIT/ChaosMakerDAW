@@ -314,19 +314,16 @@ Rectangle {
                                     tooltip: "Browse track effects"
                                 }
                             }
-                            ToolButton {
+                            CloseButton {
                                 id: closeTrackButton
                                 Layout.alignment: Qt.AlignTop
                                 objectName: "trackRemoveButton" + trackCard.trackId
-                                text: Icons.close
-                                Accessible.name: "Remove track"
+                                destructive: true
+                                glyphSize: 17
                                 implicitWidth: 20; implicitHeight: 24
+                                Accessible.name: "Remove track"
+                                tooltip: "Remove track"
                                 onClicked: root.requestRemoveTrack(trackCard.trackId, trackCard.name, trackCard.clips ? trackCard.clips.length : 0)
-                                contentItem: Text { text: Icons.close; color: closeTrackButton.hovered ? Theme.textStrong : Theme.textMuted; font.pixelSize: 17; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                                background: Rectangle { radius: 4; color: closeTrackButton.hovered ? Theme.recordBg : "transparent"; border.color: closeTrackButton.hovered ? Theme.record : "transparent" }
-                                ToolTip.visible: hovered
-                                ToolTip.text: "Remove track"
-                                ToolTip.delay: 450
                             }
                         }
 
@@ -334,9 +331,10 @@ Rectangle {
                             Layout.fillWidth: true
                             spacing: 5
                             Text { text: "VOL"; color: Theme.textMuted; font.pixelSize: Theme.microSize; font.bold: true; Layout.preferredWidth: 24 }
-                            Slider {
+                            ThemedSlider {
                                 id: volumeSlider
                                 objectName: "trackVolume" + trackCard.trackId
+                                tint: trackCard.trackColour
                                 Layout.fillWidth: true
                                 from: 0; to: 2; value: trackCard.volume
                                 onMoved: root.trackModel.setVolume(trackCard.trackId, value)
