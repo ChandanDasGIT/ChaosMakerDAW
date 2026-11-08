@@ -20,6 +20,7 @@ Item {
     property var noteSource: null
     // A drum clip: the keys the kit plays show the part's name instead of the note name
     property bool drumMode: false
+    property string drumKit: ""                          // which kit names the keys: switching kits renames them
 
     function noteLabel(note) {
         return root.noteSource ? root.noteSource.noteName(note) : ""
@@ -49,7 +50,7 @@ Item {
                 readonly property int note: 127 - index
                 readonly property bool black: root.noteSource ? root.noteSource.isBlackKey(note) : false
                 readonly property bool isC: root.noteSource ? root.noteSource.isOctaveStart(note) : false
-                readonly property string drumName: root.drumMode && root.noteSource ? root.noteSource.drumName(note) : ""
+                readonly property string drumName: root.drumMode && root.drumKit !== "" && root.noteSource ? root.noteSource.drumName(note) : ""
                 readonly property bool isActive: (keyRow.note === root.activeNote)
 
                 width: root.width

@@ -71,6 +71,8 @@ public:
     const TrackList& domain() const { return m_state; }
     QVariantList trackChoices() const;
     QVariantList instrumentChoices() const;
+    // The kinds inside an instrument group choice (hasChildren), e.g. Drums: Acoustic, Electronic.
+    Q_INVOKABLE QVariantList variantChoices(const QString& group) const;
     Q_INVOKABLE int addTrackChoice(const QString& id);
 
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
@@ -144,6 +146,9 @@ public:
     // Drums tracks, for DrumKitWrapper, the same way: drumKitChanged.
     const drumkit::Settings* drumKit(int trackId) const;       // null unless a Drums track
     bool setDrumKit(int trackId, const drumkit::Settings& settings);
+    // Electronic Drums tracks, for ElectroDrumsWrapper, the same way: electroDrumsChanged.
+    const electrodrums::Settings* electroDrums(int trackId) const;   // null unless Electronic Drums
+    bool setElectroDrums(int trackId, const electrodrums::Settings& settings);
     Q_INVOKABLE bool resetTrackEq(int trackId);
     bool newTrackRecordDry() const { return m_newTrackRecordDry; }
     void setNewTrackRecordDry(bool dry);
@@ -201,6 +206,7 @@ signals:
     void chaosEqChanged(int trackId);
     void harmoniumChanged(int trackId);
     void drumKitChanged(int trackId);
+    void electroDrumsChanged(int trackId);
     void eqPresetErrorChanged();
     void countChanged();
     void contentEndBeatsChanged();

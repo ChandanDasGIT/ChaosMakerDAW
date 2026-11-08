@@ -60,7 +60,13 @@ public:
     void adoptDocument(TrackList&& candidate);
 
     static std::vector<TrackChoice> trackChoices();
+    // The instruments in catalog order, a group (Guitar, Drums) once, where its first kind is:
+    // a group's id is GroupPrefix + its name and it has children (variantChoices).
     static std::vector<TrackChoice> instrumentChoices();
+    // The kinds in one group ("Guitar": Acoustic, Electric), ids are the track types to add.
+    // Accepts the group's name or its choice id; empty for anything else.
+    static std::vector<TrackChoice> variantChoices(const std::string& group);
+    static constexpr std::string_view GroupPrefix = "group:";
     static bool isInstrumentType(const std::string& type);
     bool canAddChoice(const std::string& id) const;
     int addTrackChoice(const std::string& id);
@@ -95,6 +101,7 @@ public:
     Change setChaosEq(int id, const chaoseq::Settings& settings);
     Change setHarmonium(int id, const harmonium::Settings& settings);
     Change setDrumKit(int id, const drumkit::Settings& settings);
+    Change setElectroDrums(int id, const electrodrums::Settings& settings);
     // Recording mode for tracks the user adds from now on (the "default recording mode"
     // preference); unset keeps Project's rule (dry only for plain Audio tracks). Loaded tracks
     // keep their saved mode.

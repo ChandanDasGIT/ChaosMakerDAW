@@ -1,6 +1,7 @@
 #include "projectdocument.h"
 #include "chaoseqjson.h"
 #include "drumkitjson.h"
+#include "electrodrumsjson.h"
 #include "harmoniumjson.h"
 #include "mixer/mixerpanel.h"
 #include "recording/takerecorder.h"
@@ -87,6 +88,8 @@ std::string ProjectDocument::serialize(const Project& project,
         trackObj["chaosEq"] = chaoseqjson::toJson(track->chaosEq);   // plan 6.2
         if (track->type == "Harmonium") trackObj["harmonium"] = harmoniumjson::toJson(track->harmonium);
         if (track->type == "Drums") trackObj["drumkit"] = drumkitjson::toJson(track->drumkit);
+        if (track->type == "Electronic Drums")
+            trackObj["electrodrums"] = electrodrumsjson::toJson(track->electrodrums);
         json effectsList = json::array();
         for (const auto& slot : track->effects) effectsList.push_back(slot.type);
         trackObj["effects"] = std::move(effectsList);   // insert effects in chain order (plan 6.1)
@@ -282,6 +285,11 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             drumkit::Settings settings;
             if (!drumkitjson::fromJson(item["drumkit"], settings, error)) return false;
             candidate.setTrackDrumKit(track.id, settings);
+        }
+        if (item.contains("electrodrums")) {
+            electrodrums::Settings settings;
+            if (!electrodrumsjson::fromJson(item["electrodrums"], settings, error)) return false;
+            candidate.setTrackElectroDrums(track.id, settings);
         }
 
         for (int i = 0; i < 10; ++i) {

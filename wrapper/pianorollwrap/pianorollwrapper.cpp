@@ -4,7 +4,7 @@
 #include <cmath>
 
 #include "core/valueformat.h"
-#include "instruments/drums/drummap.h"
+#include "instruments/instrumentcatalog.h"
 #include "transport/tempomap.h"
 
 namespace {
@@ -84,11 +84,20 @@ QString PianoRollWrapper::trackColour() const {
 bool PianoRollWrapper::drumMode() const {
     if (!m_trackList) return false;
     const auto* track = m_trackList->domain().project().findTrack(m_trackId);
-    return track && track->type == "Drums";
+    return track && instrumentcatalog::isDrumKit(track->type);
+}
+
+QString PianoRollWrapper::drumKit() const {
+    if (!drumMode()) return {};
+    return QString::fromStdString(m_trackList->domain().project().findTrack(m_trackId)->type);
 }
 
 QString PianoRollWrapper::drumName(int note) const {
-    return QString::fromUtf8(drummap::nameOf(note).data(), qsizetype(drummap::nameOf(note).size()));
+    if (!m_trackList) return {};
+    const auto* track = m_trackList->domain().project().findTrack(m_trackId);
+    if (!track) return {};
+    const auto name = instrumentcatalog::drumName(track->type, note);
+    return QString::fromUtf8(name.data(), qsizetype(name.size()));
 }
 
 namespace {

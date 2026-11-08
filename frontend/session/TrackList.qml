@@ -643,13 +643,14 @@ Rectangle {
         x: (parent.width - width) / 2
         y: (parent.height - height) / 2
         width: 330
-        height: addTrackStage === "kind" ? 222 : 382
+        height: addTrackStage === "instrument" ? 382 : 222
         modal: true
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        property string addTrackStage: "kind"
+        property string addTrackStage: "kind"               // "kind", "instrument", "variant"
+        property var group: null                            // the group choice "variant" lists
         padding: 0
-        onClosed: addTrackStage = "kind"
+        onClosed: { addTrackStage = "kind"; group = null }
         background: Rectangle { radius: 10; color: Theme.popupBg; border.color: Theme.popupBorder }
 
         contentItem: Column {
@@ -661,30 +662,36 @@ Rectangle {
                 width: parent.width
                 spacing: 8
                 ToolButton {
-                    visible: addTrackPopup.addTrackStage === "instrument"
+                    objectName: "addTrackBack"
+                    visible: addTrackPopup.addTrackStage !== "kind"
                     width: visible ? 26 : 0; height: 26
                     text: Icons.back
-                    Accessible.name: "Back to track types"
-                    onClicked: addTrackPopup.addTrackStage = "kind"
+                    Accessible.name: addTrackPopup.addTrackStage === "variant" ? "Back to instruments" : "Back to track types"
+                    onClicked: addTrackPopup.addTrackStage = addTrackPopup.addTrackStage === "variant" ? "instrument" : "kind"
                     contentItem: Text { text: Icons.back; color: Theme.text; font.pixelSize: 21; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                     background: Rectangle { radius: 5; color: parent.hovered ? Theme.trackList.backHover : "transparent" }
                 }
                 Column {
                     spacing: 3
                     Text {
-                        text: addTrackPopup.addTrackStage === "kind" ? "Create a track" : "Choose an instrument"
+                        text: addTrackPopup.addTrackStage === "kind" ? "Create a track"
+                            : addTrackPopup.addTrackStage === "variant" ? "Choose " + addTrackPopup.group.name.toLowerCase()
+                            : "Choose an instrument"
                         color: Theme.text; font.pixelSize: 16; font.bold: true
                     }
                     Text {
-                        text: addTrackPopup.addTrackStage === "kind" ? "Select the kind of track to add." : "Select the instrument type."
+                        text: addTrackPopup.addTrackStage === "kind" ? "Select the kind of track to add."
+                            : addTrackPopup.addTrackStage === "variant" ? "Select the kind of " + addTrackPopup.group.name.toLowerCase() + "."
+                            : "Select the instrument type."
                         color: Theme.textMuted; font.pixelSize: 11
                     }
                 }
             }
 
             Repeater {
-                model: !root.trackModel ? [] : addTrackPopup.addTrackStage === "kind"
-                       ? root.trackModel.trackChoices : root.trackModel.instrumentChoices
+                model: !root.trackModel ? [] : addTrackPopup.addTrackStage === "kind" ? root.trackModel.trackChoices
+                       : addTrackPopup.addTrackStage === "variant" ? root.trackModel.variantChoices(addTrackPopup.group.id)
+                       : root.trackModel.instrumentChoices
                 delegate: Rectangle {
                     required property var modelData
                     objectName: "trackChoice_" + modelData.id
@@ -717,8 +724,11 @@ Rectangle {
                         anchors.fill: parent
                         hoverEnabled: true
                         onClicked: {
-                            if (modelData.hasChildren) {
+                            if (modelData.hasChildren && addTrackPopup.addTrackStage === "kind") {
                                 addTrackPopup.addTrackStage = "instrument"
+                            } else if (modelData.hasChildren) {
+                                addTrackPopup.group = modelData
+                                addTrackPopup.addTrackStage = "variant"
                             } else if (root.trackModel) {
                                 root.trackModel.addTrackChoice(modelData.id)
                                 addTrackPopup.close()

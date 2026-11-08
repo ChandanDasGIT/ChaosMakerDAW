@@ -581,6 +581,7 @@ Item {
                         objectName: "pianoKeys"
                         noteSource: pianoRollBackend
                         drumMode: pianoRollBackend.drumMode
+                        drumKit: pianoRollBackend.drumKit
                         width: 90
                         height: root.contentGridHeight
                         keyHeight: root.keyHeight

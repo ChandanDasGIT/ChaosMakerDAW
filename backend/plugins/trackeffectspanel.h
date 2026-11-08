@@ -27,6 +27,8 @@ public:
     bool supportsHarmonium() const;
     // The drum kit's page likewise, on Drums tracks.
     bool supportsDrumKit() const;
+    // The electronic drum kit's page likewise, on Electronic Drums tracks.
+    bool supportsElectroDrums() const;
 
     const std::string& selectedEffect() const { return m_selectedEffect; }
     void setSelectedEffect(std::string_view key);

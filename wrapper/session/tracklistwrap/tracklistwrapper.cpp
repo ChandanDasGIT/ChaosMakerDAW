@@ -464,6 +464,21 @@ bool TrackListWrapper::setDrumKit(int trackId, const drumkit::Settings& settings
     return change.accepted;
 }
 
+const electrodrums::Settings* TrackListWrapper::electroDrums(int trackId) const
+{
+    const auto* track = m_project.findTrack(trackId);
+    return track && track->type == "Electronic Drums" ? &track->electrodrums : nullptr;
+}
+
+bool TrackListWrapper::setElectroDrums(int trackId, const electrodrums::Settings& settings)
+{
+    if (!electroDrums(trackId)) return false;
+    const auto before = *electroDrums(trackId);
+    const auto change = m_state.setElectroDrums(trackId, settings);
+    if (change.accepted && !(before == *electroDrums(trackId))) emit electroDrumsChanged(trackId);
+    return change.accepted;
+}
+
 const harmonium::Settings* TrackListWrapper::harmonium(int trackId) const
 {
     const auto* track = m_project.findTrack(trackId);
@@ -949,6 +964,7 @@ void TrackListWrapper::adoptDocument(TrackListWrapper& candidate) {
 
 QVariantList TrackListWrapper::trackChoices() const { return choices(TrackList::trackChoices()); }
 QVariantList TrackListWrapper::instrumentChoices() const { return choices(TrackList::instrumentChoices()); }
+QVariantList TrackListWrapper::variantChoices(const QString& group) const { return choices(TrackList::variantChoices(group.toStdString())); }
 int TrackListWrapper::addTrackChoice(const QString& choice)
 {
     const auto id = choice.toStdString();

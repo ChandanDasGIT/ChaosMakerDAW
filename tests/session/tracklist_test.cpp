@@ -391,3 +391,30 @@ TEST(tracklist, key_shift_is_the_harmonium_scale_changer_and_zero_elsewhere)
     CHECK(tracks.project().findTrack(drums)->keyShift() == 0);
     CHECK(tracks.project().findTrack(vocal)->keyShift() == 0);
 }
+
+TEST(tracklist, the_picker_groups_guitars_and_drums_by_kind)
+{
+    std::vector<std::string> ids, names;
+    for (const auto& c : TrackList::instrumentChoices()) { ids.push_back(c.id); names.push_back(c.name); }
+    CHECK(names == (std::vector<std::string>{"Piano", "Guitar", "Strings", "Drums", "Harmonium"}));
+    CHECK(ids[1] == "group:Guitar" && ids[3] == "group:Drums");
+    for (const auto& c : TrackList::instrumentChoices()) CHECK(c.hasChildren == (c.id.rfind("group:", 0) == 0));
+
+    const auto pairs = [](const std::string& group) {
+        std::vector<std::pair<std::string, std::string>> out;
+        for (const auto& c : TrackList::variantChoices(group)) { CHECK(!c.hasChildren); out.push_back({c.id, c.name}); }
+        return out;
+    };
+    using P = std::vector<std::pair<std::string, std::string>>;
+    CHECK(pairs("group:Guitar") == (P{{"Acoustic Guitar", "Acoustic"}, {"Electric Guitar", "Electric"}}));
+    CHECK(pairs("Drums") == (P{{"Drums", "Acoustic"}, {"Electronic Drums", "Electronic"}}));
+    CHECK(TrackList::variantChoices("Piano").empty() && TrackList::variantChoices("").empty());
+    CHECK(TrackList::variantChoices("group:").empty());
+
+    // A kind adds its own track type, named as before; a group is not a track type.
+    TrackList tracks;
+    const int kit = tracks.addTrackChoice("Electronic Drums");
+    CHECK(kit > 0 && tracks.project().findTrack(kit)->type == "Electronic Drums");
+    CHECK(tracks.project().findTrack(kit)->name == "Electronic Drums 1");
+    CHECK(tracks.addTrackChoice("group:Drums") == -1 && tracks.addTrackChoice("Guitar") == -1);
+}
