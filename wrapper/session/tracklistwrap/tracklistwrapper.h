@@ -21,6 +21,9 @@ class TrackListWrapper : public QAbstractListModel {
     Q_PROPERTY(QString eqPresetError READ eqPresetError NOTIFY eqPresetErrorChanged)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     Q_PROPERTY(int selectedTrackId READ selectedTrackId WRITE selectTrack NOTIFY selectedTrackChanged)
+    // Semitones the selected track's instrument moves its notes (Track::keyShift: the harmonium's
+    // scale changer); the floating piano shows what sounds. 0 with no track selected.
+    Q_PROPERTY(int selectedKeyShift READ selectedKeyShift NOTIFY selectedKeyShiftChanged)
     Q_PROPERTY(int selectedClipId READ selectedClipId WRITE setSelectedClipId NOTIFY selectedClipChanged)
     Q_PROPERTY(double contentEndBeats READ contentEndBeats NOTIFY contentEndBeatsChanged)
     Q_PROPERTY(QVariantList clips READ clips NOTIFY clipsChanged)
@@ -74,6 +77,7 @@ public:
     int count() const { return rowCount(); }
     int selectedTrackId() const { return m_state.selectedTrackId(); }
     Q_INVOKABLE bool selectTrack(int id);
+    int selectedKeyShift() const;
     int selectedClipId() const { return m_state.selectedClipId(); }
     Q_INVOKABLE void setSelectedClipId(int id);
     Q_INVOKABLE void selectClip(int trackId, int clipId);
@@ -189,6 +193,7 @@ public:
 
 signals:
     void selectedTrackChanged(int trackId);
+    void selectedKeyShiftChanged(int semitones);
     void selectedClipChanged(int clipId);
     void clipboardChanged();
     void historyChanged();
@@ -230,5 +235,7 @@ private:
     TrackList::AudioMap& m_audio = m_state.audio();
     TrackList::MediaPaths& m_mediaPaths = m_state.mediaPaths();
     int m_notifiedTrackId = -1;
+    int m_notifiedKeyShift = 0;
+    void syncKeyShift();
     int m_notifiedClipId = -1;
 };

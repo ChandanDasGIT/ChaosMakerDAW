@@ -7,19 +7,27 @@ import QtQuick.Layouts
 // play them in turn. Keys light up while held here and when the KEYS typing keyboard plays
 // them; the band above marks the keys KEYS reaches (Tab to backslash) at its current octave.
 // The notes go where a MIDI keyboard's go: the instrument tracks with MON or REC on.
+// keyShift is the selected track's scale changer (TrackListWrapper.selectedKeyShift): the piano
+// shows what sounds. The band, "E = ..." and the lit keys move by it, and a clicked key sends
+// the note that makes the instrument sound that key.
 Window {
     id: root
     property var engine: null
     property var typingKeys: null                          // TypingKeyboardWrapper: its range and notes
+    property int keyShift: 0                               // semitones the selected track moves its notes
 
     readonly property int lowestNote: 21                   // A0
     readonly property int highestNote: 108                 // C8
     // The KEYS typing keyboard's reach: Tab (lower Pa) to backslash (upper tivra Ma).
     readonly property int typingOctave: typingKeys ? typingKeys.octave : 4
-    readonly property int typingLow: 12 * (typingOctave + 1) - 5
-    readonly property int typingHigh: 12 * (typingOctave + 1) + 18
-    property var lit: ({})                                 // MIDI note -> true while it sounds
-    property int heldNote: -1                              // the note the mouse holds
+    // Where E (Sa) and the reach sound: the keys KEYS sends, moved by the scale changer.
+    readonly property int typingSa: 12 * (typingOctave + 1) + keyShift
+    readonly property int typingLow: typingSa - 5
+    readonly property int typingHigh: typingSa + 18
+    property var lit: ({})                                 // MIDI note sent -> true while it sounds
+    property int heldNote: -1                              // the key the mouse holds
+    property int heldSent: -1                              // the note sent for it (ends it, whatever the shift does)
+    function isLit(key) { return !!lit[key - keyShift] }
 
     objectName: "virtualKeyboardWindow"
     title: "Virtual piano"
@@ -43,7 +51,7 @@ Window {
         function onNoteSent(note, velocity, on) { root.setLit(note, on) }
     }
 
-    onVisibleChanged: if (!visible) { bridge.releaseAll(); root.heldNote = -1; root.lit = ({}) }
+    onVisibleChanged: if (!visible) { bridge.releaseAll(); root.heldNote = -1; root.heldSent = -1; root.lit = ({}) }
 
     function setLit(note, on) {
         const next = Object.assign({}, root.lit)
@@ -100,6 +108,7 @@ Window {
             Text {
                 objectName: "virtualKeyboardRangeLabel"
                 text: "KEYS reach  " + bridge.noteName(root.typingLow) + " – " + bridge.noteName(root.typingHigh)
+                      + "   E = " + bridge.noteName(root.typingSa)
                       + "   (Tab … \\, Z / X move it)"
                 color: Theme.text
                 font.pixelSize: Theme.smallSize
@@ -148,7 +157,7 @@ Window {
                     width: keys.whiteWidth + 1
                     height: keys.height
                     radius: 3
-                    color: root.lit[note] ? Theme.accent
+                    color: root.isLit(note) ? Theme.accent
                          : root.inTypingRange(note) ? Theme.pianoRoll.whiteKeyActive : Theme.pianoRoll.whiteKey
                     border.color: Theme.pianoRoll.whiteKeyBorder
                     Text {
@@ -172,7 +181,7 @@ Window {
                     width: keys.blackWidth
                     height: keys.blackHeight
                     radius: 2
-                    color: root.lit[note] ? Qt.darker(Theme.accent, 1.3)
+                    color: root.isLit(note) ? Qt.darker(Theme.accent, 1.3)
                          : root.inTypingRange(note) ? Theme.pianoRoll.blackKeyActive : Theme.pianoRoll.blackKey
                     border.color: Theme.pianoRoll.blackKeyBorder
                 }
@@ -184,19 +193,29 @@ Window {
                 function press(mx, my) {
                     const note = root.noteAt(mx, my)
                     if (note === root.heldNote) return
-                    if (root.heldNote >= 0) bridge.noteOff(root.heldNote)
+                    if (root.heldSent >= 0) bridge.noteOff(root.heldSent)
                     root.heldNote = note
-                    if (note >= 0) bridge.noteOn(note, root.velocityAt(my, note))
+                    const sent = note - root.keyShift            // the instrument moves it back to this key
+                    root.heldSent = note >= 0 && sent >= 0 && sent <= 127 ? sent : -1
+                    if (root.heldSent >= 0) bridge.noteOn(root.heldSent, root.velocityAt(my, note))
                 }
                 function lift() {
-                    if (root.heldNote >= 0) bridge.noteOff(root.heldNote)
+                    if (root.heldSent >= 0) bridge.noteOff(root.heldSent)
                     root.heldNote = -1
+                    root.heldSent = -1
                 }
                 onPressed: mouse => press(mouse.x, mouse.y)
                 onPositionChanged: mouse => { if (pressed) press(mouse.x, mouse.y) }
                 onReleased: lift()
                 onCanceled: lift()
             }
+        }
+
+        Text {
+            objectName: "virtualKeyboardShortcutHint"
+            text: "Z / X octave down / up  ·  C / V velocity down / up"
+            color: Theme.textMuted
+            font.pixelSize: Theme.captionSize
         }
     }
 }

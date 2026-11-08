@@ -140,6 +140,33 @@ TEST(qtharmonium, wrapper_edits_the_track_and_follows_other_panels)
     CHECK(other.styles().size() == 2);
 }
 
+TEST(qtharmonium, selected_key_shift_follows_the_selected_harmonium_scale_changer)
+{
+    Storage storage;
+    TrackListWrapper tracks;
+    const int id = tracks.addInstrumentTrackOfType("Harmonium");
+    const int drums = tracks.addInstrumentTrackOfType("Drums");
+    HarmoniumWrapper panel;
+    panel.setTrackModel(&tracks); panel.setTrackId(id);
+    QList<int> sent;
+    QObject::connect(&tracks, &TrackListWrapper::selectedKeyShiftChanged, &tracks, [&sent](int s) { sent << s; });
+
+    CHECK(tracks.selectTrack(id));
+    CHECK(tracks.selectedKeyShift() == 0 && sent.isEmpty());      // C plays C: nothing to tell
+    panel.setTranspose(2);                                        // the scale changer on the panel
+    CHECK(tracks.selectedKeyShift() == 2 && sent == QList<int>({2}));
+    panel.setBellows(0.5);                                        // other settings: no signal
+    CHECK(sent.size() == 1);
+    CHECK(tracks.selectTrack(drums));                             // no scale changer
+    CHECK(tracks.selectedKeyShift() == 0 && sent == QList<int>({2, 0}));
+    panel.setTranspose(-4);                                       // not the selected track
+    CHECK(tracks.selectedKeyShift() == 0 && sent.size() == 2);
+    CHECK(tracks.selectTrack(id));
+    CHECK(tracks.selectedKeyShift() == -4 && sent == QList<int>({2, 0, -4}));
+    CHECK(tracks.selectTrack(-1));                                // nothing selected
+    CHECK(tracks.selectedKeyShift() == 0 && sent.last() == 0);
+}
+
 TEST(qtharmonium, harmonium_track_plays_the_harmonium_and_edits_reach_it)
 {
     Storage storage;

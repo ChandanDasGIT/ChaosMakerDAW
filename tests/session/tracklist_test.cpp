@@ -368,3 +368,26 @@ TEST(tracklist, new_tracks_follow_the_default_record_mode_and_loaded_tracks_keep
     CHECK(!tracks.project().findTrack(saved)->recordDry);
     CHECK(tracks.project().findTrack(tracks.addVocalTrack())->recordDry);
 }
+
+TEST(tracklist, key_shift_is_the_harmonium_scale_changer_and_zero_elsewhere)
+{
+    TrackList tracks;
+    const int harmonium = tracks.addInstrumentTrackOfType("Harmonium");
+    const int drums = tracks.addInstrumentTrackOfType("Drums");
+    const int vocal = tracks.addTrackChoice("Vocal");
+    CHECK(harmonium > 0 && drums > 0 && vocal > 0);
+    CHECK(tracks.project().findTrack(harmonium)->keyShift() == 0);          // C plays C
+    auto settings = tracks.project().findTrack(harmonium)->harmonium;
+    settings.transpose = 3;
+    tracks.setHarmonium(harmonium, settings);
+    CHECK(tracks.project().findTrack(harmonium)->keyShift() == 3);
+    settings.transpose = -5;
+    tracks.setHarmonium(harmonium, settings);
+    CHECK(tracks.project().findTrack(harmonium)->keyShift() == -5);
+    // Other tracks ignore harmonium settings: only the harmonium has a scale changer today.
+    auto other = tracks.project().findTrack(drums)->harmonium;
+    other.transpose = 4;
+    tracks.setHarmonium(drums, other);
+    CHECK(tracks.project().findTrack(drums)->keyShift() == 0);
+    CHECK(tracks.project().findTrack(vocal)->keyShift() == 0);
+}

@@ -8,6 +8,7 @@ import "../tempo"
 Rectangle {
     id: root
     property var transport: EngineController
+    property var trackModel: null                          // the project's tracks: the piano follows the selected one's scale
     property int timeSignature: 4
     property int timeSignatureDenominator: 4
     property real bpm: 120
@@ -54,6 +55,7 @@ Rectangle {
             id: virtualKeyboard
             engine: root.transport
             typingKeys: typingKeys
+            keyShift: root.trackModel ? root.trackModel.selectedKeyShift : 0
             onVisibleChanged: if (!visible) typingKeys.enabled = false
         }
         ColumnLayout {
