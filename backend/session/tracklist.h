@@ -128,6 +128,9 @@ public:
     int addAudioClip(int trackId, const std::string& poolId, std::int64_t start, std::int64_t length,
                      std::int64_t offset = 0, bool effectsPrinted = true);
     int addClipAtBeat(int trackId, double start, double length);
+    // A new pattern clip that already holds `notes` (clip-relative beats), as one undo step
+    // (drum grooves). -1 when the clip or a note is not valid, or edits are locked.
+    int addPatternClipAtBeat(int trackId, double start, double length, std::vector<MidiNote> notes);
     bool trimClipStartAtBeat(int trackId, int clipId, double start);
     int splitClipAtBeat(int trackId, int clipId, double beat);
     Change editClips(const std::vector<int>& ids, const std::string& operation, double delta = 0, int lanes = 0);

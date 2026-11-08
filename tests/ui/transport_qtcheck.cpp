@@ -1558,6 +1558,109 @@ private slots:
         auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
         QTRY_VERIFY(!panel->property("visible").toBool());
     }
+    void drum_pages_offer_grooves_that_go_on_the_track_and_save_from_a_clip() {
+        // Both drum pages have the Grooves section: factory grooves grouped by time signature
+        // (the project's first), "Add to track" puts one on the track as a clip, the selected
+        // clip can be saved as a groove of your own, which can be renamed and deleted. The
+        // buttons are pressed directly: the section may be scrolled out of view.
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        controller->setMeter(4,4);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int e=tracks.addInstrumentTrackOfType("Electronic Drums");
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QObject* panel=nullptr;
+        const auto restore=qScopeGuard([&] {
+            if(panel) QMetaObject::invokeMethod(panel,"close");
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            window->requestActivate(); (void)QTest::qWaitForWindowActive(window);
+        });
+        QTest::qWait(30);
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(e)); QVERIFY(fx); click(fx);
+        panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(e)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        QTRY_VERIFY(visualItem(window->contentItem(),"electroDrumsGrooves"));
+        auto* bridge=visualObject(window->contentItem(),"drumGrooveBridge"); QVERIFY(bridge);
+        const auto press=[&](const char* name) {
+            auto* button=visualItem(window->contentItem(),name); QVERIFY2(button,name);
+            QVERIFY2(button->isEnabled(),name);
+            QMetaObject::invokeMethod(button,"click");
+        };
+        const auto grooveNames=[&] {
+            QStringList out; for(const auto& g:bridge->property("grooves").toList()) out<<g.toMap().value("name").toString(); return out;
+        };
+
+        // Six factory grooves, the project's 4/4 first; a 4/4 one is picked.
+        QCOMPARE(grooveNames().size(),6);
+        QVERIFY(visualItem(window->contentItem(),"groove_Rock A")); QVERIFY(visualItem(window->contentItem(),"groove_Waltz A"));
+        QVERIFY(visualItem(window->contentItem(),"groove_Groove B (3+2+2)"));
+        QTRY_VERIFY(visualItem(window->contentItem(),"groove_Rock A")->property("active").toBool());
+        QVERIFY(!visualItem(window->contentItem(),"grooveMeterNote")->isVisible());
+
+        // Add four bars of Rock A at the start.
+        press("grooveAdd");
+        QTRY_COMPARE(int(tracks.domain().clips().size()),1);
+        const auto clip=tracks.domain().clips().front();
+        QCOMPARE(clip.trackId,e); QCOMPARE(clip.startBeat,0.0); QCOMPARE(clip.lengthBeats,16.0);
+        QVERIFY(!clip.notes.empty());
+
+        // A 7/8 groove in a 4/4 project says its bars won't line up.
+        QMetaObject::invokeMethod(visualItem(window->contentItem(),"groove_Groove A (2+2+3)"),"click");
+        QTRY_VERIFY(visualItem(window->contentItem(),"grooveMeterNote")->isVisible());
+        QVERIFY(!visualItem(window->contentItem(),"grooveRename")->isVisible());   // factory: no rename/delete
+
+        // Save the clip as a groove of my own.
+        QVERIFY(!visualItem(window->contentItem(),"grooveSaveClip")->isEnabled());
+        tracks.selectClip(e,clip.clipId);
+        QTRY_VERIFY(visualItem(window->contentItem(),"grooveSaveClip")->isEnabled());
+        press("grooveSaveClip");
+        auto* dialog=visualObject(window->contentItem(),"grooveNameDialog"); if(!dialog) dialog=fxWindow()->findChild<QObject*>("grooveNameDialog");
+        QVERIFY(dialog); QTRY_VERIFY(dialog->property("visible").toBool());
+        auto* field=dialog->findChild<QQuickItem*>("grooveNameField"); QVERIFY(field);
+        field->setProperty("text","Backbeat");
+        QMetaObject::invokeMethod(dialog->findChild<QQuickItem*>("grooveNameOk"),"click");
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        QTRY_VERIFY(grooveNames().contains("Backbeat"));
+        QTRY_VERIFY(visualItem(window->contentItem(),"groove_Backbeat"));
+        QVERIFY(visualItem(window->contentItem(),"groove_Backbeat")->property("active").toBool());   // the new one is picked
+        QTRY_VERIFY(visualItem(window->contentItem(),"grooveRename")->isVisible());
+
+        // Saving again under the same name asks once more, then replaces.
+        press("grooveSaveClip");
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        field->setProperty("text","backbeat");
+        QMetaObject::invokeMethod(dialog->findChild<QQuickItem*>("grooveNameOk"),"click");
+        QTRY_VERIFY(dialog->findChild<QQuickItem*>("grooveReplaceNote")->isVisible());
+        QVERIFY(dialog->property("visible").toBool());
+        QMetaObject::invokeMethod(dialog->findChild<QQuickItem*>("grooveNameOk"),"click");
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        QCOMPARE(grooveNames().size(),7);
+
+        // Rename, then delete it.
+        press("grooveRename");
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        QCOMPARE(field->property("text").toString(),QString("backbeat"));
+        field->setProperty("text","Two and four");
+        QMetaObject::invokeMethod(dialog->findChild<QQuickItem*>("grooveNameOk"),"click");
+        QTRY_VERIFY(grooveNames().contains("Two and four"));
+        QVERIFY(!grooveNames().contains("backbeat"));
+        press("grooveDelete");
+        auto* confirm=visualObject(window->contentItem(),"grooveDeleteDialog"); if(!confirm) confirm=fxWindow()->findChild<QObject*>("grooveDeleteDialog");
+        QVERIFY(confirm); QTRY_VERIFY(confirm->property("visible").toBool());
+        QMetaObject::invokeMethod(confirm->findChild<QQuickItem*>("grooveDeleteOk"),"click");
+        QTRY_COMPARE(grooveNames().size(),6);
+        QCOMPARE(int(tracks.domain().clips().size()),1);                       // the clip stays
+
+        // The acoustic kit's page has the same section.
+        const int d=tracks.addInstrumentTrackOfType("Drums");
+        QTest::qWait(30);
+        QMetaObject::invokeMethod(panel,"close");
+        auto* fx2=visualItem(list,"trackFxButton"+QString::number(d)); QVERIFY(fx2); click(fx2);
+        auto* panel2=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(d)); QVERIFY(panel2);
+        QTRY_VERIFY(panel2->property("visible").toBool());
+        QTRY_VERIFY(visualItem(window->contentItem(),"drumKitGrooves"));
+        panel=panel2;
+    }
     void electronic_drums_live_in_fx_and_the_drawn_machine_plays_and_edits() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks);
