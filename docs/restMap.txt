@@ -10,14 +10,18 @@ view only), and the from-scratch rule (app uses only std, Qt, libjack, nlohmann 
 Before starting an item, check the code: some notes below come from older lists and may lag.
 
 Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (decision or check)
-                [L] will do later (the user's choice; section H)
+                [L] will do later (the user's choice; section H)   [-] dropped (the user)
 
 
 NEXT UP (the user, 2026-11-08 night): plans below are written, NOT started. Start each only
 after the user approves it (plan + files first, one step at a time). Suggested order: N1 and
 N2 are small and touch the same window, so they can go first; N3 (C10) is the user's "next task".
 ------------------------------------------------------------------------------------------------
-[ ] N1  Typing keyboard shortcuts shown with the virtual piano. Reading of the request ("the
+[x] N1  DONE 2026-11-08, as the user changed it: no computer keys on the piano keys; the top
+        line says what E plays ("E = C4", follows the octave) and a line under the keys reads
+        "Z / X octave down / up · C / V velocity down / up". Test: transporttests
+        virtual_piano_floats_and_plays_clicked_keys. The original plan, for the record:
+        Typing keyboard shortcuts shown with the virtual piano. Reading of the request ("the
         shortcuts for typing keyboard under the virtual midi"); confirm with the user first:
         - On the floating piano, every key KEYS reaches shows its computer key under it, at the
           bottom of the key: Tab 1 Q 2 W E 4 R 5 T Y 7 U 8 I 9 O P - [ = ] Backspace \ (white
@@ -32,7 +36,15 @@ N2 are small and touch the same window, so they can go first; N3 (C10) is the us
         tests/midi/typingkeyboard_test.cpp (keyFor matches semitoneFor both ways),
         tests/ui/transport_qtcheck.cpp (labels on keys 55..78, they follow the octave).
         Do NOT change anything else on the piano (no restyle: see the no-redesign rule).
-[ ] N2  Octave down / up for the typing keyboard with the mouse (today only Z / X).
+[x] N1b DONE 2026-11-08 (the user): the floating piano follows the selected track's scale
+        changer. Track::keyShift() (backend/session/project) is the harmonium's transpose, 0
+        elsewhere; TrackListWrapper.selectedKeyShift feeds VirtualKeyboard: the band, "E = ..."
+        and the lit keys show what sounds, a clicked key sends key - shift. WHEN THE PIANO (C5)
+        GETS A SCALE CHANGER: add its case to Track::keyShift(), nothing else.
+        Tests: backendtests tracklist, wrappertests qtharmonium, transporttests
+        virtual_piano_follows_the_selected_track_scale_changer.
+[-] N2  DROPPED by the user 2026-11-08 (Z / X are enough). The plan, for the record:
+        Octave down / up for the typing keyboard with the mouse (today only Z / X).
         - TypingKeyboardWrapper: Q_INVOKABLE octaveDown() / octaveUp() doing exactly what Z / X do
           (TypingKeyboard gets shiftOctave(int); held notes keep their own note-off, as with
           Z / X), plus canOctaveDown / canOctaveUp for the button states.
