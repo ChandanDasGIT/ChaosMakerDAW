@@ -191,6 +191,7 @@ Window {
         }
 
         TransportBar {
+            trackModel: window.projectTracks
             snapMode: timeline.snapMode
             onSnapModeEdited: value => timeline.snapMode = value
             Layout.fillWidth: true

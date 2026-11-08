@@ -68,6 +68,24 @@ TrackListWrapper::TrackListWrapper(QObject* parent)
     connect(this, &TrackListWrapper::countChanged, this, &TrackListWrapper::projectChanged);
     connect(this, &TrackListWrapper::clipsChanged, this, &TrackListWrapper::projectChanged);
     connect(this, &TrackListWrapper::clipsChanged, this, &TrackListWrapper::historyChanged);
+    // The selected track's key shift follows a new selection, its harmonium settings and loads.
+    connect(this, &TrackListWrapper::selectedTrackChanged, this, &TrackListWrapper::syncKeyShift);
+    connect(this, &TrackListWrapper::harmoniumChanged, this, &TrackListWrapper::syncKeyShift);
+    connect(this, &TrackListWrapper::projectChanged, this, &TrackListWrapper::syncKeyShift);
+}
+
+int TrackListWrapper::selectedKeyShift() const
+{
+    const auto* track = m_project.findTrack(m_state.selectedTrackId());
+    return track ? track->keyShift() : 0;
+}
+
+void TrackListWrapper::syncKeyShift()
+{
+    const int current = selectedKeyShift();
+    if (m_notifiedKeyShift == current) return;
+    m_notifiedKeyShift = current;
+    emit selectedKeyShiftChanged(current);
 }
 
 int TrackListWrapper::rowCount(const QModelIndex& parent) const

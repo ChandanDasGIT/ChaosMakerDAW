@@ -63,6 +63,9 @@ struct Track {
     // whose live input is MIDI (a keyboard plays it).
     bool canMonitor() const { return hasLiveInput() || kind == TrackKind::Instrument; }
     bool recordsWithFx() const { return hasLiveInput() && !recordDry; }
+    // Semitones the track's instrument moves every note it is sent (a scale changer): a played
+    // C4 sounds C4 + keyShift(). The harmonium's scale changer today; 0 for every other track.
+    int keyShift() const;
 };
 
 class Project {

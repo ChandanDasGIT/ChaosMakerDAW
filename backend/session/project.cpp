@@ -14,6 +14,12 @@ bool Track::hasLiveInput() const
     return definition && definition->hasLiveInput;
 }
 
+int Track::keyShift() const
+{
+    if (kind == TrackKind::Instrument && type == "Harmonium") return harmonium.transpose;
+    return 0;
+}
+
 Track& Project::addTrack(TrackKind kind, const std::string& name, const std::string& type)
 {
     auto track = std::make_unique<Track>();

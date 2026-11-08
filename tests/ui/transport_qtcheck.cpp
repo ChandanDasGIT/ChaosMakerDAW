@@ -1188,6 +1188,12 @@ private slots:
                 && std::abs(right-last->mapToScene(QPointF(last->width(),0)).x())<1.5;
         };
         QTRY_VERIFY(edges(55,78));
+        // The top line says what E (Sa) plays; the line under the keys lists the KEYS controls.
+        auto* range=visualItem(piano->contentItem(),"virtualKeyboardRangeLabel"); QVERIFY(range);
+        QVERIFY(range->property("text").toString().contains("E = C4"));
+        auto* hint=visualItem(piano->contentItem(),"virtualKeyboardShortcutHint"); QVERIFY(hint);
+        QVERIFY(hint->isVisible());
+        QCOMPARE(hint->property("text").toString(),QString("Z / X octave down / up  ·  C / V velocity down / up"));
 
         auto* c4=visualItem(piano->contentItem(),"virtualKey60"); QVERIFY(c4);
         auto* d4=visualItem(piano->contentItem(),"virtualKey62"); QVERIFY(d4);
@@ -1214,12 +1220,87 @@ private slots:
         QTest::keyClick(window,Qt::Key_Z);
         QTRY_COMPARE(typing->property("octave").toInt(),3);
         QTRY_VERIFY(edges(43,66));
+        QTRY_VERIFY(range->property("text").toString().contains("E = C3"));
         QTest::keyClick(window,Qt::Key_X);
         QTRY_COMPARE(typing->property("octave").toInt(),4);
         QTRY_VERIFY(edges(55,78));
+        QTRY_VERIFY(range->property("text").toString().contains("E = C4"));
+        QTest::keyClick(window,Qt::Key_X);
+        QTRY_VERIFY(range->property("text").toString().contains("E = C5"));
+        QTest::keyClick(window,Qt::Key_Z);
+        QTRY_COMPARE(typing->property("octave").toInt(),4);
         piano->close();                                              // closing the piano turns KEYS off
         QTRY_VERIFY(!typing->property("enabled").toBool());
         QCOMPARE(chip->property("text").toString(),QString("Off"));
+    }
+    void virtual_piano_follows_the_selected_track_scale_changer() {
+        TrackListWrapper tracks;
+        const int harmonium=tracks.addInstrumentTrackOfType("Harmonium");
+        const int drums=tracks.addInstrumentTrackOfType("Drums");
+        auto* bar=window->findChild<QObject*>("transport"); QVERIFY(bar);
+        auto* chip=visualItem(window->contentItem(),"typingKeyboardButton"); QVERIFY(chip);
+        auto* piano=window->findChild<QQuickWindow*>("virtualKeyboardWindow"); QVERIFY(piano);
+        auto* typing=window->findChild<QObject*>("typingKeyboard"); QVERIFY(typing);
+        const auto restore=qScopeGuard([&] {
+            typing->setProperty("enabled",false); piano->setVisible(false);
+            bar->setProperty("trackModel",QVariant());
+            window->requestActivate(); (void)QTest::qWaitForWindowActive(window);
+        });
+        bar->setProperty("trackModel",QVariant::fromValue(&tracks));
+        QVERIFY(tracks.selectTrack(harmonium));
+        auto settings=*tracks.harmonium(harmonium); settings.transpose=2;   // C plays D
+        QVERIFY(tracks.setHarmonium(harmonium,settings));
+        click(chip); QTRY_VERIFY(piano->isVisible()); QVERIFY(typing->property("enabled").toBool());
+        QCOMPARE(typing->property("octave").toInt(),4);
+
+        auto* bridge=piano->contentItem()->findChild<QObject*>("virtualKeyboardBridge");
+        if (!bridge) bridge=piano->findChild<QObject*>("virtualKeyboardBridge");
+        QVERIFY(bridge);
+        auto* band=visualItem(piano->contentItem(),"virtualKeyboardTypingBand"); QVERIFY(band);
+        auto* range=visualItem(piano->contentItem(),"virtualKeyboardRangeLabel"); QVERIFY(range);
+        const auto key=[&](int note) { return visualItem(piano->contentItem(),"virtualKey"+QString::number(note)); };
+        const auto edges=[&](int low,int high) {
+            const qreal left=band->mapToScene(QPointF(0,0)).x(), right=band->mapToScene(QPointF(band->width(),0)).x();
+            return std::abs(left-key(low)->mapToScene(QPointF(0,0)).x())<1.5
+                && std::abs(right-key(high)->mapToScene(QPointF(key(high)->width(),0)).x())<1.5;
+        };
+        const QColor accent("#60cdff");
+        // The band and the top line show what sounds: Tab .. backslash play A3 .. G#5, E plays D4.
+        QTRY_VERIFY(edges(57,80));
+        QVERIFY(range->property("text").toString().contains("A3 – G#5"));
+        QVERIFY(range->property("text").toString().contains("E = D4"));
+
+        // Typing E sends C4 (the harmonium makes it D4): D4 lights, C4 does not.
+        QTest::keyPress(window,Qt::Key_E);
+        QTRY_COMPARE(key(62)->property("color").value<QColor>(),accent);
+        QVERIFY(key(60)->property("color").value<QColor>()!=accent);
+        QTest::keyRelease(window,Qt::Key_E);
+        QTRY_VERIFY(key(62)->property("color").value<QColor>()!=accent);
+
+        // Clicking D4 sends C4, so the harmonium sounds the key clicked; D4 lights.
+        QSignalSpy sent(bridge,SIGNAL(noteSent(int,int,bool)));
+        const QPoint at=key(62)->mapToScene(QPointF(key(62)->width()/2,key(62)->height()*0.9)).toPoint();
+        QTest::mousePress(piano,Qt::LeftButton,Qt::NoModifier,at);
+        QTRY_COMPARE(sent.count(),1);
+        QCOMPARE(sent[0][0].toInt(),60); QVERIFY(sent[0][2].toBool());
+        QTRY_COMPARE(key(62)->property("color").value<QColor>(),accent);
+        // The scale changes while the key is held: the note sent still ends (no stuck note).
+        settings.transpose=3; QVERIFY(tracks.setHarmonium(harmonium,settings));
+        QTRY_VERIFY(range->property("text").toString().contains("E = D#4"));
+        QTRY_VERIFY(edges(58,81));
+        QTest::mouseRelease(piano,Qt::LeftButton,Qt::NoModifier,at);
+        QTRY_COMPARE(sent.count(),2);
+        QCOMPARE(sent[1][0].toInt(),60); QVERIFY(!sent[1][2].toBool());
+
+        // A track with no scale changer: everything back where it was.
+        QVERIFY(tracks.selectTrack(drums));
+        QTRY_VERIFY(edges(55,78));
+        QVERIFY(range->property("text").toString().contains("E = C4"));
+        QTest::mousePress(piano,Qt::LeftButton,Qt::NoModifier,at);
+        QTRY_COMPARE(sent.count(),3);
+        QCOMPARE(sent[2][0].toInt(),62);
+        QTest::mouseRelease(piano,Qt::LeftButton,Qt::NoModifier,at);
+        QTRY_COMPARE(sent.count(),4);
     }
     void drum_kit_lives_in_fx_and_edits_its_settings() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
