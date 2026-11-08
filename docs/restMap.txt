@@ -13,9 +13,46 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
                 [L] will do later (the user's choice; section H)   [-] dropped (the user)
 
 
-NEXT UP (the user, 2026-11-08 night): plans below are written, NOT started. Start each only
-after the user approves it (plan + files first, one step at a time). Suggested order: N1 and
-N2 are small and touch the same window, so they can go first; N3 (C10) is the user's "next task".
+NEXT UP (the user, 2026-11-08): UI polish across the app. Plans are made and approved one
+step at a time (plan + files first). No restyle beyond what each item asks (no-redesign rule).
+------------------------------------------------------------------------------------------------
+[x] U1  DONE 2026-11-08 (uncommitted, waiting for the user's look): every cross is the shared
+        frontend/common/CloseButton.qml. Muted cross at rest; under the mouse a soft round
+        backdrop (Theme.hoverOverlay) and a white cross; pressed a little darker. Remove buttons
+        (track, effect, pedal) are `destructive`: red round backdrop (Theme.recordBg).
+        Test: transporttests close_buttons_share_one_look_soft_round_on_hover_red_when_removing.
+[x] U2  DONE 2026-11-08 (uncommitted, waiting for the user's look): every slider is the shared
+        frontend/common/ThemedSlider.qml, after ProjectMusicPlayer's ThemedSlider: a 6 px rounded
+        track filled to the value (white, accent under the mouse), a round handle 10 / 14 / 16 px
+        (rest / hover / drag); vertical faders get a pill across the track. The handle's layout
+        box stays 13 px (Qt's), so no layout changed size. The pedal rows lost their own drawing
+        (and GuitarSuiteColors sliderTrack / handleBorder). controls_use_the_shared_themed_
+        components now also bans plain Slider outside frontend/common/.
+        Test: transporttests sliders_are_rounded_with_a_round_handle_and_a_pill_on_faders.
+[x] U2b DONE 2026-11-08 (the user: "still kinda basic"; uncommitted, waiting for the user's look):
+        - A track's own sliders (track card VOL, mixer CLIP) are ThemedSlider with `tint` = the
+          track colour: fill and handle ring in it, a little brighter under the mouse; a new
+          colour follows at once.
+        - Every other slider (all FX pages, the mixer master fader, the metronome volume) is
+          frontend/common/HardwareSlider.qml, a mixing-desk fader: dark slot with a lit bevel,
+          scale ticks both sides, a shaded metal cap across the slot (upright on horizontal,
+          flat on vertical) with grip grooves and an indicator line (accent while dragged);
+          brighter under the mouse; cap layout box still 13 px. Colours: Theme fader*.
+        Test: transporttests desk_faders_have_a_slot_ticks_and_a_metal_cap (+ the slider test).
+[x] U3  DONE 2026-11-08 (uncommitted): the FX panel and the on-screen piano are windows of
+        their own and did not get Main.qml's tooltip palette, so they showed the system's black
+        on yellow; both now set Theme.tooltipBg / tooltipText (thin light outline: Qt's own,
+        the user is fine with it). Test: transporttests
+        floating_windows_show_the_themed_tooltip_colours.
+[ ] U4  Found 2026-11-08, NOT caused by U1-U3 (same on the code before them): on this machine
+        four transport_ui tests fail even when run alone: track_effects_switch_in_place_* (BPM
+        typed into the main window reads 120, not 91), electronic_drums_live_in_fx_* and
+        grand_piano_lives_in_fx_* ('picture->height()>100'), harmonium_lives_in_fx_*
+        ('settings().indian.female'). drum_kit_lives_in_fx_* fails on a cold first run only.
+        They look like window activation / FX window size timing; their later slider checks
+        never run, so fix them before relying on them.
+
+Earlier NEXT UP (2026-11-08 night), all closed:
 ------------------------------------------------------------------------------------------------
 [x] N1  DONE 2026-11-08, as the user changed it: no computer keys on the piano keys; the top
         line says what E plays ("E = C4", follows the octave) and a line under the keys reads
@@ -54,7 +91,10 @@ N2 are small and touch the same window, so they can go first; N3 (C10) is the us
         typingkeyboardwrapper.h/.cpp, frontend/transportbar/VirtualKeyboard.qml; tests:
         tests/midi/typingkeyboard_test.cpp, a wrapper or UI test (buttons move the band and the
         notes typed, stop at octave 0 and 8).
-[ ] N3  = C10 Electronic drum kit ("creating electric drums", the user's next task). Plan:
+[x] N3  DONE 2026-11-08, committed in 90fc463 (synthesised 808 / 909 / Studio kit, Electronic
+        Drums track type, settings saved as "electrodrums", drum-machine FX page). The plan,
+        for the record:
+        = C10 Electronic drum kit ("creating electric drums", the user's next task). Plan:
         - Choice to confirm first: synthesised in our own code (suggested; fits the
           from-scratch rule, no samples or licences, knobs per drum) or a sampled library.
         - Synthesised: a new instrument backend/instruments/electrodrums/ (Processor, like the
@@ -144,7 +184,8 @@ decoder (C4) and the piano (C5).
         its mic regions; the sampler only has the low-pass (C5 step 2), so they are not played
         (reported "fil_type=hpf_2p"). Adding them would change how the kit sounds: the user
         decides (found 2026-11-08).
-[~] C3  DRUMS FIRST: Gogodze Phu Vol II (see C9) as the real "Drums" instrument. WAV
+[x] C3  DONE, committed in 86dd769 (what is still open moved to C3c below).
+        DRUMS FIRST: Gogodze Phu Vol II (see C9) as the real "Drums" instrument. WAV
         samples, so no decoder is needed yet. Drum keys, hi-hat choke, mic mix controls.
         Map the Drums track type to it in instrumentfactory.cpp. Sampler::setZones() must not
         run during process(): loading a kit into a live track needs a safe handoff. Listen
@@ -195,6 +236,15 @@ decoder (C4) and the piano (C5).
         cymbals in our own code (crash 49, ride 51, maybe ride bell 53: inharmonic metallic
         oscillators + filtered noise, long darkening decay, velocity -> brightness), renders
         for the user first; if liked, they join the Drums track and the piano roll labels.
+[ ] C3c Left over from C3 (found 2026-11-08 when C3 was closed):
+        - Cymbals for the acoustic kit (keys 73 crash, 75 ride are still free in drummap.h).
+          The electronic kit (90fc463) already has synthesised crash and ride voices in
+          backend/instruments/electrodrums/electrovoices; check whether they can be reused
+          before writing new ones. Renders for the user first.
+        - Judge by ear first: per-drum polyphony, live MIDI CC (hardware hi-hat pedal, mic mix
+          knob). The high-pass mic filters are C3b.
+        - The sample cache never shrinks (Full room keeps all mics, ~730 MB, until the app
+          closes).
 [x] C4  DONE 2026-11-08: backend/audiofile/flacreader (hand-written) + md5. Stream and frame
         parsing, constant / verbatim / fixed / LPC subframes, Rice residuals (both methods,
         escapes), all stereo modes, wasted bits, 4-32 bit, CRC-8/16 and MD5 checked, ID3v2
@@ -335,7 +385,7 @@ decoder (C4) and the piano (C5).
             sample-kits/GrandPiano/SplendidGrandPiano
         - CC0 1.0 = public domain dedication with a fallback licence: use, change, ship and
           sell freely, no credit required.
-[ ] C10 (NEXT, see N3 at the top for the plan) Electronic drum kit, a second drum instrument after the acoustic one (C3), added by the
+[x] C10 DONE, committed in 90fc463 (see N3 at the top). Electronic drum kit, a second drum instrument after the acoustic one (C3), added by the
         user 2026-11-08. Open choice when we get there: synthesised in our own code like the
         harmonium (808/909-style kick, snare, hats, claps, toms from oscillators, noise and
         envelopes; knobs for decay, tone, tuning; no samples or licences), suggested; or a
@@ -344,7 +394,7 @@ decoder (C4) and the piano (C5).
 
 
 D. PIANO ROLL / MIDI FOLLOW-UPS
-[~] D0  Virtual piano (the user's "virtual MIDI", 2026-11-08): a floating on-screen keyboard for
+[x] D0  DONE, committed in 86dd769 (N1 and N1b at the top added to it). Virtual piano (the user's "virtual MIDI", 2026-11-08): a floating on-screen keyboard for
         every instrument, opened together with the typing keyboard by the one KEYS switch in
         the transport bar (the user: no separate PIANO switch; closing the piano turns KEYS
         off; the main window stays active) (VirtualKeyboard.qml,
@@ -352,7 +402,6 @@ D. PIANO ROLL / MIDI FOLLOW-UPS
         key = louder, drag for glissando, keys light for its own and KEYS notes; an accent band
         marks the keys KEYS reaches (Tab .. backslash, follows Z/X); plays like KEYS / a MIDI
         keyboard (MON or REC tracks); never takes the keyboard focus; closing ends held notes.
-        Built, uncommitted, waiting for the user's test.
 [x] D0d Playback ends where the last clip ends (the user, 2026-11-08: the red line ran 2 beats
         past a 4-beat clip). The 1 s release tail is gone from SnapshotBuilder's playbackEnd;
         AudioEngine::endPlayback() stops the transport there, sends the held notes' note-offs and
