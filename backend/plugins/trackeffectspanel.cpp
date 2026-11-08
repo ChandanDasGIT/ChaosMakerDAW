@@ -36,6 +36,11 @@ bool TrackEffectsPanel::supportsPiano() const
     return std::find(m_chain.begin(), m_chain.end(), effectchain::Piano) != m_chain.end();
 }
 
+bool TrackEffectsPanel::supportsChords() const
+{
+    return std::find(m_chain.begin(), m_chain.end(), effectchain::Chords) != m_chain.end();
+}
+
 bool TrackEffectsPanel::supportsElectroDrums() const
 {
     return std::find(m_chain.begin(), m_chain.end(), effectchain::ElectroDrums) != m_chain.end();

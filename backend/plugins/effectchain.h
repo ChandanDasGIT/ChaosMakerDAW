@@ -34,6 +34,8 @@ inline constexpr std::string_view DrumKit = "drumkit";
 inline constexpr std::string_view ElectroDrums = "electrodrums";
 // The grand piano's controls (tone, pedal, scale changer), the same way.
 inline constexpr std::string_view Piano = "piano";
+// The Chords track's eight chord strips and autoplay; the grand piano's page follows it.
+inline constexpr std::string_view Chords = "chords";
 
 // Every effect type, in the order an "Add FX" picker lists them.
 std::span<const EffectDefinition> effects();

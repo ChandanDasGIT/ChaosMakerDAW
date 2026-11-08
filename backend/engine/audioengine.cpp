@@ -478,6 +478,13 @@ bool AudioEngine::isAuditionActive(int trackId) const noexcept
     return false;
 }
 
+bool AudioEngine::chainKeepsRunning(const TrackRender& track) noexcept
+{
+    for (const auto* processor : track.chain)
+        if (processor && processor->keepsRunning()) return true;
+    return false;
+}
+
 bool AudioEngine::anyAuditionActive() const noexcept
 {
     for (const auto& a : m_liveAuditions) {
@@ -561,7 +568,8 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
     m_resetPlayback = false;
     // Stop at the end of the arrangement when the user setting asks for it (metronome included).
     const bool bounded=snapshot && snapshot->playbackEnd>=0 && !m_looping && !m_recorder && m_stopAtEnd;
-    const bool anyAudition = anyAuditionActive();
+    bool anyAudition = anyAuditionActive();
+    if (snapshot) for (const auto& track : snapshot->tracks) anyAudition |= chainKeepsRunning(track);
     for (int offset = 0; offset < frames && (m_playing || anyAudition || m_ringOut > 0);) {
         if (bounded && m_playing && m_position>=snapshot->playbackEnd) {
             m_position=snapshot->playbackEnd; endPlayback();
@@ -617,7 +625,7 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
             const bool routeHw = trackReceivesHwMidi(track, snapshot);
             populateTrackMidi(track, m_position, count, blockLoopWrapped, offset == 0, io.midiIn, routeHw);
             const bool liveTrackActive = isAuditionActive(track.trackId);
-            if ((m_playing || liveTrackActive || m_ringOut > 0) && !track.chain.empty()) {
+            if ((m_playing || liveTrackActive || m_ringOut > 0 || chainKeepsRunning(track)) && !track.chain.empty()) {
                 ProcessContext context;
                 context.audio = {channels, 2, count};
                 context.midi = &m_trackMidi;
@@ -786,7 +794,7 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
                 }
             }
             const bool liveTrackActive = isAuditionActive(track.trackId);
-            if((m_playing || liveTrackActive || m_ringOut > 0) && !track.chain.empty()) {
+            if((m_playing || liveTrackActive || m_ringOut > 0 || chainKeepsRunning(track)) && !track.chain.empty()) {
                 ProcessContext context;
                 context.audio = {dry, 2, count};
                 context.midi = &m_trackMidi;

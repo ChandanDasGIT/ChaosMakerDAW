@@ -23,8 +23,8 @@ TEST(allheaders, compile_together)
 {
     EngineSnapshot snapshot;
     SampleZone zone;
-    RhythmPattern pattern;
+    chords::Pattern pattern;
     CHECK(snapshot.tracks.empty());
     CHECK(zone.audio == nullptr);
-    CHECK(pattern.steps.empty());
+    CHECK(pattern.count == 0);
 }

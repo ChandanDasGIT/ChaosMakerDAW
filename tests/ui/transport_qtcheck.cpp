@@ -17,6 +17,8 @@
 #include <QAbstractItemModelTester>
 #include <QJSValue>
 #include <QDirIterator>
+#include <QDir>
+#include <QFileInfo>
 #include <QFile>
 #include <QMetaProperty>
 #include <QRegularExpression>
@@ -1120,6 +1122,67 @@ private slots:
         QCOMPARE(panel->property("trackId").toInt(),-1);
         list->setVisible(false); list->setProperty("trackModel",QVariant());
     }
+    void fx_window_exports_a_chain_and_imports_it_onto_another_track_after_asking() {
+        // "Export chain..." / "Import chain..." in the FX window's header. The file dialogs are
+        // skipped (the panel's exportChain / previewChain take the file); import asks first and
+        // names what the track can't take.
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar"), vocal=tracks.addVocalTrack();
+        QVERIFY(tracks.addTrackEffect(guitar,"eq")>=0); QVERIFY(tracks.setEqBand(guitar,4,-3.5));
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QObject* panel=nullptr;
+        const auto restore=qScopeGuard([&] {
+            if(panel) QMetaObject::invokeMethod(panel,"close");
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            window->requestActivate(); (void)QTest::qWaitForWindowActive(window);
+        });
+        QTest::qWait(30);
+        const QString file=QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)).filePath("guitar.chaosfx");
+        QDir().mkpath(QFileInfo(file).absolutePath());
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(guitar)); QVERIFY(fx); click(fx);
+        panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(guitar)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        QVERIFY(visualItem(window->contentItem(),"exportChainButton")); QVERIFY(visualItem(window->contentItem(),"importChainButton"));
+        QVERIFY(visualItem(window->contentItem(),"importChainButton")->isEnabled());
+
+        QMetaObject::invokeMethod(panel,"exportChain",Q_ARG(QVariant,QVariant(QUrl::fromLocalFile(file))));
+        auto* message=panel->findChild<QObject*>("chainMessage"); QVERIFY(message);
+        QTRY_VERIFY(message->property("visible").toBool());
+        QCOMPARE(message->property("heading").toString(),QString("FX chain exported"));
+        QVERIFY(message->property("detail").toString().contains("GuitarSuite"));
+        QVERIFY(QFile::exists(file));
+        QMetaObject::invokeMethod(message->findChild<QQuickItem*>("chainMessageOk"),"click");
+        QTRY_VERIFY(!message->property("visible").toBool());
+        QMetaObject::invokeMethod(panel,"close"); QTRY_VERIFY(!panel->property("visible").toBool());
+
+        // Onto the vocal: the panel asks, saying GuitarSuite is skipped; Replace brings the EQ.
+        auto* vfx=visualItem(list,"trackFxButton"+QString::number(vocal)); QVERIFY(vfx); click(vfx);
+        panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(vocal)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        QMetaObject::invokeMethod(panel,"previewChain",Q_ARG(QVariant,QVariant(QUrl::fromLocalFile(file))));
+        auto* confirm=panel->findChild<QObject*>("chainImportConfirm"); QVERIFY(confirm);
+        QTRY_VERIFY(confirm->property("visible").toBool());
+        QVERIFY(confirm->findChild<QQuickItem*>("chainImportKept")->property("text").toString().contains("Equalizer"));
+        auto* skipped=confirm->findChild<QQuickItem*>("chainImportSkipped"); QVERIFY(skipped);
+        QVERIFY(skipped->isVisible()); QVERIFY(skipped->property("text").toString().contains("GuitarSuite"));
+        QVERIFY(tracks.project().findTrack(vocal)->effects.empty());           // nothing changed yet
+        QMetaObject::invokeMethod(confirm->findChild<QQuickItem*>("chainImportOk"),"click");
+        QTRY_VERIFY(!confirm->property("visible").toBool());
+        QCOMPARE(int(tracks.project().findTrack(vocal)->effects.size()),1);
+        QCOMPARE(QString::fromStdString(tracks.project().findTrack(vocal)->effects[0].type),QString("eq"));
+        QCOMPARE(tracks.project().findTrack(vocal)->eqGainDb[4],-3.5f);
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("eq"));   // the page follows
+
+        // A file that is not a chain: a message, nothing asked.
+        const QString junk=QFileInfo(file).absolutePath()+"/junk.chaosfx";
+        { QFile f(junk); QVERIFY(f.open(QIODevice::WriteOnly)); f.write("nope"); }
+        QMetaObject::invokeMethod(panel,"previewChain",Q_ARG(QVariant,QVariant(QUrl::fromLocalFile(junk))));
+        QTRY_VERIFY(message->property("visible").toBool() || panel->findChild<QObject*>("chainMessage")->property("visible").toBool());
+        QVERIFY(!confirm->property("visible").toBool());
+        QMetaObject::invokeMethod(panel->findChild<QObject*>("chainMessage")->findChild<QQuickItem*>("chainMessageOk"),"click");
+    }
     void vocal_effects_offer_eq_and_recording_controls_without_guitarsuite() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks); const int vocal=tracks.addVocalTrack();
@@ -1660,6 +1723,97 @@ private slots:
         QTRY_VERIFY(panel2->property("visible").toBool());
         QTRY_VERIFY(visualItem(window->contentItem(),"drumKitGrooves"));
         panel=panel2;
+    }
+    void chords_track_is_a_kind_of_its_own_and_its_page_has_eight_strips() {
+        // Chords sits beside Vocal and Instrument in the picker; its FX window opens on the
+        // strips page (autoplay, key, progressions, eight strips), the grand piano's page after.
+        // Controls are pressed directly: the window's size varies on this machine (U4).
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        QObject* panel=nullptr;
+        const auto restore=qScopeGuard([&] {
+            if(panel) QMetaObject::invokeMethod(panel,"close");
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            window->requestActivate(); (void)QTest::qWaitForWindowActive(window);
+        });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true); QTest::qWait(30);
+        auto* add=visualItem(list,"addTrackButton"); QVERIFY(add); click(add); QTest::qWait(20);
+        QVERIFY(visualItem(window->contentItem(),"trackChoice_Vocal")); QVERIFY(visualItem(window->contentItem(),"trackChoice_Instrument"));
+        auto* chordsChoice=visualItem(window->contentItem(),"trackChoice_Chords"); QVERIFY(chordsChoice); click(chordsChoice);
+        QTRY_COMPARE(tracks.count(),1);
+        const int id=tracks.project().tracks()[0]->id;
+        QCOMPARE(tracks.project().tracks()[0]->type,std::string("Chords"));
+
+        QTest::qWait(30);
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(id)); QVERIFY(fx); click(fx);
+        panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(id)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("chords"));     // opens on its strips
+        QVERIFY(panel->property("supportsChords").toBool()); QVERIFY(panel->property("supportsPiano").toBool());
+        QTRY_VERIFY(visualItem(window->contentItem(),"chordStrips"));
+        for(int i=0;i<8;++i) {
+            QVERIFY(visualItem(window->contentItem(),"chordStripName"+QString::number(i)));
+            QVERIFY(visualItem(window->contentItem(),"chordStripChord"+QString::number(i)));
+            QVERIFY(visualItem(window->contentItem(),"chordStripBass"+QString::number(i)));
+        }
+        auto* bridge=visualObject(window->contentItem(),"chordsBridge"); QVERIFY(bridge);
+        const auto press=[&](const QString& name) {
+            auto* item=visualItem(window->contentItem(),name); QVERIFY2(item,qPrintable(name));
+            QMetaObject::invokeMethod(item,"click");
+        };
+        // Autoplay chips.
+        QVERIFY(visualItem(window->contentItem(),"chordsAutoplay3")->property("active").toBool());
+        press("chordsAutoplay1");
+        QTRY_COMPARE(tracks.chords(id)->autoplay,1);
+        QVERIFY(visualItem(window->contentItem(),"chordsAutoplay1")->property("active").toBool());
+
+        // A strip's chord: click its name, pick the key's V7, OK.
+        QVERIFY(visualItem(window->contentItem(),"chordStripName2"));
+        auto* dialog=visualObject(window->contentItem(),"chordEditDialog"); if(!dialog) dialog=fxWindow()->findChild<QObject*>("chordEditDialog");
+        QVERIFY(dialog);
+        QMetaObject::invokeMethod(dialog,"edit",Q_ARG(QVariant,QVariant(2)));
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        auto* content=dialog->property("contentItem").value<QQuickItem*>(); QVERIFY(content);
+        const auto inDialog=[&](const char* n) { return visualItem(content,n); };
+        auto* field=inDialog("chordEditField"); QVERIFY(field);
+        QCOMPARE(field->property("text").toString(),QString("Em"));
+        QMetaObject::invokeMethod(inDialog("chordEditDegree5"),"click");
+        QCOMPARE(field->property("text").toString(),QString("G"));
+        QMetaObject::invokeMethod(inDialog("chordEditSeventh"),"click");
+        QMetaObject::invokeMethod(inDialog("chordEditDegree5"),"click");
+        QCOMPARE(field->property("text").toString(),QString("G7"));
+        QMetaObject::invokeMethod(inDialog("chordEditOk"),"click");
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        QCOMPARE(tracks.chords(id)->chords[2],std::string("G7"));
+        QTRY_VERIFY(visualItem(window->contentItem(),"chordStripName2"));
+        // A chord that does not read keeps the dialog open with a message.
+        QMetaObject::invokeMethod(dialog,"edit",Q_ARG(QVariant,QVariant(0)));
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        field->setProperty("text","Hm7");
+        QMetaObject::invokeMethod(inDialog("chordEditOk"),"click");
+        QVERIFY(dialog->property("visible").toBool());
+        QVERIFY(bridge->property("lastError").toString().contains("Hm7"));
+        QMetaObject::invokeMethod(dialog,"close");
+
+        // A progression fills all eight strips in the key.
+        press("chordsKeyMinor");
+        QTRY_VERIFY(tracks.chords(id)->key.minor);
+        auto* box=visualItem(window->contentItem(),"chordsProgression"); QVERIFY(box);
+        int andalusian=-1; const auto progs=bridge->property("progressions").toList();
+        for(const auto& p:progs) if(p.toMap().value("name").toString().startsWith("Andalusian")) andalusian=p.toMap().value("index").toInt();
+        QVERIFY(andalusian>=0);
+        box->setProperty("currentIndex",andalusian);
+        QMetaObject::invokeMethod(bridge,"setKey",Q_ARG(int,9),Q_ARG(bool,true));
+        press("chordsFill");
+        QTRY_COMPARE(tracks.chords(id)->chords[3],std::string("E"));
+        QCOMPARE(tracks.chords(id)->chords[0],std::string("Am"));
+
+        // The grand piano's page is the second page.
+        QVERIFY(visualItem(window->contentItem(),"selectEffect_piano"));
+        panel->setProperty("selectedEffect","piano");
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("piano"));
+        QTRY_VERIFY(visualObject(window->contentItem(),"trackPiano"+QString::number(id)));
     }
     void electronic_drums_live_in_fx_and_the_drawn_machine_plays_and_edits() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);

@@ -9,6 +9,7 @@
 #include "instruments/electrodrums/electrosettings.h"
 #include "instruments/piano/pianosettings.h"
 #include "instruments/harmonium/harmoniumsettings.h"
+#include "plugins/chordplayer/chordsettings.h"
 
 #include <cstdint>
 #include <array>
@@ -60,6 +61,8 @@ struct Track {
     electrodrums::Settings electrodrums;
     // Piano tracks: volume, release, resonance, velocity, brightness, scale changer.
     piano::Settings piano;
+    // Chords tracks: the eight strips' chords, autoplay and key (its piano uses `piano` above).
+    chords::Settings chords;
     // Insert effects in processing order (plan 6.1); rules in effectchain.
     std::vector<TrackEffectSlot> effects;
     std::vector<AudioClip> audioClips;
@@ -99,6 +102,7 @@ public:
     bool setTrackDrumKit(int id, const drumkit::Settings& settings);   // the same way
     bool setTrackElectroDrums(int id, const electrodrums::Settings& settings);   // and again
     bool setTrackPiano(int id, const piano::Settings& settings);
+    bool setTrackChords(int id, const chords::Settings& settings);
     // Insert effects. Not undoable by design (the user removes an effect by hand); undoing a
     // track removal still brings the track back with its effects.
     int addTrackEffect(int trackId, const std::string& type); // new effect id, or -1

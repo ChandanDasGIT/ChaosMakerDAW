@@ -3,6 +3,7 @@
 #include "drumkitjson.h"
 #include "electrodrumsjson.h"
 #include "pianojson.h"
+#include "chordsjson.h"
 #include "harmoniumjson.h"
 #include "mixer/mixerpanel.h"
 #include "recording/takerecorder.h"
@@ -91,7 +92,8 @@ std::string ProjectDocument::serialize(const Project& project,
         if (track->type == "Drums") trackObj["drumkit"] = drumkitjson::toJson(track->drumkit);
         if (track->type == "Electronic Drums")
             trackObj["electrodrums"] = electrodrumsjson::toJson(track->electrodrums);
-        if (track->type == "Piano") trackObj["piano"] = pianojson::toJson(track->piano);
+        if (track->type == "Piano" || track->type == "Chords") trackObj["piano"] = pianojson::toJson(track->piano);
+        if (track->type == "Chords") trackObj["chords"] = chordsjson::toJson(track->chords);
         json effectsList = json::array();
         for (const auto& slot : track->effects) effectsList.push_back(slot.type);
         trackObj["effects"] = std::move(effectsList);   // insert effects in chain order (plan 6.1)
@@ -297,6 +299,11 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             piano::Settings settings;
             if (!pianojson::fromJson(item["piano"], settings, error)) return false;
             candidate.setTrackPiano(track.id, settings);
+        }
+        if (item.contains("chords")) {
+            chords::Settings settings;
+            if (!chordsjson::fromJson(item["chords"], settings, error)) return false;
+            candidate.setTrackChords(track.id, settings);
         }
 
         for (int i = 0; i < 10; ++i) {

@@ -1,4 +1,5 @@
 #include "pianowrapper.h"
+#include "instruments/chords/chordsinstrument.h"
 #include "instruments/piano/piano.h"
 #include "instruments/piano/pianolibrary.h"
 #include "midi/notenames.h"
@@ -127,8 +128,13 @@ void PianoWrapper::pollKeys()
 {
     if (!m_engine || !valid()) return;
     const auto instrument = m_engine->trackInstrument(m_trackId);
-    if (!instrument || instrument->typeId() != "piano") return;
-    const auto& piano = static_cast<const Piano&>(*instrument);
+    if (!instrument) return;
+    // A Piano track's piano, or the one a Chords track plays through.
+    const Piano* found = instrument->typeId() == "piano" ? &static_cast<const Piano&>(*instrument)
+                       : instrument->typeId() == "chords" ? &static_cast<const ChordsInstrument&>(*instrument).piano()
+                       : nullptr;
+    if (!found) return;
+    const auto& piano = *found;
     // A new piano (a new track, a buffer change): take its counts without striking anything.
     const bool fresh = m_watched.lock() != instrument;
     m_watched = instrument;

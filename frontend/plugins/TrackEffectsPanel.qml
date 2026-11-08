@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 
 // A track's FX panel: its insert effects and its instrument's own page. A window of its own,
 // like the on-screen piano: it floats over the app, and the user moves it by its title bar
@@ -27,6 +28,7 @@ Window {
     readonly property bool supportsDrumKit: panelBridge.supportsDrumKit
     readonly property bool supportsElectroDrums: panelBridge.supportsElectroDrums
     readonly property bool supportsPiano: panelBridge.supportsPiano
+    readonly property bool supportsChords: panelBridge.supportsChords
     // What "+ Add FX" offers; re-read whenever the chain changes.
     readonly property var addableEffects: (root.effects, root.trackModel && root.trackId >= 0
                                            ? root.trackModel.addableEffects(root.trackId) : [])
@@ -95,6 +97,20 @@ Window {
                     spacing: 3
                     Text { text: root.trackName + " · Effects"; color: Theme.text; font.pixelSize: 17; font.bold: true }
                     Text { text: panelBridge.recordModeDescription; color: Theme.textMuted; font.pixelSize: 11 }
+                }
+                Item { Layout.fillWidth: true }                        // keeps the controls together on the right
+                PanelButton {
+                    objectName: "exportChainButton"
+                    text: "Export chain…"
+                    tooltip: "Save this track's effects, in order and with every setting, to a .chaosfx file"
+                    onClicked: exportChainDialog.open()
+                }
+                PanelButton {
+                    objectName: "importChainButton"
+                    text: "Import chain…"
+                    enabled: !EngineController.takeBusy
+                    tooltip: "Replace this track's effects with the ones in a .chaosfx file"
+                    onClicked: importChainDialog.open()
                 }
                 ThemedComboBox {
                     objectName: "trackRecordingMode"
@@ -300,7 +316,8 @@ Window {
                             : root.selectedEffect === "harmonium" ? 3
                             : root.selectedEffect === "drumkit" ? 4
                             : root.selectedEffect === "electrodrums" ? 5
-                            : root.selectedEffect === "piano" ? 6 : 7
+                            : root.selectedEffect === "piano" ? 6
+                            : root.selectedEffect === "chords" ? 7 : 8
                 Tenbandeq {
                     trackModel: root.trackModel
                     trackId: root.trackId
@@ -366,6 +383,15 @@ Window {
                         trackName: root.trackName
                     }
                 }
+                Loader {
+                    active: root.supportsChords
+                    sourceComponent: ChordsEditor {
+                        objectName: "trackChords" + root.trackId
+                        trackModel: root.trackModel
+                        trackId: root.trackId
+                        trackName: root.trackName
+                    }
+                }
                 Item {
                     Text {
                         objectName: "addEffectHint"
@@ -375,6 +401,128 @@ Window {
                         font.pixelSize: 13
                     }
                 }
+            }
+        }
+    }
+
+    // ---- FX chain files (EngineController export / preview / import) ----
+    FileDialog {
+        id: exportChainDialog
+        objectName: "exportChainDialog"
+        popupType: Popup.Item                                   // stays inside this window (plan 1.11)
+        title: "Export FX chain"
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["FX chains (*.chaosfx)"]
+        defaultSuffix: "chaosfx"
+        onAccepted: root.exportChain(selectedFile)
+    }
+    FileDialog {
+        id: importChainDialog
+        objectName: "importChainDialog"
+        popupType: Popup.Item
+        title: "Import FX chain"
+        fileMode: FileDialog.OpenFile
+        nameFilters: ["FX chains (*.chaosfx)"]
+        onAccepted: root.previewChain(selectedFile)
+    }
+    function exportChain(file) {
+        const result = EngineController.exportEffectChain(root.trackId, file)
+        chainMessage.show(result.ok ? "FX chain exported" : "Could not export",
+                          result.ok ? "Saved " + result.kept.join(", ") + "." : result.error)
+    }
+    function previewChain(file) {
+        const result = EngineController.previewEffectChain(root.trackId, file)
+        if (!result.ok) { chainMessage.show("Could not import", result.error); return }
+        chainConfirm.file = file
+        chainConfirm.kept = result.kept
+        chainConfirm.skipped = result.skipped
+        chainConfirm.sourceType = result.trackType
+        chainConfirm.open()
+    }
+
+    // Asks before the track's effects are replaced (effect changes are not on the undo list).
+    Popup {
+        id: chainConfirm
+        objectName: "chainImportConfirm"
+        property url file
+        property var kept: []
+        property var skipped: []
+        property string sourceType: ""
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: 380
+        modal: true
+        padding: 14
+        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
+        contentItem: ColumnLayout {
+            spacing: 10
+            Text {
+                text: "Replace " + root.trackName + "'s effects?"
+                color: Theme.text; font.pixelSize: Theme.bodySize; font.bold: true
+                wrapMode: Text.WordWrap; Layout.fillWidth: true
+            }
+            Text {
+                objectName: "chainImportKept"
+                text: chainConfirm.kept.length > 0
+                      ? "From the " + (chainConfirm.sourceType.length > 0 ? chainConfirm.sourceType + " chain" : "file")
+                        + ": " + chainConfirm.kept.join(", ") + "."
+                      : "Nothing in the file fits this track; its addable effects will be removed."
+                color: Theme.text; font.pixelSize: Theme.smallSize
+                wrapMode: Text.WordWrap; Layout.fillWidth: true
+            }
+            Text {
+                objectName: "chainImportSkipped"
+                visible: chainConfirm.skipped.length > 0
+                text: "Skipped, this track type can't take: " + chainConfirm.skipped.join(", ") + "."
+                color: Theme.meterWarning; font.pixelSize: Theme.captionSize
+                wrapMode: Text.WordWrap; Layout.fillWidth: true
+            }
+            Text {
+                text: "This can't be undone."
+                color: Theme.textMuted; font.pixelSize: Theme.captionSize
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                PanelButton { text: "Cancel"; onClicked: chainConfirm.close() }
+                PanelButton {
+                    objectName: "chainImportOk"
+                    text: "Replace"
+                    onClicked: {
+                        const result = EngineController.importEffectChain(root.trackId, chainConfirm.file)
+                        chainConfirm.close()
+                        if (!result.ok) chainMessage.show("Could not import", result.error)
+                    }
+                }
+            }
+        }
+    }
+
+    // A short result: what was exported, or why something failed.
+    Popup {
+        id: chainMessage
+        objectName: "chainMessage"
+        property string heading: ""
+        property string detail: ""
+        function show(heading, detail) { chainMessage.heading = heading; chainMessage.detail = detail; open() }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: 360
+        padding: 14
+        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
+        contentItem: ColumnLayout {
+            spacing: 10
+            Text { text: chainMessage.heading; color: Theme.text; font.pixelSize: Theme.bodySize; font.bold: true }
+            Text {
+                objectName: "chainMessageDetail"
+                text: chainMessage.detail
+                color: Theme.textMuted; font.pixelSize: Theme.smallSize
+                wrapMode: Text.WordWrap; Layout.fillWidth: true
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                PanelButton { objectName: "chainMessageOk"; text: "OK"; onClicked: chainMessage.close() }
             }
         }
     }

@@ -88,7 +88,7 @@ QString PianoRollWrapper::trackColour() const {
 bool PianoRollWrapper::drumMode() const {
     if (!m_trackList) return false;
     const auto* track = m_trackList->domain().project().findTrack(m_trackId);
-    return track && instrumentcatalog::isDrumKit(track->type);
+    return track && instrumentcatalog::namesKeys(track->type);
 }
 
 QString PianoRollWrapper::drumKit() const {
@@ -100,6 +100,14 @@ QString PianoRollWrapper::drumName(int note) const {
     if (!m_trackList) return {};
     const auto* track = m_trackList->domain().project().findTrack(m_trackId);
     if (!track) return {};
+    if (track->type == "Chords") {                         // the strip a key plays: "3 · F", "Bass 3 · F"
+        bool bass = false;
+        const int strip = ChordPlayer::stripOfKey(note, bass);
+        if (strip < 0) return {};
+        const auto& chord = track->chords.chords[std::size_t(strip)];
+        const QString label = (bass ? QStringLiteral("Bass %1") : QStringLiteral("%1")).arg(strip + 1);
+        return chord.empty() ? label : label + QStringLiteral(" \u00b7 ") + QString::fromStdString(chord);
+    }
     const auto name = instrumentcatalog::drumName(track->type, note);
     return QString::fromUtf8(name.data(), qsizetype(name.size()));
 }

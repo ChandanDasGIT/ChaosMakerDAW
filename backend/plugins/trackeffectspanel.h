@@ -31,6 +31,8 @@ public:
     bool supportsElectroDrums() const;
     // The grand piano's page likewise, on Piano tracks.
     bool supportsPiano() const;
+    // The Chords track's strips page likewise, on Chords tracks.
+    bool supportsChords() const;
 
     const std::string& selectedEffect() const { return m_selectedEffect; }
     void setSelectedEffect(std::string_view key);

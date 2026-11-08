@@ -468,7 +468,22 @@ bool TrackListWrapper::setDrumKit(int trackId, const drumkit::Settings& settings
 const piano::Settings* TrackListWrapper::piano(int trackId) const
 {
     const auto* track = m_project.findTrack(trackId);
-    return track && track->type == "Piano" ? &track->piano : nullptr;
+    return track && (track->type == "Piano" || track->type == "Chords") ? &track->piano : nullptr;
+}
+
+const chords::Settings* TrackListWrapper::chords(int trackId) const
+{
+    const auto* track = m_project.findTrack(trackId);
+    return track && track->type == "Chords" ? &track->chords : nullptr;
+}
+
+bool TrackListWrapper::setChords(int trackId, const chords::Settings& settings)
+{
+    if (!chords(trackId)) return false;
+    const auto before = *chords(trackId);
+    const auto change = m_state.setChords(trackId, settings);
+    if (change.accepted && !(before == *chords(trackId))) emit chordsChanged(trackId);
+    return change.accepted;
 }
 
 bool TrackListWrapper::setPiano(int trackId, const piano::Settings& settings)
