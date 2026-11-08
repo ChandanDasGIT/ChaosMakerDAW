@@ -50,3 +50,6 @@ compile_commands.json
 
 # Downloaded sample libraries (Gogodze Phu Vol II, Splendid Grand Piano, ...): large, never committed.
 /sample-kits/
+
+# Listening renders (tools and throwaway programs write here)
+/renders/

@@ -206,7 +206,7 @@ decoder (C4) and the piano (C5).
         The user asked about ffmpeg in the app (2026-11-08): not now (from-scratch rule,
         size, LGPL care). For compressed import later (E: MP3, AAC, Ogg) the suggested route
         is Qt Multimedia's QAudioDecoder (Qt 6 runs FFmpeg underneath), not linking FFmpeg.
-[~] C5  PIANO NEXT: Splendid Grand Piano (see C9) as the real "Piano" instrument, loaded
+[x] C5  DONE 2026-11-08 (the user liked the renders). PIANO: Splendid Grand Piano (see C9) as the real "Piano" instrument, loaded
         through the FLAC decoder. Sustain pedal, release, string resonance controls. Map the
         Piano track type. Listen with the user; if it disappoints, switch to the fallback
         Accurate-Salamander (WAV; CC-BY, so a credit is then required: see C8).
@@ -242,7 +242,12 @@ decoder (C4) and the piano (C5).
         any source; the pedal is a switch), sliders Brightness, Touch, String resonance,
         Release, Volume, Scale changer ("C4 plays D4 (+2)"). Colours in EffectsColors.
         Test: transport_ui grand_piano_lives_in_fx_and_the_drawn_piano_plays_and_edits.
-        5 renders, then the user plays it.
+        5 renders, then the user plays it: renders made 2026-11-08 in renders/piano/ (folder
+        in .gitignore; written by a throwaway program driving Piano offline): 01 C4 soft to
+        loud, 02 a chord dry then pedalled, 03 a run and pedalled arpeggios, 04 the range A0
+        to C8, 05 brightness 100 / 60 / 30 % (8 kHz band -23 / -29 / -44 dB vs 1 kHz), 06
+        string resonance off / full (pedalled ring +4.6 dB). Peaks -15..-4 dBFS. The user
+        liked them (2026-11-08); playing it in the app is the user's own check (B).
 [ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
         model), mapped in instrumentfactory.cpp.
 [x] C7  Harmonium, built 2026-11-07 (before C2, the user's choice); tuning by ear is left (B9).
