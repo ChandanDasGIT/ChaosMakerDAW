@@ -29,6 +29,8 @@ public:
     bool supportsDrumKit() const;
     // The electronic drum kit's page likewise, on Electronic Drums tracks.
     bool supportsElectroDrums() const;
+    // The grand piano's page likewise, on Piano tracks.
+    bool supportsPiano() const;
 
     const std::string& selectedEffect() const { return m_selectedEffect; }
     void setSelectedEffect(std::string_view key);

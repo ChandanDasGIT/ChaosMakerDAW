@@ -22,7 +22,8 @@ TEST(effectchain, only_instrument_tracks_start_with_their_instrument_fx)
     CHECK(effectchain::initialEffects("Harmonium") == List{"harmonium"});   // its page, like GuitarSuite
     CHECK(effectchain::initialEffects("Drums") == List{"drumkit"});
     CHECK(effectchain::initialEffects("Electronic Drums") == List{"electrodrums"});
-    for (const char* type : {"Vocal", "Audio", "Instrument", "Piano", "Strings", "Unknown"})
+    CHECK(effectchain::initialEffects("Piano") == List{"piano"});
+    for (const char* type : {"Vocal", "Audio", "Instrument", "Strings", "Unknown"})
         CHECK(effectchain::initialEffects(type).empty());
 }
 
@@ -141,4 +142,20 @@ TEST(effectchain, electronic_drum_page_is_fixed_like_the_drum_kit_page)
     CHECK(project.setTrackEffects(track.id, {"eq"}));
     CHECK(types(track) == (std::vector<std::string>{"electrodrums", "eq"}));
     CHECK(!project.setTrackEffects(track.id, {"drumkit"}));       // the acoustic kit's page
+}
+
+TEST(effectchain, piano_page_is_fixed_and_comes_back_on_older_files)
+{
+    std::vector<TrackEffectSlot> chain;
+    CHECK(!effectchain::canAdd(chain, "piano") && !effectchain::canRemove("piano"));
+    const auto* page = effectchain::find("piano");
+    CHECK(page && page->title == "Grand piano");
+
+    Project project;
+    auto& track = project.addTrack(TrackKind::Instrument, "Keys", "Piano");
+    CHECK(types(track) == (std::vector<std::string>{"piano"}));
+    // Piano tracks saved before the page existed had no page: it goes back in front.
+    CHECK(project.setTrackEffects(track.id, {"eq"}));
+    CHECK(types(track) == (std::vector<std::string>{"piano", "eq"}));
+    CHECK(!project.setTrackEffects(track.id, {"harmonium"}));
 }

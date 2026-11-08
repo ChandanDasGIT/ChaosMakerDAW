@@ -105,6 +105,7 @@ signals:
     void keysChanged();
     void struck(int key, int velocity);                  // a key went down (even between two looks)
     void played(int key, int velocity);                  // play() sent this note
+    void pedalSent(bool down);                           // setPedalDown() sent the pedal
 
 private:
     template <typename Change>

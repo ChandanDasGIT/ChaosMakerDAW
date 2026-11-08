@@ -10,7 +10,7 @@ std::span<const InstrumentDefinition> instrumentcatalog::instruments()
 {
     static const auto catalog = [] {
         std::vector<InstrumentDefinition> entries;
-        entries.push_back({"Piano", "Piano", false, false});
+        entries.push_back({"Piano", "Piano", false, false, "piano"});
         const auto guitars = guitardefinition::variants();
         entries.insert(entries.end(), guitars.begin(), guitars.end());
         entries.push_back({"Strings", "Strings", false, false});

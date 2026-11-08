@@ -1434,6 +1434,81 @@ private slots:
         auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
         QTRY_VERIFY(!panel->property("visible").toBool());
     }
+    void grand_piano_lives_in_fx_and_the_drawn_piano_plays_and_edits() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int p=tracks.addInstrumentTrackOfType("Piano");
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        const auto restore=qScopeGuard([&] {
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+        });
+        QTest::qWait(30);
+        const auto settings=[&]{ return tracks.project().findTrack(p)->piano; };
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(p)); QVERIFY(fx); click(fx);
+        auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(p)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("piano"));   // opens on its page
+        QVERIFY(panel->property("supportsPiano").toBool());
+        QVERIFY(!visualItem(window->contentItem(),"removeEffect_piano")->isVisible());   // fixed
+
+        auto* picture=visualItem(window->contentItem(),"pianoPicture"); QVERIFY(picture);
+        QTRY_VERIFY(picture->isVisible()); QVERIFY(picture->height()>100);
+        auto* bridge=visualObject(window->contentItem(),"pianoBridge"); QVERIFY(bridge);
+        QSignalSpy played(bridge,SIGNAL(played(int,int))), pedal(bridge,SIGNAL(pedalSent(bool)));
+
+        // All 88 keys; a click near a key's front edge is loud, near its back soft; dragging
+        // along the keys plays them in turn.
+        for (int key : {21,22,59,60,61,107,108}) QVERIFY2(visualItem(picture,"pianoKey"+QString::number(key)),qPrintable(QString::number(key)));
+        QVERIFY(!visualItem(picture,"pianoKey20") && !visualItem(picture,"pianoKey109"));
+        auto* c4=visualItem(picture,"pianoKey60"); auto* d4=visualItem(picture,"pianoKey62"); QVERIFY(c4 && d4);
+        auto* w=fxWindow();
+        const QPoint front=c4->mapToScene(QPointF(c4->width()/2,c4->height()-3)).toPoint();
+        QTest::mousePress(w,Qt::LeftButton,Qt::NoModifier,front);
+        QTRY_COMPARE(played.count(),1);
+        QCOMPARE(played[0][0].toInt(),60); QVERIFY(played[0][1].toInt()>=120);
+        QTest::mouseMove(w,d4->mapToScene(QPointF(d4->width()/2,d4->height()-3)).toPoint());
+        QTRY_COMPARE(played.count(),2);
+        QCOMPARE(played[1][0].toInt(),62);
+        QTest::mouseRelease(w,Qt::LeftButton,Qt::NoModifier,d4->mapToScene(QPointF(d4->width()/2,d4->height()-3)).toPoint());
+        auto* cs4=visualItem(picture,"pianoKey61"); QVERIFY(cs4);  // a black key, at its back: soft
+        const QPoint back=cs4->mapToScene(QPointF(cs4->width()/2,3)).toPoint();
+        QTest::mouseClick(w,Qt::LeftButton,Qt::NoModifier,back);
+        QTRY_COMPARE(played.count(),3);
+        QCOMPARE(played[2][0].toInt(),61); QVERIFY(played[2][1].toInt()<60);
+
+        // The pedal is a switch.
+        auto* pedalItem=visualItem(picture,"pianoPedal"); QVERIFY(pedalItem); click(pedalItem);
+        QTRY_COMPARE(pedal.count(),1); QVERIFY(pedal[0][0].toBool());
+
+        // Settings.
+        auto* release=visualItem(window->contentItem(),"pianoRelease"); QVERIFY(release);
+        QQuickItem* slider=nullptr;
+        for (auto* child : release->findChildren<QQuickItem*>()) if (child->inherits("QQuickSlider")) slider=child;
+        QVERIFY(slider);
+        slider->forceActiveFocus(); QTest::keyClick(w,Qt::Key_Right);
+        QTRY_VERIFY(settings().release>piano::DefaultRelease);
+        auto* transpose=visualItem(window->contentItem(),"pianoTranspose"); QVERIFY(transpose);
+        slider=nullptr;
+        for (auto* child : transpose->findChildren<QQuickItem*>()) if (child->inherits("QQuickSlider")) slider=child;
+        QVERIFY(slider);
+        slider->forceActiveFocus(); QTest::keyClick(w,Qt::Key_Right); QTest::keyClick(w,Qt::Key_Right);
+        QTRY_COMPARE(settings().transpose,2);
+        QCOMPARE(tracks.project().findTrack(p)->keyShift(),2);
+        QStringList texts;
+        for (auto* child : transpose->findChildren<QQuickItem*>()) if (child->property("text").isValid()) texts<<child->property("text").toString();
+        QVERIFY2(texts.contains("C4 plays D4 (+2)"),qPrintable(texts.join(" | ")));
+
+        auto* status=visualItem(window->contentItem(),"pianoStatus"); QVERIFY(status);
+        QTRY_VERIFY(status->isVisible());                          // the tests have no piano: it says where it looked
+        QVERIFY(status->property("text").toString().contains("not found"));
+        QVERIFY(qobject_cast<QQuickWindow*>(w)->grabWindow().save("/tmp/chaosmaker-piano-page.png"));
+
+        auto* reset=visualItem(window->contentItem(),"pianoReset"); QVERIFY(reset);
+        click(reset); QTRY_VERIFY(settings()==piano::Settings{});
+        auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!panel->property("visible").toBool());
+    }
     void harmonium_lives_in_fx_like_guitarsuite_and_edits_its_settings() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks);

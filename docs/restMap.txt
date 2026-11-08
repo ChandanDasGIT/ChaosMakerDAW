@@ -234,7 +234,15 @@ decoder (C4) and the piano (C5).
         EngineController::sendLiveControl; the engine's live audition counts the pedal as a
         held key. Piano tracks no longer use TestSynth (two tests moved to Strings). The FX
         page ("piano" in the catalog) comes with step 4. Possible later: keep samples as
-        16-bit to halve the memory. 4 the drawn FX page; 5 renders, then the user plays it.
+        16-bit to halve the memory. 4 the drawn FX page DONE 2026-11-08: "piano" page in the
+        catalog / effectchain ("Grand piano", fixed; older files get it back in front),
+        frontend/instruments/piano/PianoEditor.qml + PianoPicture.qml (a grand from above,
+        lid open, gold frame with a string per key, dampers that lift with the pedal, 88
+        clickable keys: front loud, back soft, drag to glide; keys and strings light from
+        any source; the pedal is a switch), sliders Brightness, Touch, String resonance,
+        Release, Volume, Scale changer ("C4 plays D4 (+2)"). Colours in EffectsColors.
+        Test: transport_ui grand_piano_lives_in_fx_and_the_drawn_piano_plays_and_edits.
+        5 renders, then the user plays it.
 [ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
         model), mapped in instrumentfactory.cpp.
 [x] C7  Harmonium, built 2026-11-07 (before C2, the user's choice); tuning by ear is left (B9).

@@ -52,7 +52,8 @@ TEST(instrumentcatalog, instruments_with_controls_name_their_fx_page)
     CHECK(instrumentcatalog::find("Harmonium")->page == "harmonium");
     CHECK(instrumentcatalog::find("Drums")->page == "drumkit");
     CHECK(instrumentcatalog::find("Electronic Drums")->page == "electrodrums");
-    for (const char* id : {"Piano", "Strings"}) CHECK(instrumentcatalog::find(id)->page.empty());
+    CHECK(instrumentcatalog::find("Piano")->page == "piano");
+    CHECK(instrumentcatalog::find("Strings")->page.empty());
 }
 
 TEST(instrumentcatalog, drum_kits_name_their_keys_from_their_own_maps)

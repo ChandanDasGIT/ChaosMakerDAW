@@ -113,7 +113,9 @@ void PianoWrapper::stop(int key)
 
 void PianoWrapper::setPedalDown(bool down)
 {
-    if (m_engine && valid()) m_engine->sendLiveControl(m_trackId, 64, down ? 127 : 0);
+    if (!m_engine || !valid()) return;
+    m_engine->sendLiveControl(m_trackId, 64, down ? 127 : 0);
+    emit pedalSent(down);
 }
 
 QString PianoWrapper::noteName(int key) const

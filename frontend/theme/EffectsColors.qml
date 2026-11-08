@@ -32,4 +32,18 @@ QtObject {
     readonly property color padSnare:        "#c9913a"   // snare, clap, side stick
     readonly property color padHat:          "#3f8f9b"   // hi-hats
     readonly property color padCymbal:       "#7a62a8"   // crash and ride
+
+    // The grand piano page's drawn piano, seen from above with the lid open
+    readonly property color pianoCase:       "#141416"   // black lacquer
+    readonly property color pianoCaseEdge:   "#3a3b40"
+    readonly property color pianoLid:        "#1d1e22"   // the open lid, behind the case
+    readonly property color pianoPlate:      "#b8924a"   // the cast-iron frame, gold
+    readonly property color pianoPlateEdge:  "#7c6131"
+    readonly property color pianoString:     "#d9d2c0"   // steel and copper-wound strings
+    readonly property color pianoFelt:       "#8d2f2a"   // dampers and key felt
+    readonly property color pianoKeyWhite:   "#f2efe6"
+    readonly property color pianoKeyEdge:    "#9a968b"
+    readonly property color pianoKeyBlack:   "#1a1a1c"
+    readonly property color pianoPedal:      "#c9a65a"   // brass
+    readonly property color pianoPedalEdge:  "#7d6431"
 }

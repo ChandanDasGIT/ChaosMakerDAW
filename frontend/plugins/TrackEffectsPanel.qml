@@ -26,6 +26,7 @@ Window {
     readonly property bool supportsHarmonium: panelBridge.supportsHarmonium
     readonly property bool supportsDrumKit: panelBridge.supportsDrumKit
     readonly property bool supportsElectroDrums: panelBridge.supportsElectroDrums
+    readonly property bool supportsPiano: panelBridge.supportsPiano
     // What "+ Add FX" offers; re-read whenever the chain changes.
     readonly property var addableEffects: (root.effects, root.trackModel && root.trackId >= 0
                                            ? root.trackModel.addableEffects(root.trackId) : [])
@@ -299,7 +300,8 @@ Window {
                             : root.selectedEffect === "chaoseq" ? 2
                             : root.selectedEffect === "harmonium" ? 3
                             : root.selectedEffect === "drumkit" ? 4
-                            : root.selectedEffect === "electrodrums" ? 5 : 6
+                            : root.selectedEffect === "electrodrums" ? 5
+                            : root.selectedEffect === "piano" ? 6 : 7
                 Tenbandeq {
                     trackModel: root.trackModel
                     trackId: root.trackId
@@ -351,6 +353,15 @@ Window {
                     active: root.supportsElectroDrums
                     sourceComponent: ElectroDrumsEditor {
                         objectName: "trackElectroDrums" + root.trackId
+                        trackModel: root.trackModel
+                        trackId: root.trackId
+                        trackName: root.trackName
+                    }
+                }
+                Loader {
+                    active: root.supportsPiano
+                    sourceComponent: PianoEditor {
+                        objectName: "trackPiano" + root.trackId
                         trackModel: root.trackModel
                         trackId: root.trackId
                         trackName: root.trackName

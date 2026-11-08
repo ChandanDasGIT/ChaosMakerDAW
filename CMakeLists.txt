@@ -172,6 +172,8 @@ if(DAW_BUILD_APP)
                       frontend/instruments/drums/DrumKitPicture.qml
                       frontend/instruments/electrodrums/ElectroDrumsEditor.qml
                       frontend/instruments/electrodrums/ElectroDrumsPicture.qml
+                      frontend/instruments/piano/PianoEditor.qml
+                      frontend/instruments/piano/PianoPicture.qml
                       frontend/transportbar/VirtualKeyboard.qml
                       frontend/plugins/TrackEffectsPanel.qml frontend/plugins/eq/Tenbandeq.qml frontend/plugins/chaoseq/ChaosEqEditor.qml
                       frontend/session/TrackList.qml frontend/timeline/Timeline.qml
