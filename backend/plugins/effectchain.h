@@ -32,6 +32,8 @@ inline constexpr std::string_view Harmonium = "harmonium";
 inline constexpr std::string_view DrumKit = "drumkit";
 // The electronic drum kit's controls (style, per-drum tune / decay / level), the same way.
 inline constexpr std::string_view ElectroDrums = "electrodrums";
+// The grand piano's controls (tone, pedal, scale changer), the same way.
+inline constexpr std::string_view Piano = "piano";
 
 // Every effect type, in the order an "Add FX" picker lists them.
 std::span<const EffectDefinition> effects();

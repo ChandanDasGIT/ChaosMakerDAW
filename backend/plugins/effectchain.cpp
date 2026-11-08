@@ -5,13 +5,14 @@
 #include <array>
 
 namespace {
-constexpr std::array<EffectDefinition, 6> catalog{{
+constexpr std::array<EffectDefinition, 7> catalog{{
     {effectchain::Eq, "Equalizer", "10-band tone shaping", true, true},
     {effectchain::ChaosEq, "Chaos EQ", "Parametric EQ, up to 24 bands", true, true},
     {effectchain::GuitarSuite, "GuitarSuite", "Pedals and signal chain", false, false},
     {effectchain::Harmonium, "Harmonium", "Stops, bellows and drones", false, false},
     {effectchain::DrumKit, "Drum kit", "Room, levels and character", false, false},
     {effectchain::ElectroDrums, "Electronic drums", "Style, tune, decay and levels", false, false},
+    {effectchain::Piano, "Grand piano", "Tone, pedal and scale", false, false},
 }};
 
 bool onChain(std::span<const TrackEffectSlot> chain, std::string_view type)
