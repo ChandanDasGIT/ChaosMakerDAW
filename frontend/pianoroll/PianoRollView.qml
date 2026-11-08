@@ -315,11 +315,11 @@ Item {
                     font.pixelSize: 11
                 }
 
-                ToolButton {
-                    text: Icons.close
+                CloseButton {
                     Accessible.name: "Close piano roll"
                     implicitWidth: 20
                     implicitHeight: 20
+                    glyphSize: 15
                     onClicked: root.closeRequested()
                 }
             }

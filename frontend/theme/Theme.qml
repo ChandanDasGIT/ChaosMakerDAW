@@ -65,6 +65,16 @@ QtObject {
     readonly property color fieldBorder:     "#444750"   // accent when focused
     readonly property color textDisabled:    "#777b83"
 
+    // ---- desk faders (HardwareSlider: FX pages, master fader, metronome volume) ----
+    readonly property color faderSlot:       "#0d0d0f"   // the dark slot the cap rides in
+    readonly property color faderSlotEdge:   "#3a3c42"   // its lit lower / right bevel
+    readonly property color faderTick:       "#55585f"   // scale ticks beside the slot
+    readonly property color faderCapTop:     "#d9dbe0"   // the metal cap, light end
+    readonly property color faderCapBottom:  "#7d8088"   // ... dark end
+    readonly property color faderCapEdge:    "#2a2b30"   // the cap's outline
+    readonly property color faderCapShadow:  "#99000000" // soft shadow under the cap
+    readonly property color faderCapLine:    "#ffffff"   // indicator line across the cap (accent while dragged)
+
     // ---- popups ----
     readonly property color popupBg:         "#25272c"
     readonly property color popupBorder:     "#4a4d56"

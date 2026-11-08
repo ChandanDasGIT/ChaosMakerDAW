@@ -63,7 +63,7 @@ Item {
                     color: Theme.text; font.pixelSize: 10
                 }
                 RowLayout {
-                    Slider {
+                    HardwareSlider {
                         objectName: "guitarInputTrim"
                         Layout.fillWidth: true
                         from: -24; to: 24; stepSize: 0.1
@@ -217,11 +217,10 @@ Item {
                                 text: pedalCard.isBypassed ? "BYP" : "ON"; textSize: 9
                                 onClicked: root.effectsModel.setBypassed(pedalCard.pedalId, !pedalCard.isBypassed)
                             }
-                            ToolButton {
-                                text: Icons.close
+                            CloseButton {
+                                destructive: true
                                 Accessible.name: "Remove pedal"
                                 onClicked: root.effectsModel.removePedal(pedalCard.pedalId)
-                                contentItem: Text { text: Icons.close; color: parent.hovered ? Theme.record : Theme.textMuted; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                             }
                         }
                         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.divider }
@@ -443,7 +442,7 @@ Item {
                                             elide: Text.ElideRight
                                             Layout.preferredWidth: 78
                                         }
-                                        Slider {
+                                        HardwareSlider {
                                             id: parameterSlider
                                             objectName: pedalCard.pedalType + "." + controlRow.modelData.id
                                             Layout.fillWidth: true
@@ -455,28 +454,6 @@ Item {
                                             to: controlRow.modelData.max
                                             value: controlRow.modelValue
                                             onMoved: root.effectsModel.setParameter(pedalCard.pedalId, controlRow.modelData.id, value)
-                                            background: Item {
-                                                x: parameterSlider.leftPadding
-                                                width: parameterSlider.availableWidth
-                                                height: parameterSlider.height
-                                                Rectangle {
-                                                    anchors.verticalCenter: parent.verticalCenter
-                                                    width: parent.width; height: 4; radius: 2
-                                                    color: Theme.guitarSuite.sliderTrack
-                                                }
-                                                Rectangle {
-                                                    anchors.verticalCenter: parent.verticalCenter
-                                                    width: parameterSlider.visualPosition * parent.width; height: 4; radius: 2
-                                                    color: Theme.accent
-                                                }
-                                            }
-                                            handle: Rectangle {
-                                                x: parameterSlider.leftPadding + parameterSlider.visualPosition * (parameterSlider.availableWidth - width)
-                                                anchors.verticalCenter: parent.verticalCenter
-                                                width: 12; height: 12; radius: 6
-                                                color: parameterSlider.pressed ? Theme.textStrong : Theme.text
-                                                border.color: parameterSlider.activeFocus ? Theme.accent : Theme.guitarSuite.handleBorder
-                                            }
                                             TapHandler {
                                                 acceptedButtons: Qt.LeftButton
                                                 enabled: controlRow.modelData.defaultValue !== undefined

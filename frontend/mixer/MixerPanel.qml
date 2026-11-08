@@ -76,7 +76,7 @@ Rectangle {
                     Layout.fillWidth: true
                     spacing: 4
 
-                    Slider {
+                    HardwareSlider {
                         id: masterVolumeSlider
                         objectName: "mixerMasterFader"
                         Layout.fillHeight: true
@@ -383,9 +383,10 @@ Rectangle {
                                 spacing: 4
                                 // Channel fader: gain of the selected clip on this track (or its first
                                 // clip). Track volume lives in the track list.
-                                Slider {
+                                ThemedSlider {
                                     id: clipGainSlider
                                     objectName: "mixerClipGain" + strip.trackId
+                                    tint: strip.trackColour
                                     Layout.fillHeight: true
                                     Layout.preferredWidth: 24
                                     Layout.alignment: Qt.AlignHCenter

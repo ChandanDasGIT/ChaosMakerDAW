@@ -678,11 +678,11 @@ private slots:
             QVERIFY2(qvariant_cast<QObject*>(theme->property(area)),area);
     }
     void controls_use_the_shared_themed_components() {
-        // Plan 4.3: menus, entries, separators, text buttons and drop-downs come from
+        // Plan 4.3: menus, entries, separators, text buttons, drop-downs and sliders come from
         // frontend/common/ (ThemedMenu, ThemedMenuItem, ThemedMenuSeparator, PanelButton,
-        // ThemedComboBox, ToggleChip); nothing else re-styles Qt's plain ones.
+        // ThemedComboBox, ToggleChip, ThemedSlider); nothing else re-styles Qt's plain ones.
         const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
-        const QRegularExpression plain(QStringLiteral("(^|[^\\w.])(Menu|MenuItem|MenuSeparator|Button|ComboBox)\\s*\\{"));
+        const QRegularExpression plain(QStringLiteral("(^|[^\\w.])(Menu|MenuItem|MenuSeparator|Button|ComboBox|Slider)\\s*\\{"));
         QStringList offenders;
         QStringList files{root+"/Main.qml"};
         QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
@@ -697,7 +697,7 @@ private slots:
                 if(plain.match(QString::fromUtf8(bytes)).hasMatch()) offenders<<QString("%1:%2").arg(rel).arg(line);
             }
         }
-        QVERIFY2(offenders.isEmpty(),qPrintable("Plain menus/buttons/drop-downs outside frontend/common/: "+offenders.join(", ")));
+        QVERIFY2(offenders.isEmpty(),qPrintable("Plain menus/buttons/drop-downs/sliders outside frontend/common/: "+offenders.join(", ")));
         // A converted entry keeps its name, shortcut text and the shared look.
         auto* save=visualObject(window->contentItem(),"fileSaveItem");
         if(!save) save=window->findChild<QObject*>("fileSaveItem");
@@ -1311,6 +1311,192 @@ private slots:
         QCOMPARE(sent[2][0].toInt(),62);
         QTest::mouseRelease(piano,Qt::LeftButton,Qt::NoModifier,at);
         QTRY_COMPARE(sent.count(),4);
+    }
+    void floating_windows_show_the_themed_tooltip_colours() {
+        // The FX panel and the on-screen piano are windows of their own; they do not inherit the
+        // main window's palette, so each sets the Theme's tooltip colours (not black on yellow).
+        const auto tooltipColours=[](QQuickWindow* w) {
+            auto* palette=w->property("palette").value<QObject*>();
+            return palette ? std::pair(palette->property("toolTipBase").value<QColor>(),palette->property("toolTipText").value<QColor>())
+                           : std::pair(QColor(),QColor());
+        };
+        const auto themed=std::pair(QColor("#2b2d32"),QColor("#f3f4f6"));   // Theme.tooltipBg / tooltipText
+
+        auto* piano=window->findChild<QQuickWindow*>("virtualKeyboardWindow"); QVERIFY(piano);
+        QCOMPARE(tooltipColours(piano),themed);
+
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int d=tracks.addInstrumentTrackOfType("Drums");
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        const auto restore=qScopeGuard([&] {
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+        });
+        QTest::qWait(30);
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(d)); QVERIFY(fx); click(fx);
+        auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(d)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        auto* fxWin=qobject_cast<QQuickWindow*>(fxWindow()); QVERIFY(fxWin); QVERIFY(fxWin!=window);
+        QCOMPARE(tooltipColours(fxWin),themed);
+        // Close it with its × (as the user does) and hand the keyboard back to the main window.
+        auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!panel->property("visible").toBool());
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+    }
+    void close_buttons_share_one_look_soft_round_on_hover_red_when_removing() {
+        // Every × is the shared CloseButton (frontend/common): no other file draws Icons.close.
+        const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
+        QStringList offenders;
+        QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
+        QStringList files{root+"/Main.qml"}; while(it.hasNext()) files<<it.next();
+        for(const QString& path:files) {
+            const QString rel=path.mid(root.size()+1);
+            if(rel=="frontend/common/CloseButton.qml"||rel=="frontend/icons/Icons.qml") continue;
+            QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
+            if(file.readAll().contains("Icons.close")) offenders<<rel;
+        }
+        QVERIFY2(offenders.isEmpty(),qPrintable("× drawn outside CloseButton: "+offenders.join(", ")));
+
+        auto* theme=engine->singletonInstance<QObject*>("TransportTests","Theme"); QVERIFY(theme);
+        const auto colour=[&](const char* name) { return theme->property(name).value<QColor>(); };
+        const auto backdrop=[](QQuickItem* b) { return b->property("backdrop").value<QColor>(); };
+        const auto glyph=[](QQuickItem* b) { return qvariant_cast<QQuickItem*>(b->property("contentItem"))->property("color").value<QColor>(); };
+        const auto hover=[](QWindow* w,QQuickItem* b) { QTest::mouseMove(w,b->mapToScene(QPointF(b->width()/2,b->height()/2)).toPoint()); };
+
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int vocal=tracks.addVocalTrack();
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        const auto restore=qScopeGuard([&] {
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+        });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true); QTest::qWait(30);
+
+        // Remove track: a muted × at rest, a red round backdrop and a white × under the mouse.
+        auto* remove=visualItem(list,"trackRemoveButton"+QString::number(vocal)); QVERIFY(remove);
+        QTest::mouseMove(window,QPoint(1,1)); QTRY_COMPARE(backdrop(remove),QColor(Qt::transparent));
+        QCOMPARE(glyph(remove),colour("textMuted"));
+        hover(window,remove);
+        QTRY_COMPARE(backdrop(remove),colour("recordBg"));
+        QCOMPARE(glyph(remove),colour("textStrong"));
+
+        // Close effects: a soft (not white-washed) round backdrop under the mouse.
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(vocal)); QVERIFY(fx); click(fx);
+        auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(vocal)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close);
+        QCOMPARE(backdrop(close),QColor(Qt::transparent));
+        fxWindow()->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(fxWindow()));
+        QTest::mouseMove(fxWindow(),QPoint(2,2)); hover(fxWindow(),close);
+        QTRY_COMPARE(backdrop(close),colour("hoverOverlay"));
+        QCOMPARE(glyph(close),colour("textStrong"));
+        QVERIFY(backdrop(close).alpha()<64);                        // a light veil, never a white block
+        click(close); QTRY_VERIFY(!panel->property("visible").toBool());
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+    }
+    void sliders_are_rounded_with_a_round_handle_and_a_pill_on_faders() {
+        // ThemedSlider: a rounded track filled up to the value, a round handle that grows under
+        // the mouse (10 -> 14 px) and a pill across vertical faders. The handle's layout box
+        // stays 13 px, so layouts keep their size. A track's own sliders (VOL, CLIP) are drawn
+        // in the track's colour, a little brighter under the mouse.
+        auto* theme=engine->singletonInstance<QObject*>("TransportTests","Theme"); QVERIFY(theme);
+        const auto colour=[&](const char* name) { return theme->property(name).value<QColor>(); };
+        const auto part=[](QQuickItem* slider,const char* name) {
+            for(auto* child:slider->findChildren<QQuickItem*>()) if(child->objectName()==name) return child;
+            return static_cast<QQuickItem*>(nullptr);
+        };
+        TrackListWrapper tracks; const int vocal=tracks.addVocalTrack();
+        QVERIFY(tracks.setTrackColour(vocal,"#3fb950"));
+        const QColor green("#3fb950");
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
+        const auto restore=qScopeGuard([&] {
+            list->setVisible(false); list->setProperty("trackModel",QVariant());
+            mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
+        });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true); QTest::qWait(30);
+
+        auto* volume=visualItem(list,"trackVolume"+QString::number(vocal)); QVERIFY(volume);
+        auto* knob=part(volume,"sliderKnob"); auto* fill=part(volume,"sliderFill"); QVERIFY(knob); QVERIFY(fill);
+        QCOMPARE(qvariant_cast<QQuickItem*>(volume->property("handle"))->implicitHeight(),13.0);
+        QTest::mouseMove(window,QPoint(1,1));
+        QTRY_COMPARE(knob->width(),10.0); QCOMPARE(knob->height(),10.0);
+        QCOMPARE(knob->property("radius").toDouble(),5.0);                    // a circle
+        QTRY_COMPARE(fill->property("color").value<QColor>(),green);           // the track's colour
+        QCOMPARE(QQmlProperty::read(knob,"border.color").value<QColor>(),green); // the handle's ring too
+        QVERIFY(fill->property("radius").toDouble()>0);                        // a rounded track
+        QTest::mouseMove(window,volume->mapToScene(QPointF(volume->width()/2,volume->height()/2)).toPoint());
+        QTRY_COMPARE(knob->width(),14.0);
+        QTRY_COMPARE(fill->property("color").value<QColor>(),green.lighter(130));
+        QTest::mouseMove(window,QPoint(1,1));
+        QTRY_COMPARE(knob->width(),10.0);
+        QVERIFY(tracks.setTrackColour(vocal,"#e5484d"));                       // a new colour follows
+        QTRY_COMPARE(fill->property("color").value<QColor>(),QColor("#e5484d"));
+
+        // A vertical fader (a track's CLIP): a pill lying across the track, filled up from the
+        // bottom in the track colour; greyed while the track has no clip.
+        mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true); QTest::qWait(30);
+        auto* clipFader=visualItem(mixer,"mixerClipGain"+QString::number(vocal)); QVERIFY(clipFader);
+        QCOMPARE(clipFader->property("tint").value<QColor>(),QColor("#e5484d"));
+        QCOMPARE(part(clipFader,"sliderFill")->property("color").value<QColor>(),colour("textMuted"));
+        QVERIFY(tracks.addClipAtBeat(vocal,0,4)>0);
+        QTRY_VERIFY(clipFader->isEnabled());
+        auto* pill=part(clipFader,"sliderKnob"); auto* rise=part(clipFader,"sliderFill"); QVERIFY(pill); QVERIFY(rise);
+        QTRY_VERIFY(pill->width()>pill->height());
+        QCOMPARE(pill->property("radius").toDouble(),pill->height()/2);
+        QTRY_COMPARE(rise->property("color").value<QColor>(),QColor("#e5484d"));
+        auto* track=rise->parentItem();
+        QCOMPARE(rise->y()+rise->height(),track->height());                    // reaches the bottom
+    }
+    void desk_faders_have_a_slot_ticks_and_a_metal_cap() {
+        // HardwareSlider: the FX pages, the master fader and the metronome volume look like a
+        // mixing desk: a dark slot, a metal cap across it (upright on a horizontal slider, flat
+        // on a vertical fader) with an indicator line that turns accent while dragged. The cap's
+        // layout box stays 13 px. A track's own sliders stay ThemedSlider in the track colour.
+        const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
+        QStringList offenders;
+        QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
+        while(it.hasNext()) {
+            const QString path=it.next(), rel=path.mid(root.size()+1);
+            if(!rel.startsWith("frontend/plugins/")&&!rel.startsWith("frontend/instruments/")&&rel!="frontend/settings/QuickSettings.qml") continue;
+            QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
+            if(file.readAll().contains("ThemedSlider")) offenders<<rel;
+        }
+        QVERIFY2(offenders.isEmpty(),qPrintable("FX sliders must be HardwareSlider: "+offenders.join(", ")));
+
+        auto* theme=engine->singletonInstance<QObject*>("TransportTests","Theme"); QVERIFY(theme);
+        const auto colour=[&](const char* name) { return theme->property(name).value<QColor>(); };
+        const auto part=[](QQuickItem* slider,const char* name) {
+            for(auto* child:slider->findChildren<QQuickItem*>()) if(child->objectName()==name) return child;
+            return static_cast<QQuickItem*>(nullptr);
+        };
+        TrackListWrapper tracks; tracks.addVocalTrack();
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
+        const auto restore=qScopeGuard([&] { mixer->setVisible(false); mixer->setProperty("trackModel",QVariant()); });
+        mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true); QTest::qWait(30);
+        auto* master=visualItem(mixer,"mixerMasterFader"); QVERIFY(master);
+        QVERIFY(master->inherits("QQuickSlider"));
+        QCOMPARE(qvariant_cast<QQuickItem*>(master->property("handle"))->implicitHeight(),13.0);
+        auto* cap=part(master,"faderCap"); auto* line=part(master,"faderLine"); QVERIFY(cap); QVERIFY(line); QVERIFY(part(master,"faderSlot"));
+        QVERIFY(cap->width()>cap->height());                                  // flat across the fader
+        QTest::mouseMove(window,QPoint(1,1));
+        QTRY_COMPARE(line->property("color").value<QColor>(),colour("faderCapLine"));
+        const QPoint at=cap->mapToScene(QPointF(cap->width()/2,cap->height()/2)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at);
+        QTRY_COMPARE(line->property("color").value<QColor>(),colour("accent"));  // lit while dragged
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,at);
+        QTRY_COMPARE(line->property("color").value<QColor>(),colour("faderCapLine"));
+
+        // The metronome volume (horizontal): the cap stands upright.
+        auto* button=visualItem(window->contentItem(),"quickSettingsButton"); QVERIFY(button);
+        auto* popup=window->findChild<QObject*>("quickSettingsPopup"); QVERIFY(popup);
+        click(button); QTRY_VERIFY(popup->property("visible").toBool());
+        auto* volume=visualItem(window->contentItem(),"metronomeVolume"); QVERIFY(volume);
+        auto* upright=part(volume,"faderCap"); QVERIFY(upright);
+        QVERIFY(upright->height()>upright->width());
+        click(visualItem(window->contentItem(),"closeQuickSettings"));
+        QTRY_VERIFY(!popup->property("visible").toBool());
     }
     void drum_kit_lives_in_fx_and_edits_its_settings() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);

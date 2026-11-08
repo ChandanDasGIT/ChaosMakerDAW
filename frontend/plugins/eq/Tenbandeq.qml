@@ -60,7 +60,7 @@ Item {
                         horizontalAlignment: Text.AlignHCenter
                         Layout.fillWidth: true
                     }
-                    Slider {
+                    HardwareSlider {
                         objectName: "trackEqBand" + index
                         Layout.fillHeight: true
                         Layout.alignment: Qt.AlignHCenter

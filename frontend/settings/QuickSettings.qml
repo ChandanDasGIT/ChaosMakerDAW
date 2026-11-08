@@ -84,12 +84,12 @@ Item {
             RowLayout {
                 Layout.fillWidth: true
                 Text { text: "Metronome & Snap"; color: Theme.text; font.pixelSize: 15; font.bold: true; Layout.fillWidth: true }
-                ToolButton {
+                CloseButton {
                     objectName: "closeQuickSettings"
-                    text: Icons.close; implicitWidth: 28; implicitHeight: 24
+                    implicitWidth: 28; implicitHeight: 24; glyphSize: 18
                     Accessible.name: "Close metronome and snap settings"
+                    tooltip: "Close"
                     onClicked: quickSettingsPopup.close()
-                    ToolTip.visible: hovered; ToolTip.text: "Close"
                 }
             }
 
@@ -108,7 +108,7 @@ Item {
                         tooltip: active ? "Disable metronome" : "Enable metronome; first beat is accented"
                         Accessible.name: "Metronome"
                     }
-                    Slider {
+                    HardwareSlider {
                         id: clickVolume
                         objectName: "metronomeVolume"
                         Layout.preferredWidth: 72; Layout.preferredHeight: 29
