@@ -157,7 +157,7 @@ TEST(sfzloader, missing_and_unreadable_samples_and_opcodes_are_reported)
     CHECK(r.report.missingSamples.size() == 1 && r.report.missingSamples[0].ends_with("gone.wav"));
     CHECK(r.report.unreadableSamples.size() == 2);
     for (const auto& [file, why] : r.report.unreadableSamples) {
-        if (file.ends_with("piano.flac")) CHECK(why.find("C4") != std::string::npos);
+        if (file.ends_with("piano.flac")) CHECK(why.find("piano.flac") != std::string::npos);   // a broken FLAC
         else CHECK(file.ends_with("bad.wav") && why.find("bad.wav") != std::string::npos);
     }
     CHECK(r.report.leftOutOther == 7);

@@ -53,7 +53,7 @@ struct ZoneSource {
 struct LoadReport {
     std::vector<Diagnostic> problems;     // the parser's, then the loader's, with file and line
     std::vector<std::string> missingSamples;
-    std::map<std::string, std::string> unreadableSamples;   // path -> why (FLAC until C4, bad WAV)
+    std::map<std::string, std::string> unreadableSamples;   // path -> why (a damaged WAV or FLAC)
     std::map<std::string, int> unusedOpcodes;    // understood, not played yet -> regions using it
     std::map<std::string, int> unknownOpcodes;   // not SFZ we know -> regions using it
     int regions = 0;                      // regions in the file

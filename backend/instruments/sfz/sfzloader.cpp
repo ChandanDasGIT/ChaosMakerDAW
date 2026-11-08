@@ -1,5 +1,6 @@
 #include "instruments/sfz/sfzloader.h"
 
+#include "audiofile/flacreader.h"
 #include "audiofile/wavreader.h"
 
 #include <algorithm>
@@ -413,21 +414,22 @@ private:
         SampleCache::Entry& e = m_cache->entries[path];
         auto& report = m_out.report;
         if (!std::filesystem::exists(path)) { report.missingSamples.push_back(path); return e; }
-        if (isFlac(path)) {
-            report.unreadableSamples[path] = "FLAC: readable once the FLAC decoder (C4) is in";
-            e.usable = m_options.samples == SampleMode::Exists;     // only checking: it is there
-            return e;
-        }
         if (m_options.samples == SampleMode::Exists) { e.usable = true; return e; }
         try {
-            auto wav = audiofile::readWav(path);
+            std::shared_ptr<AudioData> audio;
+            if (isFlac(path)) {
+                audio = audiofile::readFlac(path).audio;           // FLAC carries no loop points
+            } else {
+                auto wav = audiofile::readWav(path);
+                e.hasLoop = wav.hasLoop;
+                e.loopStart = wav.loopStart;
+                e.loopEnd = wav.loopEnd;
+                audio = std::move(wav.audio);
+            }
             e.usable = true;
-            e.hasLoop = wav.hasLoop;
-            e.loopStart = wav.loopStart;
-            e.loopEnd = wav.loopEnd;
             ++report.samplesRead;
-            report.sampleMegabytes += double(wav.audio->frames) * double(wav.audio->channels.size()) * 4.0 / 1e6;
-            if (m_options.samples == SampleMode::Load) e.audio = std::move(wav.audio);
+            report.sampleMegabytes += double(audio->frames) * double(audio->channels.size()) * 4.0 / 1e6;
+            if (m_options.samples == SampleMode::Load) e.audio = std::move(audio);
         } catch (const std::exception& error) {
             report.unreadableSamples[path] = error.what();
         }
