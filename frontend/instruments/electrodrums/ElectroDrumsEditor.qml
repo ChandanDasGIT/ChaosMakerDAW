@@ -176,6 +176,13 @@ Item {
                         onMoved: v => bridge.volume = v
                     }
                 }
+
+                GroovePanel {
+                    objectName: "electroDrumsGrooves"
+                    trackModel: root.trackModel
+                    trackId: root.trackId
+                    Layout.topMargin: 6
+                }
             }
         }
     }

@@ -90,6 +90,8 @@ public:
     Q_INVOKABLE QVariantList clipNotes(int trackId, int clipId) const;
     // C++ adapter used by PianoRollWrapper; one undoable edit, emits clip-edit signals on change.
     bool setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes);
+    // A new pattern clip holding `notes` (clip-relative beats), as one undo step; -1 if refused.
+    int addPatternClipAtBeat(int trackId, double startBeat, double lengthBeats, std::vector<MidiNote> notes);
     double contentEndBeats() const { return m_project.contentEndBeats(); }
     QVariantList clips() const;
     Q_INVOKABLE QVariantList clipWaveform(int trackId, int clipId, int bins, double from = 0, double to = 1) const;

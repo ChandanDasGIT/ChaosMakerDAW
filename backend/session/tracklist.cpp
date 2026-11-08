@@ -433,6 +433,28 @@ int TrackList::addClipAtBeat(int trackId, double startBeat, double lengthBeats)
     return clipId;
 }
 
+int TrackList::addPatternClipAtBeat(int trackId, double startBeat, double lengthBeats, std::vector<MidiNote> notes)
+{
+    if (editsLocked() || !m_project.findTrack(trackId)) return -1;
+    if (!std::isfinite(startBeat) || !std::isfinite(lengthBeats) || startBeat < 0.0 || lengthBeats <= 0.0)
+        return -1;
+    for (auto& n : notes) {
+        if (!std::isfinite(n.startBeat) || !std::isfinite(n.lengthBeats) || n.lengthBeats <= 0
+            || n.note < 0 || n.note > 127 || n.velocity < 0 || n.velocity > 127) return -1;
+        n.selected = false;                       // a new clip has no source offset: notes as given
+    }
+    const auto start = sampleAtBeat(m_project.tempo(), startBeat);
+    const auto end = sampleAtBeat(m_project.tempo(), startBeat + lengthBeats);
+    if (!start || !end || *end <= *start) return -1;
+
+    AudioClip clip;
+    clip.poolId = "Clip " + std::to_string(m_nextClipNumber++);
+    clip.start = *start;
+    clip.length = *end - *start;
+    clip.notes = std::move(notes);
+    return m_project.addAudioClip(trackId, std::move(clip));
+}
+
 bool TrackList::trimClipStartAtBeat(int trackId, int clipId, double startBeat) {
     const double sample = startBeat * 60 * m_project.tempo().sampleRate() / m_project.tempo().bpm();
     if (!m_recordingTracks.empty() || !std::isfinite(sample) || sample < 0 || sample >= double(INT64_MAX/4)) return false;

@@ -620,6 +620,13 @@ int TrackListWrapper::addAudioClip(int id, const QString& pool, qint64 start, qi
     return clip;
 }
 
+int TrackListWrapper::addPatternClipAtBeat(int id, double start, double length, std::vector<MidiNote> notes)
+{
+    const int clip = m_state.addPatternClipAtBeat(id, start, length, std::move(notes));
+    if (clip >= 0) notifyClipEdit(id);
+    return clip;
+}
+
 int TrackListWrapper::addClipAtBeat(int id, double start, double length)
 {
     const int clip = m_state.addClipAtBeat(id, start, length);

@@ -240,6 +240,13 @@ Item {
                         onMoved: v => bridge.micTiming = v
                     }
                 }
+
+                GroovePanel {
+                    objectName: "drumKitGrooves"
+                    trackModel: root.trackModel
+                    trackId: root.trackId
+                    Layout.topMargin: 6
+                }
             }
         }
     }
