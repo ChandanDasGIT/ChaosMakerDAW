@@ -140,6 +140,10 @@ decoder (C4) and the piano (C5).
         CC 4 and the mic mix CC 105 need live CC; offset/delay per mic, polyphony, cutoff.
         FOR C5: ampeg_hold, sustain_cc/half pedal, amp_veltrack (velocity -> level is off in
         Splendid at its default), note_polyphony, off_time.
+[ ] C3b The acoustic kit's map puts 2-pole HIGH-pass filters (30-200 Hz, cutoff_oncc110) on
+        its mic regions; the sampler only has the low-pass (C5 step 2), so they are not played
+        (reported "fil_type=hpf_2p"). Adding them would change how the kit sounds: the user
+        decides (found 2026-11-08).
 [~] C3  DRUMS FIRST: Gogodze Phu Vol II (see C9) as the real "Drums" instrument. WAV
         samples, so no decoder is needed yet. Drum keys, hi-hat choke, mic mix controls.
         Map the Drums track type to it in instrumentfactory.cpp. Sampler::setZones() must not
@@ -211,7 +215,15 @@ decoder (C4) and the piano (C5).
         grand seen from above, lid open, keys lighting as they play, a clickable pedal.
         Steps (each approved and tested): 1 FLAC decoder (= C4, DONE); 2 sampler features
         (sustain pedal CC 64 with half pedal, per-zone low-pass for the soft layer, one voice
-        per key, the pedal's string-resonance group, live release); 3 the piano instrument
+        per key, the pedal's string-resonance group, live release) DONE 2026-11-08: zones
+        have hold, a 2-pole low-pass (lpf_2p), note_polyphony + off_time, sustain_cc (classic
+        hold), amp_veltrack; sfz::LoadOptions::liveControllers keeps CC 64 live (locc64 ->
+        SampleZone::liveCc checked at note-on; ampeg_releasecc64 -> releaseCc, followed while
+        releasing with ampeg_dynamic = half pedalling). The Splendid map loads whole (360
+        zones); only ampeg_release_shape is not played (release stays exponential). Drum kit
+        unchanged (its regions use none of it; its high-pass is still "not yet", see C3b).
+        Tests: sampler (hold, low-pass, note polyphony, live zones, pedal release, sustain
+        hold, MIDI CC), sfzloader (piano opcodes, the real map when present). 3 the piano instrument
         (shared library, Piano tracks, settings + json + wrapper, transpose); 4 the drawn FX
         page; 5 renders, then the user plays it.
 [ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string

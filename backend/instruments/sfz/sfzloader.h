@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,11 @@ struct SampleCache {
 struct LoadOptions {
     SampleMode samples = SampleMode::Load;
     std::map<int, double> controllers;    // CC number -> 0..127, over the file's own defaults
+    // Controllers the player moves while notes sound (the sustain pedal, 64). They are not
+    // worked out at load time: a region whose locc/hicc names one keeps it as a condition the
+    // sampler checks at note-on (SampleZone::liveCc), and a release modulated by one is
+    // followed live (SampleZone::releaseCc). Other modulations by them take the default value.
+    std::set<int> liveControllers;
     std::shared_ptr<SampleCache> cache;   // none: a cache for this load only
 };
 

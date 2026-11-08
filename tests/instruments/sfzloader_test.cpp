@@ -3,6 +3,7 @@
 #include "instruments/sfz/sfzloader.h"
 
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -161,8 +162,8 @@ TEST(sfzloader, missing_and_unreadable_samples_and_opcodes_are_reported)
         else CHECK(file.ends_with("bad.wav") && why.find("bad.wav") != std::string::npos);
     }
     CHECK(r.report.leftOutOther == 7);
-    CHECK(r.report.unusedOpcodes.at("polyphony") == 1 && r.report.unusedOpcodes.at("amp_veltrack") == 1);
-    CHECK(r.report.unusedOpcodes.at("cutoff") == 1 && r.report.unusedOpcodes.at("trigger=first") == 1);
+    CHECK(r.report.unusedOpcodes.at("polyphony") == 1 && r.report.unusedOpcodes.at("trigger=first") == 1);
+    CHECK(!r.report.unusedOpcodes.contains("amp_veltrack") && !r.report.unusedOpcodes.contains("cutoff"));   // played now
     CHECK(r.report.unusedOpcodes.at("cutoff_ccN") == 1);
     CHECK(r.report.unknownOpcodes.size() == 1 && r.report.unknownOpcodes.at("wobble") == 1);
     CHECK(!r.report.unusedOpcodes.contains("region_label"));
@@ -266,4 +267,74 @@ TEST(sfzloader, silence_velocity_curves_offset_and_delay_reach_the_zones)
     int fading = 0;
     for (const auto& v : sampler.voices()) fading += v.active() && v.fading();
     CHECK(fading == 2 && sampler.activeVoices() == 2);           // both hat layers choked, no pedal voice
+}
+
+TEST(sfzloader, piano_opcodes_reach_the_zones)
+{
+    Folder dir("piano");
+    writeWav(dir.path / "a.wav");
+    writeText(dir.path / "p.sfz", R"(
+<curve> curve_index=11 v000=0 v064=0.5 v127=1
+<global> sample=a.wav ampeg_hold=8 ampeg_hold_oncc133=-6 note_polyphony=1 off_time=0.5 sustain_cc=90
+ampeg_dynamic=1 ampeg_release=0.6 ampeg_releasecc64=15 ampeg_release_curvecc64=11
+<region> key=60 lovel=1 hivel=40 cutoff=1000 resonance=3
+<region> key=61 amp_veltrack=0
+<region> key=62 amp_veltrack=50
+<region> key=63 cutoff=500 fil_type=hpf_2p
+<group> group=1 locc64=65
+<region> key=64
+)");
+    const auto path = (dir.path / "p.sfz").string();
+    sfz::LoadOptions live;
+    live.liveControllers = {64};
+    const auto r = loadSfz(path, live);
+    CHECK(r.report.problems.empty());
+    CHECK(r.zones.size() == 5);
+    CHECK(r.report.unusedOpcodes.size() == 1 && r.report.unusedOpcodes.at("fil_type=hpf_2p") == 1);
+    if (r.zones.size() != 5) return;
+    const auto& soft = r.zones[0];
+    CHECK_NEAR(soft.hold, 8.0 - 6.0 * 60.0 / 127.0, 1e-4);          // keyed by cc133
+    CHECK(soft.cutoffHz == 1000.0f && soft.resonanceDb == 3.0f);
+    CHECK(soft.notePolyphony == 1 && std::abs(soft.offSeconds - 0.5f) < 1e-6f && soft.sustainCc == 90);
+    CHECK(soft.dynamicRelease && soft.releaseCc == 64 && soft.releaseCcSeconds == 15.0f);
+    CHECK_NEAR(soft.release, 0.6, 1e-6);                             // the pedal is not baked in
+    CHECK_NEAR(soft.releaseFor(0), 0.6, 1e-5);
+    CHECK_NEAR(soft.releaseFor(64), 0.6 + 15.0 * 0.5, 1e-3);        // through curve 11
+    CHECK_NEAR(soft.releaseFor(127), 15.6, 1e-3);
+    CHECK(!soft.velocityCurve);                                      // amp_veltrack 100: (v/127)^2
+    CHECK(r.zones[1].velocityCurve && (*r.zones[1].velocityCurve)[1] == 1.0f && (*r.zones[1].velocityCurve)[127] == 1.0f);
+    const float half = (*r.zones[2].velocityCurve)[64];              // 1 - 0.5 * (1 - (64/127)^2)
+    CHECK_NEAR(half, 1.0 - 0.5 * (1.0 - (64.0 / 127.0) * (64.0 / 127.0)), 1e-5);
+    CHECK(r.zones[3].cutoffHz == 0.0f);                              // high-pass: not played yet
+    CHECK(r.zones[4].liveCc == 64 && r.zones[4].liveLo == 65 && r.zones[4].liveHi == 127);
+    CHECK(r.zones[0].liveCc == -1);
+
+    // Without live controllers the pedal is worked out at its default (0): the resonance
+    // region is left out and the release is the short one.
+    const auto baked = loadSfz(path);
+    CHECK(baked.zones.size() == 4 && baked.report.leftOutByControllers == 1);
+    if (!baked.zones.empty()) CHECK(baked.zones[0].releaseCc == -1 && std::abs(baked.zones[0].release - 0.6f) < 1e-5f);
+}
+
+TEST(sfzloader, the_splendid_piano_map_loads_whole_with_the_pedal_live)
+{
+    // The piano library (not in the repository): checked when it is here.
+    const auto file = fs::path(__FILE__).parent_path().parent_path().parent_path()
+                    / "sample-kits/GrandPiano/SplendidGrandPiano/Splendid Grand Piano.sfz";
+    if (!fs::exists(file)) { std::printf("    skipped: %s is not here\n", file.string().c_str()); return; }
+    sfz::LoadOptions options;
+    options.samples = sfz::SampleMode::Exists;
+    options.liveControllers = {64};
+    const auto r = loadSfz(file.string(), options);
+    CHECK(r.report.problems.empty() && r.report.unknownOpcodes.empty() && r.report.missingSamples.empty());
+    CHECK(r.zones.size() == 360 && r.report.leftOutByControllers == 0);
+    // Played as an exponential release: the map's curve shape for it is the one thing left.
+    CHECK(r.report.unusedOpcodes.size() == 1 && r.report.unusedOpcodes.contains("ampeg_release_shape"));
+    int resonance = 0, soft = 0;
+    for (const auto& z : r.zones) {
+        resonance += z.liveCc == 64 && z.liveLo == 65;
+        soft += z.cutoffHz == 1000.0f;
+        CHECK(z.releaseCc == 64 && z.dynamicRelease && z.notePolyphony == 1 && z.sustainCc == 90);
+    }
+    CHECK(resonance == 57 && soft == 61);
 }

@@ -868,3 +868,197 @@ TEST(sampler, staging_from_another_thread_while_blocks_play)
     CHECK(!sampler.zonesPending());
     CHECK(sampler.zones().size() == 2);
 }
+
+namespace {
+
+// Renders `seconds` of the sampler and returns the loudest left sample in that time.
+float play(Sampler& sampler, double seconds)
+{
+    const int frames = int(seconds * rate);
+    std::vector<float> l(std::size_t(frames), 0.0f), r(std::size_t(frames), 0.0f);
+    sampler.render(l.data(), r.data(), frames);
+    float peak = 0.0f;
+    for (const float v : l) peak = std::max(peak, std::abs(v));
+    return peak;
+}
+
+} // namespace
+
+TEST(sampler, voice_holds_full_level_before_the_decay)
+{
+    auto z = dcZone();
+    z.hold = 0.1f; z.decay = 0.05f; z.sustain = 0.0f;
+    SamplerVoice voice;
+    voice.start(z, 60, 127, rate);
+    const auto out = render(voice, int(0.2 * rate));
+    CHECK_NEAR(out.left[std::size_t(0.09 * rate)], 1.0, 1e-4);         // still holding
+    CHECK(out.left[std::size_t(0.16 * rate)] < 0.01f);                 // decayed after the hold
+    CHECK(voice.stage() != SamplerVoice::Stage::Hold);
+}
+
+TEST(sampler, voice_low_pass_keeps_lows_and_cuts_highs)
+{
+    const auto sine = [](double hz) {
+        std::vector<float> s(48000);
+        for (std::size_t i = 0; i < s.size(); ++i) s[i] = float(std::sin(2.0 * std::numbers::pi * hz * double(i) / rate));
+        return s;
+    };
+    const auto peakAfter = [](SamplerVoice& v) {
+        const auto out = render(v, 9600);
+        float p = 0.0f;
+        for (std::size_t i = 4800; i < out.left.size(); ++i) p = std::max(p, std::abs(out.left[i]));
+        return p;
+    };
+    auto low = plainZone(makeAudio({sine(100.0)})), high = plainZone(makeAudio({sine(8000.0)}));
+    low.cutoffHz = high.cutoffHz = 1000.0f;
+    SamplerVoice a, b;
+    a.start(low, 60, 127, rate);
+    b.start(high, 60, 127, rate);
+    CHECK(std::abs(peakAfter(a) - 1.0f) < 0.02f);                      // 100 Hz passes
+    CHECK(peakAfter(b) < 0.03f);                                       // 8 kHz is ~-36 dB down
+    auto resonant = plainZone(makeAudio({sine(1000.0)}));
+    resonant.cutoffHz = 1000.0f;
+    resonant.resonanceDb = 6.0f;
+    SamplerVoice c;
+    c.start(resonant, 60, 127, rate);
+    // At the cutoff this low-pass passes Q: 0.707 (Butterworth) times +6 dB = 1.41.
+    CHECK(std::abs(peakAfter(c) - 1.414f) < 0.05f);
+}
+
+TEST(sampler, sampler_note_polyphony_fades_the_last_strike_of_the_key_in_its_off_time)
+{
+    Sampler sampler;
+    sampler.setPolyphony(8);
+    auto string = keyZone(60), resonance = keyZone(60, 0.25f);
+    string.notePolyphony = 1;
+    string.offSeconds = 0.2f;
+    resonance.group = 1;                                               // another group: untouched
+    sampler.setZones({string, resonance});
+    sampler.noteOn(60, 100);
+    CHECK(sampler.activeVoices() == 2);
+    play(sampler, 0.01);                                               // it sounds before the next strike
+    sampler.noteOn(60, 100);                                           // struck again
+    CHECK(countVoices(sampler, 60, true) == 1);                        // the old string fades
+    CHECK(countVoices(sampler, 60, false) == 3);                       // new string, both resonances
+    play(sampler, 0.1);
+    CHECK(countVoices(sampler, 60, true) == 1);                        // 0.2 s: still fading
+    play(sampler, 0.2);
+    CHECK(sampler.activeVoices() == 3);
+}
+
+TEST(sampler, sampler_live_controller_zones_start_only_in_range)
+{
+    Sampler sampler;
+    sampler.setPolyphony(8);
+    auto resonance = keyZone(60);
+    resonance.liveCc = 64; resonance.liveLo = 65; resonance.liveHi = 127;
+    sampler.setZones({resonance});
+    sampler.noteOn(60, 100);
+    CHECK(sampler.activeVoices() == 0);                                // pedal up: no resonance
+    sampler.noteOff(60);
+    sampler.controlChange(64, 127);
+    CHECK(sampler.controller(64) == 127);
+    sampler.noteOn(60, 100);
+    CHECK(sampler.activeVoices() == 1);
+}
+
+TEST(sampler, sampler_pedal_lengthened_release_follows_the_pedal)
+{
+    Sampler sampler;
+    sampler.setPolyphony(8);
+    auto z = keyZone(60);
+    z.release = 0.05f;
+    z.releaseCc = 64;
+    z.releaseCcSeconds = 10.0f;
+    z.dynamicRelease = true;
+    z.sustainCc = 90;                                                  // as the piano: CC 64 only lengthens the release
+    sampler.setZones({z});
+
+    sampler.controlChange(64, 127);                                    // pedal down
+    sampler.noteOn(60, 127);
+    play(sampler, 0.01);
+    sampler.noteOff(60);
+    CHECK(voiceOn(sampler, 60)->releasing());
+    CHECK(play(sampler, 0.5) > 0.5f);                                  // a 10 s release: still loud
+    sampler.controlChange(64, 0);                                      // pedal up: 0.05 s from here
+    play(sampler, 0.2);
+    CHECK(sampler.activeVoices() == 0);
+
+    sampler.noteOn(60, 127);                                           // no pedal: the short release
+    sampler.noteOff(60);
+    play(sampler, 0.2);
+    CHECK(sampler.activeVoices() == 0);
+
+    auto fixed = z;                                                    // without ampeg_dynamic
+    fixed.dynamicRelease = false;
+    Sampler still;
+    still.setPolyphony(8);
+    still.setZones({fixed});
+    still.controlChange(64, 127);
+    still.noteOn(60, 127);
+    play(still, 0.01);
+    still.noteOff(60);
+    still.controlChange(64, 0);                                        // too late: the long release stays
+    CHECK(play(still, 0.5) > 0.5f);
+}
+
+TEST(sampler, sampler_sustain_pedal_holds_let_go_keys_until_it_comes_up)
+{
+    Sampler sampler;
+    sampler.setPolyphony(8);
+    sampler.setZones({keyZone(60), keyZone(62)});
+    sampler.controlChange(64, 127);
+    sampler.noteOn(60, 127);
+    sampler.noteOff(60);
+    CHECK(voiceOn(sampler, 60) && !voiceOn(sampler, 60)->releasing() && voiceOn(sampler, 60)->pedalHeld());
+    play(sampler, 0.3);
+    CHECK(sampler.activeVoices() == 1);
+    sampler.noteOn(60, 127);                                           // the same key again, held
+    sampler.controlChange(64, 0);                                      // pedal up: the let-go one goes
+    CHECK(countVoices(sampler, 60) == 2);
+    play(sampler, 0.2);
+    CHECK(sampler.activeVoices() == 1 && !voiceOn(sampler, 60)->releasing());   // the held one stays
+    sampler.noteOff(60);
+    play(sampler, 0.2);
+    CHECK(sampler.activeVoices() == 0);
+
+    // All notes off (CC 123) also lets go what the pedal holds.
+    sampler.controlChange(64, 127);
+    sampler.noteOn(62, 127);
+    sampler.noteOff(62);
+    sampler.allNotesOff();
+    play(sampler, 0.2);
+    CHECK(sampler.activeVoices() == 0);
+
+    // A zone that moved its sustain to another controller ignores CC 64 (the piano's map).
+    auto moved = keyZone(60);
+    moved.sustainCc = 90;
+    Sampler other;
+    other.setPolyphony(8);
+    other.setZones({moved});
+    other.controlChange(64, 127);
+    other.noteOn(60, 127);
+    other.noteOff(60);
+    CHECK(voiceOn(other, 60)->releasing());
+}
+
+TEST(sampler, process_reads_controllers_from_midi)
+{
+    Sampler sampler;
+    sampler.setPolyphony(8);
+    sampler.setZones({keyZone(60)});
+    sampler.prepare(rate, 256);
+    MidiBuffer midi;
+    midi.add({0, 0xB0, 64, 100});
+    midi.add({1, 0x90, 60, 100});
+    midi.add({2, 0x80, 60, 0});
+    std::vector<float> l(256), r(256);
+    float* ch[2] = {l.data(), r.data()};
+    ProcessContext context;
+    context.audio = {ch, 2, 256};
+    context.midi = &midi;
+    context.sampleRate = rate;
+    sampler.process(context);
+    CHECK(sampler.controller(64) == 100);
+    CHECK(voiceOn(sampler, 60) && voiceOn(sampler, 60)->pedalHeld());
+}

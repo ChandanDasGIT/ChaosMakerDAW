@@ -99,6 +99,7 @@ void Sampler::reset() noexcept
     m_releases.fill(0);
     m_velocity.fill(0);
     m_held.fill(false);
+    m_cc.fill(0);
 }
 
 void Sampler::allSoundOff() noexcept
@@ -149,15 +150,40 @@ SamplerVoice* Sampler::freeVoice() noexcept
 
 void Sampler::startZones(int key, int velocity, std::span<const int> zones) noexcept
 {
+    // A zone that needs a live controller in its range (the pedal down) starts only then.
+    const auto playable = [this](const SampleZone& z) {
+        if (z.liveCc < 0) return true;
+        const int v = m_cc[std::size_t(z.liveCc & 127)];
+        return v >= z.liveLo && v <= z.liveHi;
+    };
     // Choke first, for every starting zone, so layers of one note never choke each other.
     for (const int index : zones) {
-        const int group = m_active->zone(index).group;
-        if (group == 0) continue;
-        for (auto& voice : m_voices)
-            if (voice.active() && voice.zone() && voice.zone()->offBy == group) voice.fadeOut();
+        const auto& z = m_active->zone(index);
+        if (!playable(z)) continue;
+        if (z.group != 0)
+            for (auto& voice : m_voices)
+                if (voice.active() && voice.zone() && voice.zone()->offBy == z.group) voice.fadeOut(voice.zone()->offSeconds);
+        if (z.notePolyphony > 0) {
+            // Keep the newest notePolyphony - 1 voices of this key and group; fade the rest.
+            for (;;) {
+                int count = 0;
+                SamplerVoice* oldest = nullptr;
+                std::uint64_t oldestStart = 0;
+                for (std::size_t i = 0; i < m_voices.size(); ++i) {
+                    auto& voice = m_voices[i];
+                    if (!voice.active() || voice.fading() || voice.key() != key || !voice.zone()
+                        || voice.zone()->group != z.group)
+                        continue;
+                    ++count;
+                    if (!oldest || m_started[i] < oldestStart) { oldest = &voice; oldestStart = m_started[i]; }
+                }
+                if (count < z.notePolyphony || !oldest) break;
+                oldest->fadeOut(oldest->zone()->offSeconds);
+            }
+        }
     }
     for (const int index : zones) {
-        if (m_active->zone(index).silent) continue;
+        if (m_active->zone(index).silent || !playable(m_active->zone(index))) continue;
         limitPolyphony();
         auto* voice = freeVoice();
         if (!voice) return;
@@ -186,10 +212,11 @@ void Sampler::noteOff(int key) noexcept
     m_held[std::size_t(key)] = false;
 
     for (auto& voice : m_voices) {
-        if (!voice.active() || voice.key() != key || voice.releasing()) continue;
+        if (!voice.active() || voice.key() != key || voice.releasing() || voice.pedalHeld()) continue;
         const auto* zone = voice.zone();
         if (zone->releaseTrigger || zone->oneShot) continue;
-        voice.release();
+        if (m_cc[std::size_t(zone->sustainCc & 127)] >= 64) voice.setPedalHeld(true);   // the pedal keeps it
+        else releaseVoice(voice);
     }
 
     std::array<int, maxZonesPerNote> found{};
@@ -199,9 +226,37 @@ void Sampler::noteOff(int key) noexcept
     startZones(key, velocity, std::span<const int>(found.data(), std::size_t(count)));
 }
 
+void Sampler::releaseVoice(SamplerVoice& voice) noexcept
+{
+    const auto* zone = voice.zone();
+    voice.setPedalHeld(false);
+    if (zone && zone->releaseCc >= 0) voice.release(zone->releaseFor(m_cc[std::size_t(zone->releaseCc & 127)]));
+    else voice.release();
+}
+
 void Sampler::allNotesOff() noexcept
 {
     for (int key = 0; key < 128; ++key) noteOff(key);
+    for (auto& voice : m_voices)
+        if (voice.active() && voice.pedalHeld()) releaseVoice(voice);
+}
+
+void Sampler::controlChange(int controller, int value) noexcept
+{
+    if (controller < 0 || controller > 127) return;
+    value = std::clamp(value, 0, 127);
+    m_cc[std::size_t(controller)] = value;
+    for (auto& voice : m_voices) {
+        if (!voice.active() || !voice.zone()) continue;
+        const auto& zone = *voice.zone();
+        // The pedal came up: what it held is let go now.
+        // (A held voice is a let-go note: its key pressed again has a voice of its own.)
+        if (voice.pedalHeld() && zone.sustainCc == controller && value < 64)
+            releaseVoice(voice);
+        // A release that follows the controller (half pedalling).
+        else if (voice.releasing() && !voice.fading() && zone.dynamicRelease && zone.releaseCc == controller)
+            voice.setReleaseSeconds(zone.releaseFor(value));
+    }
 }
 
 void Sampler::render(float* left, float* right, int frames) noexcept
@@ -216,6 +271,7 @@ void Sampler::handle(const MidiEvent& event) noexcept
     else if (type == 0x80) noteOff(event.data1);
     else if (type == 0xB0 && event.data1 == 123) allNotesOff();
     else if (type == 0xB0 && event.data1 == 120) allSoundOff();
+    else if (type == 0xB0) controlChange(event.data1, event.data2);
 }
 
 // Renders frames [start, end) through the mix buffers, a buffer's length at a time.

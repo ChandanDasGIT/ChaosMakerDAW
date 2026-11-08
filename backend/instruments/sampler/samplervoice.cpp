@@ -19,11 +19,22 @@ float fallCoefficient(float seconds, double rate) noexcept
 
 } // namespace
 
+float SamplerVoice::Filter::process(int c, float x) noexcept
+{
+    const float v3 = x - ic2[c];
+    const float v1 = a1 * ic1[c] + a2 * v3;
+    const float v2 = ic2[c] + a2 * ic1[c] + a3 * v3;
+    ic1[c] = 2.0f * v1 - ic1[c];
+    ic2[c] = 2.0f * v2 - ic2[c];
+    return v2;
+}
+
 void SamplerVoice::start(const SampleZone& zone, int key, int velocity, double outputRate) noexcept
 {
     m_zone = &zone;
     m_key = key;
     if (!(outputRate > 0.0)) outputRate = 48000.0;
+    m_rate = outputRate;
 
     const auto& audio = *zone.audio;
     m_position = double(std::clamp<std::int64_t>(zone.offset, 0, audio.frames));
@@ -58,7 +69,21 @@ void SamplerVoice::start(const SampleZone& zone, int key, int velocity, double o
     m_releaseCoef = fallCoefficient(zone.release, outputRate);
     m_fadeCoef = fallCoefficient(fadeSeconds, outputRate);
     m_fading = false;
+    m_pedalHeld = false;
     m_sustain = std::clamp(zone.sustain, 0.0f, 1.0f);
+    m_holdFrames = std::isfinite(zone.hold) && zone.hold > 0.0f ? std::int64_t(double(zone.hold) * outputRate) : 0;
+
+    // The low-pass: below Nyquist, or no filter at all.
+    m_filtered = std::isfinite(zone.cutoffHz) && zone.cutoffHz > 0.0f && zone.cutoffHz < 0.49 * outputRate;
+    m_filter = Filter{};
+    if (m_filtered) {
+        const double q = std::numbers::sqrt2 / 2.0 * std::pow(10.0, std::clamp(double(zone.resonanceDb), -24.0, 40.0) / 20.0);
+        m_filter.g = float(std::tan(std::numbers::pi * double(zone.cutoffHz) / outputRate));
+        m_filter.k = float(1.0 / q);
+        m_filter.a1 = 1.0f / (1.0f + m_filter.g * (m_filter.g + m_filter.k));
+        m_filter.a2 = m_filter.g * m_filter.a1;
+        m_filter.a3 = m_filter.g * m_filter.a2;
+    }
 
     m_level = 0.0f;
     m_stage = Stage::Attack;
@@ -69,12 +94,39 @@ void SamplerVoice::release() noexcept
     if (m_stage != Stage::Off) m_stage = Stage::Release;
 }
 
+void SamplerVoice::release(float seconds) noexcept
+{
+    if (m_stage == Stage::Off) return;
+    m_releaseCoef = fallCoefficient(seconds, m_rate);
+    m_stage = Stage::Release;
+}
+
+void SamplerVoice::setReleaseSeconds(float seconds) noexcept
+{
+    if (m_stage != Stage::Release || m_fading) return;
+    m_releaseCoef = fallCoefficient(seconds, m_rate);
+}
+
 void SamplerVoice::fadeOut() noexcept
 {
     if (m_stage == Stage::Off) return;
     m_stage = Stage::Release;
     m_fading = true;
+    m_pedalHeld = false;
     m_releaseCoef = std::min(m_releaseCoef, m_fadeCoef);   // never slower than the zone's own release
+}
+
+void SamplerVoice::fadeOut(float seconds) noexcept
+{
+    if (m_stage == Stage::Off) return;
+    const bool wasReleasing = m_stage == Stage::Release;
+    const float previous = m_releaseCoef;
+    m_stage = Stage::Release;
+    m_fading = true;
+    m_pedalHeld = false;
+    const float coef = fallCoefficient(std::max(seconds, fadeSeconds), m_rate);
+    // A release already faster than this fade stays so (as fadeOut() does).
+    m_releaseCoef = wasReleasing ? std::min(previous, coef) : coef;
 }
 
 void SamplerVoice::stop() noexcept
@@ -84,6 +136,7 @@ void SamplerVoice::stop() noexcept
     m_zone = nullptr;
     m_key = -1;
     m_fading = false;
+    m_pedalHeld = false;
     m_delayFrames = 0;
 }
 
@@ -113,7 +166,10 @@ float SamplerVoice::nextEnvelope() noexcept
     switch (m_stage) {
     case Stage::Attack:
         m_level += m_attackStep;
-        if (m_level >= 1.0f) { m_level = 1.0f; m_stage = Stage::Decay; }
+        if (m_level >= 1.0f) { m_level = 1.0f; m_stage = m_holdFrames > 0 ? Stage::Hold : Stage::Decay; }
+        break;
+    case Stage::Hold:
+        if (--m_holdFrames <= 0) m_stage = Stage::Decay;
         break;
     case Stage::Decay:
         m_level = m_sustain + (m_level - m_sustain) * m_decayCoef;
@@ -152,8 +208,12 @@ void SamplerVoice::render(float* left, float* right, int frames) noexcept
 
         const auto index = std::int64_t(m_position);
         const float t = float(m_position - double(index));
-        const float l = interpolate(0, index, t);
-        const float r = stereo ? interpolate(1, index, t) : l;
+        float l = interpolate(0, index, t);
+        float r = stereo ? interpolate(1, index, t) : l;
+        if (m_filtered) {
+            l = m_filter.process(0, l);
+            r = stereo ? m_filter.process(1, r) : l;
+        }
         left[i] += l * level * m_gainLeft;
         right[i] += r * level * m_gainRight;
 
