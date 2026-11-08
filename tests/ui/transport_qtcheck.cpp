@@ -492,11 +492,19 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(board,"open"));QTRY_VERIFY(board->property("visible").toBool());
         auto* picker=visualItem(window->contentItem(),"guitarFactoryPreset");
         auto* apply=visualItem(window->contentItem(),"applyGuitarFactoryPreset");QVERIFY(picker);QVERIFY(apply);
-        QCOMPARE(picker->property("count").toInt(),2);
-        picker->setProperty("currentIndex",0);click(apply);
-        QCOMPARE(model->count(),7);
-        QCOMPARE(model->data(model->index(1),GuitarSuiteModel::PedalTypeRole).toString(),QString("pedal.distortion"));
-        picker->setProperty("currentIndex",1);click(apply);
+        // Every factory preset is offered: Djent, Jazz, MetalSolo, RockChords, RockSolo.
+        QCOMPARE(picker->property("count").toInt(),5);
+        const auto textAt=[&](int i) { QString text; QMetaObject::invokeMethod(picker,"textAt",Q_RETURN_ARG(QString,text),Q_ARG(int,i)); return text; };
+        const auto indexOf=[&](const QString& name) { for(int i=0;i<5;++i) if(textAt(i).contains(name)) return i; return -1; };
+        QStringList names; for(int i=0;i<5;++i) names<<textAt(i);
+        for(const char* name:{"Djent","Jazz","MetalSolo","RockChords","RockSolo"})
+            QVERIFY2(indexOf(name)>=0,qPrintable(names.join(", ")));
+        // Djent (rebuilt in a254d48): gate, overdrive, amp, cabinet, EQ.
+        picker->setProperty("currentIndex",indexOf("Djent"));click(apply);
+        QCOMPARE(model->count(),5);
+        QCOMPARE(model->data(model->index(0),GuitarSuiteModel::PedalTypeRole).toString(),QString("pedal.noisegate"));
+        QCOMPARE(model->data(model->index(1),GuitarSuiteModel::PedalTypeRole).toString(),QString("pedal.overdrive"));
+        picker->setProperty("currentIndex",indexOf("Jazz"));click(apply);
         QCOMPARE(model->count(),5);
         QCOMPARE(model->data(model->index(0),GuitarSuiteModel::PedalTypeRole).toString(),QString("pedal.compressor"));
         QCOMPARE(model->data(model->index(4),GuitarSuiteModel::PedalTypeRole).toString(),QString("pedal.reverb"));
@@ -3171,6 +3179,70 @@ private slots:
         QVERIFY(!label(63)->isVisible());
         QCOMPARE(label(60)->property("text").toString(),QString("Kick"));
         QCOMPARE(label(64)->property("text").toString(),QString("Snare edge"));
+    }
+    void piano_roll_velocity_lane_paints_remembers_and_follows_the_clip() {
+        TrackListWrapper tracks;
+        const int track=tracks.addInstrumentTrack();
+        const int clip=tracks.addClipAtBeat(track,0,4); QVERIFY(clip>0);
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* backend=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(backend);
+        const auto restore=qScopeGuard([&] {
+            roll->setVisible(false); roll->setProperty("clipId",-1); roll->setProperty("trackId",-1);
+            roll->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+        });
+        roll->setProperty("trackModel",QVariant::fromValue(&tracks));
+        roll->setProperty("trackId",track); roll->setProperty("clipId",clip);
+        roll->setVisible(true); QTest::qWait(30);
+        const auto add=[&](int pitch,double start,int velocity) {
+            int id=-1;
+            QMetaObject::invokeMethod(backend,"addNote",Q_RETURN_ARG(int,id),Q_ARG(int,pitch),Q_ARG(double,start),Q_ARG(double,0.5),Q_ARG(int,velocity));
+            return id;
+        };
+        const auto velocity=[&](int id) {
+            for(const auto& n:backend->property("notes").toList()) if(n.toMap().value("id").toInt()==id) return n.toMap().value("velocity").toInt();
+            return -1;
+        };
+        const int a=add(60,0.0,100), b=add(62,1.0,100), c=add(64,2.0,100);
+        QTRY_VERIFY(visualItem(roll,"velocityPin"+QString::number(c)));
+
+        // D2: the pin of the note on beat 0 shows whole inside the lane.
+        auto* area=visualItem(roll,"velocityStalkArea"); QVERIFY(area);
+        auto* pin=visualItem(roll,"velocityPin"+QString::number(a)); QVERIFY(pin);
+        QVERIFY(pin->mapToItem(area,QPointF(0,0)).x()>=-0.01);
+
+        // D3: a drag from empty lane space sweeps across the stalks, low on the left, high on
+        // the right; one undo puts every velocity back.
+        const double ppb=roll->property("pixelsPerBeat").toDouble();
+        const auto lanePoint=[&](double beat,double fraction) {
+            return area->mapToScene(QPointF(beat*ppb+2,area->height()*fraction)).toPoint();
+        };
+        const QPoint start=area->mapToScene(QPointF(0.5*ppb,area->height()*0.85)).toPoint();   // between a and b: empty
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
+        for(int i=1;i<=4;++i) QTest::mouseMove(window,start+(lanePoint(2.0,0.2)-start)*i/4);
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,lanePoint(2.0,0.2));
+        QTRY_VERIFY(velocity(c)>90);
+        QVERIFY(velocity(b)<velocity(c)); QVERIFY(velocity(b)!=100);
+        QCOMPARE(velocity(a),100);                                    // the sweep started right of a
+        QVERIFY(tracks.undo());
+        QTRY_COMPARE(velocity(b),100); QCOMPARE(velocity(c),100);
+        QVERIFY(tracks.redo());
+        QTRY_VERIFY(velocity(c)>90);
+
+        // D1: a drawn note takes the last velocity set (c's, the sweep's last stalk).
+        const int remembered=backend->property("newNoteVelocity").toInt();
+        QCOMPARE(remembered,velocity(c));
+        auto* grid=visualItem(roll,"pianoRollGrid"); QVERIFY(grid);
+        auto* flick=grid->parentItem()->parentItem();
+        QTest::mouseClick(window,Qt::LeftButton,{},grid->mapToScene(QPointF(3.1*ppb,flick->property("contentY").toDouble()+40)).toPoint());
+        QTRY_COMPARE(backend->property("count").toInt(),4);
+        QCOMPARE(backend->property("notes").toList().last().toMap().value("velocity").toInt(),remembered);
+
+        // D4: resizing the clip on the timeline moves the open piano roll's clip end.
+        QCOMPARE(roll->property("shownClipLengthBeats").toDouble(),4.0);
+        QVERIFY(tracks.resizeClipAtBeat(track,clip,8.0));
+        QTRY_COMPARE(roll->property("shownClipLengthBeats").toDouble(),8.0);
+        QVERIFY(tracks.undo());
+        QTRY_COMPARE(roll->property("shownClipLengthBeats").toDouble(),4.0);
     }
     void piano_roll_shows_no_placeholder_controls() {
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);

@@ -67,6 +67,10 @@ double PianoRollWrapper::clipStartBeat() const {
     return bound() ? m_trackList->domain().clipStartBeat(m_trackId, m_clipId) : 0.0;
 }
 
+double PianoRollWrapper::clipLengthBeats() const {
+    return bound() ? m_trackList->domain().clipLengthBeats(m_trackId, m_clipId) : 0.0;
+}
+
 double PianoRollWrapper::beatsPerBar() const {
     return m_trackList ? m_trackList->domain().project().tempo().beatsPerBar() : TempoMap{}.beatsPerBar();
 }

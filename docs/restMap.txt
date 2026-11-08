@@ -84,9 +84,9 @@ A. LEFT OVER FROM PLAN 6 (small, closest to recent work)
         design cramps near Nyquist). Possible fix: a matched / pre-warped bell design.
 [ ] A3  Merge the two backend clock formatters (PlaybackControls::formatTime and
         valueformat::position); they differ only for negative times.
-[ ] A4  transport_ui test factory_preset_picker_applies_djent_and_jazz still expects 2 guitar
-        factory presets; there are 5 since a254d48 (Djent, Jazz, MetalSolo, RockChords,
-        RockSolo). Update the test (found 2026-11-07; the only failing UI test).
+[x] A4  DONE 2026-11-08: factory_preset_picker_applies_djent_and_jazz checks all 5 factory
+        presets by name (Djent, Jazz, MetalSolo, RockChords, RockSolo), then applies Djent
+        (gate, overdrive, amp, cabinet, EQ since a254d48) and Jazz.
 (A4 and A5 moved to section H, "will do later".)
 
 
@@ -322,11 +322,17 @@ D. PIANO ROLL / MIDI FOLLOW-UPS
 -------------------------------------------------------------------------------
 Notes now reach the instrument (audioengine.cpp turns clip notes into MidiEvents), so
 follow-trail item 1 ("notes do not play yet") is out of date. Remaining there:
-[ ] D1  New notes always use velocity 100 (Reaper uses the last velocity the user set).
-[ ] D2  A velocity stalk at beat 0 sits on the lane's left edge and is half-clipped.
-[ ] D3  No velocity "paint" sweep across several notes in one drag.
-[ ] D4  Piano roll clip length is fixed when it opens: resizing the clip on the timeline while
-        the piano roll is open does not update its clip highlight.
+[x] D1  DONE 2026-11-08: drawn notes take the last velocity set in the lane or of the note last
+        clicked (PianoRollPattern::newNoteVelocity, 100 at first, never 0; kept across clips).
+[x] D2  DONE 2026-11-08: the pin of a stalk on beat 0 moves right just enough to show whole;
+        the stalk line stays on the note's edge.
+[x] D3  DONE 2026-11-08: a drag from empty velocity-lane space paints every stalk it crosses
+        (the selected ones when there are any) with the velocity at the mouse height; one
+        undo step.
+[x] D4  DONE 2026-11-08: PianoRollWrapper.clipLengthBeats (TrackList::clipLengthBeats) follows
+        timeline resizes and undo; the view's clip highlight uses it.
+        Tests for D1-D4: pianorollpattern, qtpianoroll, transport_ui
+        piano_roll_velocity_lane_paints_remembers_and_follows_the_clip.
 [ ] D5  Pattern clip sourceOffset is not rescaled when a project reopens at another sample
         rate (a trimmed pattern clip's left edge can shift slightly; notes stay on the clip).
 [ ] D6  PianoRollWrapper::notes is a plain QVariantList, so every change rebuilds all note

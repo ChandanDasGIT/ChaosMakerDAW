@@ -140,3 +140,22 @@ TEST(pianorollpattern, select_in_range_picks_notes_the_box_touches)
     CHECK(pattern.selectInRange(100, 120, 0.0, 4.0) == 0);
     CHECK(pattern.selectedCount() == 0);
 }
+
+TEST(pianorollpattern, new_notes_remember_the_last_velocity_set_or_clicked)
+{
+    PianoRollPattern p;
+    CHECK(p.newNoteVelocity() == 100);
+    const int a = p.addNote(60, 0, 1, 40), b = p.addNote(62, 1, 1, 90);
+    CHECK(p.newNoteVelocity() == 100);                     // adding a note does not change it
+    p.setNoteVelocity(a, 55);
+    CHECK(p.newNoteVelocity() == 55);                      // the last velocity set
+    p.selectNote(b);
+    CHECK(p.newNoteVelocity() == 90);                      // the note last clicked
+    p.setNoteVelocity(a, 0);
+    CHECK(p.newNoteVelocity() == 1);                       // never a silent new note
+    p.setNewNoteVelocity(300);
+    CHECK(p.newNoteVelocity() == 127);
+    p.setNotes({});                                        // another clip: the editor keeps it
+    p.clear();
+    CHECK(p.newNoteVelocity() == 127);
+}

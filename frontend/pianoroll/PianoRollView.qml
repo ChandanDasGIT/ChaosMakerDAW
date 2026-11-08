@@ -210,7 +210,10 @@ Item {
         return Qt.rgba(lo.r + (hi.r - lo.r) * t, lo.g + (hi.g - lo.g) * t, lo.b + (hi.b - lo.b) * t, 1)
     }
 
-    readonly property real clipWidthPixels: clipLengthBeats * pixelsPerBeat
+    // The bound clip's length as the timeline has it now (resizes and undo follow); the length
+    // the piano roll was opened with while nothing is bound.
+    readonly property real shownClipLengthBeats: pianoRollBackend.bound ? pianoRollBackend.clipLengthBeats : clipLengthBeats
+    readonly property real clipWidthPixels: shownClipLengthBeats * pixelsPerBeat
     // Furthest note end (beats), so the grid keeps room to scroll/drag past the clip end
     property real dragEndBeats: 0
     readonly property real notesEndBeats: {
@@ -220,7 +223,7 @@ Item {
         return end
     }
     readonly property real totalGridWidth: Math.max(gridContainer.width,
-        (Math.max(clipLengthBeats, notesEndBeats, dragEndBeats) + 8) * pixelsPerBeat)
+        (Math.max(shownClipLengthBeats, notesEndBeats, dragEndBeats) + 8) * pixelsPerBeat)
     readonly property real contentGridHeight: 128 * keyHeight
 
     // Fixed chrome: menu bar (22) + tool strip (28) + ruler (34) + footer (30).
@@ -1118,7 +1121,7 @@ Item {
                             }
                             if (isDrawing) {
                                 isDrawing = false
-                                pianoRollBackend.addNote(drawPitch, drawStartBeat, drawLength, 100)
+                                pianoRollBackend.addNote(drawPitch, drawStartBeat, drawLength, pianoRollBackend.newNoteVelocity)
                                 root.dragEndBeats = 0
                             }
                         }
