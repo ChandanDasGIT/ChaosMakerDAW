@@ -152,8 +152,11 @@ public:
     const electrodrums::Settings* electroDrums(int trackId) const;   // null unless Electronic Drums
     bool setElectroDrums(int trackId, const electrodrums::Settings& settings);
     // Piano tracks, for PianoWrapper, the same way: pianoChanged.
-    const piano::Settings* piano(int trackId) const;             // null unless a Piano track
+    const piano::Settings* piano(int trackId) const;             // null unless a Piano or Chords track
     bool setPiano(int trackId, const piano::Settings& settings);
+    // Chords tracks (strips, autoplay, key), for ChordsWrapper: chordsChanged.
+    const chords::Settings* chords(int trackId) const;           // null unless a Chords track
+    bool setChords(int trackId, const chords::Settings& settings);
     Q_INVOKABLE bool resetTrackEq(int trackId);
     bool newTrackRecordDry() const { return m_newTrackRecordDry; }
     void setNewTrackRecordDry(bool dry);
@@ -213,6 +216,7 @@ signals:
     void drumKitChanged(int trackId);
     void electroDrumsChanged(int trackId);
     void pianoChanged(int trackId);
+    void chordsChanged(int trackId);
     void eqPresetErrorChanged();
     void countChanged();
     void contentEndBeatsChanged();

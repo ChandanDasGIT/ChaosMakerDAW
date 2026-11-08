@@ -5,7 +5,7 @@
 #include <array>
 
 namespace {
-constexpr std::array<EffectDefinition, 7> catalog{{
+constexpr std::array<EffectDefinition, 8> catalog{{
     {effectchain::Eq, "Equalizer", "10-band tone shaping", true, true},
     {effectchain::ChaosEq, "Chaos EQ", "Parametric EQ, up to 24 bands", true, true},
     {effectchain::GuitarSuite, "GuitarSuite", "Pedals and signal chain", false, false},
@@ -13,6 +13,7 @@ constexpr std::array<EffectDefinition, 7> catalog{{
     {effectchain::DrumKit, "Drum kit", "Room, levels and character", false, false},
     {effectchain::ElectroDrums, "Electronic drums", "Style, tune, decay and levels", false, false},
     {effectchain::Piano, "Grand piano", "Tone, pedal and scale", false, false},
+    {effectchain::Chords, "Chords", "Chord strips and autoplay", false, false},
 }};
 
 bool onChain(std::span<const TrackEffectSlot> chain, std::string_view type)
@@ -32,8 +33,10 @@ const EffectDefinition* effectchain::find(std::string_view type)
 std::vector<std::string> effectchain::initialEffects(std::string_view trackType)
 {
     const auto* instrument = instrumentcatalog::find(trackType);
-    if (instrument && !instrument->page.empty() && find(instrument->page)) return {std::string(instrument->page)};
-    return {};
+    std::vector<std::string> pages;
+    if (instrument && !instrument->page.empty() && find(instrument->page)) pages.emplace_back(instrument->page);
+    if (instrument && !instrument->extraPage.empty() && find(instrument->extraPage)) pages.emplace_back(instrument->extraPage);
+    return pages;
 }
 
 bool effectchain::canAdd(std::span<const TrackEffectSlot> chain, std::string_view effectType)

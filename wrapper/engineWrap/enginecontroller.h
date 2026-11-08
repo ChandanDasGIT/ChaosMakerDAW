@@ -136,6 +136,14 @@ public:
     bool projectDirty() const { return m_projectSession.isDirty(); }
     bool projectLoading() const { return bool(m_loadingProject); }
     Q_INVOKABLE bool saveProject(const QUrl& file = QUrl());
+    // A track's FX chain as a .chaosfx file (persistence/effectchainjson). Each returns
+    // {ok, error, kept: [effect titles], skipped: [titles the track can't take], trackType}.
+    // preview reads a file and says what importing it would do, changing nothing; import
+    // REPLACES the track's chain (effects the track type can't take are skipped); export
+    // writes the track's chain with every setting, the GuitarSuite pedalboard too.
+    Q_INVOKABLE QVariantMap previewEffectChain(int trackId, const QUrl& file);
+    Q_INVOKABLE QVariantMap importEffectChain(int trackId, const QUrl& file);
+    Q_INVOKABLE QVariantMap exportEffectChain(int trackId, const QUrl& file);
     Q_INVOKABLE bool openProject(const QUrl& file);
     Q_INVOKABLE bool newProject();
     Q_INVOKABLE void shutdownSession();

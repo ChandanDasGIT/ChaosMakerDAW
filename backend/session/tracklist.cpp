@@ -89,13 +89,17 @@ void TrackList::adoptDocument(TrackList&& candidate)
 
 std::vector<TrackList::TrackChoice> TrackList::trackChoices()
 {
-    return {{"Vocal", "Vocal", false}, {"Instrument", "Instrument", true}};
+    std::vector<TrackChoice> choices{{"Vocal", "Vocal", false}, {"Instrument", "Instrument", true}};
+    for (const auto& entry : instrumentcatalog::instruments())
+        if (entry.ownKind) choices.push_back({std::string(entry.id), std::string(entry.name), false});
+    return choices;
 }
 
 std::vector<TrackList::TrackChoice> TrackList::instrumentChoices()
 {
     std::vector<TrackChoice> choices;
     for (const auto& entry : instrumentcatalog::instruments()) {
+        if (entry.ownKind) continue;                       // listed beside Vocal and Instrument
         if (entry.group.empty()) {
             choices.push_back({std::string(entry.id), std::string(entry.name), false});
             continue;
@@ -272,6 +276,10 @@ TrackList::Change TrackList::setElectroDrums(int id, const electrodrums::Setting
 TrackList::Change TrackList::setPiano(int id, const piano::Settings& settings)
 {
     return result(m_project.setTrackPiano(id, settings));
+}
+TrackList::Change TrackList::setChords(int id, const chords::Settings& settings)
+{
+    return result(m_project.setTrackChords(id, settings));
 }
 int TrackList::addTrackEffect(int trackId, const std::string& type)
 {

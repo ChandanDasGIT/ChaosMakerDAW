@@ -109,7 +109,7 @@ endforeach()
 if(DAW_BUILD_APP)
     add_executable(wrappertests
         tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp tests/wrapper/clipediting_qtcheck.cpp
-        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp
+        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp
         wrapper/pianorollwrap/pianorollwrapper.cpp wrapper/pianorollwrap/pianorollwrapper.h
         wrapper/engineWrap/enginecontroller.cpp wrapper/engineWrap/enginecontroller.h
         wrapper/session/tracklistwrap/tracklistwrapper.cpp wrapper/session/tracklistwrap/tracklistwrapper.h
@@ -126,6 +126,7 @@ if(DAW_BUILD_APP)
         wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.cpp wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.h
         wrapper/instruments/drums/drumkitwrap/drumkitwrapper.cpp wrapper/instruments/drums/drumkitwrap/drumkitwrapper.h
         wrapper/instruments/drums/groovewrap/drumgroovewrapper.cpp wrapper/instruments/drums/groovewrap/drumgroovewrapper.h
+        wrapper/plugins/chordplayer/chordswrap/chordswrapper.cpp wrapper/plugins/chordplayer/chordswrap/chordswrapper.h
         wrapper/instruments/electrodrums/electrodrumswrap/electrodrumswrapper.cpp wrapper/instruments/electrodrums/electrodrumswrap/electrodrumswrapper.h
         wrapper/instruments/piano/pianowrap/pianowrapper.cpp wrapper/instruments/piano/pianowrap/pianowrapper.h
         wrapper/midi/virtualkeyboardwrap/virtualkeyboardwrapper.cpp wrapper/midi/virtualkeyboardwrap/virtualkeyboardwrapper.h)
@@ -145,6 +146,8 @@ if(DAW_BUILD_APP)
     add_test(NAME qtharmonium COMMAND wrappertests qtharmonium)
     add_test(NAME qtdrumkit COMMAND wrappertests qtdrumkit)
     add_test(NAME qtdrumgroove COMMAND wrappertests qtdrumgroove)
+    add_test(NAME qteffectchain COMMAND wrappertests qteffectchain)
+    add_test(NAME qtchords COMMAND wrappertests qtchords)
     add_test(NAME qtelectrodrums COMMAND wrappertests qtelectrodrums)
     add_test(NAME qtpiano COMMAND wrappertests qtpiano)
     add_test(NAME qtvirtualkeyboard COMMAND wrappertests qtvirtualkeyboard)
@@ -178,6 +181,7 @@ if(DAW_BUILD_APP)
                       frontend/instruments/piano/PianoPicture.qml
                       frontend/transportbar/VirtualKeyboard.qml
                       frontend/plugins/TrackEffectsPanel.qml frontend/plugins/eq/Tenbandeq.qml frontend/plugins/chaoseq/ChaosEqEditor.qml
+                      frontend/plugins/chordplayer/ChordsEditor.qml frontend/plugins/chordplayer/ChordStrips.qml
                       frontend/session/TrackList.qml frontend/timeline/Timeline.qml
                       frontend/mixer/MixerPanel.qml
                       frontend/dsp/StereoLevelMeter.qml

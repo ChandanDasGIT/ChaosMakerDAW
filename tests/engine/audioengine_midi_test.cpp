@@ -624,3 +624,37 @@ TEST(audioengine_midi, playback_stops_at_the_end_and_instruments_ring_out)
         CHECK(rec->processCalls == calls);
     }
 }
+
+TEST(audioengine_midi, a_processor_that_keeps_running_is_processed_while_stopped)
+{
+    // The Chords track's latched autoplay plays with no key held and the transport stopped:
+    // its processor says so (keepsRunning) and the engine keeps calling it, in both mixing paths.
+    struct Runner : MidiRecordingProcessor {
+        bool running = false;
+        bool keepsRunning() const noexcept override { return running; }
+    };
+    for (bool multi : {false, true}) {
+        AudioEngine engine{nullptr};
+        engine.deviceChanged(48000.0, 128);
+        auto runner = std::make_shared<Runner>();
+        auto snapshot = std::make_unique<EngineSnapshot>();
+        snapshot->multiMonitor = multi;
+        snapshot->tempo.set(120.0, 4, 4, 48000.0);
+        TrackRender track;
+        track.trackId = 1;
+        track.chain.push_back(runner.get());
+        snapshot->tracks.push_back(track);
+        snapshot->keepProcessors.push_back(runner);
+        engine.publishPlayback(std::move(snapshot));
+
+        for (int i = 0; i < 4; ++i) renderEngine(engine, 128);
+        CHECK(runner->processCalls == 0);                           // stopped, nothing held: idle
+        runner->running = true;
+        for (int i = 0; i < 4; ++i) renderEngine(engine, 128);
+        CHECK(runner->processCalls >= 4);
+        const int calls = runner->processCalls;
+        runner->running = false;
+        for (int i = 0; i < 4; ++i) renderEngine(engine, 128);
+        CHECK(runner->processCalls == calls);                       // idle again
+    }
+}

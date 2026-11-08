@@ -250,6 +250,14 @@ bool Project::setTrackPiano(int id, const piano::Settings& settings)
     return true;
 }
 
+bool Project::setTrackChords(int id, const chords::Settings& settings)
+{
+    auto* track = findTrack(id);
+    if (!track) return false;
+    track->chords = chords::sanitize(settings);
+    return true;
+}
+
 bool Project::setTrackEqBand(int id, int band, float gainDb)
 {
     auto* track = findTrack(id);

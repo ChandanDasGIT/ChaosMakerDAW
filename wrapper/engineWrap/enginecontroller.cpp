@@ -14,7 +14,10 @@
 #include "instruments/electrodrums/electrodrums.h"
 #include "instruments/harmonium/harmonium.h"
 #include "instruments/piano/piano.h"
+#include "instruments/chords/chordsinstrument.h"
 #include "persistence/projectdocument.h"
+#include "persistence/effectchainjson.h"
+#include "plugins/effectchain.h"
 #include "processor/trackinput.h"
 
 #include <QCoreApplication>
@@ -925,6 +928,21 @@ void EngineController::attachProject(TrackListWrapper* model) {
         if (!settings || it == m_trackEffects.end()) return;
         if (it->second.instrument && it->second.instrument->typeId() == "piano")
             static_cast<Piano&>(*it->second.instrument).setSettings(*settings);
+        if (it->second.instrument && it->second.instrument->typeId() == "chords")
+            static_cast<ChordsInstrument&>(*it->second.instrument).piano().setSettings(*settings);
+        if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
+    });
+    // Chords edits (strips, autoplay): straight into the track's player; no playback rebuild.
+    connect(model, &TrackListWrapper::chordsChanged, this, [this](int trackId) {
+        if (!m_project) return;
+        const auto* settings = m_project->chords(trackId);
+        const auto it = m_trackEffects.find(trackId);
+        if (!settings || it == m_trackEffects.end()) return;
+        if (it->second.instrument && it->second.instrument->typeId() == "chords") {
+            auto& player = static_cast<ChordsInstrument&>(*it->second.instrument).player();
+            player.setStrips(chords::playerStrips(*settings));
+            player.setAutoplay(settings->autoplay);
+        }
         if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
     });
     // Electronic drum edits: straight into the track's kit (atomic parameters); no rebuild.
@@ -1289,4 +1307,124 @@ bool EngineController::connectMidiInput(const QString& portName) {
     const bool ok = m_engine->connectMidiInput(portName.toStdString());
     emit midiInputPortsChanged();
     return ok;
+}
+
+// ---------------------------------------------------------------- FX chain files
+namespace {
+
+QVariantMap chainResult(bool ok, const QString& error, const std::vector<std::string>& kept = {},
+                        const std::vector<std::string>& skipped = {}, const std::string& trackType = {})
+{
+    QStringList keptList, skippedList;
+    for (const auto& t : kept) keptList << QString::fromStdString(t);
+    for (const auto& t : skipped) skippedList << QString::fromStdString(t);
+    return {{QStringLiteral("ok"), ok}, {QStringLiteral("error"), error}, {QStringLiteral("kept"), keptList},
+            {QStringLiteral("skipped"), skippedList}, {QStringLiteral("trackType"), QString::fromStdString(trackType)}};
+}
+
+// Reads and checks a chain file; false with `error` set.
+bool readChainFile(const QUrl& file, persistence::chainjson::ChainFile& chain, QString& error)
+{
+    if (!file.isLocalFile()) { error = QStringLiteral("Choose a local FX chain file."); return false; }
+    QFile in(file.toLocalFile());
+    if (!in.open(QIODevice::ReadOnly)) { error = QStringLiteral("Could not open the FX chain file."); return false; }
+    if (in.size() > qint64(persistence::chainjson::MaxFileSize)) { error = QStringLiteral("The FX chain file is too large."); return false; }
+    const QByteArray bytes = in.readAll();
+    const auto json = nlohmann::json::parse(bytes.constData(), bytes.constData() + bytes.size(), nullptr, false);
+    std::string why;
+    if (json.is_discarded() || !persistence::chainjson::fromJson(json, chain, why)) {
+        error = why.empty() ? QStringLiteral("Not an FX chain file.") : QString::fromStdString(why);
+        return false;
+    }
+    return true;
+}
+
+} // namespace
+
+QVariantMap EngineController::previewEffectChain(int trackId, const QUrl& file)
+{
+    const auto* track = m_project ? m_project->project().findTrack(trackId) : nullptr;
+    if (!track) return chainResult(false, QStringLiteral("Pick a track first."));
+    persistence::chainjson::ChainFile chain;
+    QString error;
+    if (!readChainFile(file, chain, error)) return chainResult(false, error);
+    persistence::chainjson::ImportPlan plan;
+    std::string why;
+    if (!persistence::chainjson::planImport(*track, chain, plan, why)) return chainResult(false, QString::fromStdString(why));
+    return chainResult(true, {}, plan.kept, plan.skipped, chain.trackType);
+}
+
+QVariantMap EngineController::importEffectChain(int trackId, const QUrl& file)
+{
+    const auto* track = m_project ? m_project->project().findTrack(trackId) : nullptr;
+    if (!track) return chainResult(false, QStringLiteral("Pick a track first."));
+    if (m_project->domain().trackLocked(trackId) || takeBusy())
+        return chainResult(false, QStringLiteral("Finish recording before changing the effects."));
+    persistence::chainjson::ChainFile chain;
+    QString error;
+    if (!readChainFile(file, chain, error)) return chainResult(false, error);
+    persistence::chainjson::ImportPlan plan;
+    std::string why;
+    if (!persistence::chainjson::planImport(*track, chain, plan, why)) return chainResult(false, QString::fromStdString(why));
+    auto* pedals = plan.guitarSuite ? qobject_cast<GuitarSuiteModel*>(trackEffects(trackId)) : nullptr;
+    if (pedals && pedals->busy()) return chainResult(false, QStringLiteral("GuitarSuite is still loading; try again in a moment."));
+
+    // The chain: the effects the user can add go, the file's come in, then the order.
+    std::vector<int> removable;
+    for (const auto& slot : track->effects) if (effectchain::canRemove(slot.type)) removable.push_back(slot.id);
+    for (int id : removable) m_project->removeTrackEffect(trackId, id);
+    for (const auto& type : plan.addTypes) m_project->addTrackEffect(trackId, QString::fromStdString(type));
+    for (int index = 0; index < int(plan.finalOrder.size()); ++index) {
+        const auto* now = m_project->project().findTrack(trackId);
+        if (!now) break;
+        for (const auto& slot : now->effects) {
+            if (slot.type != plan.finalOrder[index]) continue;
+            m_project->moveTrackEffect(trackId, slot.id, index);
+            break;
+        }
+    }
+    // The settings.
+    if (plan.eqGainsDb) for (int band = 0; band < int(plan.eqGainsDb->size()); ++band) m_project->setEqBand(trackId, band, (*plan.eqGainsDb)[band]);
+    if (plan.chaosEq) m_project->setChaosEq(trackId, *plan.chaosEq);
+    if (plan.harmonium) m_project->setHarmonium(trackId, *plan.harmonium);
+    if (plan.drumkit) m_project->setDrumKit(trackId, *plan.drumkit);
+    if (plan.electrodrums) m_project->setElectroDrums(trackId, *plan.electrodrums);
+    if (plan.piano) m_project->setPiano(trackId, *plan.piano);
+    if (plan.chords) m_project->setChords(trackId, *plan.chords);
+    if (pedals && plan.guitarSuite && !pedals->restoreSessionData(QByteArray::fromStdString(plan.guitarSuite->dump())))
+        return chainResult(false, QStringLiteral("The effects were replaced, but the GuitarSuite pedalboard in the file did not load."),
+                           plan.kept, plan.skipped, chain.trackType);
+    setTransportMessage(QStringLiteral("FX chain imported."));
+    return chainResult(true, {}, plan.kept, plan.skipped, chain.trackType);
+}
+
+QVariantMap EngineController::exportEffectChain(int trackId, const QUrl& file)
+{
+    const auto* track = m_project ? m_project->project().findTrack(trackId) : nullptr;
+    if (!track) return chainResult(false, QStringLiteral("Pick a track first."));
+    if (!file.isLocalFile()) return chainResult(false, QStringLiteral("Choose a local file to export to."));
+    nlohmann::json pedals = nullptr;
+    const bool hasSuite = std::any_of(track->effects.begin(), track->effects.end(),
+                                      [](const TrackEffectSlot& s) { return s.type == effectchain::GuitarSuite; });
+    if (hasSuite) {
+        auto* model = qobject_cast<GuitarSuiteModel*>(trackEffects(trackId));
+        if (model && model->busy()) return chainResult(false, QStringLiteral("GuitarSuite is still loading; try again in a moment."));
+        if (model) {
+            const std::string data = model->sessionDataStd();
+            pedals = nlohmann::json::parse(data, nullptr, false);
+            if (pedals.is_discarded() || !pedals.is_object()) pedals = nullptr;
+        }
+    }
+    const auto chain = persistence::chainjson::capture(*track, pedals);
+    QSaveFile out(file.toLocalFile());
+    const std::string text = persistence::chainjson::toJson(chain).dump(2) + "\n";
+    if (!out.open(QIODevice::WriteOnly) || out.write(text.data(), qint64(text.size())) != qint64(text.size()) || !out.commit())
+        return chainResult(false, QStringLiteral("Could not write the FX chain file."));
+    std::vector<std::string> titles;
+    for (const auto& e : chain.effects) {
+        const auto* def = effectchain::find(e.type);
+        titles.push_back(def ? std::string(def->title) : e.type);
+    }
+    setTransportMessage(QStringLiteral("FX chain exported."));
+    return chainResult(true, {}, titles, {}, chain.trackType);
 }

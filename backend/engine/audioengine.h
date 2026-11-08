@@ -160,6 +160,8 @@ private:
     LiveTrackAudition* findAudition(int trackId) noexcept;
     bool isAuditionActive(int trackId) const noexcept;
     bool anyAuditionActive() const noexcept;
+    // A processor on the track sounds on its own (Processor::keepsRunning).
+    static bool chainKeepsRunning(const TrackRender& track) noexcept;
 
     bool m_resetPlayback = false;
     std::atomic<float> m_inputTrimGain{1.0f};

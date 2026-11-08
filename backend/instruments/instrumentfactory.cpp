@@ -1,4 +1,5 @@
 #include "instruments/instrumentfactory.h"
+#include "instruments/chords/chordsinstrument.h"
 #include "instruments/drums/drumkit.h"
 #include "instruments/electrodrums/electrodrums.h"
 #include "instruments/harmonium/harmonium.h"
@@ -12,6 +13,7 @@ std::shared_ptr<Processor> createInstrument(std::string_view typeId)
     if (typeId == "Drums") return std::make_shared<DrumKit>();
     if (typeId == "Electronic Drums") return std::make_shared<ElectroDrums>();
     if (typeId == "Piano") return std::make_shared<Piano>();
+    if (typeId == "Chords") return std::make_shared<ChordsInstrument>();
     // The other instrument types play through TestSynth until their real instruments exist.
     return std::make_shared<TestSynth>();
 }

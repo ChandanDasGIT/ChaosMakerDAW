@@ -1,4 +1,5 @@
 #include "engine/snapshotbuilder.h"
+#include "instruments/chords/chordsinstrument.h"
 #include "instruments/drums/drumkit.h"
 #include "instruments/electrodrums/electrodrums.h"
 #include "instruments/harmonium/harmonium.h"
@@ -51,6 +52,12 @@ void SnapshotBuilder::syncTrackEq(const Project& project, const MutableEffectRes
             static_cast<ElectroDrums&>(*fx->instrument).setSettings(track->electrodrums);
         if (fx->instrument && fx->instrument->typeId() == "piano")
             static_cast<Piano&>(*fx->instrument).setSettings(track->piano);
+        if (fx->instrument && fx->instrument->typeId() == "chords") {
+            auto& chordsTrack = static_cast<ChordsInstrument&>(*fx->instrument);
+            chordsTrack.piano().setSettings(track->piano);
+            chordsTrack.player().setStrips(chords::playerStrips(track->chords));
+            chordsTrack.player().setAutoplay(track->chords.autoplay);
+        }
     }
 }
 

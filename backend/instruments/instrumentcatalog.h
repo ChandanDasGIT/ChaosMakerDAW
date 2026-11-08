@@ -17,6 +17,10 @@ struct InstrumentDefinition {
     // for an instrument listed on its own.
     std::string_view group = {};
     std::string_view variant = {};
+    // A second page after `page` (the Chords track: its strips, then the grand piano's page).
+    std::string_view extraPage = {};
+    // Listed in the "Add track" picker's first list, beside Vocal and Instrument (Chords).
+    bool ownKind = false;
 };
 
 namespace instrumentcatalog {
@@ -28,4 +32,6 @@ const InstrumentDefinition* find(std::string_view id);
 bool isDrumKit(std::string_view id) noexcept;
 // The part a drum kit plays on `key` ("Kick", "Clap" ...); "" for other keys and instruments.
 std::string_view drumName(std::string_view id, int key) noexcept;
+// Instruments whose keys the piano roll names: the drum kits and the Chords track (its strips).
+bool namesKeys(std::string_view id) noexcept;
 }

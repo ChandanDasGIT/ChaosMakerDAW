@@ -7,8 +7,8 @@
 
 TEST(instrumentcatalog, existing_track_type_ids_names_and_choice_order_are_preserved)
 {
-    constexpr std::array<std::string_view, 7> expected{
-        "Piano", "Acoustic Guitar", "Electric Guitar", "Strings", "Drums", "Harmonium", "Electronic Drums"
+    constexpr std::array<std::string_view, 8> expected{
+        "Piano", "Acoustic Guitar", "Electric Guitar", "Strings", "Drums", "Harmonium", "Electronic Drums", "Chords"
     };
     const auto entries = instrumentcatalog::instruments();
     CHECK(entries.size() == expected.size());
@@ -54,6 +54,13 @@ TEST(instrumentcatalog, instruments_with_controls_name_their_fx_page)
     CHECK(instrumentcatalog::find("Electronic Drums")->page == "electrodrums");
     CHECK(instrumentcatalog::find("Piano")->page == "piano");
     CHECK(instrumentcatalog::find("Strings")->page.empty());
+    // The Chords track: its strips, then the grand piano it plays through; listed on its own.
+    const auto* chordsTrack = instrumentcatalog::find("Chords");
+    CHECK(chordsTrack && chordsTrack->page == "chords" && chordsTrack->extraPage == "piano" && chordsTrack->ownKind);
+    for (const auto& entry : instrumentcatalog::instruments())
+        if (entry.id != "Chords") CHECK(!entry.ownKind && entry.extraPage.empty());
+    CHECK(instrumentcatalog::namesKeys("Chords") && instrumentcatalog::namesKeys("Drums") && !instrumentcatalog::namesKeys("Piano"));
+    CHECK(!instrumentcatalog::isDrumKit("Chords"));
 }
 
 TEST(instrumentcatalog, drum_kits_name_their_keys_from_their_own_maps)

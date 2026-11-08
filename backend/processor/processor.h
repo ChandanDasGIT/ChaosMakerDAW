@@ -42,6 +42,10 @@ public:
 
     virtual int latencySamples() const noexcept { return 0; }
 
+    // True while the processor makes sound on its own with no note held and the transport
+    // stopped (the Chords track's latched autoplay): the engine keeps running its track. Any thread.
+    virtual bool keepsRunning() const noexcept { return false; }
+
     std::span<const std::unique_ptr<Parameter>> parameters() const { return m_parameters; }
 
 protected:
