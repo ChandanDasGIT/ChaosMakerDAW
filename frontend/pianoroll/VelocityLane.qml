@@ -223,11 +223,13 @@ Item {
                                  : Qt.lighter(stalkDelegate.fill, stalkDelegate.isSelected ? 2.0 : 1.6) // lifted so quiet notes stay visible
                         }
 
-                        // Stalk pin handle
+                        // Stalk pin handle; at the lane's left edge (a note on beat 0) it moves right
+                        // just enough to show whole, the stalk line stays on the note's edge.
                         Rectangle {
+                            objectName: "velocityPin" + stalkDelegate.noteId
                             anchors.bottom: parent.bottom
                             anchors.bottomMargin: Math.max(0, stalkDelegate.barHeight - 3)
-                            anchors.horizontalCenter: parent.horizontalCenter
+                            x: Math.max(-stalkDelegate.x, (stalkDelegate.width - width) / 2)
                             width: 7
                             height: 7
                             radius: 3.5
@@ -250,6 +252,9 @@ Item {
                 cursorShape: root.hoveredNoteId >= 0 || dragging ? Qt.SizeVerCursor : Qt.ArrowCursor
 
                 property bool dragging: false
+                property bool painting: false     // a sweep from empty lane space (D3)
+                property real lastX: 0            // the sweep's last point, content x and lane y
+                property real lastY: 0
                 property bool relative: false     // true when dragging a group of selected notes
                 property var targetIds: []
                 property var startVelocities: []
@@ -274,6 +279,29 @@ Item {
                     return best
                 }
 
+                // A paint sweep from (lastX, lastY) to (cx, my): every stalk the segment crosses
+                // (the selected ones when there are any) takes the velocity at the segment's
+                // height there, so a fast drag skips none.
+                function paintTo(cx, my) {
+                    const anySelected = root.notes.some(n => n.selected)
+                    const x0 = Math.min(lastX, cx) - 3, x1 = Math.max(lastX, cx) + 3
+                    const preview = Object.assign({}, root.previewVelocities)
+                    let last = -1
+                    for (let i = 0; i < root.notes.length; ++i) {
+                        const n = root.notes[i]
+                        if (anySelected && !n.selected) continue
+                        const sx = (n.startBeat ?? 0) * root.beatWidth + 2
+                        if (sx < x0 || sx > x1) continue
+                        const t = cx === lastX ? 1 : Math.max(0, Math.min(1, (sx - lastX) / (cx - lastX)))
+                        last = velocityAtY(lastY + (my - lastY) * t)
+                        preview[String(n.id)] = last
+                    }
+                    lastX = cx
+                    lastY = my
+                    label = "Vel " + velocityAtY(my)
+                    root.previewVelocities = preview
+                }
+
                 function applyAt(my) {
                     const preview = {}
                     if (relative) {
@@ -290,15 +318,25 @@ Item {
                 }
 
                 onPositionChanged: mouse => {
+                    if (painting) { paintTo(mouse.x + root.contentX, mouse.y); return }
                     if (dragging) { applyAt(mouse.y); return }
                     const n = noteAt(mouse.x, mouse.y)
                     root.hoveredNoteId = n ? n.id : -1
                 }
-                onExited: if (!dragging) root.hoveredNoteId = -1
+                onExited: if (!dragging && !painting) root.hoveredNoteId = -1
 
                 onPressed: mouse => {
                     const n = noteAt(mouse.x, mouse.y)
-                    if (!n) { mouse.accepted = false; return }
+                    if (!n) {
+                        // Empty lane space: paint across the stalks the drag passes.
+                        if (root.notes.length === 0) { mouse.accepted = false; return }
+                        painting = true
+                        lastX = mouse.x + root.contentX
+                        lastY = mouse.y
+                        root.previewVelocities = ({})
+                        paintTo(lastX, mouse.y)
+                        return
+                    }
                     root.hoveredNoteId = n.id
                     relative = !!n.selected
                     const ids = [], vels = []
@@ -314,6 +352,17 @@ Item {
                 }
 
                 onReleased: {
+                    if (painting) {
+                        painting = false
+                        const ids = [], vels = []
+                        for (const key in root.previewVelocities) {
+                            ids.push(Number(key))
+                            vels.push(root.previewVelocities[key])
+                        }
+                        if (ids.length > 0) root.velocitiesEdited(ids, vels)   // one undo step
+                        root.previewVelocities = ({})
+                        return
+                    }
                     if (!dragging) return
                     const ids = [], vels = []
                     for (let i = 0; i < targetIds.length; ++i) {
@@ -327,12 +376,13 @@ Item {
 
                 onCanceled: {
                     dragging = false
+                    painting = false
                     root.previewVelocities = ({})
                 }
 
                 // Value readout next to the cursor while dragging
                 Rectangle {
-                    visible: velocityMouse.dragging
+                    visible: velocityMouse.dragging || velocityMouse.painting
                     x: Math.min(parent.width - width - 2, velocityMouse.mouseX + 12)
                     y: Math.max(2, Math.min(parent.height - height - 2, velocityMouse.mouseY - height - 4))
                     width: valueText.implicitWidth + 10

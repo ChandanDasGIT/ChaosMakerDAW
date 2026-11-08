@@ -274,3 +274,29 @@ TEST(qtpianoroll, velocity_edits_are_one_undoable_change_and_clamped) {
     CHECK(!roll->setNoteVelocities({a}, {20}));
     CHECK(roll->backend().findNote(a)->velocity == 100);
 }
+
+TEST(qtpianoroll, clip_length_and_new_note_velocity_follow_the_clip_and_the_edits) {
+    QObject owner;
+    TrackListWrapper tracks;
+    const int t = tracks.addInstrumentTrack();
+    const int c = tracks.addClipAtBeat(t, 4, 4);
+    auto* roll = boundRoll(tracks, t, c, &owner);
+    CHECK(std::abs(roll->clipLengthBeats() - 4.0) < 1e-6);
+    int changes = 0;
+    QObject::connect(roll, &PianoRollWrapper::clipStartChanged, &owner, [&] { ++changes; });
+    CHECK(tracks.resizeClipAtBeat(t, c, 6.0));                 // a timeline resize
+    CHECK(changes >= 1 && std::abs(roll->clipLengthBeats() - 6.0) < 1e-6);
+    CHECK(tracks.undo());
+    CHECK(std::abs(roll->clipLengthBeats() - 4.0) < 1e-6);
+
+    CHECK(roll->newNoteVelocity() == 100);
+    const int n = roll->addNote(60, 0, 1, 100);
+    CHECK(roll->setNoteVelocities({n}, {42}));
+    CHECK(roll->newNoteVelocity() == 42);
+    const int m = roll->addNote(62, 1, 1, 77);
+    roll->selectNote(m);
+    CHECK(roll->newNoteVelocity() == 77);
+
+    CHECK(tracks.removeAudioClip(t, c));                       // unbound: no length
+    CHECK(roll->clipLengthBeats() == 0.0);
+}

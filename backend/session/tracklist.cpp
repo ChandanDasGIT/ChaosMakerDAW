@@ -368,6 +368,14 @@ double TrackList::clipStartBeat(int trackId, int clipId) const
     return clip ? m_project.tempo().beatAt(clip->start) : 0.0;
 }
 
+double TrackList::clipLengthBeats(int trackId, int clipId) const
+{
+    const auto* clip = findClip(trackId, clipId);
+    if (!clip) return 0.0;
+    const auto& tempo = m_project.tempo();
+    return tempo.beatAt(clip->start + clip->length) - tempo.beatAt(clip->start);
+}
+
 TrackList::Change TrackList::setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes)
 {
     if (editsLocked()) return {};

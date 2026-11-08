@@ -57,13 +57,19 @@ bool PianoRollPattern::setNoteVelocity(int noteId, int velocity) {
     MidiNote* n = findNote(noteId);
     if (!n) return false;
     n->velocity = std::clamp(velocity, 0, 127);
+    m_newNoteVelocity = std::max(1, n->velocity);
     return true;
+}
+
+void PianoRollPattern::setNewNoteVelocity(int velocity) noexcept {
+    m_newNoteVelocity = std::clamp(velocity, 1, 127);
 }
 
 void PianoRollPattern::selectNote(int noteId, bool addToSelection) {
     for (auto& n : m_notes) {
         if (n.id == noteId) {
             n.selected = true;
+            m_newNoteVelocity = std::max(1, n.velocity);
         } else if (!addToSelection) {
             n.selected = false;
         }

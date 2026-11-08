@@ -28,6 +28,10 @@ class PianoRollWrapper : public QObject {
     Q_PROPERTY(bool bound READ bound NOTIFY bindingChanged)
     // Project beat where the bound clip starts; note beats and the playhead are relative to it.
     Q_PROPERTY(double clipStartBeat READ clipStartBeat NOTIFY clipStartChanged)
+    // The bound clip's length in beats, following timeline resizes and undo; 0 when unbound.
+    Q_PROPERTY(double clipLengthBeats READ clipLengthBeats NOTIFY clipStartChanged)
+    // The velocity the next drawn note gets (backend PianoRollPattern::newNoteVelocity).
+    Q_PROPERTY(int newNoteVelocity READ newNoteVelocity NOTIFY notesChanged)
     // Project meter in quarter-note beats (4/4 -> 4 and 1, 6/8 -> 3 and 0.5); 4/4 when unbound.
     Q_PROPERTY(double beatsPerBar READ beatsPerBar NOTIFY meterChanged)
     Q_PROPERTY(double beatUnit READ beatUnit NOTIFY meterChanged)
@@ -69,6 +73,8 @@ public:
     int clipId() const noexcept { return m_clipId; }
     void setClipId(int id);
     bool bound() const;
+    double clipLengthBeats() const;
+    int newNoteVelocity() const noexcept { return m_pattern.newNoteVelocity(); }
     double clipStartBeat() const;
     double beatsPerBar() const;
     double beatUnit() const;
