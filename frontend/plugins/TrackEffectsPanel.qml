@@ -2,8 +2,14 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-Popup {
+// A track's FX panel: its insert effects and its instrument's own page. A window of its own,
+// like the on-screen piano: it floats over the app, and the user moves it by its title bar
+// (onto another screen too) and resizes it. open() shows it (centred on the app the first
+// time), close(), the x button or Escape hide it; closed() follows every hide, and the
+// app's window gets the keyboard back.
+Window {
     id: root
+    signal closed()
     property var trackModel
     property int trackId: -1
     property string trackName: ""
@@ -34,17 +40,43 @@ Popup {
         chain: root.effects
     }
 
-    parent: Overlay.overlay
-    x: (parent.width - width) / 2
-    y: (parent.height - height) / 2
-    width: Math.min(1120, parent.width - 32)
-    height: Math.min(680, parent.height - 70)
-    modal: false
-    focus: true
-    closePolicy: Popup.CloseOnEscape
-    padding: 0
-    background: Rectangle { color: Theme.popupBg; radius: 10; border.color: Theme.popupBorder }
-    contentItem: ColumnLayout {
+    property bool placed: false                             // centred once; then where the user left it
+
+    function open() {
+        if (!placed) {
+            const screenW = Screen.desktopAvailableWidth, screenH = Screen.desktopAvailableHeight
+            width = Math.min(1120, screenW - 32)
+            height = Math.min(680, screenH - 70)
+            const host = transientParent
+            x = host ? host.x + (host.width - width) / 2 : (screenW - width) / 2
+            y = host ? host.y + (host.height - height) / 2 : (screenH - height) / 2
+            placed = true
+        }
+        show()
+        requestActivate()
+    }
+    onVisibleChanged: {
+        if (visible) return
+        // The window it floats over takes the keyboard back (shortcuts, KEYS, the transport).
+        if (transientParent) transientParent.requestActivate()
+        closed()
+    }
+
+    title: root.trackName + " · Effects"
+    flags: Qt.Tool | Qt.WindowStaysOnTopHint
+    width: 1120
+    height: 680
+    minimumWidth: 640
+    minimumHeight: 420
+    color: Theme.popupBg
+
+    Shortcut {
+        sequences: [StandardKey.Cancel]
+        onActivated: root.close()
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
         spacing: 0
         Rectangle {
             Layout.fillWidth: true

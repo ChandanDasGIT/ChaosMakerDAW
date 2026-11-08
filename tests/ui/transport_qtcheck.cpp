@@ -1091,17 +1091,19 @@ private slots:
         QCOMPARE(order(),(QStringList{"guitarsuite","eq"}));
         auto* grip=visualItem(window->contentItem(),"effectGrip_eq"); QVERIFY(grip);
         const QPoint from=grip->mapToScene(QPointF(grip->width()/2,grip->height()/2)).toPoint();
-        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,from);
-        for(int dy=6;dy<=62;dy+=8) QTest::mouseMove(window,from-QPoint(0,dy));
-        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,from-QPoint(0,62));
+        QTest::mousePress(fxWindow(),Qt::LeftButton,Qt::NoModifier,from);
+        for(int dy=6;dy<=62;dy+=8) QTest::mouseMove(fxWindow(),from-QPoint(0,dy));
+        QTest::mouseRelease(fxWindow(),Qt::LeftButton,Qt::NoModifier,from-QPoint(0,62));
         QTRY_COMPARE(order(),(QStringList{"eq","guitarsuite"}));
         // Remove the EQ with its ×; the panel falls back to GuitarSuite.
         click(visualItem(window->contentItem(),"removeEffect_eq"));
         QTRY_COMPARE(order(),QStringList{"guitarsuite"});
         QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("guitarsuite"));
         QVERIFY(visualItem(window->contentItem(),"addEffectButton")->isEnabled());
-        // The FX workspace stays open while editing the transport.
-        click(field); QTest::keyClick(window,Qt::Key_9); QTest::keyClick(window,Qt::Key_1); QTest::keyClick(window,Qt::Key_Return);
+        // The FX window stays open while editing the transport (the user clicks back into the
+        // main window, which makes it the active one again).
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+        click(field); QTest::qWait(10); QTest::keyClick(window,Qt::Key_9); QTest::keyClick(window,Qt::Key_1); QTest::keyClick(window,Qt::Key_Return);
         QCOMPARE(controller->bpm(),91.0); QVERIFY(panel->property("visible").toBool());
         window->grabWindow().save("/tmp/projectdaw-track-effects.png");
         // One shared panel (plan 5.1): removing its track closes it.
@@ -1135,13 +1137,13 @@ private slots:
         QVERIFY(!visualItem(window->contentItem(),"selectEffect_guitarsuite"));
         QVERIFY(!visualObject(window->contentItem(),"trackGuitarSuiteEditor"+QString::number(vocal)));
         auto* band=visualItem(window->contentItem(),"trackEqBand5"); QVERIFY(band); QVERIFY(band->isVisible());
-        band->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Up);
+        band->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Up);
         QCOMPARE(tracks.project().findTrack(vocal)->eqGainDb[5],0.5f);
         auto* mode=visualItem(window->contentItem(),"trackRecordingMode"); QVERIFY(mode);
         QVERIFY(mode->isVisible()); QVERIFY(mode->isEnabled());
-        mode->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Down);
+        mode->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Down);
         QTRY_VERIFY(tracks.project().findTrack(vocal)->recordDry);
-        QTest::keyClick(window,Qt::Key_Up); QTRY_VERIFY(!tracks.project().findTrack(vocal)->recordDry);
+        QTest::keyClick(fxWindow(),Qt::Key_Up); QTRY_VERIFY(!tracks.project().findTrack(vocal)->recordDry);
         // Unsupported navigation cannot reveal the pedal page, including after reopen.
         panel->setProperty("selectedEffect","guitarsuite");
         QCOMPARE(panel->property("selectedEffect").toString(),QString("eq"));
@@ -1324,11 +1326,11 @@ private slots:
         QQuickItem* slider=nullptr;
         for (auto* child : kick->findChildren<QQuickItem*>()) if (child->inherits("QQuickSlider")) slider=child;
         QVERIFY(slider);
-        slider->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Left);
+        slider->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Left);
         QTRY_VERIFY(settings().kickDb<0.0);
 
         auto* room=visualItem(window->contentItem(),"drumKitRoom"); QVERIFY(room);
-        room->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Down);
+        room->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Down);
         QTRY_VERIFY(settings().room==drumkit::Room::Full);
 
         // The drawn kit: a press on the snare's head plays Snare (harder in the middle), on
@@ -1340,7 +1342,7 @@ private slots:
         const qreal scale=picture->property("s").toReal(), rx=snare->property("rx").toReal()*scale, ry=snare->property("ry").toReal()*scale;
         const auto pressAt=[&](QPointF local) {
             const QPoint at=snare->mapToScene(local).toPoint();
-            QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at); QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,at);
+            QTest::mousePress(fxWindow(),Qt::LeftButton,Qt::NoModifier,at); QTest::mouseRelease(fxWindow(),Qt::LeftButton,Qt::NoModifier,at);
         };
         pressAt(QPointF(rx,ry));                                    // the centre
         QTRY_COMPARE(played.count(),1);
@@ -1400,7 +1402,7 @@ private slots:
         QQuickItem* slider=nullptr;
         for (auto* child : level->findChildren<QQuickItem*>()) if (child->inherits("QQuickSlider")) slider=child;
         QVERIFY(slider);
-        slider->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Left);
+        slider->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Left);
         QTRY_VERIFY(settings().drum(electrodrums::Drum::Clap).levelDb<0.0);
         QCOMPARE(settings().drum(electrodrums::Drum::Kick).levelDb,0.0);
 
@@ -1413,9 +1415,9 @@ private slots:
         // The volume knob: dragging up turns it up.
         auto* knob=visualItem(picture,"electroVolumeKnob"); QVERIFY(knob);
         const QPoint from=knob->mapToScene(QPointF(knob->width()/2,knob->height()/2)).toPoint();
-        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,from);
-        QTest::mouseMove(window,from-QPoint(0,10)); QTest::mouseMove(window,from-QPoint(0,30));
-        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,from-QPoint(0,30));
+        QTest::mousePress(fxWindow(),Qt::LeftButton,Qt::NoModifier,from);
+        QTest::mouseMove(fxWindow(),from-QPoint(0,10)); QTest::mouseMove(fxWindow(),from-QPoint(0,30));
+        QTest::mouseRelease(fxWindow(),Qt::LeftButton,Qt::NoModifier,from-QPoint(0,30));
         QTRY_VERIFY(settings().volumeDb>0.0);
         QVERIFY(window->grabWindow().save("/tmp/chaosmaker-electrodrums-page.png"));
 
@@ -1450,7 +1452,7 @@ private slots:
         QQuickItem* slider=nullptr;
         for (auto* child : bellows->findChildren<QQuickItem*>()) if (child->inherits("QQuickSlider")) slider=child;
         QVERIFY(slider);
-        slider->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Right);
+        slider->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Right);
         QTRY_VERIFY(settings().bellows>0.75);
 
         auto* sustain=visualItem(window->contentItem(),"harmoniumSustain"); QVERIFY(sustain); QVERIFY(sustain->isVisible());
@@ -1458,7 +1460,7 @@ private slots:
         slider=nullptr;
         for (auto* child : sustain->findChildren<QQuickItem*>()) if (child->inherits("QQuickSlider")) slider=child;
         QVERIFY(slider);
-        slider->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Right);
+        slider->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Right);
         QTRY_VERIFY(settings().sustainSeconds>1.55);
 
         auto* up=visualItem(window->contentItem(),"harmoniumTransposeUp"); QVERIFY(up);
@@ -1467,11 +1469,11 @@ private slots:
         QCOMPARE(label->property("text").toString(),QString("C plays D (+2)"));
 
         auto* drone=visualItem(window->contentItem(),"harmoniumDrone0"); QVERIFY(drone);
-        drone->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Down);
+        drone->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Down);
         QTRY_COMPARE(settings().drones[0],36);
 
         auto* style=visualItem(window->contentItem(),"harmoniumStyle"); QVERIFY(style);
-        style->forceActiveFocus(); QTest::keyClick(window,Qt::Key_Down);
+        style->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Down);
         QTRY_VERIFY(settings().style==harmonium::Style::Western);
         QTRY_VERIFY(!visualItem(window->contentItem(),"harmoniumMale")->isVisible());
         auto* vox=visualItem(window->contentItem(),"harmoniumVoxHumana"); QVERIFY(vox); QVERIFY(vox->isVisible());
@@ -1614,7 +1616,7 @@ private slots:
         QVERIFY(visualItem(window->contentItem(),"chaosEqNoSelection")->isVisible());
         // Double-click above the 0 dB line, left of centre: a boosting bell appears there.
         const QPoint at=plot->mapToScene(QPointF(plot->width()*0.4,plot->height()*0.3)).toPoint();
-        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,at);
+        QTest::mouseDClick(fxWindow(),Qt::LeftButton,Qt::NoModifier,at);
         QTRY_VERIFY(chaos().bands[0].inUse);
         const double startHz=chaos().bands[0].filter.frequencyHz;
         QCOMPARE(int(chaos().bands[0].filter.shape),int(eqband::Shape::Bell));
@@ -1627,16 +1629,16 @@ private slots:
         auto* node=visualItem(window->contentItem(),"chaosEqNode0"); QVERIFY(node); QTRY_VERIFY(node->isVisible());
         const QPoint from=node->mapToScene(QPointF(node->width()/2,node->height()/2)).toPoint();
         const double startGain=chaos().bands[0].filter.gainDb;
-        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,from);
-        for(int d=8;d<=80;d+=8) QTest::mouseMove(window,from+QPoint(d,d/4));
-        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,from+QPoint(80,20));
+        QTest::mousePress(fxWindow(),Qt::LeftButton,Qt::NoModifier,from);
+        for(int d=8;d<=80;d+=8) QTest::mouseMove(fxWindow(),from+QPoint(d,d/4));
+        QTest::mouseRelease(fxWindow(),Qt::LeftButton,Qt::NoModifier,from+QPoint(80,20));
         QTRY_VERIFY(chaos().bands[0].filter.frequencyHz>startHz*1.2);
         QVERIFY(chaos().bands[0].filter.gainDb<startGain);
         // Scroll on the node: narrower (higher Q).
         const double startQ=chaos().bands[0].filter.q;
         const QPointF mid=node->mapToScene(QPointF(node->width()/2,node->height()/2));
-        QWheelEvent wheel(mid,window->mapToGlobal(mid),QPoint(),QPoint(0,120),Qt::NoButton,Qt::NoModifier,Qt::NoScrollPhase,false);
-        QCoreApplication::sendEvent(window,&wheel); QCoreApplication::processEvents();
+        QWheelEvent wheel(mid,fxWindow()->mapToGlobal(mid),QPoint(),QPoint(0,120),Qt::NoButton,Qt::NoModifier,Qt::NoScrollPhase,false);
+        QCoreApplication::sendEvent(fxWindow(),&wheel); QCoreApplication::processEvents();
         QTRY_VERIFY(chaos().bands[0].filter.q>startQ);
         // Inspector buttons.
         click(visualItem(window->contentItem(),"chaosEqBypass")); QTRY_VERIFY(chaos().bands[0].bypassed);
@@ -1646,7 +1648,7 @@ private slots:
         click(visualItem(window->contentItem(),"chaosEqAutoGain")); QTRY_VERIFY(chaos().autoGain);
         QVERIFY(window->grabWindow().save("/tmp/chaosmaker-chaos-eq.png"));
         // Select the node and press Delete: the band goes away.
-        click(node); QTest::keyClick(window,Qt::Key_Delete);
+        click(node); QTest::keyClick(fxWindow(),Qt::Key_Delete);
         QTRY_VERIFY(!chaos().bands[0].inUse);
         QTRY_VERIFY(visualItem(window->contentItem(),"chaosEqNoSelection")->isVisible());
         auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
@@ -3622,15 +3624,35 @@ private:
             return value.value<QJSValue>().toVariant().toList();
         return value.toList();
     }
-    static QObject* visualObject(QQuickItem* root,const QString& name) {
+    static QObject* visualObjectIn(QQuickItem* root,const QString& name) {
         if(root->objectName()==name)return root;
         if(auto* object=root->findChild<QObject*>(name))return object;
-        for(auto* child:root->childItems())if(auto* result=visualObject(child,name))return result;
+        for(auto* child:root->childItems())if(auto* result=visualObjectIn(child,name))return result;
+        return nullptr;
+    }
+    static QQuickItem* visualItemIn(QQuickItem* root,const QString& name) {
+        if(root->objectName()==name)return root;
+        for(auto* child:root->childItems())if(auto* result=visualItemIn(child,name))return result;
+        return nullptr;
+    }
+    // The app's other open windows (the FX panel floats in one of its own), for a search
+    // that starts at a window's content item and finds nothing there.
+    static QList<QQuickItem*> otherWindowRoots(QQuickItem* root) {
+        QList<QQuickItem*> roots;
+        if(!root->window()||root!=root->window()->contentItem())return roots;
+        for(auto* top:QGuiApplication::topLevelWindows())
+            if(auto* quick=qobject_cast<QQuickWindow*>(top);quick&&quick!=root->window()&&quick->isVisible())
+                roots.append(quick->contentItem());
+        return roots;
+    }
+    static QObject* visualObject(QQuickItem* root,const QString& name) {
+        if(auto* found=visualObjectIn(root,name))return found;
+        for(auto* other:otherWindowRoots(root))if(auto* found=visualObjectIn(other,name))return found;
         return nullptr;
     }
     static QQuickItem* visualItem(QQuickItem* root,const QString& name) {
-        if(root->objectName()==name)return root;
-        for(auto* child:root->childItems())if(auto* result=visualItem(child,name))return result;
+        if(auto* found=visualItemIn(root,name))return found;
+        for(auto* other:otherWindowRoots(root))if(auto* found=visualItemIn(other,name))return found;
         return nullptr;
     }
     void chooseEditItem(const char* name) {
@@ -3647,8 +3669,19 @@ private:
         }
         QTRY_VERIFY(popup->property("visible").toBool()); QTest::qWait(20);
     }
+    // The open FX panel's own window (it floats apart from the main one); the main window
+    // when no panel is open. Keys and drags meant for the panel go here.
+    QWindow* fxWindow() {
+        for(auto* top:QGuiApplication::topLevelWindows())
+            if(auto* quick=qobject_cast<QQuickWindow*>(top);quick&&quick!=window&&quick->isVisible()
+               &&quick->objectName().startsWith("trackEffectsPanel"))
+                return quick;
+        return window;
+    }
+    // Clicks the item's middle in whichever window shows it (the FX panel has its own).
     void click(QQuickItem* item) {
-        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,item->mapToScene(QPointF(item->width()/2,item->height()/2)).toPoint());
+        QWindow* target=item->window()?static_cast<QWindow*>(item->window()):static_cast<QWindow*>(window);
+        QTest::mouseClick(target,Qt::LeftButton,Qt::NoModifier,item->mapToScene(QPointF(item->width()/2,item->height()/2)).toPoint());
     }
     // Adds an effect through the open FX panel's "+ Add FX" picker, as a user would.
     void addEffectFromPicker(const QString& type) {
