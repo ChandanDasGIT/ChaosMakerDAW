@@ -147,7 +147,7 @@ Item {
                         to: bridge.maxDecay
                         stepSize: 0.05
                         value: root.knobs.decay
-                        valueText: "× " + value.toFixed(2)
+                        valueText: value.toFixed(2) + "x"
                         tooltip: "How long this drum rings: shorter or longer than the style's own"
                         onMoved: v => bridge.setDecay(root.selectedDrum, v)
                     }
