@@ -26,7 +26,15 @@
 //   one-shot zones ignore note-off and play to their end (drums)
 //   choke groups   a starting zone fades out every voice whose zone has offBy == its group
 //                  (a closed hi-hat stops the open one); group 0 chokes nothing. A silent zone
-//                  only chokes: it starts no voice.
+//                  only chokes: it starts no voice. A cut voice fades in its zone's off time.
+//   note polyphony a zone with notePolyphony n fades the older voices of its key and group
+//                  past n when it starts (a piano string struck again)
+//   controllers    CC values are kept as they arrive (0 at first). A zone with a live
+//                  controller starts only while that controller is in its range; a zone whose
+//                  release depends on a controller releases for its value then, and follows
+//                  it while releasing when dynamicRelease (half pedalling).
+//   sustain pedal  while a zone's sustainCc is at 64 or more, letting its key go keeps it
+//                  sounding; the pedal coming up releases it. CC 123 releases those too.
 //   new zones      stageZones() hands a new set to a live sampler: the audio thread takes it at
 //                  the start of its next block and fades out what still sounds (a few ms).
 //                  The old set is kept until no voice plays from it; collectRetired() frees it
@@ -60,7 +68,9 @@ public:
 
     void noteOn(int key, int velocity) noexcept;           // velocity 0 is a note-off
     void noteOff(int key) noexcept;
-    void allNotesOff() noexcept;                           // releases every held note
+    void allNotesOff() noexcept;                           // releases every held note, pedal or not
+    void controlChange(int controller, int value) noexcept;
+    int controller(int number) const noexcept { return number >= 0 && number < 128 ? m_cc[std::size_t(number)] : 0; }
     void allSoundOff() noexcept;                           // silences at once, keeps the counters
 
     // Adds `frames` frames of every voice to left and right.
@@ -76,6 +86,7 @@ private:
     SamplerVoice* freeVoice() noexcept;
     void limitPolyphony() noexcept;
     void startZones(int key, int velocity, std::span<const int> zones) noexcept;
+    void releaseVoice(SamplerVoice& voice) noexcept;      // its zone's release for the controllers now
     void takeStagedZones() noexcept;                       // audio thread, block start
     int collectRetiredLocked();
 
@@ -95,5 +106,6 @@ private:
     std::array<std::uint32_t, 128> m_releases{};           // round-robin counts, release zones
     std::array<int, 128> m_velocity{};                     // last note-on velocity of each key
     std::array<bool, 128> m_held{};
+    std::array<int, 128> m_cc{};                           // controller values as they arrived
     std::vector<float> m_left, m_right;                    // one block of the mix, before the output
 };

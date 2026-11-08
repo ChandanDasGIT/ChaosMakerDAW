@@ -24,6 +24,8 @@ const std::set<std::string, std::less<>> Mapped{
     "seq_length", "seq_position", "group", "off_by", "trigger",
     "loop_mode", "loopmode", "loop_start", "loopstart", "loop_end", "loopend",
     "ampeg_attack", "ampeg_decay", "ampeg_sustain", "ampeg_release", "offset", "delay",
+    "ampeg_hold", "ampeg_dynamic", "cutoff", "resonance", "note_polyphony", "off_time",
+    "sustain_cc", "amp_veltrack",
 };
 
 // Opcodes that only name things: nothing to play, nothing to report.
@@ -35,11 +37,11 @@ const std::set<std::string, std::less<>> Labels{
 const std::set<std::string, std::less<>> NotYet{
     "offset_random", "delay_random", "end", "count",
     "cutoff", "resonance", "fil_type", "fil_veltrack", "fil_keytrack", "fil_random",
-    "polyphony", "note_polyphony", "polyphony_group", "off_mode", "off_time",
-    "amp_veltrack", "amp_keytrack", "amp_keycenter", "amp_random",
-    "ampeg_hold", "ampeg_delay", "ampeg_start", "ampeg_dynamic",
+    "polyphony", "polyphony_group", "off_mode",
+    "amp_keytrack", "amp_keycenter", "amp_random",
+    "ampeg_delay", "ampeg_start",
     "ampeg_attack_shape", "ampeg_decay_shape", "ampeg_release_shape",
-    "sustain_cc", "sustain_sw", "sostenuto_cc", "pitch_veltrack", "pitch_random",
+    "sustain_sw", "sostenuto_cc", "pitch_veltrack", "pitch_random",
     "rt_decay", "rt_dead", "pitch_keycenter_sample", "direction",
     "sw_lokey", "sw_hikey", "sw_last", "sw_down", "sw_up", "sw_default",
     "xfin_lovel", "xfin_hivel", "xfout_lovel", "xfout_hivel", "xf_velcurve",
@@ -51,7 +53,7 @@ const std::set<std::string, std::less<>> NotYet{
 const std::set<std::string, std::less<>> Modulated{
     "amplitude", "volume", "pan", "tune", "pitch",
     "ampeg_attack", "ampeg_decay", "ampeg_sustain", "ampeg_release", "ampeg_hold", "ampeg_delay",
-    "offset", "delay",
+    "offset", "delay", "amp_veltrack",
 };
 
 const std::set<std::string, std::less<>> ControlKnown{"default_path", "set_cc", "set_hdcc", "label_cc", "label_key"};
@@ -185,6 +187,8 @@ public:
         int keyTrack = 100;
         double volume = 0.0, groupVolume = 0.0, amplitude = 100.0, pan = 0.0, tune = 0.0, transpose = 0.0;
         double attack = 0.0, decay = 0.0, sustain = 100.0, release = 0.001, offset = 0.0, delay = 0.0;
+        double hold = 0.0, cutoff = 0.0, resonance = 0.0, velTrack = 100.0;
+        std::string filterType;
         std::map<int, double> velocityPoints;                   // amp_velcurve_N
         std::string loopMode, trigger = "attack";
         bool loopStartSet = false, loopEndSet = false;
@@ -213,6 +217,7 @@ public:
             if (name == "pitch_keycenter") { key(z.rootKey); continue; }
             if (name == "trigger") { trigger = op.value; continue; }
             if (name == "loop_mode" || name == "loopmode") { loopMode = op.value; continue; }
+            if (name == "fil_type") { filterType = op.value; continue; }
 
             if (Mapped.contains(name)) {
                 if (!num()) continue;
@@ -237,6 +242,14 @@ public:
                 else if (name == "ampeg_release") release = v;
                 else if (name == "offset") offset = v;
                 else if (name == "delay") delay = v;
+                else if (name == "ampeg_hold") hold = v;
+                else if (name == "ampeg_dynamic") z.dynamicRelease = v != 0.0;
+                else if (name == "cutoff") cutoff = v;
+                else if (name == "resonance") resonance = v;
+                else if (name == "note_polyphony") z.notePolyphony = std::max(0, int(v));
+                else if (name == "off_time") z.offSeconds = float(std::clamp(v, 0.0, 30.0));
+                else if (name == "sustain_cc") z.sustainCc = std::clamp(int(v), 0, 127);
+                else if (name == "amp_veltrack") velTrack = v;
                 continue;
             }
 
@@ -272,8 +285,16 @@ public:
             if (!why.empty()) problem(r, why);
         };
 
-        // Controllers at their defaults decide whether the region is there at all.
+        // Controllers at their defaults decide whether the region is there at all; a live one
+        // (the pedal) becomes the zone's condition, checked when a note starts.
         for (const auto& [cc, range] : conditions) {
+            if (m_options.liveControllers.contains(cc)) {
+                if (z.liveCc >= 0) { problem(r, "only one live controller range per region: locc/hicc" + std::to_string(cc) + " left out"); continue; }
+                z.liveCc = cc;
+                z.liveLo = range.first;
+                z.liveHi = range.second;
+                continue;
+            }
             const int value = int(std::lround(ccValue(cc, z.rootKey) * 127.0));
             if (value < range.first || value > range.second) { ++m_out.report.leftOutByControllers; return; }
         }
@@ -305,6 +326,18 @@ public:
             for (const auto& [cc, m] : mods[base]) sum += m.value * m_curves.at(m.curve, ccValue(cc, z.rootKey));
             return sum;
         };
+        // A release lengthened by a live controller (the pedal) is left to the sampler.
+        for (auto it = mods["ampeg_release"].begin(); it != mods["ampeg_release"].end();) {
+            if (!m_options.liveControllers.contains(it->first)) { ++it; continue; }
+            if (z.releaseCc < 0) {
+                z.releaseCc = it->first;
+                z.releaseCcSeconds = float(it->second.value);
+                z.releaseCcCurve = controllerCurve(it->second.curve);
+            } else {
+                problem(r, "only one live controller lengthens a release: ampeg_release_cc" + std::to_string(it->first) + " left out");
+            }
+            it = mods["ampeg_release"].erase(it);
+        }
         volume += groupVolume + add("volume");
         pan += add("pan");
         tune += add("tune") + add("pitch") + transpose * 100.0;
@@ -314,6 +347,8 @@ public:
         release += add("ampeg_release");
         offset += add("offset");
         delay += add("delay");
+        hold += add("ampeg_hold");
+        velTrack += add("amp_veltrack");
         if (!(gain > 0.0)) {
             if (controlled) ++m_out.report.leftOutByControllers; else leftOut("");
             return;
@@ -327,7 +362,18 @@ public:
         z.release = float(std::max(release, 0.0));
         z.offset = std::max<std::int64_t>(0, std::llround(offset));
         z.delaySeconds = float(std::clamp(delay, 0.0, 10.0));
-        if (!velocityPoints.empty()) z.velocityCurve = velocityCurve(velocityPoints);
+        z.hold = float(std::clamp(hold, 0.0, 100.0));
+        if (velTrack < 0.0) problem(r, "a negative amp_veltrack is played as 0");
+        velTrack = std::clamp(velTrack, 0.0, 100.0);
+        if (!velocityPoints.empty() || velTrack != 100.0) z.velocityCurve = velocityCurve(velocityPoints, velTrack);
+        if (cutoff > 0.0) {
+            if (filterType.empty() || filterType == "lpf_2p") {
+                z.cutoffHz = float(cutoff);
+                z.resonanceDb = float(resonance);
+            } else {
+                ++m_out.report.unusedOpcodes["fil_type=" + filterType];   // not played: no filter
+            }
+        }
 
         std::string relative = r.defaultPath + sample;
         std::replace(relative.begin(), relative.end(), '\\', '/');
@@ -381,22 +427,41 @@ private:
     }
 
     // The gain for each velocity through the given points (0 at 0 and 1 at 127 unless given),
-    // straight lines between them. Regions with the same points share one curve.
-    std::shared_ptr<const SampleZone::VelocityCurve> velocityCurve(const std::map<int, double>& given)
+    // straight lines between them; with no points, (velocity / 127)^2. amp_veltrack (0..100 %)
+    // then sets how much velocity counts: gain = 1 - track * (1 - curve). Regions with the same
+    // points and tracking share one curve.
+    std::shared_ptr<const SampleZone::VelocityCurve> velocityCurve(const std::map<int, double>& given, double track)
     {
-        if (const auto it = m_velocityCurves.find(given); it != m_velocityCurves.end()) return it->second;
-        std::map<int, double> points = given;
-        points.try_emplace(0, 0.0);
-        points.try_emplace(127, 1.0);
+        const auto key = std::make_pair(given, track);
+        if (const auto it = m_velocityCurves.find(key); it != m_velocityCurves.end()) return it->second;
         auto curve = std::make_shared<SampleZone::VelocityCurve>();
-        auto left = points.begin();
-        for (auto right = std::next(left); right != points.end(); left = right++) {
-            for (int v = left->first; v <= right->first; ++v) {
-                const double t = double(v - left->first) / double(right->first - left->first);
-                (*curve)[std::size_t(v)] = float(std::clamp(left->second + (right->second - left->second) * t, 0.0, 1.0));
+        if (given.empty()) {
+            for (int v = 0; v < 128; ++v) (*curve)[std::size_t(v)] = float(v / 127.0 * (v / 127.0));
+        } else {
+            std::map<int, double> points = given;
+            points.try_emplace(0, 0.0);
+            points.try_emplace(127, 1.0);
+            auto left = points.begin();
+            for (auto right = std::next(left); right != points.end(); left = right++) {
+                for (int v = left->first; v <= right->first; ++v) {
+                    const double t = double(v - left->first) / double(right->first - left->first);
+                    (*curve)[std::size_t(v)] = float(std::clamp(left->second + (right->second - left->second) * t, 0.0, 1.0));
+                }
             }
         }
-        m_velocityCurves.emplace(given, curve);
+        const float t = float(track / 100.0);
+        for (auto& g : *curve) g = 1.0f - t * (1.0f - g);
+        m_velocityCurves.emplace(key, curve);
+        return curve;
+    }
+
+    // A controller curve (an SFZ curve index) as a table for the 128 controller values.
+    std::shared_ptr<const SampleZone::ControllerCurve> controllerCurve(int index)
+    {
+        if (const auto it = m_controllerCurves.find(index); it != m_controllerCurves.end()) return it->second;
+        auto curve = std::make_shared<SampleZone::ControllerCurve>();
+        for (int v = 0; v < 128; ++v) (*curve)[std::size_t(v)] = float(m_curves.at(index, v / 127.0));
+        m_controllerCurves.emplace(index, curve);
         return curve;
     }
 
@@ -445,7 +510,8 @@ private:
     Curves m_curves;
     std::array<double, 128> m_cc{};
     std::shared_ptr<SampleCache> m_cache;
-    std::map<std::map<int, double>, std::shared_ptr<const SampleZone::VelocityCurve>> m_velocityCurves;
+    std::map<std::pair<std::map<int, double>, double>, std::shared_ptr<const SampleZone::VelocityCurve>> m_velocityCurves;
+    std::map<int, std::shared_ptr<const SampleZone::ControllerCurve>> m_controllerCurves;
 };
 
 } // namespace
