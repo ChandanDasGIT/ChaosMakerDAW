@@ -13,12 +13,111 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
                 [L] will do later (the user's choice; section H)   [-] dropped (the user)
 
 
-NEXT UP (the user, 2026-11-09): G4 step 5 below: the user plays the Chords track in the app
-(patterns, zones, the name press, the caret, the Preferences choice). Start here when the user
-says "let's continue". Plans first, one step at a time.
+NEXT UP (2026-11-09): U4 (the flaky UI tests). Start here when the user says "let's continue".
+Plans first, one step at a time.
+
+OPEN — everything not finished, in the order the user wants it done (import and export last).
+Done items stay further down as the record.
 ------------------------------------------------------------------------------------------------
-[~] G4  Chords track: real pattern and voicing variations. Steps 1-4 DONE 2026-11-09 (not
-        committed):
+-- UI tests
+[ ] U4  Found 2026-11-08, NOT caused by U1-U3 (same on the code before them): on this machine
+        four transport_ui tests fail even when run alone: track_effects_switch_in_place_* (BPM
+        typed into the main window reads 120, not 91), electronic_drums_live_in_fx_* and
+        grand_piano_lives_in_fx_* ('picture->height()>100'), harmonium_lives_in_fx_*
+        ('settings().indian.female'). drum_kit_lives_in_fx_* fails on a cold first run only.
+        They look like window activation / FX window size timing; their later slider checks
+        never run, so fix them before relying on them.
+        2026-11-09: in long ordered runs window activation fails at random here (different
+        tests each run, e.g. the picker test, floating_windows_*, close_buttons_*); each
+        passes alone or in short runs.
+
+-- Left over from plan 6 (was section A)
+[ ] A1  Re-voice only the factory Jazz preset (resources/presets/guitarsuite/Jazz.gspreset) for
+        the rebuilt amp and drives. It has no amp "channel" value, so the amp loads on Crunch,
+        and its settings were tuned for the old pedals. (Djent, MetalSolo, RockChords and
+        RockSolo are already new, fitted factory presets.)
+[ ] A2  Chaos EQ: bells above ~10 kHz come out slightly narrower than their Q (standard RBJ
+        design cramps near Nyquist). Possible fix: a matched / pre-warped bell design.
+[ ] A3  Merge the two backend clock formatters (PlaybackControls::formatTime and
+        valueformat::position); they differ only for negative times.
+
+-- Checks in the real app, need the user (was section B)
+[?] B1  Clip gain drag, then Ctrl+Z.
+[?] B2  Delete a track that has a pedalboard, then Ctrl+Z (pedalboard comes back).
+[?] B3  Piano roll in 3/4 and 6/8.
+[?] B4  Buffer size change with JACK.
+[?] B5  Pedal cards and tuner look unchanged (now also: amp "Channel" dial shows Clean /
+        Crunch / High Gain; cabinet "Cab" dial shows None / 1x12 Open / 2x12 / 4x12 Closed).
+[?] B6  Custom track colour, then typing still works.
+[?] B7  Listen to Chaos EQ on real audio (solo, auto gain, stereo placement, analyzer).
+[?] B8  Built-in cabinet models in the app (renders in local-reference/renders/cab-*.wav).
+[?] B9  Listen to the harmonium (C7) in the app: Harmonium track, FX → Harmonium; play it with
+        MON on from the digital piano (IN → MIDI device) and from KEYS. 2026-11-08: the user
+        liked harmonium-western-full-voxhumana.wav; the first Indian renders were "trash"
+        (buzzy); the rebuilt reed (renders harmonium-v2-*.wav) is "much better". Note what to
+        change next (see C7 tuning step 2).
+
+-- Instruments (was section C)
+[ ] C3b The acoustic kit's map puts 2-pole HIGH-pass filters (30-200 Hz, cutoff_oncc110) on
+        its mic regions; the sampler only has the low-pass (C5 step 2), so they are not played
+        (reported "fil_type=hpf_2p"). Adding them would change how the kit sounds: the user
+        decides (found 2026-11-08).
+[ ] C3c Left over from C3 (found 2026-11-08 when C3 was closed):
+        - Cymbals for the acoustic kit (keys 73 crash, 75 ride are still free in drummap.h).
+          The electronic kit (90fc463) already has synthesised crash and ride voices in
+          backend/instruments/electrodrums/electrovoices; check whether they can be reused
+          before writing new ones. Renders for the user first.
+        - Judge by ear first: per-drum polyphony, live MIDI CC (hardware hi-hat pedal, mic mix
+          knob). The high-pass mic filters are C3b.
+        - The sample cache never shrinks (Full room keeps all mics, ~730 MB, until the app
+          closes).
+[ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
+        model), mapped in instrumentfactory.cpp.
+[ ] C8  Credits: the user's rule (2026-11-07): no third-party credit or attribution of any
+        kind in the GitHub repo. So no courtesy credits, no "Third-party sounds" README
+        section. The first choices need none (Gogodze Phu Vol II is CC0, Splendid is public
+        domain). Only if a CC-BY library is used (the Accurate-Salamander fallback) is a
+        credit legally required; then ask the user where it goes before adding anything.
+        Ready-made text for that case:
+          Accurate-Salamander Grand Piano. Original recordings: Salamander Grand Piano by
+          Alexander Holm (Yamaha C5). Remaster: Accurate-Salamander by Chisato Yamauchi.
+          Licence: CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/).
+          Changes: converted and mapped for ChaosMaker.
+
+-- Piano roll (was section D)
+[ ] D5  Pattern clip sourceOffset is not rescaled when a project reopens at another sample
+        rate (a trimmed pattern clip's left edge can shift slightly; notes stay on the clip).
+[ ] D6  PianoRollWrapper::notes is a plain QVariantList, so every change rebuilds all note
+        delegates; a list model would update notes one by one.
+[ ] D7  Make the mouse-driven piano roll harness a permanent Qt Test target.
+
+-- Tools and docs (was section F)
+[ ] F3  tools/latencytest is empty (the roadmap mentions a latency tool).
+[?] F4  EducationPurpose/architecture.txt: the user updates it at the end of the project
+        (do not edit it).
+
+-- LAST: audio import (was section E), then export
+Target: WAV, MP3 and FLAC import through a file picker, editable clips, reliable reopen.
+Note: the old plan proposes libsndfile, which breaks the from-scratch rule. Decoders would
+be hand-written (WAV first; MP3 is a large job). The FLAC decoder comes from C4 (built for
+the piano) and is reused here.
+[?] E0  Decide: hand-written decoders, which formats first.
+[ ] E1  Decoder foundation: common WAV variants, mono/stereo, damaged files, memory limits,
+        sample-rate handling, with focused test files.
+[ ] E2  Session import: Import Audio (multiple files), one new Audio track per file at the
+        playhead, background decoding + waveform with progress/cancel.
+[ ] E3  Editing/project integration: undoable import, project marked modified, shared decoder
+        on reopen; trims, splits, stereo, sample-rate differences, missing files.
+[ ] E4  Portability: project-local media copies with relative references (recordings and
+        cabinet IRs too), then drag and drop.
+[ ] F2  Phase 13: Export and finish — offline render of the whole song (backend/render is
+        empty), export controls, final verification.
+
+
+DONE (the record, newest first)
+------------------------------------------------------------------------------------------------
+[x] G4  DONE 2026-11-09 (the user: "good enough"; committed in 27ec028, pushed): Chords track,
+        real pattern and voicing variations. Steps 1-4, then seven rounds of the user's fixes:
         1. rhythmpattern rewritten as written tables: Flowing / Pop / Comping / Ballad, two
            bars (bar 2 varied), for 4/4 3/4 6/8 7/8 5/4, other meters from the nearest; tones
            counted from the root in E3..D#4 (moves with the zone); group accents; weak 16ths a
@@ -185,7 +284,7 @@ chord / arpeggio sequencer (G3 = F1).
         - Renders (both kits, 4 bars each): renders/drum-grooves/ (git-ignored).
         Tests: backendtests drumgroove; wrappertests qtdrumgroove; transport_ui
         drum_pages_offer_grooves_that_go_on_the_track_and_save_from_a_clip.
-[x] G2  DONE 2026-11-09 (uncommitted, waiting for the user's try): FX chain export / import (.chaosfx).
+[x] G2  DONE 2026-11-09 (committed in 29fc61e): FX chain export / import (.chaosfx).
         - backend/persistence/effectchainjson (persistence::chainjson): the .chaosfx file
           ({"format": "ChaosMakerChain", "version": 1, "trackType", "effects": [{type, settings}]}),
           capture() (the chain in order with every setting; GuitarSuite's pedalboard is its
@@ -200,7 +299,7 @@ chord / arpeggio sequencer (G3 = F1).
           A spacer now keeps the header's controls together on the right.
         Tests: backendtests effectchainjson; wrappertests qteffectchain; transport_ui
         fx_window_exports_a_chain_and_imports_it_onto_another_track_after_asking.
-[x] G3  DONE 2026-11-09 (uncommitted, waiting for the user's try) = F1: the Chords track,
+[x] G3  DONE 2026-11-09 (committed in 29fc61e) = F1: the Chords track,
         GarageBand Smart Keyboard style (the user's local-reference/GarageBand.jpg).
         - Track type "Chords" beside Vocal and Instrument in the picker (catalog ownKind);
           pages: "chords" (strips) then "piano" (catalog extraPage); plays the Splendid Grand
@@ -255,16 +354,11 @@ Earlier NEXT UP (2026-11-08): UI polish across the app.
         on yellow; both now set Theme.tooltipBg / tooltipText (thin light outline: Qt's own,
         the user is fine with it). Test: transporttests
         floating_windows_show_the_themed_tooltip_colours.
-[ ] U4  Found 2026-11-08, NOT caused by U1-U3 (same on the code before them): on this machine
-        four transport_ui tests fail even when run alone: track_effects_switch_in_place_* (BPM
-        typed into the main window reads 120, not 91), electronic_drums_live_in_fx_* and
-        grand_piano_lives_in_fx_* ('picture->height()>100'), harmonium_lives_in_fx_*
-        ('settings().indian.female'). drum_kit_lives_in_fx_* fails on a cold first run only.
-        They look like window activation / FX window size timing; their later slider checks
-        never run, so fix them before relying on them.
-        2026-11-09: in long ordered runs window activation fails at random here (different
-        tests each run, e.g. the picker test, floating_windows_*, close_buttons_*); each
-        passes alone or in short runs.
+[x] U5  DONE 2026-11-09 (not committed yet): the Delete track? and Save changes? dialogs
+        were dark only in their body; the title bar and button row were Qt's light grey
+        (the title nearly unreadable). Both use frontend/common/ThemedDialog (title, body
+        and buttons in Theme colours, PanelButton-style buttons). Test: verifyThemedDialog
+        in removing_a_track_with_clips_asks_first and open_recent_lists_saved_projects_*.
 
 Earlier NEXT UP (2026-11-08 night), all closed:
 ------------------------------------------------------------------------------------------------
@@ -330,14 +424,6 @@ Earlier NEXT UP (2026-11-08 night), all closed:
 
 A. LEFT OVER FROM PLAN 6 (small, closest to recent work)
 ---------------------------------------------------------
-[ ] A1  Re-voice only the factory Jazz preset (resources/presets/guitarsuite/Jazz.gspreset) for
-        the rebuilt amp and drives. It has no amp "channel" value, so the amp loads on Crunch,
-        and its settings were tuned for the old pedals. (Djent, MetalSolo, RockChords and
-        RockSolo are already new, fitted factory presets.)
-[ ] A2  Chaos EQ: bells above ~10 kHz come out slightly narrower than their Q (standard RBJ
-        design cramps near Nyquist). Possible fix: a matched / pre-warped bell design.
-[ ] A3  Merge the two backend clock formatters (PlaybackControls::formatTime and
-        valueformat::position); they differ only for negative times.
 [x] A4  DONE 2026-11-08: factory_preset_picker_applies_djent_and_jazz checks all 5 factory
         presets by name (Djent, Jazz, MetalSolo, RockChords, RockSolo), then applies Djent
         (gate, overdrive, amp, cabinet, EQ since a254d48) and Jazz.
@@ -346,22 +432,7 @@ A. LEFT OVER FROM PLAN 6 (small, closest to recent work)
 
 B. CHECKS IN THE REAL APP (need the user; JACK/hardware)
 ----------------------------------------------------------
-[?] B1  Clip gain drag, then Ctrl+Z.
-[?] B2  Delete a track that has a pedalboard, then Ctrl+Z (pedalboard comes back).
-[?] B3  Piano roll in 3/4 and 6/8.
-[?] B4  Buffer size change with JACK.
-[?] B5  Pedal cards and tuner look unchanged (now also: amp "Channel" dial shows Clean /
-        Crunch / High Gain; cabinet "Cab" dial shows None / 1x12 Open / 2x12 / 4x12 Closed).
-[?] B6  Custom track colour, then typing still works.
-[?] B7  Listen to Chaos EQ on real audio (solo, auto gain, stereo placement, analyzer).
-[?] B8  Built-in cabinet models in the app (renders in local-reference/renders/cab-*.wav).
-[?] B9  Listen to the harmonium (C7) in the app: Harmonium track, FX → Harmonium; play it with
-        MON on from the digital piano (IN → MIDI device) and from KEYS. 2026-11-08: the user
-        liked harmonium-western-full-voxhumana.wav; the first Indian renders were "trash"
-        (buzzy); the rebuilt reed (renders harmonium-v2-*.wav) is "much better". Note what to
-        change next (see C7 tuning step 2).
-[?] B10 The digital piano over MIDI (it has USB and BLE MIDI; the app picked BLE MIDI 1:out on
-        its own) and recording MIDI takes from it and from KEYS.
+[x] B10 DONE 2026-11-09 (the user): the digital piano over MIDI and recording MIDI takes (D8).
 
 
 C. INSTRUMENTS (the biggest musical gap) — roadmap Phase 11
@@ -394,10 +465,6 @@ decoder (C4) and the piano (C5).
         CC 4 and the mic mix CC 105 need live CC; offset/delay per mic, polyphony, cutoff.
         FOR C5: ampeg_hold, sustain_cc/half pedal, amp_veltrack (velocity -> level is off in
         Splendid at its default), note_polyphony, off_time.
-[ ] C3b The acoustic kit's map puts 2-pole HIGH-pass filters (30-200 Hz, cutoff_oncc110) on
-        its mic regions; the sampler only has the low-pass (C5 step 2), so they are not played
-        (reported "fil_type=hpf_2p"). Adding them would change how the kit sounds: the user
-        decides (found 2026-11-08).
 [x] C3  DONE, committed in 86dd769 (what is still open moved to C3c below).
         DRUMS FIRST: Gogodze Phu Vol II (see C9) as the real "Drums" instrument. WAV
         samples, so no decoder is needed yet. Drum keys, hi-hat choke, mic mix controls.
@@ -450,15 +517,6 @@ decoder (C4) and the piano (C5).
         cymbals in our own code (crash 49, ride 51, maybe ride bell 53: inharmonic metallic
         oscillators + filtered noise, long darkening decay, velocity -> brightness), renders
         for the user first; if liked, they join the Drums track and the piano roll labels.
-[ ] C3c Left over from C3 (found 2026-11-08 when C3 was closed):
-        - Cymbals for the acoustic kit (keys 73 crash, 75 ride are still free in drummap.h).
-          The electronic kit (90fc463) already has synthesised crash and ride voices in
-          backend/instruments/electrodrums/electrovoices; check whether they can be reused
-          before writing new ones. Renders for the user first.
-        - Judge by ear first: per-drum polyphony, live MIDI CC (hardware hi-hat pedal, mic mix
-          knob). The high-pass mic filters are C3b.
-        - The sample cache never shrinks (Full room keeps all mics, ~730 MB, until the app
-          closes).
 [x] C4  DONE 2026-11-08: backend/audiofile/flacreader (hand-written) + md5. Stream and frame
         parsing, constant / verbatim / fixed / LPC subframes, Rice residuals (both methods,
         escapes), all stereo modes, wasted bits, 4-32 bit, CRC-8/16 and MD5 checked, ID3v2
@@ -512,8 +570,6 @@ decoder (C4) and the piano (C5).
         to C8, 05 brightness 100 / 60 / 30 % (8 kHz band -23 / -29 / -44 dB vs 1 kHz), 06
         string resonance off / full (pedalled ring +4.6 dB). Peaks -15..-4 dBFS. The user
         liked them (2026-11-08); playing it in the app is the user's own check (B).
-[ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
-        model), mapped in instrumentfactory.cpp.
 [x] C7  Harmonium, built 2026-11-07 (before C2, the user's choice); tuning by ear is left (B9).
         Tuning step 1 done 2026-11-08: the Indian reed is a free-reed air-puff model (lopsided
         Hann pulse, derivative radiated; puff width 0.30 at full air, 0.55 at low air), fitted
@@ -542,16 +598,6 @@ decoder (C4) and the piano (C5).
         names its page in InstrumentDefinition::page). Tests: backendtests
         harmonium, harmoniumjson; wrappertests qtharmonium; transport_ui harmonium_lives_in_fx_*.
         Worst case (32 keys + 4 drones, all ranks) ~2 % of one core.
-[ ] C8  Credits: the user's rule (2026-11-07): no third-party credit or attribution of any
-        kind in the GitHub repo. So no courtesy credits, no "Third-party sounds" README
-        section. The first choices need none (Gogodze Phu Vol II is CC0, Splendid is public
-        domain). Only if a CC-BY library is used (the Accurate-Salamander fallback) is a
-        credit legally required; then ask the user where it goes before adding anything.
-        Ready-made text for that case:
-          Accurate-Salamander Grand Piano. Original recordings: Salamander Grand Piano by
-          Alexander Holm (Yamaha C5). Remaster: Accurate-Salamander by Chisato Yamauchi.
-          Licence: CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/).
-          Changes: converted and mapped for ChaosMaker.
 [x] C9  Sample libraries chosen, the reference for C3 and C5 (the user, 2026-11-07: try the
         first choices, switch to the fallback if they disappoint). Licences checked against the
         sources on that date; re-read the licence file in each download.
@@ -644,47 +690,19 @@ follow-trail item 1 ("notes do not play yet") is out of date. Remaining there:
         timeline resizes and undo; the view's clip highlight uses it.
         Tests for D1-D4: pianorollpattern, qtpianoroll, transport_ui
         piano_roll_velocity_lane_paints_remembers_and_follows_the_clip.
-[ ] D5  Pattern clip sourceOffset is not rescaled when a project reopens at another sample
-        rate (a trimmed pattern clip's left edge can shift slightly; notes stay on the clip).
-[ ] D6  PianoRollWrapper::notes is a plain QVariantList, so every change rebuilds all note
-        delegates; a list model would update notes one by one.
-[ ] D7  Make the mouse-driven piano roll harness a permanent Qt Test target.
-[~] D8  Play the instrument from the piano roll keys or a MIDI keyboard; MIDI recording.
-        (Check first: follow-trail item 7 placeholders were partly handled in plan 1.1/1.3.)
-        Done 2026-11-07: MON on every instrument track plays it from MIDI (no arming needed);
-        IN on instrument tracks picks the shared MIDI input (refreshed on open, skips "Midi
-        Through"); KEYS in the transport bar turns the computer keyboard into a MIDI keyboard,
-        sargam layout Tab..Backspace = lower Pa to upper Ma, E = Sa
-        (backend/midi/typingkeyboard, AudioEngine::sendKeyboardMidi). Still to check with the
-        user: their digital piano over USB/BLE MIDI, and recording MIDI takes from it.
+[x] D8  DONE 2026-11-09 (the user tested it with a real MIDI keyboard): play the instrument
+        from the piano roll keys or a MIDI keyboard; MIDI recording. MON on every instrument
+        track plays it from MIDI; IN picks the shared MIDI input; KEYS turns the computer
+        keyboard into a MIDI keyboard (sargam layout, backend/midi/typingkeyboard).
 
 
-E. AUDIO IMPORT — planned in docs/follow-trail.md, not started
----------------------------------------------------------------
-Target: WAV, MP3 and FLAC import through a file picker, editable clips, reliable reopen.
-Note: the old plan proposes libsndfile, which breaks the from-scratch rule. Decoders would
-be hand-written (WAV first; MP3 is a large job). The FLAC decoder comes from C4 (built for
-the piano) and is reused here.
-[?] E0  Decide: hand-written decoders, which formats first.
-[ ] E1  Decoder foundation: common WAV variants, mono/stereo, damaged files, memory limits,
-        sample-rate handling, with focused test files.
-[ ] E2  Session import: Import Audio (multiple files), one new Audio track per file at the
-        playhead, background decoding + waveform with progress/cancel.
-[ ] E3  Editing/project integration: undoable import, project marked modified, shared decoder
-        on reopen; trims, splits, stereo, sample-rate differences, missing files.
-[ ] E4  Portability: project-local media copies with relative references (recordings and
-        cabinet IRs too), then drag and drop.
+E. AUDIO IMPORT — moved to OPEN at the top (E0-E4).
 
 
 F. LATER ROADMAP PHASES — from docs/roadmap.txt
 ------------------------------------------------
 [x] F1  DONE 2026-11-09 as G3 (the Chords track, see the top). Phase 12: Auto chord player — chord input and rhythm-pattern playback, wrapper, UI,
         tests (backend/plugins/chordplayer has only rhythmpattern.h).
-[ ] F2  Phase 13: Export and finish — offline render of the whole song (backend/render is
-        empty), export controls, final verification.
-[ ] F3  tools/latencytest is empty (the roadmap mentions a latency tool).
-[?] F4  EducationPurpose/architecture.txt: the user updates it at the end of the project
-        (do not edit it).
 
 
 G. LOCAL-ONLY MATERIAL (in .gitignore, never committed)

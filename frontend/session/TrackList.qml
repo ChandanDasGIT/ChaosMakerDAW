@@ -604,7 +604,7 @@ Rectangle {
         removeTrackDialog.open()
     }
 
-    Dialog {
+    ThemedDialog {
         id: removeTrackDialog
         objectName: "removeTrackDialog"
         property int trackId: -1
@@ -613,12 +613,8 @@ Rectangle {
         parent: Overlay.overlay
         anchors.centerIn: parent
         width: Math.min(420, parent.width - 32)
-        modal: true
         title: "Delete track?"
         standardButtons: Dialog.Ok | Dialog.Cancel
-        background: Rectangle { color: Theme.panelBg; border.color: Theme.divider; radius: 8 }
-        palette.windowText: Theme.text
-        palette.text: Theme.text
         contentItem: Text {
             text: "Delete \u201c" + removeTrackDialog.trackName + "\u201d and its " + removeTrackDialog.clipCount
                   + (removeTrackDialog.clipCount === 1 ? " clip" : " clips")

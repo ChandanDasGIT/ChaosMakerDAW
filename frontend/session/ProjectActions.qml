@@ -107,7 +107,7 @@ RowLayout {
         onAccepted: EngineController.openProject(selectedFile)
     }
 
-    Dialog {
+    ThemedDialog {
         id: unsavedDialog
         objectName: "unsavedProjectChanges"
         parent: Overlay.overlay
@@ -115,11 +115,7 @@ RowLayout {
         title: "Save changes to this project?"
         implicitWidth: 420
         width: Math.min(420, parent.width - 32)
-        modal: true
         standardButtons: Dialog.Save | Dialog.Discard | Dialog.Cancel
-        background: Rectangle { color: Theme.panelBg; border.color: Theme.divider; radius: 8 }
-        palette.windowText: Theme.text
-        palette.text: Theme.text
         contentItem: Text { text: "Save your changes before continuing."; color: Theme.text; padding: 16 }
         onAccepted: actionsBridge.onUnsavedSave(EngineController.projectFile.toString().length > 0)
         onDiscarded: actionsBridge.onUnsavedDiscard()
