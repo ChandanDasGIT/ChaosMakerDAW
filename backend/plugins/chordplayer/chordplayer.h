@@ -73,9 +73,11 @@ public:
 
     void setStrips(const std::array<Strip, Strips>& strips) noexcept;
     void setAutoplay(int mode) noexcept;                  // 0 .. 4
+    void setVariation(int variation) noexcept;            // 0 .. Variations-1, of the autoplay's style
     void setDynamics(int dynamics) noexcept;              // chords::DynamicsEven / DynamicsTopNote
     void setBassWithChords(bool on) noexcept;
     int autoplay() const noexcept { return m_autoplay.load(std::memory_order_relaxed); }
+    int variation() const noexcept { return m_variation.load(std::memory_order_relaxed); }
     int dynamics() const noexcept { return m_dynamics.load(std::memory_order_relaxed); }
     bool bassWithChords() const noexcept { return m_bassWithChords.load(std::memory_order_relaxed); }
 
@@ -131,6 +133,7 @@ private:
     std::array<std::atomic<int>, Strips * 6> m_shared{};   // per strip: count, bass, tones[4]
     std::atomic<std::uint32_t> m_generation{1};
     std::atomic<int> m_autoplay{3};
+    std::atomic<int> m_variation{0};
     std::atomic<int> m_dynamics{0};
     std::atomic<bool> m_bassWithChords{true};
     // Settings in use (audio thread).
@@ -139,7 +142,7 @@ private:
 
     // Pattern for the current meter, autoplay and area.
     chords::Pattern m_pattern{};
-    int m_patternMode = -1, m_patternNumerator = 0, m_patternDenominator = 0;
+    int m_patternMode = -1, m_patternVariation = -1, m_patternNumerator = 0, m_patternDenominator = 0;
     chords::Part m_patternPart = chords::Part::Chord;
     int m_numerator = 4, m_denominator = 4;               // the meter of this block
 

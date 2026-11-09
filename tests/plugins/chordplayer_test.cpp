@@ -225,6 +225,143 @@ TEST(chordplayer, each_meter_has_its_own_rhythm_not_four_four_cut_short)
     }
 }
 
+TEST(chordplayer, every_style_has_four_variations_that_fit_every_meter)
+{
+    // Four named variations per style, each different from the others in every meter, inside
+    // its two bars, with the bass part's root, third, fifth and octave all in it.
+    using Key = std::tuple<double, int, int, int>;
+    for (int mode = 1; mode <= 4; ++mode) {
+        std::set<std::string_view> names;
+        for (int v = 0; v < Variations; ++v) {
+            CHECK(!variationName(mode, v).empty() && !variationDescription(mode, v).empty());
+            names.insert(variationName(mode, v));
+        }
+        CHECK(int(names.size()) == Variations);
+        CHECK(variationName(mode, Variations).empty() && variationName(0, 0).empty());
+        for (const auto [n, d] : {std::pair{4, 4}, std::pair{3, 4}, std::pair{6, 8}, std::pair{7, 8}, std::pair{5, 4},
+                                  std::pair{2, 4}, std::pair{9, 8}, std::pair{12, 8}}) {
+            std::set<std::vector<Key>> seen;
+            for (int v = 0; v < Variations; ++v) {
+                Pattern p;
+                buildPattern(mode, v, n, d, Part::Chord, p);
+                CHECK(p.count > 0 && p.pedal == (mode == 1 || mode == 4));
+                std::vector<Key> notes;
+                bool root = false, third = false, fifth = false, octave = false;
+                for (int i = 0; i < p.count; ++i) {
+                    const auto& st = p.steps[std::size_t(i)];
+                    CHECK(st.beat >= 0 && st.beat < p.lengthBeats() && st.length > 0);
+                    if (i > 0) CHECK(st.beat >= p.steps[std::size_t(i - 1)].beat);
+                    notes.push_back({st.beat, int(st.kind), st.degree, st.octave});
+                    root |= st.kind == Kind::Bass && st.octave == 0;
+                    third |= st.kind == Kind::Low && st.degree == 1 && st.octave == 0;
+                    fifth |= st.kind == Kind::Low && st.degree == 2 && st.octave == 0;
+                    octave |= (st.kind == Kind::Bass && st.octave == 1) || (st.kind == Kind::Low && st.degree == 0 && st.octave == 1);
+                }
+                // The five written meters, and the placed variations (Comping, Ballad) everywhere;
+                // a borrowed meter (2/4 = half of 4/4) may cut a written bar's last bass note.
+                const bool writtenMeter = (n == 4 && d == 4) || (n == 3 && d == 4) || (n == 6 && d == 8)
+                                          || (n == 7 && d == 8) || (n == 5 && d == 4);
+                if (writtenMeter || (mode >= 3 && v > 0)) CHECK(root && third && fifth && octave);
+                CHECK(seen.insert(notes).second);                    // not the same as another variation
+                // The bass area keeps only the bass part.
+                Pattern bass;
+                buildPattern(mode, v, n, d, Part::Bass, bass);
+                CHECK(bass.count > 0);
+                for (int i = 0; i < bass.count; ++i)
+                    CHECK(bass.steps[std::size_t(i)].kind == Kind::Bass || bass.steps[std::size_t(i)].kind == Kind::Low);
+            }
+        }
+    }
+    // The first variation is the written pattern (the old 5-argument call).
+    Pattern a, b;
+    buildPattern(2, 4, 4, Part::Chord, a);
+    buildPattern(2, 0, 4, 4, Part::Chord, b);
+    CHECK(a.count == b.count);
+    for (int i = 0; i < a.count; ++i) CHECK(a.steps[std::size_t(i)].degree == b.steps[std::size_t(i)].degree);
+}
+
+TEST(chordplayer, the_figures_are_played_like_a_pianist_plays_them)
+{
+    // Every style and variation, in the five written meters:
+    // - each bar starts with the bass struck together with the right hand (Off-beat comping
+    //   and the 3/4 waltz alone leave the right hand for later in the beat or bar);
+    // - in Flowing the bass is never struck on its own, always with a note of the arpeggio;
+    // - bar 2 is not bar 1 again (the right hand differs);
+    // - Flowing never climbs straight up the bottom triad (C4 E4 G4: the steps of an exercise,
+    //   not an arpeggio; 1-5-8-10-12 may pass C5 E5 G5 on its way up) or repeats a close
+    //   triad twice (C E G C E G), and reaches the octave across its two bars.
+    const auto leftHand = [](const PatternStep& s) { return s.kind == Kind::Bass || s.kind == Kind::Low; };
+    for (int mode = 1; mode <= 4; ++mode)
+        for (int v = 0; v < Variations; ++v)
+            for (const auto [n, d] : {std::pair{4, 4}, std::pair{3, 4}, std::pair{6, 8}, std::pair{7, 8}, std::pair{5, 4}}) {
+                Pattern p;
+                buildPattern(mode, v, n, d, Part::Chord, p);
+                const auto handsAt = [&](double beat, bool left) {
+                    for (int i = 0; i < p.count; ++i) {
+                        const auto& s = p.steps[std::size_t(i)];
+                        if (std::abs(s.beat - beat) < 1e-9 && leftHand(s) == left) return true;
+                    }
+                    return false;
+                };
+                // Off-beat comping, and the 3/4 waltz (oom-pah-pah), strike the bass alone on the one.
+                const bool offBeat = (mode == 3 && v == 2) || (mode == 3 && v == 0 && n == 3 && d == 4);
+                for (int bar = 0; bar < 2; ++bar) {
+                    CHECK(handsAt(bar * p.barBeats, true));
+                    if (!offBeat) CHECK(handsAt(bar * p.barBeats, false));
+                }
+                if (mode == 1)
+                    for (int i = 0; i < p.count; ++i)
+                        if (leftHand(p.steps[std::size_t(i)])) CHECK(handsAt(p.steps[std::size_t(i)].beat, false));
+
+                std::vector<std::tuple<double, int, int, int>> bars[2];
+                for (int i = 0; i < p.count; ++i) {
+                    const auto& s = p.steps[std::size_t(i)];
+                    if (leftHand(s)) continue;
+                    const int bar = s.beat >= p.barBeats - 1e-9 ? 1 : 0;
+                    bars[bar].push_back({std::round((s.beat - bar * p.barBeats) * 1e6), int(s.kind), s.degree, s.octave});
+                }
+                CHECK(bars[0] != bars[1]);
+
+                if (mode == 1) {
+                    std::vector<const PatternStep*> right;
+                    bool above = false;
+                    for (int i = 0; i < p.count; ++i)
+                        if (!leftHand(p.steps[std::size_t(i)])) right.push_back(&p.steps[std::size_t(i)]);
+                    for (std::size_t i = 0; i < right.size(); ++i) {
+                        above |= right[i]->octave >= 1;
+                        const auto triad = [&](std::size_t j) {
+                            return j + 2 < right.size() && right[j]->octave == right[j + 1]->octave
+                                   && right[j + 1]->octave == right[j + 2]->octave && right[j]->degree == 0
+                                   && right[j + 1]->degree == 1 && right[j + 2]->degree == 2;
+                        };
+                        CHECK(!(triad(i) && right[i]->octave == 0));
+                        CHECK(!(triad(i) && triad(i + 3)));
+                    }
+                    CHECK(above);
+                }
+            }
+}
+
+TEST(chordplayer, the_variation_changes_what_plays_and_is_kept_in_range)
+{
+    std::set<std::vector<int>> heard;
+    for (int v = 0; v < Variations; ++v) {
+        Rig rig(1);
+        rig.player.setVariation(v);
+        CHECK(rig.player.variation() == v);
+        rig.press(0, 0);
+        rig.run(rig.beatSample(8.0));
+        std::vector<int> keys;
+        for (const auto& e : rig.out) if (e.on) keys.push_back(e.key);
+        CHECK(!keys.empty() && heard.insert(keys).second);
+    }
+    ChordPlayer p;
+    p.setVariation(9);
+    CHECK(p.variation() == Variations - 1);
+    p.setVariation(-1);
+    CHECK(p.variation() == 0);
+}
+
 TEST(chordplayer, arpeggios_use_the_whole_chord_across_the_bar)
 {
     // The bug of the first version: the run restarted on every beat, so only two notes played.
@@ -722,6 +859,7 @@ TEST(chordplayer, the_bass_part_is_root_third_fifth_octave)
     // all four of them in every pattern; the right hand above, in its zone.
     const std::array<const char*, 8> names{"Am", "G", "F", "E", "C", "Dm", "G7", "Cmaj7"};   // the rig's strips
     for (int mode = 0; mode <= 4; ++mode)
+      for (int variation = 0; variation < (mode == 0 ? 1 : Variations); ++variation)
         for (int strip = 0; strip < 8; ++strip)
             for (int zone = 0; zone < 3; ++zone) {
                 const auto chord = parse(names[std::size_t(strip)]);
@@ -729,11 +867,13 @@ TEST(chordplayer, the_bass_part_is_root_third_fifth_octave)
                 const int third = root + (chord->intervals[1] % 12);
                 const int fifth = root + (chord->intervals[2] % 12);
                 Rig rig(mode);
+                rig.player.setVariation(variation);
                 const auto keys = zone == 0 ? ChordPlayer::LowChordKeys : zone == 2 ? ChordPlayer::HighChordKeys : ChordPlayer::ChordKeys;
                 rig.at(0, 0x90, keys[std::size_t(strip)], 100);
                 rig.at(rig.beatSample(8.0), 0x80, keys[std::size_t(strip)], 0);
                 rig.run(rig.beatSample(8.0));
                 Rig bass(mode);
+                bass.player.setVariation(variation);
                 bass.press(0, strip, true);
                 bass.run(bass.beatSample(8.0));
                 int lowest = 127;

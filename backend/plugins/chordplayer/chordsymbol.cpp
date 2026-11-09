@@ -128,9 +128,16 @@ bool usesFlats(const Key& key) noexcept
     return major == 5 || major == 10 || major == 3 || major == 8 || major == 1 || major == 6;
 }
 
+std::string tonicLabel(int pitchClass)
+{
+    const int pc = mod12(pitchClass);
+    const std::string sharp = noteName(pc, false), flat = noteName(pc, true);
+    return sharp == flat ? sharp : sharp + "/" + flat;
+}
+
 std::string keyName(const Key& key)
 {
-    return noteName(key.tonic, usesFlats(key)) + (key.minor ? " minor" : " major");
+    return tonicLabel(key.tonic) + (key.minor ? " minor" : " major");
 }
 
 std::array<std::string, 7> degreeLabels(const Key& key)

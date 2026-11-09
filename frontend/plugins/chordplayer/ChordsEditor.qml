@@ -65,20 +65,96 @@ Item {
             RowLayout {
                 spacing: 6
                 SectionTitle { text: "AUTOPLAY" }
-                Repeater {
-                    model: bridge.autoplayModes
-                    delegate: ToggleChip {
-                        required property var modelData
-                        objectName: "chordsAutoplay" + modelData.mode
-                        text: modelData.mode === 0 ? "Off" : modelData.mode + " " + modelData.title
-                        textSize: 11
-                        leftPadding: 10; rightPadding: 10
-                        implicitHeight: 28
-                        hoverHighlight: true
-                        active: bridge.autoplay === modelData.mode
-                        tooltip: modelData.mode === 0 ? modelData.description
-                                                      : "Autoplay " + modelData.mode + ", " + modelData.title + ": " + modelData.description
-                        onClicked: bridge.autoplay = modelData.mode
+                // A menu: Off, then the styles; hovering a style opens its variations.
+                Button {
+                    id: autoplayButton
+                    objectName: "chordsAutoplay"
+                    readonly property var current: bridge.autoplayModes[bridge.autoplayChoice] ?? null
+                    readonly property string displayText: current ? current.title : ""
+                    implicitWidth: 190
+                    implicitHeight: 28
+                    hoverEnabled: true
+                    checkable: true
+                    checked: autoplayMenu.visible
+                    onClicked: autoplayMenu.visible ? autoplayMenu.close() : autoplayMenu.open()
+                    contentItem: Text {
+                        leftPadding: 8
+                        rightPadding: 20
+                        text: autoplayButton.displayText
+                        color: Theme.text
+                        font.pixelSize: Theme.smallSize
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                        Text {
+                            anchors { right: parent.right; rightMargin: 8; verticalCenter: parent.verticalCenter }
+                            text: Icons.menuArrow
+                            color: Theme.textMuted
+                            font.pixelSize: 9
+                        }
+                    }
+                    background: Rectangle {
+                        radius: 5
+                        color: autoplayButton.pressed || autoplayButton.hovered ? Theme.fieldHover : Theme.field
+                        border.color: autoplayMenu.visible || autoplayButton.visualFocus ? Theme.accent : Theme.fieldBorder
+                    }
+                    ToolTip.visible: hovered && !autoplayMenu.visible && !!current
+                    ToolTip.text: current ? current.description : ""
+                    ToolTip.delay: 450
+
+                    ThemedMenu {
+                        id: autoplayMenu
+                        objectName: "chordsAutoplayMenu"
+                        y: parent.height + 4
+                        width: 170
+                        // The styles' entries: in the same tick column as Off, the playing style ticked.
+                        delegate: ThemedMenuItem {
+                            checkable: true
+                            checked: !!subMenu && subMenu.objectName === "chordsAutoplayStyle" + bridge.autoplay
+                        }
+
+                        ThemedMenuItem {
+                            objectName: "chordsAutoplayOff"
+                            text: "Off"
+                            checkable: true
+                            checked: bridge.autoplay === 0
+                            ToolTip.visible: hovered
+                            ToolTip.text: bridge.autoplayModes[0].description
+                            ToolTip.delay: 450
+                            onTriggered: bridge.setAutoplayChoice(0)
+                        }
+                        ThemedMenuSeparator {}
+
+                        Instantiator {
+                            model: bridge.autoplayStyles
+                            delegate: ThemedMenu {
+                                id: styleMenu
+                                required property var modelData
+                                objectName: "chordsAutoplayStyle" + modelData.mode
+                                title: modelData.title
+                                width: 200
+                                Instantiator {
+                                    model: styleMenu.modelData.variations
+                                    delegate: ThemedMenuItem {
+                                        required property var modelData
+                                        objectName: "chordsAutoplayChoice" + modelData.index
+                                        text: modelData.name
+                                        checkable: true
+                                        checked: bridge.autoplayChoice === modelData.index
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: modelData.description
+                                        ToolTip.delay: 450
+                                        onTriggered: {
+                                            bridge.setAutoplayChoice(modelData.index)
+                                            autoplayMenu.close()
+                                        }
+                                    }
+                                    onObjectAdded: (index, object) => styleMenu.insertItem(index, object)
+                                    onObjectRemoved: (index, object) => styleMenu.removeItem(object)
+                                }
+                            }
+                            onObjectAdded: (index, object) => autoplayMenu.insertMenu(index + 2, object)
+                            onObjectRemoved: (index, object) => autoplayMenu.removeMenu(object)
+                        }
                     }
                 }
             }

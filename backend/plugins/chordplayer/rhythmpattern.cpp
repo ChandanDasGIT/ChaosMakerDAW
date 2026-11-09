@@ -33,11 +33,6 @@ constexpr Src L(double b, double l, int degree, int v, int octave = 0) { return 
 constexpr double S = 0.22;                // a sixteenth's sounding length
 
 // ---- 4/4 ------------------------------------------------------------------------------------
-// 1 Flowing: eighths grouped 3+3+2 over a held bass.
-constexpr Src Flow44A[]{B(0, Hold, 90), L(0.5, Hold, 1, 66), T(1.0, Hold, 0, 0, 70), T(1.5, Hold, 1, 0, 78),
-                        T(2.0, Hold, 2, 0, 68), T(2.5, Hold, 0, 1, 70), T(3.0, Hold, 1, 1, 78), T(3.5, Hold, 2, 0, 64)};
-constexpr Src Flow44B[]{B(0, Hold, 90), L(0.5, Hold, 2, 66), L(1.0, Hold, 0, 68, 1), T(1.5, Hold, 1, 0, 78),
-                        T(2.0, Hold, 2, 0, 68), T(2.5, Hold, 0, 1, 72), T(3.0, Hold, 2, 1, 80), T(3.5, Hold, 1, 1, 66)};
 // 2 Pop: sixteenths in cells of 3+3+3+3+2+2, bass on 1 and the "and" of 2.
 constexpr Src Pop44A[]{B(0, 1.4, 92), L(1.5, 2.4, 2, 84),
                        T(0.00, S, 0, 0, 86), T(0.25, S, 2, 0, 64), T(0.50, S, 0, 1, 70),
@@ -65,11 +60,6 @@ constexpr Src Ball44B[]{B(0, Hold, 86), U(0, 2.0, 68), L(1.0, 1.0, 1, 62), B(2.0
                         T(2.5, 1.0, 1, 1, 70), T(3.5, 0.5, 0, 1, 62)};
 
 // ---- 3/4 ------------------------------------------------------------------------------------
-// 1 Flowing: six eighths in three pairs, each beat starting low again.
-constexpr Src Flow34A[]{B(0, Hold, 90), L(0.5, Hold, 2, 66), T(1.0, Hold, 0, 0, 72), T(1.5, Hold, 2, 0, 70),
-                        T(2.0, Hold, 1, 0, 74), T(2.5, Hold, 0, 1, 64)};
-constexpr Src Flow34B[]{B(0, Hold, 90), L(0.5, Hold, 1, 66), L(1.0, Hold, 0, 72, 1), T(1.5, Hold, 2, 0, 70),
-                        T(2.0, Hold, 1, 0, 74), T(2.5, Hold, 0, 1, 64)};
 // 2 Pop: a waltz: bass and a sixteenth run on 1, the chord on 2 and 3 with sixteenths after.
 constexpr Src Pop34A[]{B(0, 0.95, 92), L(2.5, 0.45, 2, 76),
                        T(0.00, S, 0, 0, 86), T(0.25, S, 1, 0, 64), T(0.50, S, 2, 0, 70), T(0.75, S, 0, 1, 64),
@@ -87,11 +77,6 @@ constexpr Src Ball34A[]{B(0, Hold, 88), Rl(0, Hold, 82, 35), L(1.0, Hold, 2, 64)
 constexpr Src Ball34B[]{B(0, Hold, 86), U(0, 1.0, 66), L(1.0, 1.0, 1, 62), L(2.0, Hold, 0, 66, 1), T(1.0, 1.5, 0, 2, 70), T(2.5, 0.5, 2, 1, 64)};
 
 // ---- 6/8 ------------------------------------------------------------------------------------
-// 1 Flowing: two rolling groups of three, the first in the left hand.
-constexpr Src Flow68A[]{B(0, Hold, 90), L(0.5, Hold, 2, 64), L(1.0, Hold, 0, 66, 1), T(1.5, Hold, 1, 0, 80),
-                        T(2.0, Hold, 2, 0, 68), T(2.5, Hold, 0, 1, 70)};
-constexpr Src Flow68B[]{B(0, Hold, 90), L(0.5, Hold, 1, 64), T(1.0, Hold, 0, 0, 68), T(1.5, Hold, 2, 0, 80),
-                        T(2.0, Hold, 0, 1, 70), T(2.5, Hold, 1, 1, 72)};
 // 2 Pop: two lilting groups of three eighths, each starting low, the bass on 1 and 4.
 constexpr Src Pop68A[]{B(0, 1.4, 92), L(1.5, 1.4, 2, 84),
                        T(0.00, S, 0, 0, 86), T(0.25, S, 2, 0, 62), T(0.50, S, 0, 1, 68), T(1.00, S, 1, 0, 70), T(1.25, S, 2, 0, 62),
@@ -109,11 +94,6 @@ constexpr Src Ball68A[]{B(0, Hold, 88), Rl(0, Hold, 82, 35), L(1.5, Hold, 2, 64)
 constexpr Src Ball68B[]{B(0, Hold, 86), U(0, 1.5, 66), L(1.0, 0.5, 1, 62), B(1.5, Hold, 64, 1), T(1.5, 1.0, 2, 1, 70), T(2.5, 0.5, 0, 2, 64)};
 
 // ---- 7/8 = 2+2+3 ----------------------------------------------------------------------------
-// 1 Flowing: the groups of two, two, three, each starting low again.
-constexpr Src Flow78A[]{B(0, Hold, 90), L(0.5, Hold, 2, 64), L(1.0, Hold, 0, 78, 1), T(1.5, Hold, 1, 0, 66),
-                        T(2.0, Hold, 0, 0, 80), T(2.5, Hold, 2, 0, 68), T(3.0, Hold, 0, 1, 70)};
-constexpr Src Flow78B[]{B(0, Hold, 90), L(0.5, Hold, 1, 64), L(1.0, Hold, 2, 78), T(1.5, Hold, 2, 0, 66),
-                        T(2.0, Hold, 0, 0, 80), T(2.5, Hold, 1, 0, 68), T(3.0, Hold, 2, 0, 64)};
 // 2 Pop: sixteenth figures on the 2+2+3 groups, each starting low again, the bass on the groups.
 constexpr Src Pop78A[]{B(0, 0.95, 92), L(1.0, 0.95, 2, 80), B(2.0, 1.4, 86, 1),
                        T(0.00, S, 0, 0, 86), T(0.25, S, 2, 0, 62), T(0.50, S, 0, 1, 68), T(0.75, S, 2, 0, 62),
@@ -137,13 +117,6 @@ constexpr Src Ball78B[]{B(0, Hold, 86), U(0, 1.0, 68), L(1.0, 1.0, 1, 62), B(2.0
                         T(2.5, 1.0, 1, 1, 68)};
 
 // ---- 5/4 = 3+2 ------------------------------------------------------------------------------
-// 1 Flowing: three beats and two, the bass struck again on the group of two.
-constexpr Src Flow54A[]{B(0, 3.0, 90), L(0.5, Hold, 2, 64), T(1.0, Hold, 0, 0, 70), T(1.5, Hold, 1, 0, 68),
-                        T(2.0, Hold, 2, 0, 72), T(2.5, Hold, 0, 1, 68), L(3.0, Hold, 0, 84, 1),
-                        T(3.5, Hold, 1, 0, 68), T(4.0, Hold, 2, 0, 72), T(4.5, Hold, 0, 1, 66)};
-constexpr Src Flow54B[]{B(0, 3.0, 90), L(0.5, Hold, 1, 64), T(1.0, Hold, 1, 0, 70), T(1.5, Hold, 2, 0, 68),
-                        T(2.0, Hold, 0, 1, 72), T(2.5, Hold, 1, 1, 70), L(3.0, Hold, 2, 84),
-                        T(3.5, Hold, 2, 0, 68), T(4.0, Hold, 0, 1, 72), T(4.5, Hold, 2, 0, 64)};
 // 2 Pop: a sixteenth figure per beat, climbing through the group of three, starting low again on the group of two.
 constexpr Src Pop54A[]{B(0, 1.4, 92), L(1.5, 1.4, 2, 84), B(3.0, 1.4, 86, 1), L(4.5, 0.45, 2, 76),
                        T(0.00, S, 0, 0, 86), T(0.25, S, 2, 0, 62), T(0.50, S, 0, 1, 68), T(0.75, S, 2, 0, 62),
@@ -177,12 +150,14 @@ struct Written {
 
 enum Family { F44, F34, F68, F78, F54, Families };
 
-constexpr Written Table[Families][4]{
-    {{4.0, Flow44A, Flow44B}, {4.0, Pop44A, Pop44B}, {4.0, Comp44A, Comp44B}, {4.0, Ball44A, Ball44B}},
-    {{3.0, Flow34A, Flow34B}, {3.0, Pop34A, Pop34B}, {3.0, Comp34A, Comp34B}, {3.0, Ball34A, Ball34B}},
-    {{3.0, Flow68A, Flow68B}, {3.0, Pop68A, Pop68B}, {3.0, Comp68A, Comp68B}, {3.0, Ball68A, Ball68B}},
-    {{3.5, Flow78A, Flow78B}, {3.5, Pop78A, Pop78B}, {3.5, Comp78A, Comp78B}, {3.5, Ball78A, Ball78B}},
-    {{5.0, Flow54A, Flow54B}, {5.0, Pop54A, Pop54B}, {5.0, Comp54A, Comp54B}, {5.0, Ball54A, Ball54B}},
+// Pop, Comping and Ballad's first variations, written per meter family (Flowing and the other
+// variations are built from the meter: see generated() below).
+constexpr Written Table[Families][3]{
+    {{4.0, Pop44A, Pop44B}, {4.0, Comp44A, Comp44B}, {4.0, Ball44A, Ball44B}},
+    {{3.0, Pop34A, Pop34B}, {3.0, Comp34A, Comp34B}, {3.0, Ball34A, Ball34B}},
+    {{3.0, Pop68A, Pop68B}, {3.0, Comp68A, Comp68B}, {3.0, Ball68A, Ball68B}},
+    {{3.5, Pop78A, Pop78B}, {3.5, Comp78A, Comp78B}, {3.5, Ball78A, Ball78B}},
+    {{5.0, Pop54A, Pop54B}, {5.0, Comp54A, Comp54B}, {5.0, Ball54A, Ball54B}},
 };
 
 int cleanDenominator(int denominator) noexcept
@@ -261,10 +236,247 @@ int groupStarts(int numerator, int denominator, std::array<double, 32>& out) noe
     return n;
 }
 
-void buildPattern(int mode, int numerator, int denominator, Part part, Pattern& out) noexcept
+namespace {
+
+// ---------------------------------------------------------------------------------------------
+// Variations built from the meter. The right hand plays figures on a spread chord, the way a
+// pianist does: rungs of root (1), third (3), fifth (5), octave (8), tenth (10), twelfth (12),
+// fifteenth (15) and seventeenth (17), counted from the zone's root. The bass is struck with the
+// first note of each figure, on the beat, and rings under it; bar 2 always differs from bar 1.
+
+struct Rung { int degree, octave; };
+constexpr Rung N1{0, 0}, N3{1, 0}, N5{2, 0}, N8{0, 1}, N10{1, 1}, N12{2, 1}, N15{0, 2}, N17{1, 2};
+
+constexpr int MaxSrc = 128;
+struct SrcBar {
+    std::array<Src, MaxSrc> steps{};
+    int count = 0;
+    void add(const Src& s) noexcept { if (count < MaxSrc) steps[std::size_t(count++)] = s; }
+    std::span<const Src> span() const noexcept { return {steps.data(), std::size_t(count)}; }
+};
+
+constexpr Src tone(double beat, double length, Rung r, int velocity) noexcept
+{
+    return T(beat, length, r.degree, r.octave, velocity);
+}
+
+// The bass notes by code: 0 root, 1 third, 2 fifth, 3 octave.
+constexpr Src bassNote(double beat, double length, int code, int velocity) noexcept
+{
+    return code == 1 ? L(beat, length, 1, velocity)
+         : code == 2 ? L(beat, length, 2, velocity)
+         : code == 3 ? B(beat, length, velocity, 1)
+                     : B(beat, length, velocity);
+}
+
+// Up a list of rungs and back down, bouncing between its second and its top rung, `count` notes:
+// the arpeggio's contour over a stretch of the bar (`top` rungs used going up).
+template <std::size_t N>
+Rung upAndBack(const Rung (&list)[N], int top, int k) noexcept
+{
+    top = std::clamp(top, 2, int(N));
+    if (k < top) return list[std::size_t(k)];
+    const int span = top - 2;                              // between index 1 and top-1
+    if (span <= 0) return list[1];
+    const int phase = (k - top) % (2 * span);
+    return list[std::size_t(phase < span ? top - 2 - phase : 2 + (phase - span))];
+}
+
+template <std::size_t N>
+Rung cycle(const Rung (&list)[N], int k) noexcept { return list[std::size_t(k) % N]; }
+
+void generated(int mode, int variation, int bar, double barBeats, int denominator,
+               std::span<const double> groups, SrcBar& out) noexcept
+{
+    const bool eighths = denominator >= 8;
+    const double pulse = eighths ? 0.5 : 1.0;
+    const int groupCount = int(groups.size());
+    const auto isGroup = [&](double t) {
+        for (double g : groups) if (near(g, t)) return true;
+        return false;
+    };
+    // The middle of the bar: the group start nearest it, or the half bar on the eighth grid.
+    double middle = std::floor(barBeats / 2 / 0.5) * 0.5;
+    if (groupCount >= 2) {
+        double best = 1e9;
+        for (double g : groups)
+            if (g > 0 && std::abs(g - barBeats / 2) < best) { best = std::abs(g - barBeats / 2); middle = g; }
+    }
+    const double lastPulse = std::floor((barBeats - 1e-9) / pulse) * pulse;
+    // Repeating figures start again on the bar's two halves (the bass marks every group).
+    const auto halfOf = [&](double t) { return t >= middle - 1e-9 && middle > 0 ? middle : 0.0; };
+
+    // ---- the bass ------------------------------------------------------------------------
+    std::array<double, 40> slots{};
+    std::array<int, 40> codes{};
+    int slotCount = 0;
+    const auto slot = [&](double t, int code) {
+        if (slotCount < 40 && t >= 0 && t < barBeats - 1e-9 && (slotCount == 0 || t > slots[std::size_t(slotCount - 1)] + 0.2)) {
+            slots[std::size_t(slotCount)] = t;
+            codes[std::size_t(slotCount++)] = code;
+        }
+    };
+    if (mode == 1) {
+        // Flowing: struck on every group (a single-group bar also on its last beat), held;
+        // bar 1 root - octave - fifth, bar 2 root - fifth - octave, and a third leading back.
+        constexpr int One[]{0, 3, 2, 3}, Two[]{0, 2, 3, 2};
+        if (groupCount >= 2) {
+            for (int g = 0; g < groupCount; ++g) slot(groups[std::size_t(g)], (bar == 0 ? One : Two)[std::size_t(g % 4)]);
+        } else {
+            slot(0, 0);
+            slot(lastPulse, bar == 0 ? 3 : 2);
+        }
+        if (bar == 1) slot(barBeats - 0.5, 1);
+    } else if (mode == 2) {
+        // Pop: the root on the one, a push half a beat before the middle; bar 2 walks back.
+        slot(0, 0);
+        slot(middle - 0.5, bar == 0 ? 2 : 1);
+        if (bar == 1) { slot(barBeats - 1.0, 3); slot(barBeats - 0.5, 2); }
+    } else {
+        // Comping and Ballad: on the groups (a single-group bar also on its last beat), bar 1
+        // root - fifth - octave, bar 2 root - third - fifth and a pickup octave. Off-beat comping
+        // walks on every beat.
+        constexpr int One[]{0, 2, 3, 2, 3, 2, 3, 2}, Two[]{0, 1, 2, 3, 2, 1, 2, 3};
+        int i = 0;
+        if (mode == 3 && variation == 2 && !eighths) {
+            for (double t = 0; t < barBeats - 1e-9; t += 1.0, ++i) slot(t, (bar == 0 ? One : Two)[std::size_t(i % 8)]);
+        } else {
+            for (double g : groups) slot(g, (bar == 0 ? One : Two)[std::size_t(i++ % 8)]);
+            if (groupCount < 2) slot(lastPulse, (bar == 0 ? One : Two)[std::size_t(i++ % 8)]);
+        }
+        if (bar == 1) slot(barBeats - 0.5, 3);
+    }
+    for (int i = 0; i < slotCount; ++i) {
+        const double t = slots[std::size_t(i)];
+        const double next = i + 1 < slotCount ? slots[std::size_t(i + 1)] : barBeats;
+        const bool held = mode == 1 || mode == 4;
+        out.add(bassNote(t, held ? next - t : std::max((next - t) * 0.9, 0.2), codes[std::size_t(i)], i == 0 ? 92 : 82));
+    }
+
+    // ---- the right hand ------------------------------------------------------------------
+    const int eighthCount = int(std::lround(barBeats / 0.5));
+    if (mode == 1) {
+        // Flowing: eighths, each ringing under the pedal. Long bars (over ten eighths) are two
+        // figures, split at the middle group.
+        const int half = eighthCount > 10 ? int(std::lround(middle / 0.5)) : eighthCount;
+        for (int e = 0; e < eighthCount; ++e) {
+            const double t = e * 0.5;
+            const int stretch = e < half ? half : eighthCount - half;
+            const int k = e < half ? e : e - half;
+            Rung r = N1;
+            if (variation == 0) {                              // Rolling: 1-5-8-10-12-10-8-5
+                static constexpr Rung Up1[]{N1, N5, N8, N10, N12, N15};
+                static constexpr Rung Up2[]{N1, N8, N10, N12, N15, N17};
+                r = bar == 0 ? upAndBack(Up1, stretch / 2 + 1, k) : upAndBack(Up2, std::min(stretch / 2 + 1, 5), k);
+            } else if (variation == 1) {                       // Alberti: 1-5-3-5, bar 2 turns to 3-8-5-8
+                static constexpr Rung A[]{N1, N5, N3, N5};
+                static constexpr Rung B2[]{N3, N8, N5, N8};
+                const int n = int(std::lround((t - halfOf(t)) / 0.5));
+                r = bar == 1 && t >= middle - 1e-9 && middle > 0 ? cycle(B2, n) : cycle(A, n);
+            } else if (variation == 2) {                       // Open: 1-5-10-5, bar 2 1-5-12-10
+                static constexpr Rung O1[]{N1, N5, N10, N5};
+                static constexpr Rung O2[]{N1, N5, N12, N10};
+                const int n = int(std::lround((t - halfOf(t)) / 0.5));
+                r = bar == 0 ? cycle(O1, n) : cycle(O2, n);
+            } else {                                           // Cascade: from the top down, then back up
+                static constexpr Rung D1[]{N12, N10, N8, N5, N3};
+                static constexpr Rung D2[]{N15, N12, N10, N8, N5};
+                r = upAndBack(bar == 0 ? D1 : D2, stretch / 2 + 1, k);
+            }
+            out.add(tone(t, Hold, r, e == 0 ? 80 : 70));
+        }
+        return;
+    }
+    if (mode == 2) {
+        const int sixteenths = int(std::lround(barBeats / 0.25));
+        if (variation == 1) {                                  // Pulse: driving eighth chords
+            for (int e = 0; e < eighthCount; ++e) {
+                const double t = e * 0.5;
+                if (bar == 1 && e == eighthCount - 1) { out.add(U(t + 0.25, 0.2, 80)); continue; }   // a push into the loop
+                out.add(isGroup(t) ? C(t, 0.45, 90) : U(t, 0.4, 76));
+            }
+            return;
+        }
+        static constexpr Rung Os1[]{N8, N10, N5, N10};        // Ostinato: a high riff
+        static constexpr Rung Os2[]{N8, N12, N10, N12};
+        static constexpr Rung Sh1[]{N1, N8, N5, N8, N3, N8, N5, N8};       // Shimmer: under a held-high top
+        static constexpr Rung Sh2[]{N1, N10, N5, N10, N8, N10, N5, N10};
+        for (int x = 0; x < sixteenths; ++x) {
+            const double t = x * 0.25;
+            const int n = int(std::lround((t - halfOf(t)) / 0.25));
+            const Rung r = variation == 2 ? (bar == 0 ? cycle(Os1, n) : cycle(Os2, n))
+                                          : (bar == 0 ? cycle(Sh1, n) : cycle(Sh2, n));
+            out.add(tone(t, S, r, x % 4 == 0 ? 84 : 66));
+        }
+        return;
+    }
+    const auto groupEnd = [&](double g) {
+        double end = barBeats;
+        for (double o : groups) if (o > g + 1e-9) end = std::min(end, o);
+        return end;
+    };
+    if (mode == 3 && variation == 1) {                         // Steady: on every beat, bar 2 pushes
+        for (double t = 0; t < barBeats - 1e-9; t += pulse) {
+            const bool last = t + pulse >= barBeats - 1e-9;
+            if (bar == 1 && last && t > 0) {                   // the last beat pushed ahead of it
+                out.add(U(eighths ? barBeats - 0.25 : barBeats - 0.5, eighths ? 0.2 : 0.45, 82));
+                continue;
+            }
+            out.add(isGroup(t) ? C(t, pulse * 0.9, 88) : U(t, pulse * 0.8, 76));
+        }
+    } else if (mode == 3 && variation == 2) {                  // Off-beat: between the beats
+        if (eighths) {
+            for (double t = 0; t < barBeats - 1e-9; t += 0.5) if (!isGroup(t)) out.add(U(t, bar == 1 ? 0.2 : 0.4, 80));
+            if (bar == 1) out.add(U(barBeats - 0.25, 0.2, 74));   // short stabs, a double one into the loop
+        } else {
+            for (double t = 0.5; t < barBeats - 1e-9; t += 1.0) out.add(U(t, 0.4, 82));
+            if (bar == 1 && barBeats >= 2) out.add(U(barBeats - 0.25, 0.2, 74));   // a double stab into the loop
+        }
+    } else if (mode == 3) {                                    // Sparse: the one and a push
+        out.add(C(0, eighths ? 1.0 : 1.4, 90));
+        const double push = bar == 0 ? (eighths ? 1.0 : 1.5) : barBeats - 0.5;
+        if (push > 0.4 && push < barBeats - 1e-9) out.add(U(push, 0.45, 80));
+    } else if (variation == 1) {                               // Ballad, Arpeggio: up, then an answer down
+        static constexpr Rung A1[]{N1, N5, N10, N12, N10, N5};
+        static constexpr Rung A2[]{N8, N12, N10, N5, N10, N12};
+        int k = 0;
+        for (double t = 0; t < barBeats - 1e-9; t += pulse, ++k)
+            out.add(tone(t, Hold, bar == 0 ? cycle(A1, k) : cycle(A2, k), k == 0 ? 78 : 70));
+    } else if (variation == 2) {                               // Ballad, Hymn
+        if (bar == 0 && !eighths) {                            // x/4: a chord on every beat
+            for (double t = 0; t < barBeats - 1e-9; t += 1.0)
+                out.add(C(t, (std::min(t + 1.0, barBeats) - t) * 0.95, isGroup(t) ? 86 : 74));
+        } else if (bar == 0) {                                 // x/8: on each group, and its last eighth
+            for (double g : groups) {
+                const double end = groupEnd(g);
+                out.add(C(g, (end - g - 0.5) * 0.95, 86));
+                if (end - g > 0.75) out.add(U(end - 0.5, 0.45, 72));
+            }
+        } else {                                               // long chords on the groups, a short one last
+            for (double g : groups) out.add(C(g, (groupEnd(g) - g) * 0.95, 84));
+            if (!isGroup(lastPulse) && lastPulse > 0) out.add(U(lastPulse, pulse * 0.9, 72));
+        }
+    } else {                                                   // Ballad, Echo: a roll, then an answer
+        static constexpr Rung E1[]{N10, N12};
+        static constexpr Rung E2[]{N12, N15};
+        int k = 0;
+        for (double g : groups) {
+            const double end = groupEnd(g);
+            out.add(Rl(g, end - g, 80, 30));
+            const double answer = g + std::max(pulse, std::floor((end - g) / 2 / pulse) * pulse);
+            if (answer < end - 1e-9) out.add(tone(answer, end - answer, bar == 0 ? cycle(E1, k) : cycle(E2, k), 70));
+            ++k;
+        }
+    }
+}
+
+} // namespace
+
+void buildPattern(int mode, int variation, int numerator, int denominator, Part part, Pattern& out) noexcept
 {
     numerator = std::clamp(numerator, 1, 32);
     denominator = cleanDenominator(denominator);
+    variation = std::clamp(variation, 0, Variations - 1);
     out.count = 0;
     out.bars = PatternBars;
     out.barBeats = numerator * 4.0 / denominator;
@@ -272,7 +484,7 @@ void buildPattern(int mode, int numerator, int denominator, Part part, Pattern& 
     if (mode < 1 || mode > 4) { out.pedal = false; return; }
 
     const Choice choice = choose(numerator, denominator);
-    const Written& w = Table[choice.family][mode - 1];
+    const Written& w = Table[choice.family][mode >= 2 ? mode - 2 : 0];
     std::array<double, 32> groups{};
     const int groupCount = groupStarts(numerator, denominator, groups);
     const auto isGroupStart = [&](double beatInBar) {
@@ -289,16 +501,27 @@ void buildPattern(int mode, int numerator, int denominator, Part part, Pattern& 
         if (on(1.0)) return AccentBeat;
         return on(0.5) ? AccentOffbeat : AccentSixteenth;
     };
+    const bool written = variation == 0 && mode != 1;            // Flowing is always built
 
     int weak = 0;                                                      // weak sixteenths so far
+    SrcBar made;
     for (int bar = 0; bar < PatternBars; ++bar) {
-        const std::span<const Src> src = bar == 0 ? w.a : w.b;
+        std::span<const Src> src = bar == 0 ? w.a : w.b;
+        double familyBar = choice.bar, copyStep = w.bar, scale = choice.scale;
+        if (!written) {
+            made.count = 0;
+            generated(mode, variation, bar, out.barBeats, denominator,
+                      std::span<const double>(groups.data(), std::size_t(groupCount)), made);
+            src = made.span();
+            familyBar = copyStep = out.barBeats;
+            scale = 1.0;
+        }
         const double barStart = bar * out.barBeats;
         // The family's bar, cut to this meter's or repeated until it is filled.
-        for (double copy = 0; copy < choice.bar - 1e-9; copy += w.bar) {
+        for (double copy = 0; copy < familyBar - 1e-9; copy += copyStep) {
             for (const Src& s : src) {
                 const double inBar = copy + s.beat;                    // family beats
-                if (inBar >= choice.bar - 1e-9) continue;
+                if (inBar >= familyBar - 1e-9) continue;
                 const bool leftHand = s.kind == Kind::Bass || s.kind == Kind::Low;
                 if (part == Part::Bass && !leftHand) continue;
                 Kind kind = s.kind;
@@ -315,12 +538,12 @@ void buildPattern(int mode, int numerator, int denominator, Part part, Pattern& 
                     octave = 0;
                 }
                 if (out.count >= MaxSteps) break;
-                const double beatInBar = inBar * choice.scale;
-                double length = (s.length == Hold ? choice.bar - inBar : s.length) * choice.scale;
+                const double beatInBar = inBar * scale;
+                double length = (s.length == Hold ? familyBar - inBar : s.length) * scale;
                 length = std::min(length, out.barBeats - beatInBar);
                 PatternStep step;
                 step.beat = barStart + beatInBar;
-                step.length = std::max(length, 0.05 * choice.scale);
+                step.length = std::max(length, 0.05 * scale);
                 step.kind = kind;
                 step.degree = degree;
                 step.octave = octave;
@@ -367,6 +590,42 @@ std::string_view autoplayDescription(int mode) noexcept
     case 4: return "A rolled chord, then a slow top line of chord tones, pedalled";
     default: return "";
     }
+}
+
+std::string_view variationName(int mode, int variation) noexcept
+{
+    static constexpr std::string_view Names[4][Variations]{
+        {"Rolling", "Alberti", "Open", "Cascade"},
+        {"Cells", "Pulse", "Ostinato", "Shimmer"},
+        {"Pushes", "Steady", "Off-beat", "Sparse"},
+        {"Top line", "Arpeggio", "Hymn", "Echo"},
+    };
+    if (mode < 1 || mode > 4 || variation < 0 || variation >= Variations) return "";
+    return Names[mode - 1][variation];
+}
+
+std::string_view variationDescription(int mode, int variation) noexcept
+{
+    static constexpr std::string_view Text[4][Variations]{
+        {"The classic piano arpeggio in eighths: root, fifth, octave, tenth, twelfth and back down, over the bass, pedalled",
+         "The Alberti bass in eighths: root, fifth, third, fifth; bar 2 turns to third, octave, fifth, octave",
+         "Wide and airy: root, fifth, tenth, fifth; bar 2 reaches the twelfth",
+         "From the top of the chord down, then turning back up, over the bass, pedalled"},
+        {"A syncopated sixteenth arpeggio in cells, bass on the one and the push",
+         "Driving eighth-note chords, fuller on the groups, with a push into the next bar",
+         "A high broken riff in sixteenths: octave, tenth, fifth, tenth",
+         "Sixteenths moving under a repeated high octave, like a guitar's open string"},
+        {"Chords on the one with pushes ahead of the beat, over a moving bass",
+         "A chord on every beat (every eighth in x/8), fuller on the groups",
+         "Chords between the beats over a walking bass, reggae and ska style",
+         "Just the one and a push: a full chord, then a short stab"},
+        {"A rolled chord, then a slow top line of chord tones, pedalled",
+         "A slow spread arpeggio, one note per beat: up in bar 1, an answer coming down in bar 2",
+         "Full chords like a hymn: one on every beat, then long chords on the groups",
+         "A rolled chord on each group, answered by a high note; higher answers in bar 2"},
+    };
+    if (mode < 1 || mode > 4 || variation < 0 || variation >= Variations) return "";
+    return Text[mode - 1][variation];
 }
 
 } // namespace chords

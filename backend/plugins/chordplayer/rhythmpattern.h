@@ -5,10 +5,12 @@
 #include <string_view>
 
 // The Chords track's autoplay patterns: what a held chord plays, two bars at a time, for any
-// time signature. Each pattern is written out for the meters a pianist counts differently
-// (4/4, 3/4, 6/8, 7/8 = 2+2+3 and 5/4 = 3+2); other meters borrow the nearest of them (2/4 and
-// 8/8 from 4/4, 9/8 and 12/8 from 6/8, 5/8 = 3+2 from 6/8, 6/4 from 3/4 ...). Bar 2 is a
-// variation of bar 1, so the pattern never loops a single bar.
+// time signature. Four styles (Flowing, Pop, Comping, Ballad), four variations each. Pop, Comping
+// and Ballad's first variations are written out for the meters a pianist counts differently
+// (4/4, 3/4, 6/8, 7/8 = 2+2+3 and 5/4 = 3+2; other meters borrow the nearest). Flowing and the
+// other variations are built from the meter's own beats and groups: piano figures on a spread
+// chord (root, fifth, octave, tenth, twelfth ...), the bass struck with the first note of each
+// figure. Bar 2 always differs from bar 1, so the pattern never loops a single bar.
 //
 // Positions are in beats (quarter notes) from the pattern's start, so a pattern follows the
 // project's BPM by itself. Built without heap memory: the chord player may rebuild one on the
@@ -21,7 +23,8 @@ namespace chords {
 enum class Part { Chord, Bass, RightHand };
 
 constexpr int AutoplayOff = 0;            // the chord is held while pressed
-constexpr int AutoplayModes = 5;          // Off, 1 .. 4
+constexpr int AutoplayModes = 5;          // Off, Flowing, Pop, Comping, Ballad
+constexpr int Variations = 4;             // of each style; 0 is the first written one
 
 // How loud the notes are: all the same, the chord's top note louder, or by the meter (the bar's
 // one loudest, then the group starts, the beats, the off-beat eighths, the sixteenths).
@@ -78,19 +81,28 @@ struct Pattern {
 // Two bars of autoplay `mode` (1 .. 4) under numerator/denominator, for the strip's chord area
 // or bass area (the bass area keeps the left hand's notes only). Mode 0 (or any other) gives an
 // empty pattern.
-//   1 Flowing   a broken chord across two octaves over a held bass, in eighths, pedalled
-//   2 Pop       a syncopated sixteenth arpeggio in a shape (4/4: 3+3+3+3+2+2), bass on 1 and 2&
-//   3 Comping   rhythmic chords with pushes over a moving bass
-//   4 Ballad    a rolled chord, then a slow top line of chord tones, pedalled
-// The left hand plays only the bass note, the third, the fifth and the octave (C2 E2 G2 C3 for
-// C), and every pattern uses all four across its two bars. Group starts of the meter carry accents; weak sixteenths are played a few ms early or late
-// (always the same, so a recording replays as it was heard).
-void buildPattern(int mode, int numerator, int denominator, Part part, Pattern& out) noexcept;
+//   1 Flowing   eighth-note arpeggios over a held bass, pedalled: Rolling, Alberti, Open, Cascade
+//   2 Pop       sixteenth figures or driving eighth chords: Cells, Pulse, Ostinato, Shimmer
+//   3 Comping   rhythmic chords over a moving bass: Pushes, Steady, Off-beat, Sparse
+//   4 Ballad    slow, pedalled: Top line, Arpeggio, Hymn, Echo
+// Group starts of the meter carry accents; weak sixteenths are played a few ms early or late
+// (always the same, so a recording replays as it was heard). The left hand plays only the bass
+// note, the third, the fifth and the octave (C2 E2 G2 C3 for C).
+// `variation` (0 .. Variations-1) picks one of the style's variations (see variationName).
+void buildPattern(int mode, int variation, int numerator, int denominator, Part part, Pattern& out) noexcept;
+inline void buildPattern(int mode, int numerator, int denominator, Part part, Pattern& out) noexcept
+{
+    buildPattern(mode, 0, numerator, denominator, part, out);
+}
 
 // "Off", "Flowing", "Pop", "Comping", "Ballad".
 std::string_view autoplayName(int mode) noexcept;
 // One line on how mode `mode` plays, for the page's tooltips ("" for none).
 std::string_view autoplayDescription(int mode) noexcept;
+// A variation's name ("Rising", "Bounce", "Off-beat", "Hymn" ...) and one line on how it plays;
+// "" for Off or out of range.
+std::string_view variationName(int mode, int variation) noexcept;
+std::string_view variationDescription(int mode, int variation) noexcept;
 
 // Where the meter's groups start, in beats from the bar's start (4/4: 0 2; 3/4: 0; 6/8: 0 1.5;
 // 7/8: 0 1 2; 5/4: 0 3). Returns how many were written to `out`.

@@ -88,7 +88,22 @@ TEST(qtchords, the_page_edits_the_track_and_its_player_follows)
     CHECK(page.valid());
     CHECK((page.chords() == QStringList{"C", "Dm", "Em", "F", "G", "Am", "Bdim", "G7"}));
     CHECK(page.autoplay() == 3 && page.keyName() == "C major");
-    CHECK(page.autoplayModes().size() == 5 && page.progressions().size() >= 6);
+    CHECK(page.autoplayModes().size() == 17 && page.progressions().size() >= 6);
+    CHECK(page.autoplayChoice() == 9 && page.variation() == 0);           // Comping · Pushes
+    CHECK(page.autoplayModes()[0].toMap().value("title").toString() == "Off");
+    CHECK(page.autoplayModes()[16].toMap().value("title").toString() == QString::fromUtf8("Ballad \u00b7 Echo"));
+    // The menu's styles: four, each with its four variations pointing into autoplayModes.
+    const auto styles = page.autoplayStyles();
+    CHECK(styles.size() == 4 && styles[0].toMap().value("title").toString() == "Flowing");
+    for (const auto& style : styles) {
+        const auto variations = style.toMap().value("variations").toList();
+        CHECK(variations.size() == 4);
+        for (const auto& v : variations) {
+            const int index = v.toMap().value("index").toInt();
+            CHECK(page.autoplayModes()[index].toMap().value("name").toString() == v.toMap().value("name").toString());
+            CHECK(page.autoplayModes()[index].toMap().value("mode").toInt() == style.toMap().value("mode").toInt());
+        }
+    }
     // Each strip's zones, from its chord's root (C Dm Em F G Am Bdim G7): C3–C5, C4–C6, C5–C7 ...
     const auto u = [](const char* text) { return QString::fromUtf8(text); };
     CHECK((page.zoneRanges()[0].toStringList() == QStringList{u("C3\u2013C5"), u("C4\u2013C6"), u("C5\u2013C7")}));
@@ -125,10 +140,25 @@ TEST(qtchords, the_page_edits_the_track_and_its_player_follows)
     CHECK(page.progressions()[pop].toMap().value("name").toString() == QString::fromUtf8("Pop i\u2013v\u2013VI\u2013iv"));
     page.setKey(9, true);
     CHECK(page.keyName() == "A minor" && page.tonicNames()[9] == "A" && (page.chords().mid(0, 4) == QStringList{"Am", "Em", "F", "Dm"}));
+    // Picking D#/Eb: the key list keeps its names (it does not turn into flats), the key reads
+    // "D#/Eb minor", the chords keep the key's spelling.
+    const QStringList labels{"C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"};
+    CHECK(page.tonicNames() == labels);
+    page.setKey(3, true);
+    CHECK(page.tonicNames() == labels && page.keyName() == "D#/Eb minor" && page.chords()[0] == "Ebm");
+    page.setKey(9, true);
     CHECK(andalusian >= 0 && page.applyProgression(andalusian));
     CHECK((page.chords().mid(0, 4) == QStringList{"Am", "G", "F", "E"}));
+    page.setAutoplayChoice(15);                                          // Ballad · Hymn
+    CHECK(tracks.chords(id)->autoplay == 4 && tracks.chords(id)->variation == 2 && page.autoplayChoice() == 15);
+    CHECK(playerOf(controller, id)->autoplay() == 4 && playerOf(controller, id)->variation() == 2);
+    page.setAutoplayChoice(99);                                          // out of range: ignored
+    CHECK(page.autoplayChoice() == 15);
+    page.setAutoplay(1);                                                 // a new style: its first variation
+    CHECK(tracks.chords(id)->autoplay == 1 && tracks.chords(id)->variation == 0 && changes >= 5);
+    page.setAutoplayChoice(0);
+    CHECK(tracks.chords(id)->autoplay == 0 && page.autoplayChoice() == 0);
     page.setAutoplay(1);
-    CHECK(tracks.chords(id)->autoplay == 1 && changes >= 5);
     CHECK(controller.projectDirty());
 
     // A second page on the same track follows; a page on another track type does nothing.

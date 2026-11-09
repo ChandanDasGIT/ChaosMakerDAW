@@ -13,12 +13,54 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
                 [L] will do later (the user's choice; section H)   [-] dropped (the user)
 
 
-NEXT UP (2026-11-09): U4 (the flaky UI tests). Start here when the user says "let's continue".
-Plans first, one step at a time.
+NEXT UP (2026-11-09): U4 (the
+flaky UI tests). Start here when the user says "let's continue". Plans first, one step at a time.
 
 OPEN — everything not finished, in the order the user wants it done (import and export last).
 Done items stay further down as the record.
 ------------------------------------------------------------------------------------------------
+-- Chords track
+[x] G5  DONE 2026-11-09 (the user: "I like these much better"): autoplay as a menu with variations.
+        - Round 1: the AUTOPLAY chips (they read "1 Flowing" ..., after the positions of
+          GarageBand's Autoplay knob) became one dropdown with no numbers: Off, then four
+          variations per style. Settings.variation, saved as "variation" (older projects: 0);
+          ChordPlayer setVariation; ChordsWrapper autoplayModes (17 entries), autoplayChoice,
+          setAutoplayChoice; ChordsEditor's AUTOPLAY ThemedComboBox.
+        - Round 2, the user: "what kind of arpeggios run just C E G twice? the bass should play
+          alongside the upper note ... make it professional". The first variations stepped up
+          the chord (C4 E4 G4 C5 E5 G5) and Flowing struck the bass ahead of the arpeggio. Now
+          Flowing and every variation but the three written ones (Pop Cells, Comping Pushes,
+          Ballad Top line) are built from the meter as piano figures on a spread chord (rungs
+          1 3 5 8 10 12 15 17 from the zone's root), the bass struck with the first note:
+            Flowing  Rolling (1-5-8-10-12-10-8-5), Alberti (1-5-3-5; bar 2 3-8-5-8),
+                     Open (1-5-10-5; bar 2 1-5-12-10), Cascade (from the top down and back up)
+            Pop      Cells, Pulse (eighth chords, a push into the loop), Ostinato (8-10-5-10
+                     riff), Shimmer (sixteenths under a repeated high octave)
+            Comping  Pushes, Steady, Off-beat, Sparse (bar 2 pushes or double-stabs)
+            Ballad   Top line, Arpeggio (1-5-10-12 up, bar 2 answers down), Hymn (a chord a
+                     beat, bar 2 long chords on the groups), Echo (bar 2 answers higher)
+          The three weak spots found in round 1 are gone (rise-and-fall that never fell in
+          4/4, figures restarting every half bar, Ballad bar 2 = bar 1). Flowing's bass: on
+          every group, bar 1 root-octave-fifth, bar 2 root-fifth-octave and a third leading
+          back. Repeating figures start again on the bar's two halves (7/8: 4+3 eighths).
+        - Renders: build/chordrender renders/chords-v3 (80 files: 5 meters x 16, 100 BPM).
+        - Known, not new: 2/4 borrows half of each 4/4 bar, so the written Pop, Comping Pushes
+          and Ballad Top line lose one bass note there.
+        Tests: backendtests chordplayer (the_figures_are_played_like_a_pianist_plays_them:
+        the bass with the first note, Flowing's bass never alone, bar 2 != bar 1, no C4 E4 G4
+        runs; every_style_has_four_variations_that_fit_every_meter; the bass test over every
+        variation), chordsjson; wrappertests qtchords; transport_ui chords page.
+        - Round 3: AUTOPLAY is a menu (ChordsEditor: a button showing the playing choice, a
+          ThemedMenu with Off and a submenu per style, filled from ChordsWrapper autoplayStyles
+          [{mode, title, variations: [{index, name, description}]}]); hovering a style opens its
+          four variations; the playing style and variation are ticked; each entry's tooltip
+          says how it plays. Test: transport_ui chords page opens the menu, checks Off + the
+          four styles and Flowing's four variations, picks Flowing · Open.
+        - Round 4 (the user: "when I select D# it becomes Eb, make the name consistent"): the
+          KEY list re-spelt itself for the chosen key. Now it always reads C, C#/Db, D, D#/Eb,
+          E, F, F#/Gb, G, G#/Ab, A, A#/Bb, B (chords::tonicLabel), and the key's name uses the
+          same label ("D#/Eb major"); chord names keep the key's own spelling (Eb, Fm, Gm ...).
+
 -- UI tests
 [ ] U4  Found 2026-11-08, NOT caused by U1-U3 (same on the code before them): on this machine
         four transport_ui tests fail even when run alone: track_effects_switch_in_place_* (BPM
