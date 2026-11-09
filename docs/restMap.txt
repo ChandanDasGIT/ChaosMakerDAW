@@ -13,10 +13,94 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
                 [L] will do later (the user's choice; section H)   [-] dropped (the user)
 
 
-NEXT UP (the user, 2026-11-09): G4 below, the Chords track's real variations. Start here when
-the user says "let's continue". Plans first, one step at a time.
+NEXT UP (the user, 2026-11-09): G4 step 5 below: the user plays the Chords track in the app
+(patterns, zones, the name press, the caret, the Preferences choice). Start here when the user
+says "let's continue". Plans first, one step at a time.
 ------------------------------------------------------------------------------------------------
-[ ] G4  Chords track: real pattern and voicing variations (the user, 2026-11-09, after trying
+[~] G4  Chords track: real pattern and voicing variations. Steps 1-4 DONE 2026-11-09 (not
+        committed):
+        1. rhythmpattern rewritten as written tables: Flowing / Pop / Comping / Ballad, two
+           bars (bar 2 varied), for 4/4 3/4 6/8 7/8 5/4, other meters from the nearest; tones
+           counted from the root in E3..D#4 (moves with the zone); group accents; weak 16ths a
+           few ms off (fixed); CC 64 changed per chord for Flowing / Ballad; a press near a
+           grid step joins it, else strikes the chord.
+        2. tools/chordrender (target chordrender): renders/chords-v2/, 40 takes, Am G F E. The
+           user listened: "i like them".
+        3. Zones: low C3..C5 / middle G3..G5 / high G4..G6 (chordvoicer ZoneRanges). The user
+           wanted BOTH MIDI mappings, chosen in Settings > Preferences > Chords Track Zones:
+           "Own octave per zone" (default; low C0..C1, middle C4..C5, high C6..C7) or "Zone keys"
+           (F#2 / G#2 / A#2 before a C4..C5 press; back to middle on a transport start, stop or
+           jump). The player always understands both; the preference (AppSettings
+           chords/zoneMapping) only picks what the strips write (ChordPlayer::triggerNotes).
+        4. Page: each chord area drawn as high / middle / low zones above the bass; pressing the
+           chord name plays the whole strip (middle zone) with both areas lit (GarageBand); a
+           caret beside the name changes the chord. Autoplay tooltips describe each pattern; the
+           piano roll names zone keys and zone octaves ("4 low · F", "Zone high").
+           Tests: backendtests chordplayer (12), appsettings, chordsjson, audioengine_midi;
+           wrappertests qtchords (5); transporttests chords page, chord zone preference.
+        Fixes after the user's first try (2026-11-09): "tell the range of each block, like
+        bass" -> each zone shows its range (C3–C5 / G3–G5 / G4–G6, ChordsWrapper.zoneRanges).
+        "Changing chords feels disruptive; I hear a normal chord press once even with autoplay,
+        kinda random" -> a press between pattern steps no longer strikes a block chord: the new
+        bass sounds at once and the pattern carries on with the new chord (a press on a step
+        joins it, plus the new bass if that step has none); with the transport stopped every
+        press starts the pattern afresh (it was random because the free grid ran on from the
+        first press). Tests: chordplayer a_chord_change_follows_the_pattern_never_a_block_chord,
+        stopped_every_chord_starts_its_pattern_afresh.
+        Second round (the user, 2026-11-09): "the problem still remains when I click the chord
+        names" -> chord changes are now SEAMLESS (the user's pick): while a pattern plays, a
+        click strikes nothing and restarts nothing (stopped too: the pattern's own grid goes
+        on); the old notes ring and the new chord comes in on the pattern's next note (old
+        notes end and the pedal changes there); a click a hair late for a note replays it at
+        once. Fixed on the way: a click exactly on a note now always takes it (events go before
+        same-instant notes; the stopped clock drifted by 1e-13). Two per-track options on the
+        page, saved with the project (chordsjson "dynamics", "bassWithChords"):
+        VOLUME Same (default: every note 88) / Top note (the voicing's top note, and in lines
+        every note of its name, 104, the rest 80; the written accents are no longer used);
+        "Bass with chords" (default on; off = right hand only, the left hand's lone notes
+        moved to the right hand so the rhythm stays; the BASS area always plays the bass).
+        Third round (the user): "the volume options are not working" -> the engine's live
+        edit path (EngineController on chordsChanged) set only the strips and the autoplay, so
+        the volume and bass options waited for a project reload. Now one backend function,
+        chords::applyTo(player, settings), sets everything, for live edits, loading and Convert;
+        qtchords checks the player itself follows each edit. "With bass with chords on I should
+        see the bass part lit as well" -> a chord (area or name) lights its BASS area too
+        whenever bass with chords is on.
+        Fourth round (the user): zones follow the chord's root, an octave apart: low = root3 ..
+        root5, middle = root4 .. root6, high = root5 .. root7 (C: C3-C5, C4-C6, C5-C7; G: G3-G5,
+        G4-G6, G5-G7; chordvoicer zoneRange); arpeggios and top lines count from the zone's
+        root; each strip's zones are labelled with its own ranges. "I need bass to be C2-C3":
+        the bass note is the chord's bass in octave 2 and every left-hand note (fifth, third,
+        octave) is folded into C2 .. C3 (ChordsBass), in both areas and every pattern.
+        Fifth round (the user: "why is bass just two notes repeating?"): folding into C2 .. C3
+        turned the octave back into the root. Now the bass part is the bass note in octave 2
+        and its third, fifth and octave above it (C: C2 E2 G2 C3; Cm: C2 Eb2 G2 C3; G: G2 B2
+        D3 G3; chordvoicer bassRange), and every pattern's two bars use all four, in the same
+        rhythm as before. Then (the user chose "every progression in both modes"): one "Key
+        chords" that follows Major/Minor (C: C Dm Em F G Am Bdim G7; Cm: Cm Ddim Eb Fm Gm Ab
+        Bb G7); every progression has a major and a minor form counted in the mode's own
+        chords (Pop I-V-vi-IV / i-v-VI-iv), named for the mode; picking a progression fills
+        the strips at once (no Fill strips button); a key or mode change refills them with
+        the same progression in the new key, and chords of your own ("Custom", found by
+        matching the strips, nothing new saved) become the key chords.
+        Sixth round ("changing time signature doesn't sound like it"): the meter does reach
+        the player (wrapper test a_time_signature_change_reaches_the_patterns), but Pop and
+        Flowing in 3/4 and 7/8 were the 4/4 bar cut short and every note now plays at one
+        volume, so the meter was hard to hear. A: Pop and Flowing in 3/4, 6/8, 7/8 and 5/4
+        have their own rhythms (3/4 Pop a waltz: run on 1, chord on 2 and 3; 6/8 two lilting
+        groups of three; 7/8 figures on 2+2+3; 5/4 climbing through 3, low again on 2), every
+        group starting with the bass or the right hand low again. B: a third VOLUME option,
+        "Meter accents" (DynamicsMeter, saved as "accents"): every step carries its accent by
+        where it falls (the bar's one 104, group starts 96, other beats of x/4 84, other
+        eighths of x/8 76, off-beat eighths 74, sixteenths 64), scaled by the press.
+        Seventh round ("can I change chords within a bar?"): yes, a change comes in on the
+        pattern's next note anywhere in the bar, but the root came only on the next bar's one
+        (mid-bar the new chord was rootless or on its fifth). Now, while the bass part plays,
+        the new chord's first bass-part note is its root in octave 2: in place of the
+        pattern's bass note there, or under the first right-hand note, held to the next bass
+        note (ChordPlayer m_rootPending).
+        Below: the plan as it was written (kept for the record).
+        (the user, 2026-11-09, after trying
         G3: "not much useful. I asked for chord variations, not a ballad, a trash arpeggio and a
         16-note arpeggio. The arpeggio just makes two notes repeat each other. It doesn't
         change any rhythm according to the time signature.")
@@ -78,8 +162,7 @@ the user says "let's continue". Plans first, one step at a time.
         transport_qtcheck.cpp. Saved projects: autoplay 1..4 keep their numbers (they now
         name the new patterns); no file format change unless zones need saving (they don't:
         a zone is per press).
-        STILL OPEN BEFORE G4 (the user decides): commit / push. Local commits not pushed:
-        63fec35, 72e6e1c (grooves). Uncommitted: G2 (FX chains, .chaosfx) and G3 (Chords track).
+        STILL OPEN (the user decides): commit / push of G4 (everything up to c80bfe1 is pushed).
 
 Earlier NEXT UP (2026-11-08/09): drum grooves (G1), FX chain export / import (G2), then the
 chord / arpeggio sequencer (G3 = F1).
