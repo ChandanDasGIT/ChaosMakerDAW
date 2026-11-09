@@ -17,6 +17,8 @@ std::vector<MidiNote> withoutSelection(std::vector<MidiNote> notes)
 
 PianoRollWrapper::PianoRollWrapper(QObject* parent)
     : QObject(parent) {
+    // Every edit path announces notesChanged; the model follows from there.
+    connect(this, &PianoRollWrapper::notesChanged, this, [this] { m_noteModel.sync(m_pattern.notes()); });
 }
 
 QVariantList PianoRollWrapper::notes() const {

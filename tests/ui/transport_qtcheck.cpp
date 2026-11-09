@@ -10,6 +10,7 @@
 #include <QPointer>
 #include <QQuickWindow>
 #include <memory>
+#include <functional>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QStandardPaths>
@@ -3933,6 +3934,66 @@ private slots:
         // A plain click on empty grid clears the selection.
         QTest::mouseClick(window,Qt::LeftButton,{},at(6.0,top-3,kh/2));
         QVERIFY(selected().isEmpty());
+    }
+    // The mouse-driven piano roll harness, kept as a test (D7): move, resize and erase by
+    // mouse; an edit leaves the other notes' blocks in place (D6, the note list model).
+    void piano_roll_mouse_moves_resizes_and_erases_notes() {
+        auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
+        auto* notes=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(notes);
+        auto* grid=visualItem(roll,"pianoRollGrid"); QVERIFY(grid);
+        const auto restore=qScopeGuard([&] { QMetaObject::invokeMethod(notes,"clear"); roll->setVisible(false); });
+        roll->setVisible(true); QTest::qWait(30);
+        roll->setProperty("activeTool","pencil");
+        const double ppb=roll->property("pixelsPerBeat").toDouble();
+        const double kh=roll->property("keyHeight").toDouble();
+        auto* flick=grid->parentItem()->parentItem();
+        const int top=127-int(std::floor((flick->property("contentY").toDouble()+20)/kh)); // a visible row
+        const auto add=[&](int pitch,double start,double length) {
+            int id=-1;
+            QMetaObject::invokeMethod(notes,"addNote",Q_RETURN_ARG(int,id),Q_ARG(int,pitch),Q_ARG(double,start),Q_ARG(double,length),Q_ARG(int,100));
+            return id;
+        };
+        const auto note=[&](int id) {
+            for(const auto& n:notes->property("notes").toList())
+                if(n.toMap().value("id").toInt()==id)return n.toMap();
+            return QVariantMap{};
+        };
+        const std::function<QQuickItem*(QQuickItem*,int)> blockIn=[&](QQuickItem* item,int id) -> QQuickItem* {
+            if(item->property("notePitch").isValid() && item->property("noteId").toInt()==id)return item;
+            for(auto* child:item->childItems())
+                if(auto* found=blockIn(child,id))return found;
+            return nullptr;
+        };
+        const auto block=[&](int id) { return blockIn(roll,id); };
+        const auto at=[&](double beat,int pitch) {
+            return grid->mapToScene(QPointF(beat*ppb,(127-pitch)*kh+kh/2)).toPoint();
+        };
+        const auto drag=[&](QPoint from,QPoint to) {
+            QTest::mousePress(window,Qt::LeftButton,{},from);
+            QTest::mouseMove(window,(from+to)/2,10); QTest::mouseMove(window,to,10);
+            QTest::mouseRelease(window,Qt::LeftButton,{},to,10);
+        };
+        const int a=add(top-1,1.0,1.0), b=add(top-6,4.0,1.0);
+        QTest::qWait(10);
+        QPointer<QQuickItem> bBlock=block(b); QVERIFY(bBlock);
+
+        // Move: drag the body one beat right and two rows down
+        drag(at(1.3,top-1),at(2.3,top-3));
+        QCOMPARE(note(a).value("startBeat").toDouble(),2.0);
+        QCOMPARE(note(a).value("note").toInt(),top-3);
+        QVERIFY(note(a).value("selected").toBool());
+        QVERIFY(bBlock && block(b)==bBlock);                       // b's block was not rebuilt
+
+        // Resize: drag the right edge one beat further
+        drag(at(3.0,top-3)-QPoint(3,0),at(4.0,top-3)-QPoint(3,0));
+        QCOMPARE(note(a).value("lengthBeats").toDouble(),2.0);
+        QCOMPARE(note(a).value("startBeat").toDouble(),2.0);
+        QVERIFY(bBlock && block(b)==bBlock);
+
+        // Erase: right-click a note's body
+        QTest::mouseClick(window,Qt::RightButton,{},at(4.4,top-6));
+        QCOMPARE(notes->property("count").toInt(),1);
+        QVERIFY(note(b).isEmpty() && !note(a).isEmpty());
     }
     void piano_roll_ctrl_wheel_zooms_time_and_rows_around_the_cursor() {
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
