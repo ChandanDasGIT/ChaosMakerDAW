@@ -99,6 +99,22 @@ void ChordsWrapper::setAutoplay(int mode)
     if (mode < 0 || mode >= chords::AutoplayModes || mode == m_s.autoplay) return;
     auto s = m_s;
     s.autoplay = mode;
+    s.variation = 0;
+    commit(s);
+}
+
+// Entry 0 is Off, then Variations entries per style.
+int ChordsWrapper::autoplayChoice() const
+{
+    return m_s.autoplay == chords::AutoplayOff ? 0 : 1 + (m_s.autoplay - 1) * chords::Variations + m_s.variation;
+}
+
+void ChordsWrapper::setAutoplayChoice(int index)
+{
+    if (!valid() || index < 0 || index >= 1 + (chords::AutoplayModes - 1) * chords::Variations || index == autoplayChoice()) return;
+    auto s = m_s;
+    s.autoplay = index == 0 ? chords::AutoplayOff : 1 + (index - 1) / chords::Variations;
+    s.variation = index == 0 ? 0 : (index - 1) % chords::Variations;
     commit(s);
 }
 
@@ -123,8 +139,7 @@ QString ChordsWrapper::keyName() const { return QString::fromStdString(chords::k
 QStringList ChordsWrapper::tonicNames() const
 {
     QStringList out;
-    const bool flats = chords::usesFlats(m_s.key);
-    for (int pc = 0; pc < 12; ++pc) out << QString::fromStdString(chords::noteName(pc, flats));
+    for (int pc = 0; pc < 12; ++pc) out << QString::fromStdString(chords::tonicLabel(pc));
     return out;
 }
 
@@ -137,13 +152,38 @@ QStringList ChordsWrapper::degreeLabels() const
 
 QVariantList ChordsWrapper::autoplayModes() const
 {
+    const auto text = [](std::string_view v) { return QString::fromUtf8(v.data(), qsizetype(v.size())); };
     QVariantList out;
-    for (int mode = 0; mode < chords::AutoplayModes; ++mode) {
-        const auto name = chords::autoplayName(mode);
-        const auto description = chords::autoplayDescription(mode);
-        out.append(QVariantMap{{QStringLiteral("mode"), mode},
-                               {QStringLiteral("title"), QString::fromUtf8(name.data(), qsizetype(name.size()))},
-                               {QStringLiteral("description"), QString::fromUtf8(description.data(), qsizetype(description.size()))}});
+    const auto off = text(chords::autoplayName(chords::AutoplayOff));
+    out.append(QVariantMap{{QStringLiteral("index"), 0}, {QStringLiteral("mode"), chords::AutoplayOff},
+                           {QStringLiteral("variation"), 0}, {QStringLiteral("style"), off}, {QStringLiteral("name"), off},
+                           {QStringLiteral("title"), off},
+                           {QStringLiteral("description"), text(chords::autoplayDescription(chords::AutoplayOff))}});
+    for (int mode = 1; mode < chords::AutoplayModes; ++mode)
+        for (int v = 0; v < chords::Variations; ++v) {
+            const auto style = text(chords::autoplayName(mode));
+            const auto name = text(chords::variationName(mode, v));
+            out.append(QVariantMap{{QStringLiteral("index"), int(out.size())}, {QStringLiteral("mode"), mode},
+                                   {QStringLiteral("variation"), v}, {QStringLiteral("style"), style},
+                                   {QStringLiteral("name"), name},
+                                   {QStringLiteral("title"), style + QStringLiteral(" \u00b7 ") + name},
+                                   {QStringLiteral("description"), text(chords::variationDescription(mode, v))}});
+        }
+    return out;
+}
+
+QVariantList ChordsWrapper::autoplayStyles() const
+{
+    const auto text = [](std::string_view v) { return QString::fromUtf8(v.data(), qsizetype(v.size())); };
+    QVariantList out;
+    for (int mode = 1; mode < chords::AutoplayModes; ++mode) {
+        QVariantList variations;
+        for (int v = 0; v < chords::Variations; ++v)
+            variations.append(QVariantMap{{QStringLiteral("index"), 1 + (mode - 1) * chords::Variations + v},
+                                          {QStringLiteral("name"), text(chords::variationName(mode, v))},
+                                          {QStringLiteral("description"), text(chords::variationDescription(mode, v))}});
+        out.append(QVariantMap{{QStringLiteral("mode"), mode}, {QStringLiteral("title"), text(chords::autoplayName(mode))},
+                               {QStringLiteral("variations"), variations}});
     }
     return out;
 }

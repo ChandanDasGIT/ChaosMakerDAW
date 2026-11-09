@@ -1824,11 +1824,45 @@ private slots:
         QVERIFY(!visualItem(window->contentItem(),"chordsDynamicsTop")->property("active").toBool());
         press("chordsDynamicsEven");
         QTRY_COMPARE(tracks.chords(id)->dynamics,0);
-        // Autoplay chips.
-        QVERIFY(visualItem(window->contentItem(),"chordsAutoplay3")->property("active").toBool());
-        press("chordsAutoplay1");
+        // Autoplay: a menu. Click it: Off, then Flowing, Pop, Comping, Ballad; hover a style for
+        // its four variations (no numbers anywhere); the button shows the one playing.
+        QVERIFY(!visualItem(window->contentItem(),"chordsAutoplay3"));
+        auto* autoplayButton=visualItem(window->contentItem(),"chordsAutoplay"); QVERIFY(autoplayButton);
+        QCOMPARE(autoplayButton->property("displayText").toString(),QString::fromUtf8("Comping \u00b7 Pushes"));
+        auto* autoplayMenu=autoplayButton->findChild<QObject*>("chordsAutoplayMenu"); QVERIFY(autoplayMenu);
+        QVERIFY(!autoplayMenu->property("visible").toBool());
+        QMetaObject::invokeMethod(autoplayButton,"click");
+        QTRY_VERIFY(autoplayMenu->property("visible").toBool());
+        QCOMPARE(autoplayMenu->property("count").toInt(),6);                         // Off, a line, four styles
+        QStringList styles;
+        for(int i=2;i<6;++i) {
+            QObject* entry=nullptr;
+            QMetaObject::invokeMethod(autoplayMenu,"itemAt",Q_RETURN_ARG(QQuickItem*,reinterpret_cast<QQuickItem*&>(entry)),Q_ARG(int,i));
+            QVERIFY(entry); styles<<entry->property("text").toString();
+            QCOMPARE(entry->property("checked").toBool(),i==4);                       // Comping is playing
+        }
+        QCOMPARE(styles,QStringList({"Flowing","Pop","Comping","Ballad"}));
+        auto* flowing=autoplayButton->findChild<QObject*>("chordsAutoplayStyle1"); QVERIFY(flowing);
+        QCOMPARE(flowing->property("count").toInt(),4);
+        QStringList names;
+        for(int i=0;i<4;++i) {
+            QObject* entry=nullptr;
+            QMetaObject::invokeMethod(flowing,"itemAt",Q_RETURN_ARG(QQuickItem*,reinterpret_cast<QQuickItem*&>(entry)),Q_ARG(int,i));
+            QVERIFY(entry); names<<entry->property("text").toString();
+        }
+        QCOMPARE(names,QStringList({"Rolling","Alberti","Open","Cascade"}));
+        QVERIFY(autoplayButton->findChild<QObject*>("chordsAutoplayChoice9")->property("checked").toBool());   // Comping · Pushes ticked
+        QMetaObject::invokeMethod(flowing,"open");
+        QTRY_VERIFY(flowing->property("visible").toBool());
+        auto* open=autoplayButton->findChild<QObject*>("chordsAutoplayChoice3"); QVERIFY(open);
+        QMetaObject::invokeMethod(open,"triggered");
         QTRY_COMPARE(tracks.chords(id)->autoplay,1);
-        QVERIFY(visualItem(window->contentItem(),"chordsAutoplay1")->property("active").toBool());
+        QCOMPARE(tracks.chords(id)->variation,2);
+        QTRY_VERIFY(!autoplayMenu->property("visible").toBool());
+        QCOMPARE(autoplayButton->property("displayText").toString(),QString::fromUtf8("Flowing \u00b7 Open"));
+        QVERIFY(open->property("checked").toBool());
+        for(const auto& entry:bridge->property("autoplayModes").toList())
+            QVERIFY(!entry.toMap().value("title").toString().contains(QRegularExpression("[0-9]")));
 
         // A strip's chord: click its name, pick the key's V7, OK.
         QVERIFY(visualItem(window->contentItem(),"chordStripName2"));

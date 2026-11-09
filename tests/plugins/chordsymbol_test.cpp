@@ -50,7 +50,13 @@ TEST(chordsymbol, chord_names_read_in_every_usual_spelling)
 TEST(chordsymbol, keys_give_their_chords_by_degree_and_roman_numeral)
 {
     const Key cMajor{0, false}, aMinor{9, true}, fMajor{5, false}, dMinor{2, true};
-    CHECK(keyName(cMajor) == "C major" && keyName(aMinor) == "A minor" && keyName({10, false}) == "Bb major");
+    CHECK(keyName(cMajor) == "C major" && keyName(aMinor) == "A minor" && keyName({10, false}) == "A#/Bb major");
+    CHECK(keyName({3, false}) == "D#/Eb major" && keyName({6, true}) == "F#/Gb minor");
+    // The key list's names: the same whichever key is chosen, both spellings on the black keys.
+    const std::array<std::string, 12> labels{"C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"};
+    for (int pc = 0; pc < 12; ++pc) CHECK(tonicLabel(pc) == labels[std::size_t(pc)] && tonicLabel(pc + 12) == labels[std::size_t(pc)]);
+    // Chords keep the key's own spelling (D#/Eb major: Eb, Fm, Gm ...).
+    CHECK(romanChord(Key{3, false}, "I")->name == "Eb" && romanChord(Key{3, false}, "ii")->name == "Fm");
     CHECK(!usesFlats(cMajor) && usesFlats(fMajor) && usesFlats(dMinor) && !usesFlats(aMinor));
 
     std::vector<Chord> major;

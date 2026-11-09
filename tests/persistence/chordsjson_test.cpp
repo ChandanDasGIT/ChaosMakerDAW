@@ -13,6 +13,7 @@ TEST(chordsjson, settings_round_trip_and_bad_ones_are_refused)
     chords::Settings s;
     s.chords = {"Am", "G", "F", "E", "", "Dm7", "G/B", "Csus4"};
     s.autoplay = 2;
+    s.variation = 3;
     s.dynamics = chords::DynamicsTopNote;
     s.bassWithChords = false;
     s.key = {9, true};
@@ -30,6 +31,7 @@ TEST(chordsjson, settings_round_trip_and_bad_ones_are_refused)
     accents.dynamics = chords::DynamicsMeter;
     CHECK(persistence::chordsjson::toJson(accents)["dynamics"] == "accents");
     CHECK(persistence::chordsjson::fromJson(persistence::chordsjson::toJson(accents), loaded, error) && loaded.dynamics == chords::DynamicsMeter);
+    CHECK(persistence::chordsjson::toJson(s)["variation"] == 3);
     // Older files without the field keep the default (same volume, bass with chords).
     CHECK(persistence::chordsjson::fromJson(json::object(), loaded, error) && loaded == chords::Settings{});
     CHECK(loaded.dynamics == chords::DynamicsEven && loaded.bassWithChords);
@@ -46,6 +48,8 @@ TEST(chordsjson, settings_round_trip_and_bad_ones_are_refused)
     CHECK(refused([](json& j) { j["autoplay"] = 7; }));
     CHECK(refused([](json& j) { j["key"] = 12; }));
     CHECK(refused([](json& j) { j["minor"] = "yes"; }));
+    CHECK(refused([](json& j) { j["variation"] = 4; }));
+    CHECK(refused([](json& j) { j["variation"] = "two"; }));
     CHECK(refused([](json& j) { j["dynamics"] = "loud"; }));
     CHECK(refused([](json& j) { j["dynamics"] = 1; }));
     CHECK(refused([](json& j) { j["bassWithChords"] = "on"; }));

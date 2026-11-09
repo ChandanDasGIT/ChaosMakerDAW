@@ -35,6 +35,9 @@ std::optional<Chord> parse(std::string_view text);
 
 // "C", "C#", "Db" ... for a pitch class, with sharps or flats.
 std::string noteName(int pitchClass, bool flats);
+// A key's tonic as the key list shows it, the same whatever key is chosen: "C", "C#/Db", "D",
+// "D#/Eb" ... (both spellings for the black keys).
+std::string tonicLabel(int pitchClass);
 
 struct Key {
     int tonic = 0;                        // pitch class
@@ -43,7 +46,7 @@ struct Key {
 };
 // Whether the key is written with flats (F, Bb, Eb ... major; D, G, C ... minor).
 bool usesFlats(const Key& key) noexcept;
-// "C major", "F# minor", "Bb major".
+// "C major", "F#/Gb minor", "A#/Bb major" (the tonic as tonicLabel writes it).
 std::string keyName(const Key& key);
 
 // The seven degree labels of the key: {"I","ii","iii","IV","V","vi","vii°"} or the minor ones.

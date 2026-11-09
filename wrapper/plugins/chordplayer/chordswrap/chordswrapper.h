@@ -37,9 +37,16 @@ class ChordsWrapper : public QObject {
     Q_PROPERTY(int keyTonic READ keyTonic NOTIFY settingsChanged)
     Q_PROPERTY(bool keyMinor READ keyMinor NOTIFY settingsChanged)
     Q_PROPERTY(QString keyName READ keyName NOTIFY settingsChanged)
-    Q_PROPERTY(QStringList tonicNames READ tonicNames NOTIFY settingsChanged)   // 12, spelt for the key
+    Q_PROPERTY(QStringList tonicNames READ tonicNames CONSTANT)   // 12: "C", "C#/Db", "D", "D#/Eb" ...
     Q_PROPERTY(QStringList degreeLabels READ degreeLabels NOTIFY settingsChanged)
-    Q_PROPERTY(QVariantList autoplayModes READ autoplayModes CONSTANT)  // [{mode, title, description}]
+    Q_PROPERTY(int variation READ variation NOTIFY settingsChanged)    // of the autoplay's style
+    // The autoplay list: Off, then every style's variations ("Flowing · Rising" ...), as
+    // [{index, mode, variation, style, name, title, description}]; autoplayChoice is the entry playing.
+    Q_PROPERTY(QVariantList autoplayModes READ autoplayModes CONSTANT)
+    // The same, for the AUTOPLAY menu: the styles, each with its variations, as
+    // [{mode, title, variations: [{index, name, description}]}] (index into autoplayModes).
+    Q_PROPERTY(QVariantList autoplayStyles READ autoplayStyles CONSTANT)
+    Q_PROPERTY(int autoplayChoice READ autoplayChoice NOTIFY settingsChanged)
     // Per strip, its zones' ranges for its chord: [low, middle, high], "G3–G5" ...; [] for an empty strip.
     Q_PROPERTY(QVariantList zoneRanges READ zoneRanges NOTIFY settingsChanged)
     // [{index, name, description}], named for the key's mode ("Pop I–V–vi–IV" / "Pop i–v–VI–iv").
@@ -67,7 +74,11 @@ public:
 
     QStringList chords() const;
     int autoplay() const { return m_s.autoplay; }
-    void setAutoplay(int mode);
+    void setAutoplay(int mode);                          // a new style starts on its first variation
+    int variation() const { return m_s.variation; }
+    int autoplayChoice() const;
+    // Picks entry `index` of autoplayModes (its style and variation).
+    Q_INVOKABLE void setAutoplayChoice(int index);
     int dynamics() const { return m_s.dynamics; }
     void setDynamics(int dynamics);
     bool bassWithChords() const { return m_s.bassWithChords; }
@@ -78,6 +89,7 @@ public:
     QStringList tonicNames() const;
     QStringList degreeLabels() const;
     QVariantList autoplayModes() const;
+    QVariantList autoplayStyles() const;
     QVariantList zoneRanges() const;
     QVariantList progressions() const;
     int currentProgression() const;

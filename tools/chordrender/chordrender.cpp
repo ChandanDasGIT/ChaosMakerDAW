@@ -3,8 +3,9 @@
 //
 //   chordrender <out-dir> [chords ...]
 //
-// For every meter (4/4, 3/4, 6/8, 7/8, 5/4), tempo (100, 120 BPM) and pattern (1 .. 4) it writes
-// <out-dir>/<n>-<d>-<bpm>bpm-<mode>-<name>.wav: the chords (default Am G F E) one per bar, twice
+// For every meter (4/4, 3/4, 6/8, 7/8, 5/4), style (Flowing, Pop, Comping, Ballad) and each of its
+// variations, at 100 BPM, it writes <out-dir>/<n>-<d>-<style>-<v>-<variation>.wav: the chords
+// (default Am G F E) one per bar, twice
 // through, then the last chord stopped and the piano left to ring out. The piano comes from the
 // sample-kits folder (or $CHAOSMAKER_SAMPLE_KITS); nothing else is read or written.
 #include "instruments/piano/piano.h"
@@ -50,6 +51,7 @@ struct Take {
     int numerator, denominator;
     double bpm;
     int mode;
+    int variation;
 };
 
 // One take: the chords one per bar, twice, then the last one pressed again (it stops) and a
@@ -60,6 +62,7 @@ double render(Piano& piano, const std::array<ChordPlayer::Strip, 8>& strips, int
     ChordPlayer player;
     player.prepare(Rate);
     player.setAutoplay(take.mode);
+    player.setVariation(take.variation);
     player.setStrips(strips);
     piano.reset();
 
@@ -146,11 +149,13 @@ int main(int argc, char** argv)
         }
 
         for (auto [n, d] : std::vector<std::pair<int, int>>{{4, 4}, {3, 4}, {6, 8}, {7, 8}, {5, 4}})
-            for (double bpm : {100.0, 120.0})
-                for (int mode = 1; mode <= 4; ++mode) {
-                    const std::string file = std::to_string(n) + "-" + std::to_string(d) + "-" + std::to_string(int(bpm)) + "bpm-"
-                                             + std::to_string(mode) + "-" + std::string(chords::autoplayName(mode)) + ".wav";
-                    const double peak = render(piano, strips, int(names.size()), Take{n, d, bpm, mode}, (out / file).string());
+            for (int mode = 1; mode <= 4; ++mode)
+                for (int variation = 0; variation < chords::Variations; ++variation) {
+                    std::string name(chords::variationName(mode, variation));
+                    for (auto& c : name) if (c == ' ') c = '-';
+                    const std::string file = std::to_string(n) + "-" + std::to_string(d) + "-" + std::string(chords::autoplayName(mode))
+                                             + "-" + std::to_string(variation + 1) + "-" + name + ".wav";
+                    const double peak = render(piano, strips, int(names.size()), Take{n, d, 100.0, mode, variation}, (out / file).string());
                     std::printf("%-32s peak %6.1f dBFS\n", file.c_str(), 20 * std::log10(std::max(peak, 1e-12)));
                 }
     } catch (const std::exception& e) {

@@ -86,6 +86,11 @@ void ChordPlayer::setAutoplay(int mode) noexcept
     m_autoplay.store(std::clamp(mode, 0, chords::AutoplayModes - 1), std::memory_order_relaxed);
 }
 
+void ChordPlayer::setVariation(int variation) noexcept
+{
+    m_variation.store(std::clamp(variation, 0, chords::Variations - 1), std::memory_order_relaxed);
+}
+
 void ChordPlayer::setDynamics(int dynamics) noexcept
 {
     m_dynamics.store(std::clamp(dynamics, 0, chords::DynamicsModes - 1), std::memory_order_relaxed);
@@ -146,13 +151,16 @@ void ChordPlayer::rebuildPattern(int numerator, int denominator) noexcept
     const int mode = m_autoplay.load(std::memory_order_relaxed);
     const chords::Part part = m_bass ? chords::Part::Bass
                             : m_bassWithChords.load(std::memory_order_relaxed) ? chords::Part::Chord : chords::Part::RightHand;
-    if (mode == m_patternMode && numerator == m_patternNumerator && denominator == m_patternDenominator && part == m_patternPart)
+    const int variation = m_variation.load(std::memory_order_relaxed);
+    if (mode == m_patternMode && variation == m_patternVariation && numerator == m_patternNumerator
+        && denominator == m_patternDenominator && part == m_patternPart)
         return;
     m_patternMode = mode;
+    m_patternVariation = variation;
     m_patternNumerator = numerator;
     m_patternDenominator = denominator;
     m_patternPart = part;
-    chords::buildPattern(mode, numerator, denominator, part, m_pattern);
+    chords::buildPattern(mode, variation, numerator, denominator, part, m_pattern);
 }
 
 int ChordPlayer::offsetAt(double beat) const noexcept

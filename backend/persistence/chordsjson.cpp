@@ -8,7 +8,7 @@ json toJson(const chords::Settings& s)
 {
     json names = json::array();
     for (const auto& n : s.chords) names.push_back(n);
-    return {{"chords", std::move(names)}, {"autoplay", s.autoplay},
+    return {{"chords", std::move(names)}, {"autoplay", s.autoplay}, {"variation", s.variation},
             {"dynamics", s.dynamics == chords::DynamicsTopNote ? "top" : s.dynamics == chords::DynamicsMeter ? "accents" : "even"}, {"bassWithChords", s.bassWithChords},
             {"key", s.key.tonic}, {"minor", s.key.minor}};
 }
@@ -33,6 +33,11 @@ bool fromJson(const json& j, chords::Settings& settings, std::string& error)
         if (!j["autoplay"].is_number_integer()) return false;
         r.autoplay = j["autoplay"].get<int>();
         if (r.autoplay < 0 || r.autoplay >= chords::AutoplayModes) return false;
+    }
+    if (j.contains("variation")) {                        // older projects: the style's first one
+        if (!j["variation"].is_number_integer()) return false;
+        r.variation = j["variation"].get<int>();
+        if (r.variation < 0 || r.variation >= chords::Variations) return false;
     }
     if (j.contains("dynamics")) {                         // older projects have neither: the defaults
         if (!j["dynamics"].is_string()) return false;
