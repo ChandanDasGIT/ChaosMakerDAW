@@ -911,6 +911,25 @@ private slots:
         QCOMPARE(item(floating)->property("clipId").toInt(),clip);
         window->close(); QTRY_VERIFY(!window->isVisible()); QVERIFY(item(floating));
     }
+    void chord_zone_mapping_is_a_preference() {
+        // Preferences: own octave per zone by default, zone keys the other choice; a click saves it.
+        auto* bridge=window->findChild<AppSettingsWrapper*>("appSettingsBridge"); QVERIFY(bridge);
+        const auto restoreBridge=qScopeGuard([&] { bridge->setChordZoneMapping("octaves"); });
+        QCOMPARE(bridge->chordZoneMapping(),QString("octaves"));
+        auto* settings=visualItem(window->contentItem(),"settingsButton"); QVERIFY(settings); click(settings);
+        QQuickItem* preferences=nullptr;
+        QTRY_VERIFY((preferences=visualItem(window->contentItem(),"preferencesSetting"))); click(preferences);
+        QQuickItem* keys=nullptr; QQuickItem* octaves=nullptr;
+        QTRY_VERIFY((keys=visualItem(window->contentItem(),"chordZoneKeys")) && keys->isVisible());
+        octaves=visualItem(window->contentItem(),"chordZoneOctaves"); QVERIFY(octaves);
+        QVERIFY(octaves->property("checked").toBool()); QVERIFY(!keys->property("checked").toBool());
+        click(keys); QTRY_COMPARE(bridge->chordZoneMapping(),QString("zonekeys"));
+        QCOMPARE(QSettings().value("chords/zoneMapping").toString(),QString("zonekeys"));
+        QCOMPARE(AppSettingsWrapper::storedChordZoneMapping(),QString("zonekeys"));
+        click(octaves); QTRY_COMPARE(bridge->chordZoneMapping(),QString("octaves"));
+        QCOMPARE(QSettings().value("chords/zoneMapping").toString(),QString("octaves"));
+        QMetaObject::invokeMethod(window->findChild<QObject*>("preferencesPopup"),"close");
+    }
     void default_record_mode_is_a_preference_and_new_tracks_follow_it() {
         // Preferences: two radio buttons, Dry checked by default; a click saves the choice.
         auto* bridge=window->findChild<AppSettingsWrapper*>("appSettingsBridge"); QVERIFY(bridge);
@@ -1756,12 +1775,31 @@ private slots:
             QVERIFY(visualItem(window->contentItem(),"chordStripName"+QString::number(i)));
             QVERIFY(visualItem(window->contentItem(),"chordStripChord"+QString::number(i)));
             QVERIFY(visualItem(window->contentItem(),"chordStripBass"+QString::number(i)));
+            QVERIFY(visualItem(window->contentItem(),"chordStripHigh"+QString::number(i)));
+            QVERIFY(visualItem(window->contentItem(),"chordStripLow"+QString::number(i)));
+            QVERIFY(visualItem(window->contentItem(),"chordStripCaret"+QString::number(i)));
         }
         auto* bridge=visualObject(window->contentItem(),"chordsBridge"); QVERIFY(bridge);
         const auto press=[&](const QString& name) {
             auto* item=visualItem(window->contentItem(),name); QVERIFY2(item,qPrintable(name));
             QMetaObject::invokeMethod(item,"click");
         };
+        // Volume and bass with chords: same volume and bass on by default; a click saves them.
+        QVERIFY(visualItem(window->contentItem(),"chordsDynamicsEven")->property("active").toBool());
+        QVERIFY(visualItem(window->contentItem(),"chordsBassWithChords")->property("active").toBool());
+        press("chordsDynamicsTop");
+        QTRY_COMPARE(tracks.chords(id)->dynamics,1);
+        QVERIFY(visualItem(window->contentItem(),"chordsDynamicsTop")->property("active").toBool());
+        press("chordsBassWithChords");
+        QTRY_VERIFY(!tracks.chords(id)->bassWithChords);
+        press("chordsBassWithChords");
+        QTRY_VERIFY(tracks.chords(id)->bassWithChords);
+        press("chordsDynamicsMeter");
+        QTRY_COMPARE(tracks.chords(id)->dynamics,2);
+        QVERIFY(visualItem(window->contentItem(),"chordsDynamicsMeter")->property("active").toBool());
+        QVERIFY(!visualItem(window->contentItem(),"chordsDynamicsTop")->property("active").toBool());
+        press("chordsDynamicsEven");
+        QTRY_COMPARE(tracks.chords(id)->dynamics,0);
         // Autoplay chips.
         QVERIFY(visualItem(window->contentItem(),"chordsAutoplay3")->property("active").toBool());
         press("chordsAutoplay1");
@@ -1772,7 +1810,7 @@ private slots:
         QVERIFY(visualItem(window->contentItem(),"chordStripName2"));
         auto* dialog=visualObject(window->contentItem(),"chordEditDialog"); if(!dialog) dialog=fxWindow()->findChild<QObject*>("chordEditDialog");
         QVERIFY(dialog);
-        QMetaObject::invokeMethod(dialog,"edit",Q_ARG(QVariant,QVariant(2)));
+        QMetaObject::invokeMethod(visualItem(window->contentItem(),"chordStripCaret2"),"click");   // the caret opens it
         QTRY_VERIFY(dialog->property("visible").toBool());
         auto* content=dialog->property("contentItem").value<QQuickItem*>(); QVERIFY(content);
         const auto inDialog=[&](const char* n) { return visualItem(content,n); };
@@ -1796,18 +1834,26 @@ private slots:
         QVERIFY(bridge->property("lastError").toString().contains("Hm7"));
         QMetaObject::invokeMethod(dialog,"close");
 
-        // A progression fills all eight strips in the key.
+        // Minor refills the strips with the key chords at once; there is no Fill button.
+        QVERIFY(!visualItem(window->contentItem(),"chordsFill"));
+        auto* box=visualItem(window->contentItem(),"chordsProgression"); QVERIFY(box);
+        QCOMPARE(box->property("displayText").toString(),QString("Custom"));   // the chords edited above
         press("chordsKeyMinor");
         QTRY_VERIFY(tracks.chords(id)->key.minor);
-        auto* box=visualItem(window->contentItem(),"chordsProgression"); QVERIFY(box);
+        QTRY_COMPARE(tracks.chords(id)->chords[1],std::string("Ddim"));
+        QCOMPARE(tracks.chords(id)->chords[0],std::string("Cm"));
+        QTRY_COMPARE(box->property("currentIndex").toInt(),0);
+        QCOMPARE(box->property("displayText").toString(),QString("Key chords"));
+        // Picking a progression fills the strips in the key.
         int andalusian=-1; const auto progs=bridge->property("progressions").toList();
         for(const auto& p:progs) if(p.toMap().value("name").toString().startsWith("Andalusian")) andalusian=p.toMap().value("index").toInt();
         QVERIFY(andalusian>=0);
-        box->setProperty("currentIndex",andalusian);
         QMetaObject::invokeMethod(bridge,"setKey",Q_ARG(int,9),Q_ARG(bool,true));
-        press("chordsFill");
+        QTRY_COMPARE(tracks.chords(id)->chords[0],std::string("Am"));
+        QMetaObject::invokeMethod(box,"activated",Q_ARG(int,andalusian));
         QTRY_COMPARE(tracks.chords(id)->chords[3],std::string("E"));
-        QCOMPARE(tracks.chords(id)->chords[0],std::string("Am"));
+        QCOMPARE(tracks.chords(id)->chords[1],std::string("G"));
+        QTRY_COMPARE(box->property("currentIndex").toInt(),andalusian);
 
         // The grand piano's page is the second page.
         QVERIFY(visualItem(window->contentItem(),"selectEffect_piano"));

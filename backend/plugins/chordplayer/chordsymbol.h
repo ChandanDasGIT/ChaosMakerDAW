@@ -57,15 +57,20 @@ std::optional<Chord> degreeChord(const Key& key, int degree, bool seventh = fals
 // maj7, sus4 or sus2. "V" in a minor key is the major V (E in A minor). Nothing if not read.
 std::optional<Chord> romanChord(const Key& key, std::string_view token);
 
-// Eight chords for the strips, from a key and a list of Roman tokens.
+// Eight chords for the strips, from a key and a list of Roman tokens. Every progression has a
+// major and a minor form, each counted in that mode's own chords (Pop: I V vi IV in major,
+// i v VI iv in minor); the key's mode picks the form.
 struct Progression {
-    std::string_view name;
+    std::array<std::string_view, 2> names;            // major, minor: "Pop I–V–vi–IV", "Pop i–v–VI–iv"
     std::string_view description;
-    bool minor;                           // the mode it is written in; the key's tonic is kept
-    std::array<std::string_view, 8> tokens;
+    std::array<std::array<std::string_view, 8>, 2> tokens;   // major, minor
+    std::string_view name(bool minor) const noexcept { return names[minor ? 1 : 0]; }
 };
 std::span<const Progression> progressions();
-// The progression's eight chords in `tonic` (its own mode); empty if a token does not read.
-std::vector<Chord> progressionChords(const Progression& progression, int tonic);
+// The progression's eight chords in the key (its form for the key's mode); empty if a token
+// does not read.
+std::vector<Chord> progressionChords(const Progression& progression, const Key& key);
+// Which progression the eight strips hold in the key, or -1 (chords of your own).
+int matchProgression(std::span<const std::string> strips, const Key& key);
 
 } // namespace chords

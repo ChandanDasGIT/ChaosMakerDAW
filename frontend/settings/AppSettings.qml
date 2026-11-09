@@ -186,6 +186,52 @@ ToolButton {
             }
 
             Text {
+                text: "Chords Track Zones"
+                color: Theme.text
+                font.pixelSize: Theme.bodySize
+                font.bold: true
+            }
+
+            ColumnLayout {
+                spacing: 8
+                Text {
+                    text: "How a strip's low / middle / high zone is written to MIDI (KEYS, recording). Clips play either way."
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.smallSize
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                }
+                RadioButton {
+                    id: zoneOctavesRadio
+                    objectName: "chordZoneOctaves"
+                    text: "Own octave per zone · low C0–C1, middle C4–C5, high C6–C7"
+                    checked: appSettingsBridge.chordZoneMapping === "octaves"
+                    onToggled: if (checked) appSettingsBridge.chordZoneMapping = "octaves"
+                    contentItem: Text {
+                        text: zoneOctavesRadio.text
+                        color: Theme.text
+                        font.pixelSize: Theme.bodySize
+                        leftPadding: zoneOctavesRadio.indicator.width + 6
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+                RadioButton {
+                    id: zoneKeysRadio
+                    objectName: "chordZoneKeys"
+                    text: "Zone keys · F#2 / G#2 / A#2, then C4–C5"
+                    checked: appSettingsBridge.chordZoneMapping === "zonekeys"
+                    onToggled: if (checked) appSettingsBridge.chordZoneMapping = "zonekeys"
+                    contentItem: Text {
+                        text: zoneKeysRadio.text
+                        color: Theme.text
+                        font.pixelSize: Theme.bodySize
+                        leftPadding: zoneKeysRadio.indicator.width + 6
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
+
+            Text {
                 text: "Piano Roll Display"
                 color: Theme.text
                 font.pixelSize: Theme.bodySize

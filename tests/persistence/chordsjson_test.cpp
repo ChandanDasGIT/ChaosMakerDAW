@@ -13,6 +13,8 @@ TEST(chordsjson, settings_round_trip_and_bad_ones_are_refused)
     chords::Settings s;
     s.chords = {"Am", "G", "F", "E", "", "Dm7", "G/B", "Csus4"};
     s.autoplay = 2;
+    s.dynamics = chords::DynamicsTopNote;
+    s.bassWithChords = false;
     s.key = {9, true};
     chords::Settings loaded;
     std::string error;
@@ -23,8 +25,14 @@ TEST(chordsjson, settings_round_trip_and_bad_ones_are_refused)
     json tidy = persistence::chordsjson::toJson(s);
     tidy["chords"][0] = "Amin7";
     CHECK(persistence::chordsjson::fromJson(tidy, loaded, error) && loaded.chords[0] == "Am7");
-    // Older files without the field keep the default.
+    CHECK(persistence::chordsjson::toJson(s)["dynamics"] == "top" && persistence::chordsjson::toJson(s)["bassWithChords"] == false);
+    auto accents = s;
+    accents.dynamics = chords::DynamicsMeter;
+    CHECK(persistence::chordsjson::toJson(accents)["dynamics"] == "accents");
+    CHECK(persistence::chordsjson::fromJson(persistence::chordsjson::toJson(accents), loaded, error) && loaded.dynamics == chords::DynamicsMeter);
+    // Older files without the field keep the default (same volume, bass with chords).
     CHECK(persistence::chordsjson::fromJson(json::object(), loaded, error) && loaded == chords::Settings{});
+    CHECK(loaded.dynamics == chords::DynamicsEven && loaded.bassWithChords);
 
     const chords::Settings before = loaded;
     const auto refused = [&](auto edit) {
@@ -38,6 +46,9 @@ TEST(chordsjson, settings_round_trip_and_bad_ones_are_refused)
     CHECK(refused([](json& j) { j["autoplay"] = 7; }));
     CHECK(refused([](json& j) { j["key"] = 12; }));
     CHECK(refused([](json& j) { j["minor"] = "yes"; }));
+    CHECK(refused([](json& j) { j["dynamics"] = "loud"; }));
+    CHECK(refused([](json& j) { j["dynamics"] = 1; }));
+    CHECK(refused([](json& j) { j["bassWithChords"] = "on"; }));
     CHECK(refused([](json& j) { j = json::array(); }));
 
     // sanitize: autoplay and key into range, an unreadable chord becomes an empty strip.

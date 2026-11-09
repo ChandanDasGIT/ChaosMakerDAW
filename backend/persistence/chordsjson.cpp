@@ -8,7 +8,9 @@ json toJson(const chords::Settings& s)
 {
     json names = json::array();
     for (const auto& n : s.chords) names.push_back(n);
-    return {{"chords", std::move(names)}, {"autoplay", s.autoplay}, {"key", s.key.tonic}, {"minor", s.key.minor}};
+    return {{"chords", std::move(names)}, {"autoplay", s.autoplay},
+            {"dynamics", s.dynamics == chords::DynamicsTopNote ? "top" : s.dynamics == chords::DynamicsMeter ? "accents" : "even"}, {"bassWithChords", s.bassWithChords},
+            {"key", s.key.tonic}, {"minor", s.key.minor}};
 }
 
 bool fromJson(const json& j, chords::Settings& settings, std::string& error)
@@ -31,6 +33,16 @@ bool fromJson(const json& j, chords::Settings& settings, std::string& error)
         if (!j["autoplay"].is_number_integer()) return false;
         r.autoplay = j["autoplay"].get<int>();
         if (r.autoplay < 0 || r.autoplay >= chords::AutoplayModes) return false;
+    }
+    if (j.contains("dynamics")) {                         // older projects have neither: the defaults
+        if (!j["dynamics"].is_string()) return false;
+        const auto d = j["dynamics"].get<std::string>();
+        if (d != "even" && d != "top" && d != "accents") return false;
+        r.dynamics = d == "top" ? chords::DynamicsTopNote : d == "accents" ? chords::DynamicsMeter : chords::DynamicsEven;
+    }
+    if (j.contains("bassWithChords")) {
+        if (!j["bassWithChords"].is_boolean()) return false;
+        r.bassWithChords = j["bassWithChords"].get<bool>();
     }
     if (j.contains("key")) {
         if (!j["key"].is_number_integer()) return false;

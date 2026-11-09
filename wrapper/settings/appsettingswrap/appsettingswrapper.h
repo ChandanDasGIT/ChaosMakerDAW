@@ -15,6 +15,8 @@ class AppSettingsWrapper : public QObject {
     // Recording mode new tracks start with: "dry" (default) or "print" (plan 6.6)
     Q_PROPERTY(QString defaultRecordMode READ defaultRecordMode WRITE setDefaultRecordMode NOTIFY defaultRecordModeChanged)
     Q_PROPERTY(bool recordDryByDefault READ recordDryByDefault NOTIFY defaultRecordModeChanged)
+    // How the Chords track's strips write a zone: "octaves" (default) or "zonekeys"
+    Q_PROPERTY(QString chordZoneMapping READ chordZoneMapping WRITE setChordZoneMapping NOTIFY chordZoneMappingChanged)
     Q_PROPERTY(QString defaultProjectDirectory READ defaultProjectDirectory WRITE setDefaultProjectDirectory NOTIFY defaultProjectDirectoryChanged)
     Q_PROPERTY(bool autoSaveEnabled READ autoSaveEnabled WRITE setAutoSaveEnabled NOTIFY autoSaveChanged)
     Q_PROPERTY(int autoSaveIntervalSeconds READ autoSaveIntervalSeconds WRITE setAutoSaveIntervalSeconds NOTIFY autoSaveChanged)
@@ -36,6 +38,11 @@ public:
     QString defaultRecordMode() const { return QString::fromStdString(m_settings.defaultRecordMode()); }
     void setDefaultRecordMode(const QString& mode);
     bool recordDryByDefault() const noexcept { return m_settings.recordDryByDefault(); }
+
+    QString chordZoneMapping() const { return QString::fromStdString(m_settings.chordZoneMapping()); }
+    void setChordZoneMapping(const QString& mapping);
+    // The stored choice, for wrappers that act on it at the moment (ChordsWrapper's presses).
+    static QString storedChordZoneMapping();
 
     QString defaultProjectDirectory() const;
     void setDefaultProjectDirectory(const QString& path);
@@ -63,6 +70,7 @@ public:
 signals:
     void pianoRollPresentationChanged();
     void defaultRecordModeChanged();
+    void chordZoneMappingChanged();
     void defaultProjectDirectoryChanged();
     void autoSaveChanged();
     void layoutSizesChanged();

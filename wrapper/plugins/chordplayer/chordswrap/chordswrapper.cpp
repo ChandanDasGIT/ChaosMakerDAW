@@ -1,6 +1,7 @@
 #include "chordswrapper.h"
 #include "instruments/chords/chordsinstrument.h"
 #include "plugins/chordplayer/chordrender.h"
+#include "wrapper/settings/appsettingswrap/appsettingswrapper.h"
 #include "wrapper/engineWrap/enginecontroller.h"
 #include "wrapper/session/tracklistwrap/tracklistwrapper.h"
 
@@ -35,7 +36,7 @@ void ChordsWrapper::setTrackModel(QObject* model)
 void ChordsWrapper::setTrackId(int id)
 {
     if (id == m_trackId) return;
-    for (int i = 0; i < 16; ++i) if (m_down[std::size_t(i)]) release(i % 8, i >= 8);   // let go on the old track
+    for (int i = 0; i < 16; ++i) if (m_down[std::size_t(i)] >= 0) release(i % 8, i >= 8);   // let go on the old track
     m_trackId = id;
     emit trackIdChanged();
     reload();
@@ -101,6 +102,22 @@ void ChordsWrapper::setAutoplay(int mode)
     commit(s);
 }
 
+void ChordsWrapper::setDynamics(int dynamics)
+{
+    if (dynamics < 0 || dynamics >= chords::DynamicsModes || dynamics == m_s.dynamics) return;
+    auto s = m_s;
+    s.dynamics = dynamics;
+    commit(s);
+}
+
+void ChordsWrapper::setBassWithChords(bool on)
+{
+    if (on == m_s.bassWithChords) return;
+    auto s = m_s;
+    s.bassWithChords = on;
+    commit(s);
+}
+
 QString ChordsWrapper::keyName() const { return QString::fromStdString(chords::keyName(m_s.key)); }
 
 QStringList ChordsWrapper::tonicNames() const
@@ -123,8 +140,30 @@ QVariantList ChordsWrapper::autoplayModes() const
     QVariantList out;
     for (int mode = 0; mode < chords::AutoplayModes; ++mode) {
         const auto name = chords::autoplayName(mode);
+        const auto description = chords::autoplayDescription(mode);
         out.append(QVariantMap{{QStringLiteral("mode"), mode},
-                               {QStringLiteral("title"), QString::fromUtf8(name.data(), qsizetype(name.size()))}});
+                               {QStringLiteral("title"), QString::fromUtf8(name.data(), qsizetype(name.size()))},
+                               {QStringLiteral("description"), QString::fromUtf8(description.data(), qsizetype(description.size()))}});
+    }
+    return out;
+}
+
+QVariantList ChordsWrapper::zoneRanges() const
+{
+    const auto name = [](int note) {
+        return QString::fromStdString(chords::noteName(note % 12, false)) + QString::number(note / 12 - 1);
+    };
+    QVariantList out;
+    for (const auto& text : m_s.chords) {
+        QStringList zones;
+        if (const auto chord = chords::parse(text)) {
+            const auto tones = chords::chordTones(*chord);
+            for (int zone = 0; zone < 3 && !tones.empty(); ++zone) {
+                const auto range = chords::zoneRange(zone, tones.front());
+                zones << name(range.low) + QStringLiteral("\u2013") + name(range.high);
+            }
+        }
+        out.append(zones);
     }
     return out;
 }
@@ -134,12 +173,29 @@ QVariantList ChordsWrapper::progressions() const
     QVariantList out;
     int index = 0;
     for (const auto& p : chords::progressions()) {
+        const auto name = p.name(m_s.key.minor);
         out.append(QVariantMap{{QStringLiteral("index"), index++},
-                               {QStringLiteral("name"), QString::fromUtf8(p.name.data(), qsizetype(p.name.size()))},
-                               {QStringLiteral("description"), QString::fromUtf8(p.description.data(), qsizetype(p.description.size()))},
-                               {QStringLiteral("minor"), p.minor}});
+                               {QStringLiteral("name"), QString::fromUtf8(name.data(), qsizetype(name.size()))},
+                               {QStringLiteral("description"), QString::fromUtf8(p.description.data(), qsizetype(p.description.size()))}});
     }
     return out;
+}
+
+int ChordsWrapper::currentProgression() const
+{
+    return valid() ? chords::matchProgression(m_s.chords, m_s.key) : -1;
+}
+
+// The eight strips of progression `index` in `key`; false if there is none.
+static bool fillWith(chords::Settings& s, int index, const chords::Key& key)
+{
+    const auto list = chords::progressions();
+    if (index < 0 || index >= int(list.size())) return false;
+    const auto chordsIn = chords::progressionChords(list[std::size_t(index)], key);
+    if (chordsIn.size() != 8) return false;
+    s.key = key;
+    for (std::size_t i = 0; i < 8; ++i) s.chords[i] = chordsIn[i].name;
+    return true;
 }
 
 bool ChordsWrapper::setChord(int strip, const QString& name)
@@ -176,23 +232,19 @@ bool ChordsWrapper::setDegree(int strip, int degree, bool seventh)
 void ChordsWrapper::setKey(int tonic, bool minor)
 {
     if (!valid()) return;
+    const chords::Key key{((tonic % 12) + 12) % 12, minor};
+    if (key == m_s.key) return;
+    const int progression = std::max(currentProgression(), 0);    // your own chords: the key chords
     auto s = m_s;
-    s.key = chords::Key{((tonic % 12) + 12) % 12, minor};
-    if (s.key == m_s.key) return;
+    if (!fillWith(s, progression, key)) s.key = key;
     commit(s);
 }
 
 bool ChordsWrapper::applyProgression(int index)
 {
-    const auto list = chords::progressions();
-    if (!valid() || index < 0 || index >= int(list.size())) return false;
-    const auto& p = list[std::size_t(index)];
-    const auto chordsIn = chords::progressionChords(p, m_s.key.tonic);
-    if (chordsIn.size() != 8) return false;
+    if (!valid()) return false;
     auto s = m_s;
-    s.key.minor = p.minor;
-    for (std::size_t i = 0; i < 8; ++i) s.chords[i] = chordsIn[i].name;
-    return commit(s);
+    return fillWith(s, index, m_s.key) && commit(s);
 }
 
 bool ChordsWrapper::resetToDefaults()
@@ -206,41 +258,67 @@ int ChordsWrapper::keyOf(int strip, bool bass) const
     return (bass ? ChordPlayer::BassKeys : ChordPlayer::ChordKeys)[std::size_t(strip)];
 }
 
-void ChordsWrapper::press(int strip, bool bass, int velocity)
+void ChordsWrapper::press(int strip, bool bass, int velocity, int zone)
 {
-    const int key = keyOf(strip, bass);
-    if (key < 0 || !m_engine || !valid()) return;
+    if (strip < 0 || strip >= 8 || !m_engine || !valid()) return;
+    if (m_whole >= 0) { m_whole = -1; emit activeChanged(); }
+    const auto mapping = AppSettingsWrapper::storedChordZoneMapping() == QStringLiteral("zonekeys")
+                             ? ChordPlayer::KeyMapping::ZoneKeys : ChordPlayer::KeyMapping::Octaves;
+    const auto trigger = ChordPlayer::triggerNotes(strip, bass, zone, mapping);
     const std::size_t slot = std::size_t(strip + (bass ? 8 : 0));
-    if (m_down[slot]) m_engine->sendLiveNoteOff(m_trackId, key);
-    m_down[slot] = true;
-    m_engine->sendLiveNoteOn(m_trackId, key, std::clamp(velocity, 1, 127));
+    if (m_down[slot] >= 0) m_engine->sendLiveNoteOff(m_trackId, m_down[slot]);
+    m_down[slot] = trigger.stripKey;
+    velocity = std::clamp(velocity, 1, 127);
+    for (int i = 0; i < trigger.count; ++i) {
+        const int key = trigger.keys[std::size_t(i)];
+        m_engine->sendLiveNoteOn(m_trackId, key, velocity);
+        if (key != trigger.stripKey) m_engine->sendLiveNoteOff(m_trackId, key);   // a zone key: a short note
+    }
 }
 
 void ChordsWrapper::release(int strip, bool bass)
 {
-    const int key = keyOf(strip, bass);
-    if (key < 0) return;
+    if (strip < 0 || strip >= 8) return;
     const std::size_t slot = std::size_t(strip + (bass ? 8 : 0));
-    if (!m_down[slot]) return;
-    m_down[slot] = false;
+    const int key = m_down[slot];
+    if (key < 0) return;
+    m_down[slot] = -1;
     if (m_engine) m_engine->sendLiveNoteOff(m_trackId, key);
+}
+
+void ChordsWrapper::pressWhole(int strip, int velocity)
+{
+    press(strip, false, velocity, 1);
+    if (strip < 0 || strip >= 8 || !valid()) return;
+    m_whole = strip;
+    emit activeChanged();
+}
+
+void ChordsWrapper::releaseWhole(int strip)
+{
+    release(strip, false);
 }
 
 void ChordsWrapper::pollActive()
 {
     int strip = -1;
     bool bass = false;
+    int zone = 1;
     if (m_engine && valid()) {
         const auto instrument = m_engine->trackInstrument(m_trackId);
         if (instrument && instrument->typeId() == "chords") {
             const auto& player = static_cast<const ChordsInstrument&>(*instrument).player();
             strip = player.activeStrip();
             bass = strip >= 0 && player.activeBass();
+            zone = player.activeZone();
         }
     }
-    if (strip == m_activeStrip && bass == m_activeBass) return;
+    if (strip == m_activeStrip && bass == m_activeBass && zone == m_activeZone) return;
+    // The name's press lights both areas while that strip plays; any other press ends it.
+    if (m_whole >= 0 && m_activeStrip == m_whole && (strip != m_whole || bass || zone != 1)) m_whole = -1;
     m_activeStrip = strip;
     m_activeBass = bass;
+    m_activeZone = zone;
     emit activeChanged();
 }
 
