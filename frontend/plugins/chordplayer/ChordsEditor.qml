@@ -66,37 +66,14 @@ Item {
                 spacing: 6
                 SectionTitle { text: "AUTOPLAY" }
                 // A menu: Off, then the styles; hovering a style opens its variations.
-                Button {
+                ThemedMenuButton {
                     id: autoplayButton
                     objectName: "chordsAutoplay"
                     readonly property var current: bridge.autoplayModes[bridge.autoplayChoice] ?? null
                     readonly property string displayText: current ? current.title : ""
                     implicitWidth: 190
-                    implicitHeight: 28
-                    hoverEnabled: true
-                    checkable: true
-                    checked: autoplayMenu.visible
-                    onClicked: autoplayMenu.visible ? autoplayMenu.close() : autoplayMenu.open()
-                    contentItem: Text {
-                        leftPadding: 8
-                        rightPadding: 20
-                        text: autoplayButton.displayText
-                        color: Theme.text
-                        font.pixelSize: Theme.smallSize
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
-                        Text {
-                            anchors { right: parent.right; rightMargin: 8; verticalCenter: parent.verticalCenter }
-                            text: Icons.menuArrow
-                            color: Theme.textMuted
-                            font.pixelSize: 9
-                        }
-                    }
-                    background: Rectangle {
-                        radius: 5
-                        color: autoplayButton.pressed || autoplayButton.hovered ? Theme.fieldHover : Theme.field
-                        border.color: autoplayMenu.visible || autoplayButton.visualFocus ? Theme.accent : Theme.fieldBorder
-                    }
+                    text: displayText
+                    menu: autoplayMenu
                     ToolTip.visible: hovered && !autoplayMenu.visible && !!current
                     ToolTip.text: current ? current.description : ""
                     ToolTip.delay: 450
