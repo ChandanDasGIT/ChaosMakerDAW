@@ -13,8 +13,9 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
                 [L] will do later (the user's choice; section H)   [-] dropped (the user)
 
 
-NEXT UP (2026-11-09): U4 (the
-flaky UI tests). Start here when the user says "let's continue". Plans first, one step at a time.
+NEXT UP (2026-11-09): A1-A3, then D5-D7 and F3 (the user's order); then C6 other instruments,
+import and export last. Start here when the user says "let's continue". Plans first, one step at
+a time.
 
 OPEN — everything not finished, in the order the user wants it done (import and export last).
 Done items stay further down as the record.
@@ -62,7 +63,7 @@ Done items stay further down as the record.
           same label ("D#/Eb major"); chord names keep the key's own spelling (Eb, Fm, Gm ...).
 
 -- UI tests
-[ ] U4  Found 2026-11-08, NOT caused by U1-U3 (same on the code before them): on this machine
+[x] U4  DONE 2026-11-09 (not committed yet). Found 2026-11-08, NOT caused by U1-U3 (same on the code before them): on this machine
         four transport_ui tests fail even when run alone: track_effects_switch_in_place_* (BPM
         typed into the main window reads 120, not 91), electronic_drums_live_in_fx_* and
         grand_piano_lives_in_fx_* ('picture->height()>100'), harmonium_lives_in_fx_*
@@ -72,6 +73,12 @@ Done items stay further down as the record.
         2026-11-09: in long ordered runs window activation fails at random here (different
         tests each run, e.g. the picker test, floating_windows_*, close_buttons_*); each
         passes alone or in short runs.
+        2026-11-09, closed: the full suite run as ctest runs it (offscreen, software renderer,
+        throwaway settings) passed 8 times in a row with none of the failures above; they went
+        with the FX window and focus work since (U3 on). The runs did catch a real failure of
+        mine: G5's AUTOPLAY button was a plain Button (controls_use_the_shared_themed_components).
+        Now frontend/common/ThemedMenuButton (the drop-downs' face, opens a ThemedMenu), and the
+        suite passed 142/142 five times in a row.
 
 -- Left over from plan 6 (was section A)
 [ ] A1  Re-voice only the factory Jazz preset (resources/presets/guitarsuite/Jazz.gspreset) for
