@@ -13,8 +13,8 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
                 [L] will do later (the user's choice; section H)   [-] dropped (the user)
 
 
-NEXT UP (2026-11-09): D5-D7 and F3 (the user's order; A1-A3 done); then C6 other instruments,
-import and export last. Start here when the user says "let's continue". Plans first, one step at
+NEXT UP (2026-11-10): C6 other instruments (A1-A3, D5-D7 and F3 done); import and export
+last. Start here when the user says "let's continue". Plans first, one step at
 a time.
 
 OPEN — everything not finished, in the order the user wants it done (import and export last).
@@ -64,14 +64,31 @@ Done items stay further down as the record.
           Changes: converted and mapped for ChaosMaker.
 
 -- Piano roll (was section D)
-[ ] D5  Pattern clip sourceOffset is not rescaled when a project reopens at another sample
-        rate (a trimmed pattern clip's left edge can shift slightly; notes stay on the clip).
-[ ] D6  PianoRollWrapper::notes is a plain QVariantList, so every change rebuilds all note
-        delegates; a list model would update notes one by one.
-[ ] D7  Make the mouse-driven piano roll harness a permanent Qt Test target.
+[x] D5  DONE 2026-11-10 (not committed yet): a pattern clip's sourceOffset is in project
+        samples, so ProjectDocument now rescales it with start and length when a project
+        reopens at another rate (an audio clip's offset is in its file's samples: unchanged).
+        A trimmed pattern clip keeps its left edge; notes stay where they were in the song.
+        Test: backendtests projectdocument (reopening_at_another_rate_rescales_only_pattern_
+        clip_offsets; clip_notes_round_trip_and_stay_clip_relative now checks the 96 kHz offset).
+[x] D6  DONE 2026-11-10 (not committed yet): wrapper/pianorollwrap/pianorollnotemodel
+        (QAbstractListModel, roles id note startBeat lengthBeats velocity selected). sync()
+        compares by note id: a changed note updates its row, new / removed notes insert /
+        remove rows, never a reset. PianoRollWrapper.noteModel follows every notesChanged; the
+        note blocks in PianoRollView use it. The notes list stays (velocity lane, tests).
+        Test: wrappertests qtpianoroll note_model_updates_only_the_rows_an_edit_touches.
+[x] D7  DONE 2026-11-10 (not committed yet): the mouse harness is a transport_ui test,
+        piano_roll_mouse_moves_resizes_and_erases_notes (drag a note's body, drag its right
+        edge, right-click to erase; the other note's block is not rebuilt). Box select, drawing
+        and zoom by mouse were already covered there.
 
 -- Tools and docs (was section F)
-[ ] F3  tools/latencytest is empty (the roadmap mentions a latency tool).
+[x] F3  DONE 2026-11-10 (not committed yet): tools/latencytest (target latencytest, libjack).
+        With a loopback cable from an output to an input: plays a click, finds it in the
+        recording, prints each run and the median round trip next to the latency JACK reports
+        for the two ports, and the difference. --list names the ports; --out / --in / --runs.
+        The maths: backend/dsp/latencymeasure (a Hann-windowed 1-8 kHz chirp, cross-
+        correlation, polarity, "not found" for weak or unclear peaks).
+        Test: backendtests latencymeasure. The user runs the measurement on their interface.
 [?] F4  EducationPurpose/architecture.txt: the user updates it at the end of the project
         (do not edit it).
 

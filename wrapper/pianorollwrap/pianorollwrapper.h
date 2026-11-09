@@ -9,6 +9,7 @@
 #include "midi/pianorollpattern.h"
 #include "midi/pianorollgrid.h"
 #include "midi/notenames.h"
+#include "pianorollnotemodel.h"
 #include "wrapper/session/tracklistwrap/tracklistwrapper.h" // full type needed by Q_PROPERTY
 
 // Adapts PianoRollPattern (editing state + selection) to QML. When bound to a clip through
@@ -20,6 +21,9 @@ class PianoRollWrapper : public QObject {
     QML_ELEMENT
 
     Q_PROPERTY(QVariantList notes READ notes NOTIFY notesChanged)
+    // The same notes as a list model: an edit updates only the rows it touches, so the
+    // piano roll's note blocks are not all rebuilt on every change.
+    Q_PROPERTY(PianoRollNoteModel* noteModel READ noteModel CONSTANT)
     Q_PROPERTY(int selectedCount READ selectedCount NOTIFY notesChanged)
     Q_PROPERTY(int count READ count NOTIFY notesChanged)
     Q_PROPERTY(TrackListWrapper* trackList READ trackList WRITE setTrackList NOTIFY bindingChanged)
@@ -63,6 +67,7 @@ public:
     const PianoRollPattern& backend() const noexcept { return m_pattern; }
 
     QVariantList notes() const;
+    PianoRollNoteModel* noteModel() noexcept { return &m_noteModel; }
     int selectedCount() const noexcept { return m_pattern.selectedCount(); }
     int count() const noexcept { return static_cast<int>(m_pattern.notes().size()); }
 
@@ -164,6 +169,7 @@ private:
     void syncGridMeter();
 
     PianoRollPattern m_pattern;
+    PianoRollNoteModel m_noteModel;
     PianoRollGrid m_grid;
     double m_pixelsPerBeat = 96.0;
     QPointer<TrackListWrapper> m_trackList;

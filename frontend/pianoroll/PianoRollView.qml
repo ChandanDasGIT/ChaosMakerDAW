@@ -777,16 +777,16 @@ Item {
 
                     // Notes Blocks
                     Repeater {
-                        model: root.notes
+                        model: pianoRollBackend.noteModel
                         delegate: Rectangle {
                             id: noteCard
-                            required property var modelData
+                            required property var model
                             required property int index
-                            readonly property int noteId: modelData.id ?? 0
-                            readonly property int notePitch: modelData.note ?? 60
-                            readonly property real startBeat: modelData.startBeat ?? 0
-                            readonly property real lengthBeats: modelData.lengthBeats ?? 1
-                            readonly property bool isSelected: modelData.selected ?? false
+                            readonly property int noteId: model.id ?? 0
+                            readonly property int notePitch: model.note ?? 60
+                            readonly property real startBeat: model.startBeat ?? 0
+                            readonly property real lengthBeats: model.lengthBeats ?? 1
+                            readonly property bool isSelected: model.selected ?? false
 
                             property real visualBeat: startBeat
                             property int visualPitch: notePitch
@@ -804,7 +804,7 @@ Item {
                             height: root.keyHeight - 2
                             radius: 2
                             z: (isDragging || isResizing) ? 10 : 1
-                            readonly property int noteVelocity: modelData.velocity ?? 100
+                            readonly property int noteVelocity: model.velocity ?? 100
                             readonly property bool isHovered: noteMouse.containsMouse || resizeMouse.containsMouse
                             // Follows the velocity lane's live drag preview
                             readonly property int shownVelocity: velocityLane.previewVelocities[String(noteId)] ?? noteVelocity
@@ -864,9 +864,8 @@ Item {
 
                                     if (mouse.button === Qt.LeftButton) {
                                         root.forceActiveFocus()
-                                        // Do NOT touch the backend here: any notesChanged rebuilds every note
-                                        // delegate (including this one) mid-press and kills the drag.
-                                        // Selection is applied on release instead.
+                                        // Selection is applied on release, not here, so a press never
+                                        // changes the notes under a drag that is just starting.
                                         pressAddToSelection = (mouse.modifiers & Qt.ShiftModifier) || (mouse.modifiers & Qt.ControlModifier)
                                         pressStartBeat = noteCard.startBeat
                                         pressPitch = noteCard.notePitch
@@ -919,8 +918,8 @@ Item {
                                 onReleased: mouse => {
                                     if (mouse.button !== Qt.LeftButton || root.activeTool === "eraser")
                                         return
-                                    // Capture everything first: each backend call below rebuilds the note
-                                    // delegates, so this delegate's context is gone after the first call.
+                                    // Capture everything first: moveNote can re-sort the notes, which may move
+                                    // this delegate before selectNote runs.
                                     const backend = pianoRollBackend
                                     const view = root
                                     const id = noteCard.noteId
@@ -993,7 +992,7 @@ Item {
                                     onReleased: mouse => {
                                         root.endAutoScroll()
                                         if (noteCard.isResizing) {
-                                            // Capture first: resizeNote rebuilds this delegate
+                                            // Capture first: resizeNote updates this delegate's note
                                             const view = root
                                             noteCard.isResizing = false
                                             pianoRollBackend.resizeNote(noteCard.noteId, noteCard.visualLength)

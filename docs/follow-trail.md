@@ -148,16 +148,14 @@ step). Remaining, one task at a time, each waiting for the user's go-ahead:
 4. **No velocity "paint" sweep** across several notes in one drag (Reaper pencil).
 5. **Piano roll clip length is fixed when it opens.** Resizing the clip on the
    timeline while the piano roll is open does not update its clip highlight.
-6. **Pattern clip `sourceOffset` is not rescaled** when a project is reopened at a
-   different sample rate, so a trimmed pattern clip's left edge can shift slightly.
-   Notes are saved clip-relative, so they stay on the clip.
+6. **Done (2026-11-10): pattern clip `sourceOffset` is rescaled** when a project is
+   reopened at a different sample rate, like the clip's start and length.
 7. **Placeholders:** piano roll menu bar, snap/quantize/undo/redo/transport buttons,
    and a playhead not linked to the transport.
-8. **`PianoRollWrapper::notes` is a plain `QVariantList`**, so every change rebuilds
-   all note delegates (worked around in QML by committing only on release). A list
-   model in the wrapper would update notes individually.
-9. **The mouse-driven piano roll harness was a temporary scratchpad tool.** Consider
-   adding it as a permanent Qt Test target next to `transporttests`.
+8. **Done (2026-11-10): `PianoRollWrapper::noteModel`** (`PianoRollNoteModel`) feeds
+   the note blocks; an edit updates only the notes it touches.
+9. **Done (2026-11-10): the mouse-driven piano roll harness** is the `transport_ui`
+   test `piano_roll_mouse_moves_resizes_and_erases_notes`.
 
 ### Planned audio import — implementation deferred
 

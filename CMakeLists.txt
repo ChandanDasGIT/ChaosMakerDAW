@@ -90,6 +90,10 @@ target_link_libraries(fxrender PRIVATE dawengine)
 add_executable(chordrender tools/chordrender/chordrender.cpp)
 target_compile_options(chordrender PRIVATE -Wall -Wextra)
 target_link_libraries(chordrender PRIVATE dawengine)
+# latencytest: measures the interface's round trip through JACK with a loopback cable (restMap F3).
+add_executable(latencytest tools/latencytest/latencytest.cpp)
+target_compile_options(latencytest PRIVATE -Wall -Wextra)
+target_link_libraries(latencytest PRIVATE dawengine)
 
 # ---------------------------------------------------------------- the tests (no Qt)
 # tests/abc/abc_test.cpp is found by itself, and ctest gets one entry named abc.
@@ -115,6 +119,7 @@ if(DAW_BUILD_APP)
         tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp tests/wrapper/clipediting_qtcheck.cpp
         tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp
         wrapper/pianorollwrap/pianorollwrapper.cpp wrapper/pianorollwrap/pianorollwrapper.h
+        wrapper/pianorollwrap/pianorollnotemodel.cpp wrapper/pianorollwrap/pianorollnotemodel.h
         wrapper/engineWrap/enginecontroller.cpp wrapper/engineWrap/enginecontroller.h
         wrapper/session/tracklistwrap/tracklistwrapper.cpp wrapper/session/tracklistwrap/tracklistwrapper.h
         wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.cpp wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h

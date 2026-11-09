@@ -300,3 +300,61 @@ TEST(qtpianoroll, clip_length_and_new_note_velocity_follow_the_clip_and_the_edit
     CHECK(tracks.removeAudioClip(t, c));                       // unbound: no length
     CHECK(roll->clipLengthBeats() == 0.0);
 }
+
+TEST(qtpianoroll, note_model_updates_only_the_rows_an_edit_touches) {
+    QObject owner;
+    TrackListWrapper tracks;
+    const int t = tracks.addInstrumentTrack();
+    const int c = tracks.addClipAtBeat(t, 4, 4);
+    auto* roll = boundRoll(tracks, t, c, &owner);
+    PianoRollNoteModel* model = roll->noteModel();
+    CHECK(model->rowCount() == 0);
+
+    int resets = 0, inserts = 0, removes = 0, changedRows = 0, lastChanged = -1;
+    QObject::connect(model, &QAbstractItemModel::modelReset, &owner, [&] { ++resets; });
+    QObject::connect(model, &QAbstractItemModel::rowsInserted, &owner, [&] { ++inserts; });
+    QObject::connect(model, &QAbstractItemModel::rowsRemoved, &owner, [&] { ++removes; });
+    QObject::connect(model, &QAbstractItemModel::dataChanged, &owner,
+                     [&](const QModelIndex& a, const QModelIndex& b) { changedRows += b.row() - a.row() + 1; lastChanged = a.row(); });
+
+    const int a = roll->addNote(60, 0.0, 1.0, 100);
+    const int b = roll->addNote(64, 1.0, 1.0, 100);
+    const int d = roll->addNote(67, 2.0, 1.0, 100);
+    CHECK(model->rowCount() == 3 && inserts == 3);
+    const auto roles = model->roleNames();
+    CHECK(roles.value(PianoRollNoteModel::IdRole) == "id" && roles.value(PianoRollNoteModel::StartBeatRole) == "startBeat");
+
+    // Moving one note changes its row only
+    changedRows = 0;
+    CHECK(roll->moveNote(b, 65, 1.5));
+    CHECK(changedRows == 1);
+    const int rowB = model->rows()[1].id == b ? 1 : (model->rows()[0].id == b ? 0 : 2);
+    CHECK(lastChanged == rowB);
+    CHECK(model->data(model->index(rowB), PianoRollNoteModel::NoteRole).toInt() == 65);
+    CHECK(model->data(model->index(rowB), PianoRollNoteModel::StartBeatRole).toDouble() == 1.5);
+
+    // Resize, velocity and selection: one row each
+    changedRows = 0;
+    CHECK(roll->resizeNote(d, 0.5));
+    CHECK(changedRows == 1);
+    changedRows = 0;
+    roll->selectNote(a);
+    CHECK(changedRows == 1);
+
+    // Remove one, then undo brings it back as an inserted row; never a reset
+    CHECK(roll->removeNote(a));
+    CHECK(removes == 1 && model->rowCount() == 2);
+    CHECK(tracks.undo());
+    CHECK(model->rowCount() == 3 && inserts == 4);
+    CHECK(resets == 0);
+
+    // The rows always match the wrapper's notes list
+    const auto list = roll->notes();
+    CHECK(list.size() == model->rowCount());
+    for (int i = 0; i < model->rowCount(); ++i)
+        CHECK(list[i].toMap().value("id").toInt() == model->data(model->index(i), PianoRollNoteModel::IdRole).toInt());
+
+    // Unbinding empties the model by removing rows
+    CHECK(tracks.removeAudioClip(t, c));
+    CHECK(model->rowCount() == 0 && resets == 0);
+}

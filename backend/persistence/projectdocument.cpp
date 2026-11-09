@@ -337,11 +337,15 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
                 return false;
             }
 
-            clip.sourceOffset = offset;
+            std::string pathStr = c.value("path", "");
+            const bool hasAudio = c.value("hasAudio", false);
+            // A pattern clip has no media: its offset is in project samples, so it is rescaled
+            // with start and length. An audio clip's offset is in the file's own samples.
+            const bool pattern = !hasAudio && pathStr.starts_with("Clip ");
+            clip.sourceOffset = pattern ? std::llround(offset * rate / oldRate) : offset;
             clip.start = std::llround(start * rate / oldRate);
             clip.length = std::max<std::int64_t>(1, std::llround(length * rate / oldRate));
 
-            std::string pathStr = c.value("path", "");
             std::string resolvedPath = pathStr;
             if (!baseDirectory.empty() && !pathStr.empty()) {
                 std::error_code ec;
@@ -390,7 +394,6 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
                 }
             }
 
-            const bool hasAudio = c.value("hasAudio", false);
             if (hasAudio) {
                 mediaPaths.insert(resolvedPath);
                 if (!audio.contains(resolvedPath)) {

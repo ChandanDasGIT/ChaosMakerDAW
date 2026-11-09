@@ -216,12 +216,36 @@ TEST(projectdocument, clip_notes_round_trip_and_stay_clip_relative)
     CHECK_NEAR(notes[1].startBeat, 0.25, 1e-9);
     CHECK(notes[0].id != notes[1].id);
 
-    // Reopened at another rate: the offset isn't rescaled, but clip-relative times are kept
+    // Reopened at another rate: the trim (offset) keeps its length in beats, and the notes
+    // stay where they were in the song
     ProjectFileContent at96k;
     CHECK(ProjectDocument::deserialize(jsonStr, at96k, error, 96000.0));
     const auto& c96 = at96k.project.tracks()[0]->audioClips[0];
+    CHECK(c96.sourceOffset == 24000);                          // 0.5 beat at 96 kHz
+    CHECK(c96.start == 96000);
     const double offset96 = double(c96.sourceOffset) * 120.0 / (60.0 * 96000.0);
+    CHECK_NEAR(offset96, 0.5, 1e-9);
+    CHECK_NEAR(c96.notes[0].startBeat, 1.0, 1e-9);
     CHECK_NEAR(c96.notes[0].startBeat - offset96, 0.5, 1e-9);
+}
+
+TEST(projectdocument, reopening_at_another_rate_rescales_only_pattern_clip_offsets)
+{
+    // 44.1 kHz file: a trimmed pattern clip and an audio clip that starts 1000 samples into its file
+    const std::string doc = R"({"format":"ChaosMakerProject","version":2,"project":{"version":1,"bpm":120.0,
+        "sampleRate":44100.0,"numerator":4,"denominator":4,"tracks":[{"name":"Keys","type":"Piano",
+        "instrument":true,"volume":1.0,"eq":[0,0,0,0,0,0,0,0,0,0],"clips":[
+          {"path":"Clip 1","hasAudio":false,"start":"44100","length":"88200","offset":"11025"},
+          {"path":"take.wav","hasAudio":true,"start":"0","length":"44100","offset":"1000"}]}]},
+        "trackEffects":[""]})";
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(doc, loaded, error, 48000.0));
+    const auto& clips = loaded.project.tracks()[0]->audioClips;
+    CHECK(clips.size() == 2);
+    CHECK(clips[0].start == 48000 && clips[0].length == 96000);
+    CHECK(clips[0].sourceOffset == 12000);                     // 0.25 s = 0.5 beat, as at 44.1 kHz
+    CHECK(clips[1].sourceOffset == 1000);                      // file samples: unchanged
 }
 
 TEST(projectdocument, clip_notes_are_optional_and_validated)
