@@ -235,3 +235,83 @@ TEST(eqbanddesign, filtering_a_sine_matches_the_computed_response)
     const auto shelf = make(eqband::Shape::HighShelf, 40.0, -10.0, eqband::DefaultQ, eqband::Slope::Db24);
     CHECK_NEAR(measuredDb(shelf, 25.0), db(shelf, 25.0), 0.05);
 }
+
+namespace {
+
+// The analog bell (RBJ prototype) in dB, the reference the matched bell follows.
+double analogBellDb(double f, double f0, double gainDb, double q)
+{
+    const double a = std::pow(10.0, gainDb / 40.0), w = f / f0;
+    const double num = (1 - w * w) * (1 - w * w) + (w * a / q) * (w * a / q);
+    const double den = (1 - w * w) * (1 - w * w) + (w / (a * q)) * (w / (a * q));
+    return 10.0 * std::log10(num / den);
+}
+
+// Octaves between the points where the gain is half the peak's (in dB), searched below Nyquist.
+template <class Gain>
+double halfGainWidth(Gain gain, double gainDb, double sr)
+{
+    double lo = 0, hi = 0;
+    for (double f = 20; f < sr / 2 * 0.9999; f *= 1.0005)
+        if (std::abs(gain(f)) >= std::abs(gainDb) / 2) { if (lo == 0) lo = f; hi = f; }
+    return std::log2(hi / lo);
+}
+
+} // namespace
+
+TEST(eqbanddesign, matched_bells_keep_their_width_up_to_nyquist)
+{
+    using namespace eqband;
+    // The cookbook bell returns to 0 dB at Nyquist, so a bell above ~10 kHz comes out narrower
+    // than its Q (a 12 kHz Q 2 bell at 48 kHz: 0.45 octaves instead of 0.71). The matched bell
+    // (Chaos EQ) keeps the analog bell's width, its gain at Nyquist, its peak, and leaves 1 kHz
+    // where the analog bell has it.
+    for (const double sr : {44100.0, 48000.0})
+        for (const double f0 : {10000.0, 12000.0, 15000.0, 18000.0})
+            for (const double gain : {12.0, -12.0, 6.0})
+                for (const double q : {0.7, 2.0, 5.0}) {
+                    Settings s;
+                    s.frequencyHz = f0; s.gainDb = gain; s.q = q;
+                    const auto matched = design(s, sr, Bells::Matched);
+                    const auto cookbook = design(s, sr);
+                    CHECK(std::abs(magnitudeDb(matched, f0, sr) - gain) < 0.05);
+                    CHECK(std::abs(magnitudeDb(matched, sr / 2 * 0.9999, sr) - analogBellDb(sr / 2, f0, gain, q)) < 0.3);
+                    CHECK(std::abs(magnitudeDb(matched, 1000, sr) - analogBellDb(1000, f0, gain, q)) < 0.3);
+                    const double analog = halfGainWidth([&](double f) { return analogBellDb(f, f0, gain, q); }, gain, sr);
+                    const double width = halfGainWidth([&](double f) { return magnitudeDb(matched, f, sr); }, gain, sr);
+                    const double narrow = halfGainWidth([&](double f) { return magnitudeDb(cookbook, f, sr); }, gain, sr);
+                    CHECK(std::abs(width - analog) < 0.2);
+                    CHECK(std::abs(width - analog) <= std::abs(narrow - analog) + 1e-9);
+                }
+}
+
+TEST(eqbanddesign, matched_bells_are_the_cookbook_bell_down_low_and_the_default_is_unchanged)
+{
+    using namespace eqband;
+    // Low bells: the matched bell follows the analog bell within 0.15 dB everywhere below
+    // Nyquist, at least as closely as the cookbook's (whose wide bells still dip to 0 dB at
+    // Nyquist), and narrow ones are the cookbook bell to within 0.1 dB. 0 dB is no filter; anything not asking for matched bells (the guitar pedals,
+    // the harmonium) keeps the cookbook bell exactly.
+    for (const double f0 : {60.0, 250.0, 1000.0, 2000.0})
+        for (const double q : {0.5, 1.0, 4.0}) {
+            Settings s;
+            s.frequencyHz = f0; s.gainDb = 9; s.q = q;
+            const auto matched = design(s, 48000, Bells::Matched), cookbook = design(s, 48000);
+            double matchedError = 0, cookbookError = 0;
+            for (double f = 20; f < 20000; f *= 1.1) {
+                if (q >= 1.0 && f < 5000) CHECK(std::abs(magnitudeDb(matched, f, 48000) - magnitudeDb(cookbook, f, 48000)) < 0.1);
+                matchedError = std::max(matchedError, std::abs(magnitudeDb(matched, f, 48000) - analogBellDb(f, f0, 9, q)));
+                cookbookError = std::max(cookbookError, std::abs(magnitudeDb(cookbook, f, 48000) - analogBellDb(f, f0, 9, q)));
+            }
+            CHECK(matchedError < 0.15 && matchedError <= cookbookError + 1e-6);
+        }
+    Settings flat;
+    flat.gainDb = 0;
+    const auto none = design(flat, 48000, Bells::Matched);
+    CHECK(none.sectionCount == 1 && std::abs(magnitudeDb(none, 3000, 48000)) < 1e-9);
+    Settings s;
+    s.frequencyHz = 12000; s.gainDb = 12; s.q = 2;
+    const auto a = design(s, 48000), b = design(s, 48000, Bells::Cookbook);
+    CHECK(a.sections[0].b0 == b.sections[0].b0 && a.sections[0].a1 == b.sections[0].a1 && a.sections[0].a2 == b.sections[0].a2);
+    CHECK(std::abs(magnitudeDb(a, 23990, 48000)) < 0.1);                 // the cookbook bell: back to 0 dB at Nyquist
+}

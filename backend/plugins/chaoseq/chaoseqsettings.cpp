@@ -71,7 +71,7 @@ double autoGainDb(const Settings& settings) noexcept
     int count = 0;
     for (const auto& band : settings.bands) {
         if (!band.inUse || band.bypassed || !eqband::usesGain(band.filter.shape)) continue;
-        designs[static_cast<std::size_t>(count++)] = eqband::design(band.filter, rate);
+        designs[static_cast<std::size_t>(count++)] = eqband::design(band.filter, rate, eqband::Bells::Matched);
     }
     if (count == 0) return 0.0;
     double sum = 0.0;

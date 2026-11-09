@@ -1,7 +1,9 @@
 #include "testkit.h"
 #include "engine/playbackcontrols.h"
+#include "core/valueformat.h"
 
 #include <cmath>
+#include <limits>
 
 TEST(playbackcontrols, state_transitions)
 {
@@ -53,6 +55,14 @@ TEST(playbackcontrols, formatting)
     CHECK(PlaybackControls::formatTime(65.432) == "00:01:05.43");
     CHECK(PlaybackControls::formatTime(3661.129) == "01:01:01.12");  // floored, never rounded up
     CHECK(PlaybackControls::formatTime(0.29) == "00:00:00.29");      // 0.29 * 100 is 28.999...
+    // One clock format (valueformat::position); the transport clock reads zero before the start
+    // or without a position, and a time too large to count no longer overflows.
+    for (const double s : {0.0, 0.29, 59.9996, 65.432, 3661.129, 360000.0})
+        CHECK(PlaybackControls::formatTime(s) == valueformat::position(s));
+    CHECK(PlaybackControls::formatTime(-1.5) == "00:00:00.00");
+    CHECK(PlaybackControls::formatTime(std::numeric_limits<double>::quiet_NaN()) == "00:00:00.00");
+    CHECK(PlaybackControls::formatTime(std::numeric_limits<double>::infinity()) == "00:00:00.00");
+    CHECK(PlaybackControls::formatTime(1e99) == valueformat::position(1e99));
 
     CHECK(PlaybackControls::formatBarsBeats(0.0, 4, 4) == "1.1.00");
     CHECK(PlaybackControls::formatBarsBeats(4.0, 4, 4) == "2.1.00");

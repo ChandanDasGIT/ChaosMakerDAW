@@ -8,29 +8,32 @@
       "type": "pedal.compressor",
       "bypassed": false,
       "parameters": {
-        "threshold": -20,
-        "ratio": 1.6,
+        "threshold": -22,
+        "ratio": 2,
         "attack": 25,
         "release": 180,
-        "makeup": 1.5
+        "makeup": 3
       }
     },
     {
       "type": "pedal.amp",
       "bypassed": false,
       "parameters": {
-        "drive": 0,
-        "bass": 1.5,
-        "mid": 2,
-        "treble": -4,
-        "presence": 0.05,
-        "master": -5
+        "channel": 0,
+        "drive": 8,
+        "bass": 1,
+        "mid": 1,
+        "treble": -3,
+        "presence": 0.15,
+        "resonance": 0.2,
+        "master": 0
       }
     },
     {
       "type": "pedal.cabinet",
       "bypassed": false,
       "parameters": {
+        "model": 1,
         "mix": 1,
         "level": 0
       }
@@ -40,13 +43,13 @@
       "bypassed": false,
       "parameters": {
         "lowfreq": 150,
-        "lowgain": -1,
+        "lowgain": 0,
         "lowq": 0.7,
-        "midfreq": 900,
+        "midfreq": 800,
         "midgain": 1,
         "midq": 0.7,
         "highfreq": 3500,
-        "highgain": -3,
+        "highgain": -4,
         "highq": 0.5,
         "level": 0
       }
@@ -56,8 +59,8 @@
       "bypassed": false,
       "parameters": {
         "room": 0.35,
-        "damping": 0.65,
-        "mix": 0.12
+        "damping": 0.7,
+        "mix": 0.14
       }
     }
   ]

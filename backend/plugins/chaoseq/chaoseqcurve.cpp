@@ -26,7 +26,7 @@ Curve curve(const Settings& input, double sampleRate, int points)
     for (int b = 0; b < MaxBands; ++b) {
         const auto& band = settings.bands[static_cast<std::size_t>(b)];
         if (!band.inUse) continue;
-        const auto design = eqband::design(band.filter, rate);
+        const auto design = eqband::design(band.filter, rate, eqband::Bells::Matched);
         auto& values = result.bandDb[static_cast<std::size_t>(b)];
         values.resize(count);
         for (std::size_t i = 0; i < count; ++i) {
