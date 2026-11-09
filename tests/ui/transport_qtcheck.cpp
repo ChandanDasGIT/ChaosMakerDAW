@@ -50,6 +50,30 @@ public:
     }
 };
 
+
+// A ThemedDialog: its title and button row on the dark panel, in the theme's colours.
+static void verifyThemedDialog(QObject* dialog)
+{
+    auto* title=qvariant_cast<QQuickItem*>(dialog->property("header")); QVERIFY(title);
+    QCOMPARE(title->objectName(),QString("themedDialogTitle"));
+    QCOMPARE(title->property("color").value<QColor>(),QColor("#ededed"));
+    QVERIFY(title->property("text").toString().length()>0);
+    auto* buttons=qvariant_cast<QQuickItem*>(dialog->property("footer")); QVERIFY(buttons);
+    QCOMPARE(buttons->objectName(),QString("themedDialogButtons"));
+    auto* row=qvariant_cast<QQuickItem*>(buttons->property("background")); QVERIFY(row);
+    QCOMPARE(row->property("color").value<QColor>().alpha(),0);               // the dark panel shows through
+    auto* panel=qvariant_cast<QQuickItem*>(dialog->property("background")); QVERIFY(panel);
+    QCOMPARE(panel->property("color").value<QColor>(),QColor("#202020"));
+    int count=0;
+    for(auto* child:buttons->findChildren<QQuickItem*>())
+        if(child->inherits("QQuickAbstractButton")) {
+            ++count;
+            auto* back=qvariant_cast<QQuickItem*>(child->property("background")); QVERIFY(back);
+            QVERIFY(back->property("color").value<QColor>().lightness()<90);   // dark chip, not a grey system button
+        }
+    QVERIFY(count>=2);
+}
+
 class TransportUiTest : public QObject {
     Q_OBJECT
 private slots:
@@ -3456,6 +3480,7 @@ private slots:
         chooseRecent("recentProject_1");
         auto* dialog=window->findChild<QObject*>("unsavedProjectChanges"); QVERIFY(dialog);
         QTRY_VERIFY(dialog->property("visible").toBool());
+        verifyThemedDialog(dialog);
         QVERIFY(QMetaObject::invokeMethod(dialog,"reject"));
         QCOMPARE(controller->projectFile(),QUrl::fromLocalFile(first));
 
@@ -4044,6 +4069,7 @@ private slots:
         click(removeFull);
         QTRY_VERIFY(dialog->property("visible").toBool());
         QCOMPARE(dialog->property("clipCount").toInt(),1);
+        verifyThemedDialog(dialog);
         QVERIFY(QMetaObject::invokeMethod(dialog,"reject"));
         QTRY_VERIFY(!dialog->property("visible").toBool()); QCOMPARE(tracks.count(),1);
         // ...Delete removes it; the dialog says it can be undone
