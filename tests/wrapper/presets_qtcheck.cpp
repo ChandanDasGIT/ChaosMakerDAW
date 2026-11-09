@@ -181,6 +181,18 @@ TEST(qtpresets, factory_presets_apply_exactly_their_declared_chains) {
     CHECK(!model.applyFactoryPreset("Other"));CHECK(model.count()==count);CHECK(published==before);
 }
 
+TEST(qtpresets, jazz_is_voiced_for_the_rebuilt_amp_and_cabinet) {
+    // Not the amp's and cab's defaults (Crunch, 4x12 closed): the Clean channel and the 1x12
+    // open cab, gently compressed, the treble rolled off, as loud as the other factory presets.
+    Fixture fixture; GuitarSuiteModel model;
+    model.setPublisher([](auto){});
+    CHECK(model.applyFactoryPreset("Jazz"));CHECK(!model.busy());
+    CHECK(model.count()==5);
+    CHECK(parameter(model,1,"channel")==0);CHECK(parameter(model,1,"master")==0);CHECK(parameter(model,1,"treble")==-3);
+    CHECK(parameter(model,2,"model")==1);
+    CHECK(parameter(model,3,"highgain")==-4);
+}
+
 TEST(qtpresets, factory_presets_preserve_cached_cabinet_and_allow_custom_save_load) {
     Fixture fixture;fixture.wav(); GuitarSuiteModel model;
     model.setPublisher([](auto){});

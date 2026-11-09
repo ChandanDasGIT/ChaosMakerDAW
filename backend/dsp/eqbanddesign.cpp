@@ -64,6 +64,62 @@ biquad::Coefficients bell(double f, double gainDb, double q, double sr) noexcept
                       1.0 + alpha / a, -2.0 * cosw, 1.0 - alpha / a);
 }
 
+// The matched bell (Orfanidis): peak gain g at w0, gain at Nyquist g1 (the analog bell's there,
+// instead of 1), and gain sqrt(g) (halfway in dB) at two band edges `dw` apart.
+biquad::Coefficients orfanidisBell(double w0, double dw, double g, double g1) noexcept
+{
+    const auto root = [](double v) { return std::sqrt(std::max(v, 0.0)); };
+    const double g2 = g * g, gb2 = g;
+    const double F = std::abs(g2 - gb2), G00 = std::abs(g2 - 1.0), F00 = std::abs(gb2 - 1.0);
+    const double G01 = std::abs(g2 - g1), G11 = std::abs(g2 - g1 * g1);
+    const double F01 = std::abs(gb2 - g1), F11 = std::abs(gb2 - g1 * g1);
+    const double tw = std::tan(w0 / 2.0);
+    const double W2 = root(G11 / G00) * tw * tw;
+    const double DW = (1.0 + root(F00 / F11) * W2) * std::tan(dw / 2.0);
+    const double C = F11 * DW * DW - 2.0 * W2 * (F01 - root(F00 * F11));
+    const double D = 2.0 * W2 * (G01 - root(G00 * G11));
+    const double A = root((C + D) / F);
+    const double B = root((g2 * C + gb2 * D) / F);
+    return normalised(g1 + W2 + B, -2.0 * (g1 - W2), g1 - B + W2,
+                      1.0 + W2 + A, -2.0 * (1.0 - W2), 1.0 + W2 - A);
+}
+
+double gainAt(const biquad::Coefficients& c, double w) noexcept
+{
+    const double cw = std::cos(w), c2w = std::cos(2.0 * w), sw = std::sin(w), s2w = std::sin(2.0 * w);
+    const double nr = c.b0 + c.b1 * cw + c.b2 * c2w, ni = -(c.b1 * sw + c.b2 * s2w);
+    const double dr = 1.0 + c.a1 * cw + c.a2 * c2w, di = -(c.a1 * sw + c.a2 * s2w);
+    return std::sqrt((nr * nr + ni * ni) / (dr * dr + di * di));
+}
+
+// The analog bell's band edges (gain halfway in dB) lie w0/Q apart, geometrically around w0.
+// Where the upper edge is under Nyquist the bell is matched with that width. Where it is above
+// (a wide bell near the top), the width is found so the lower edge lands where the analog one
+// is: the band cannot reach past Nyquist, and widening it downwards instead would lift the mids.
+// A fixed bisection, no allocation: safe on the audio thread. 0 dB is no filter.
+biquad::Coefficients matchedBell(double f, double gainDb, double q, double sr) noexcept
+{
+    if (std::abs(gainDb) < 1e-6) return {};
+    const double w0 = 2.0 * pi * f / sr;
+    const double g = std::pow(10.0, gainDb / 20.0);
+    const double half = 1.0 / (2.0 * q);
+    const double lower = w0 * (std::sqrt(1.0 + half * half) - half);
+    const double upper = w0 * (std::sqrt(1.0 + half * half) + half);
+    const double nyquistTerm = (w0 * w0 - pi * pi) * (w0 * w0 - pi * pi);
+    const double dwa = w0 / q;
+    const double g1 = std::sqrt((nyquistTerm + g * pi * pi * dwa * dwa) / (nyquistTerm + pi * pi * dwa * dwa / g));
+    if (upper < 0.9 * pi) return orfanidisBell(w0, dwa, g, g1);
+    const double edge = std::sqrt(g);                                  // gain halfway in dB
+    double lo = 1e-4, hi = 0.98 * pi;
+    for (int i = 0; i < 48; ++i) {                                      // wider band: more gain at the lower edge
+        const double mid = 0.5 * (lo + hi);
+        const double at = gainAt(orfanidisBell(w0, mid, g, g1), lower);
+        const bool beyond = g > 1.0 ? at > edge : at < edge;
+        (beyond ? hi : lo) = mid;
+    }
+    return orfanidisBell(w0, 0.5 * (lo + hi), g, g1);
+}
+
 biquad::Coefficients lowCut2(double f, double q, double sr) noexcept
 {
     const auto [cosw, alpha] = angle(f, q, sr);
@@ -229,14 +285,15 @@ Settings sanitize(const Settings& settings, double sampleRate) noexcept
     return s;
 }
 
-Design design(const Settings& settings, double sampleRate) noexcept
+Design design(const Settings& settings, double sampleRate, Bells bells) noexcept
 {
     const double sr = std::isfinite(sampleRate) && sampleRate > 1000.0 ? sampleRate : 48000.0;
     const Settings s = sanitize(settings, sr);
     Design d;
     switch (s.shape) {
     case Shape::Bell:
-        d.sections[0] = bell(s.frequencyHz, s.gainDb, s.q, sr);
+        d.sections[0] = bells == Bells::Matched ? matchedBell(s.frequencyHz, s.gainDb, s.q, sr)
+                                                : bell(s.frequencyHz, s.gainDb, s.q, sr);
         d.sectionCount = 1;
         break;
     case Shape::LowShelf:  addShelf(d, true, s.gainDb, s, sr); break;

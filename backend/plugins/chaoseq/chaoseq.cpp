@@ -182,7 +182,7 @@ ChaosEq::Ramp ChaosEq::advance(Voice& voice, const Target& t, int frames) noexce
         s.frequencyHz = voice.frequency;
         s.gainDb = voice.gain;
         s.q = voice.q;
-        voice.design = eqband::design(s, m_sampleRate);
+        voice.design = eqband::design(s, m_sampleRate, eqband::Bells::Matched);   // high bells keep their width
     }
     if (voice.mix <= 0.0) for (auto& channel : voice.state) channel = {};
     return ramp;

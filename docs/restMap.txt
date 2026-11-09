@@ -13,83 +13,13 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
                 [L] will do later (the user's choice; section H)   [-] dropped (the user)
 
 
-NEXT UP (2026-11-09): A1-A3, then D5-D7 and F3 (the user's order); then C6 other instruments,
+NEXT UP (2026-11-09): D5-D7 and F3 (the user's order; A1-A3 done); then C6 other instruments,
 import and export last. Start here when the user says "let's continue". Plans first, one step at
 a time.
 
 OPEN — everything not finished, in the order the user wants it done (import and export last).
 Done items stay further down as the record.
 ------------------------------------------------------------------------------------------------
--- Chords track
-[x] G5  DONE 2026-11-09 (the user: "I like these much better"): autoplay as a menu with variations.
-        - Round 1: the AUTOPLAY chips (they read "1 Flowing" ..., after the positions of
-          GarageBand's Autoplay knob) became one dropdown with no numbers: Off, then four
-          variations per style. Settings.variation, saved as "variation" (older projects: 0);
-          ChordPlayer setVariation; ChordsWrapper autoplayModes (17 entries), autoplayChoice,
-          setAutoplayChoice; ChordsEditor's AUTOPLAY ThemedComboBox.
-        - Round 2, the user: "what kind of arpeggios run just C E G twice? the bass should play
-          alongside the upper note ... make it professional". The first variations stepped up
-          the chord (C4 E4 G4 C5 E5 G5) and Flowing struck the bass ahead of the arpeggio. Now
-          Flowing and every variation but the three written ones (Pop Cells, Comping Pushes,
-          Ballad Top line) are built from the meter as piano figures on a spread chord (rungs
-          1 3 5 8 10 12 15 17 from the zone's root), the bass struck with the first note:
-            Flowing  Rolling (1-5-8-10-12-10-8-5), Alberti (1-5-3-5; bar 2 3-8-5-8),
-                     Open (1-5-10-5; bar 2 1-5-12-10), Cascade (from the top down and back up)
-            Pop      Cells, Pulse (eighth chords, a push into the loop), Ostinato (8-10-5-10
-                     riff), Shimmer (sixteenths under a repeated high octave)
-            Comping  Pushes, Steady, Off-beat, Sparse (bar 2 pushes or double-stabs)
-            Ballad   Top line, Arpeggio (1-5-10-12 up, bar 2 answers down), Hymn (a chord a
-                     beat, bar 2 long chords on the groups), Echo (bar 2 answers higher)
-          The three weak spots found in round 1 are gone (rise-and-fall that never fell in
-          4/4, figures restarting every half bar, Ballad bar 2 = bar 1). Flowing's bass: on
-          every group, bar 1 root-octave-fifth, bar 2 root-fifth-octave and a third leading
-          back. Repeating figures start again on the bar's two halves (7/8: 4+3 eighths).
-        - Renders: build/chordrender renders/chords-v3 (80 files: 5 meters x 16, 100 BPM).
-        - Known, not new: 2/4 borrows half of each 4/4 bar, so the written Pop, Comping Pushes
-          and Ballad Top line lose one bass note there.
-        Tests: backendtests chordplayer (the_figures_are_played_like_a_pianist_plays_them:
-        the bass with the first note, Flowing's bass never alone, bar 2 != bar 1, no C4 E4 G4
-        runs; every_style_has_four_variations_that_fit_every_meter; the bass test over every
-        variation), chordsjson; wrappertests qtchords; transport_ui chords page.
-        - Round 3: AUTOPLAY is a menu (ChordsEditor: a button showing the playing choice, a
-          ThemedMenu with Off and a submenu per style, filled from ChordsWrapper autoplayStyles
-          [{mode, title, variations: [{index, name, description}]}]); hovering a style opens its
-          four variations; the playing style and variation are ticked; each entry's tooltip
-          says how it plays. Test: transport_ui chords page opens the menu, checks Off + the
-          four styles and Flowing's four variations, picks Flowing · Open.
-        - Round 4 (the user: "when I select D# it becomes Eb, make the name consistent"): the
-          KEY list re-spelt itself for the chosen key. Now it always reads C, C#/Db, D, D#/Eb,
-          E, F, F#/Gb, G, G#/Ab, A, A#/Bb, B (chords::tonicLabel), and the key's name uses the
-          same label ("D#/Eb major"); chord names keep the key's own spelling (Eb, Fm, Gm ...).
-
--- UI tests
-[x] U4  DONE 2026-11-09 (not committed yet). Found 2026-11-08, NOT caused by U1-U3 (same on the code before them): on this machine
-        four transport_ui tests fail even when run alone: track_effects_switch_in_place_* (BPM
-        typed into the main window reads 120, not 91), electronic_drums_live_in_fx_* and
-        grand_piano_lives_in_fx_* ('picture->height()>100'), harmonium_lives_in_fx_*
-        ('settings().indian.female'). drum_kit_lives_in_fx_* fails on a cold first run only.
-        They look like window activation / FX window size timing; their later slider checks
-        never run, so fix them before relying on them.
-        2026-11-09: in long ordered runs window activation fails at random here (different
-        tests each run, e.g. the picker test, floating_windows_*, close_buttons_*); each
-        passes alone or in short runs.
-        2026-11-09, closed: the full suite run as ctest runs it (offscreen, software renderer,
-        throwaway settings) passed 8 times in a row with none of the failures above; they went
-        with the FX window and focus work since (U3 on). The runs did catch a real failure of
-        mine: G5's AUTOPLAY button was a plain Button (controls_use_the_shared_themed_components).
-        Now frontend/common/ThemedMenuButton (the drop-downs' face, opens a ThemedMenu), and the
-        suite passed 142/142 five times in a row.
-
--- Left over from plan 6 (was section A)
-[ ] A1  Re-voice only the factory Jazz preset (resources/presets/guitarsuite/Jazz.gspreset) for
-        the rebuilt amp and drives. It has no amp "channel" value, so the amp loads on Crunch,
-        and its settings were tuned for the old pedals. (Djent, MetalSolo, RockChords and
-        RockSolo are already new, fitted factory presets.)
-[ ] A2  Chaos EQ: bells above ~10 kHz come out slightly narrower than their Q (standard RBJ
-        design cramps near Nyquist). Possible fix: a matched / pre-warped bell design.
-[ ] A3  Merge the two backend clock formatters (PlaybackControls::formatTime and
-        valueformat::position); they differ only for negative times.
-
 -- Checks in the real app, need the user (was section B)
 [?] B1  Clip gain drag, then Ctrl+Z.
 [?] B2  Delete a track that has a pedalboard, then Ctrl+Z (pedalboard comes back).
@@ -165,6 +95,82 @@ the piano) and is reused here.
 
 DONE (the record, newest first)
 ------------------------------------------------------------------------------------------------
+[x] G5  DONE 2026-11-09 (the user: "I like these much better"): autoplay as a menu with variations.
+        - Round 1: the AUTOPLAY chips (they read "1 Flowing" ..., after the positions of
+          GarageBand's Autoplay knob) became one dropdown with no numbers: Off, then four
+          variations per style. Settings.variation, saved as "variation" (older projects: 0);
+          ChordPlayer setVariation; ChordsWrapper autoplayModes (17 entries), autoplayChoice,
+          setAutoplayChoice; ChordsEditor's AUTOPLAY ThemedComboBox.
+        - Round 2, the user: "what kind of arpeggios run just C E G twice? the bass should play
+          alongside the upper note ... make it professional". The first variations stepped up
+          the chord (C4 E4 G4 C5 E5 G5) and Flowing struck the bass ahead of the arpeggio. Now
+          Flowing and every variation but the three written ones (Pop Cells, Comping Pushes,
+          Ballad Top line) are built from the meter as piano figures on a spread chord (rungs
+          1 3 5 8 10 12 15 17 from the zone's root), the bass struck with the first note:
+            Flowing  Rolling (1-5-8-10-12-10-8-5), Alberti (1-5-3-5; bar 2 3-8-5-8),
+                     Open (1-5-10-5; bar 2 1-5-12-10), Cascade (from the top down and back up)
+            Pop      Cells, Pulse (eighth chords, a push into the loop), Ostinato (8-10-5-10
+                     riff), Shimmer (sixteenths under a repeated high octave)
+            Comping  Pushes, Steady, Off-beat, Sparse (bar 2 pushes or double-stabs)
+            Ballad   Top line, Arpeggio (1-5-10-12 up, bar 2 answers down), Hymn (a chord a
+                     beat, bar 2 long chords on the groups), Echo (bar 2 answers higher)
+          The three weak spots found in round 1 are gone (rise-and-fall that never fell in
+          4/4, figures restarting every half bar, Ballad bar 2 = bar 1). Flowing's bass: on
+          every group, bar 1 root-octave-fifth, bar 2 root-fifth-octave and a third leading
+          back. Repeating figures start again on the bar's two halves (7/8: 4+3 eighths).
+        - Renders: build/chordrender renders/chords-v3 (80 files: 5 meters x 16, 100 BPM).
+        - Known, not new: 2/4 borrows half of each 4/4 bar, so the written Pop, Comping Pushes
+          and Ballad Top line lose one bass note there.
+        Tests: backendtests chordplayer (the_figures_are_played_like_a_pianist_plays_them:
+        the bass with the first note, Flowing's bass never alone, bar 2 != bar 1, no C4 E4 G4
+        runs; every_style_has_four_variations_that_fit_every_meter; the bass test over every
+        variation), chordsjson; wrappertests qtchords; transport_ui chords page.
+        - Round 3: AUTOPLAY is a menu (ChordsEditor: a button showing the playing choice, a
+          ThemedMenu with Off and a submenu per style, filled from ChordsWrapper autoplayStyles
+          [{mode, title, variations: [{index, name, description}]}]); hovering a style opens its
+          four variations; the playing style and variation are ticked; each entry's tooltip
+          says how it plays. Test: transport_ui chords page opens the menu, checks Off + the
+          four styles and Flowing's four variations, picks Flowing · Open.
+        - Round 4 (the user: "when I select D# it becomes Eb, make the name consistent"): the
+          KEY list re-spelt itself for the chosen key. Now it always reads C, C#/Db, D, D#/Eb,
+          E, F, F#/Gb, G, G#/Ab, A, A#/Bb, B (chords::tonicLabel), and the key's name uses the
+          same label ("D#/Eb major"); chord names keep the key's own spelling (Eb, Fm, Gm ...).
+[x] U4  DONE 2026-11-09 (committed in b416d9c). Found 2026-11-08, NOT caused by U1-U3 (same on the code before them): on this machine
+        four transport_ui tests fail even when run alone: track_effects_switch_in_place_* (BPM
+        typed into the main window reads 120, not 91), electronic_drums_live_in_fx_* and
+        grand_piano_lives_in_fx_* ('picture->height()>100'), harmonium_lives_in_fx_*
+        ('settings().indian.female'). drum_kit_lives_in_fx_* fails on a cold first run only.
+        They look like window activation / FX window size timing; their later slider checks
+        never run, so fix them before relying on them.
+        2026-11-09: in long ordered runs window activation fails at random here (different
+        tests each run, e.g. the picker test, floating_windows_*, close_buttons_*); each
+        passes alone or in short runs.
+        2026-11-09, closed: the full suite run as ctest runs it (offscreen, software renderer,
+        throwaway settings) passed 8 times in a row with none of the failures above; they went
+        with the FX window and focus work since (U3 on). The runs did catch a real failure of
+        mine: G5's AUTOPLAY button was a plain Button (controls_use_the_shared_themed_components).
+        Now frontend/common/ThemedMenuButton (the drop-downs' face, opens a ThemedMenu), and the
+        suite passed 142/142 five times in a row.
+[x] A1  DONE 2026-11-09 (not committed yet): the factory Jazz preset had no amp "channel" and no
+        cabinet "model", so it loaded on Crunch through the 4x12 closed cab, about 6 dB quieter
+        than the other presets (RMS -34 vs -28 dBFS on the dry DI). Now: Clean channel, 1x12 open
+        cab, compressor 2:1, amp drive 8 bass +1 mid +1 treble -3 presence 0.15 resonance 0.2
+        master 0, EQ highs -4 dB at 3.5 kHz, reverb 0.14: RMS -27.9 dBFS (RockChords -28.0), 10 dB
+        headroom, stays clean at any master. Renders: local-reference/renders/jazz-a1 (old/new,
+        chords and solo DI). Test: wrappertests qtpresets jazz_is_voiced_for_the_rebuilt_amp_and_cabinet.
+[x] A2  DONE 2026-11-09 (not committed yet): Chaos EQ bells use a matched design (eqband::Bells::
+        Matched, Orfanidis with the analog bell's gain at Nyquist; for wide bells whose analog upper
+        edge is past Nyquist, the width is found so the lower edge matches, by a fixed bisection).
+        A 12 kHz Q 2 bell at 48 kHz is 0.72 octaves wide (analog 0.71; cookbook 0.45); low bells
+        are unchanged. The guitar pedals and the harmonium keep the cookbook bell (Bells::Cookbook
+        is the default), so their voicing does not move. Tests: backendtests eqbanddesign
+        (matched_bells_keep_their_width_up_to_nyquist, matched_bells_are_the_cookbook_bell_down_
+        low_and_the_default_is_unchanged), chaoseq, chaoseqcurve; transport_ui Chaos EQ.
+[x] A3  DONE 2026-11-09 (not committed yet): PlaybackControls::formatTime now writes the clock
+        with valueformat::position (one clock format); the transport still reads 00:00:00.00
+        before the start or without a position, and a huge time no longer overflows an int64.
+        Test: backendtests playbackcontrols, valueformat; transport_ui clock tests.
+
 [x] G4  DONE 2026-11-09 (the user: "good enough"; committed in 27ec028, pushed): Chords track,
         real pattern and voicing variations. Steps 1-4, then seven rounds of the user's fixes:
         1. rhythmpattern rewritten as written tables: Flowing / Pop / Comping / Ballad, two

@@ -4,8 +4,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iomanip>
-#include <sstream>
 
 PlaybackControls::PlaybackControls() = default;
 PlaybackControls::~PlaybackControls() = default;
@@ -234,23 +232,11 @@ double PlaybackControls::calculateForwardSeekBeat(double currentBeat, int numera
     return currentBeat + barBeats;
 }
 
+// The transport clock, HH:MM:SS.cc, written by valueformat::position (the one clock format).
+// Before the start (a count-in) or without a position it reads zero, never "—"; a time too
+// large to count reads "—".
 std::string PlaybackControls::formatTime(double seconds) noexcept {
-    if (!std::isfinite(seconds) || seconds < 0.0)
-        seconds = 0.0;
-    // HH:MM:SS.cc (hundredths). The tiny tolerance keeps exact hundredths from flooring down.
-    int64_t total = static_cast<int64_t>(std::floor(seconds * 100.0 + 1e-6));
-    int64_t hours = total / 360000;
-    int64_t minutes = (total / 6000) % 60;
-    int64_t secs = (total / 100) % 60;
-    int64_t hundredths = total % 100;
-
-    std::ostringstream ss;
-    ss << std::setfill('0')
-       << std::setw(2) << hours << ":"
-       << std::setw(2) << minutes << ":"
-       << std::setw(2) << secs << "."
-       << std::setw(2) << hundredths;
-    return ss.str();
+    return valueformat::position(std::isfinite(seconds) && seconds > 0.0 ? seconds : 0.0);
 }
 
 std::string PlaybackControls::formatBarsBeats(double beats, int numerator, int denominator) noexcept {
