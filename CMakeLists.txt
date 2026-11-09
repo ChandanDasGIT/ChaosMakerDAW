@@ -86,6 +86,10 @@ endif()
 add_executable(fxrender tools/fxrender/fxrender.cpp)
 target_compile_options(fxrender PRIVATE -Wall -Wextra)
 target_link_libraries(fxrender PRIVATE dawengine)
+# chordrender: the Chords track's autoplay patterns on the grand piano, offline (restMap G4).
+add_executable(chordrender tools/chordrender/chordrender.cpp)
+target_compile_options(chordrender PRIVATE -Wall -Wextra)
+target_link_libraries(chordrender PRIVATE dawengine)
 
 # ---------------------------------------------------------------- the tests (no Qt)
 # tests/abc/abc_test.cpp is found by itself, and ctest gets one entry named abc.

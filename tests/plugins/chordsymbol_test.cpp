@@ -82,20 +82,43 @@ TEST(chordsymbol, keys_give_their_chords_by_degree_and_roman_numeral)
     for (const char* bad : {"", "VIII", "X", "iV7x", "I7b9"}) CHECK(!romanChord(cMajor, bad));
 }
 
-TEST(chordsymbol, every_progression_fills_eight_strips_in_any_key)
+TEST(chordsymbol, every_progression_fills_eight_strips_in_any_key_and_both_modes)
 {
     CHECK(progressions().size() >= 6);
-    std::set<std::string_view> seen;
-    for (const auto& p : progressions()) {
-        CHECK(seen.insert(p.name).second && !p.description.empty());
-        for (int tonic = 0; tonic < 12; ++tonic) CHECK(progressionChords(p, tonic).size() == 8);
+    for (const bool minor : {false, true}) {
+        std::set<std::string_view> seen;
+        for (const auto& p : progressions()) {
+            CHECK(seen.insert(p.name(minor)).second && !p.description.empty());
+            for (int tonic = 0; tonic < 12; ++tonic) CHECK(progressionChords(p, Key{tonic, minor}).size() == 8);
+        }
     }
     const auto find = [](std::string_view prefix) {
-        for (const auto& p : progressions()) if (p.name.starts_with(prefix)) return &p;
+        for (const auto& p : progressions()) if (p.name(false).starts_with(prefix)) return &p;
         return static_cast<const Progression*>(nullptr);
     };
-    CHECK(find("Pop") && names(progressionChords(*find("Pop"), 0)).starts_with("C G Am F"));
-    CHECK(find("Andalusian") && names(progressionChords(*find("Andalusian"), 9)).starts_with("Am G F E"));
-    CHECK(find("Jazz") && names(progressionChords(*find("Jazz"), 0)).starts_with("Dm7 G7 Cmaj7"));
-    CHECK(find("Fifties") && names(progressionChords(*find("Fifties"), 7)).starts_with("G Em C D"));
+    const Key cMajor{0, false}, cMinor{0, true};
+    // One "Key chords", following the mode.
+    CHECK(progressions()[0].name(false) == "Key chords" && progressions()[0].name(true) == "Key chords");
+    CHECK(names(progressionChords(progressions()[0], cMajor)) == "C Dm Em F G Am Bdim G7");
+    CHECK(names(progressionChords(progressions()[0], cMinor)) == "Cm Ddim Eb Fm Gm Ab Bb G7");
+    // The other progressions, counted in the mode's own chords.
+    CHECK(find("Pop") && names(progressionChords(*find("Pop"), cMajor)).starts_with("C G Am F"));
+    CHECK(find("Pop") && names(progressionChords(*find("Pop"), cMinor)).starts_with("Cm Gm Ab Fm"));
+    CHECK(find("Andalusian") && names(progressionChords(*find("Andalusian"), Key{9, true})).starts_with("Am G F E"));
+    CHECK(find("Andalusian") && names(progressionChords(*find("Andalusian"), cMajor)).starts_with("C Bdim Am G"));
+    CHECK(find("Jazz") && names(progressionChords(*find("Jazz"), cMajor)).starts_with("Dm7 G7 Cmaj7"));
+    CHECK(find("Fifties") && names(progressionChords(*find("Fifties"), Key{7, false})).starts_with("G Em C D"));
+}
+
+TEST(chordsymbol, the_strips_progression_is_found_or_is_your_own)
+{
+    const std::array<std::string, 8> keyChords{"C", "Dm", "Em", "F", "G", "Am", "Bdim", "G7"};
+    CHECK(matchProgression(keyChords, Key{0, false}) == 0);
+    CHECK(matchProgression(keyChords, Key{0, true}) == -1);           // not C minor's
+    CHECK(matchProgression(keyChords, Key{2, false}) == -1);          // nor D major's
+    const std::array<std::string, 8> pop{"Cm", "Gm", "Ab", "Fm", "Ddim", "Eb", "G7", "Fm7"};
+    CHECK(matchProgression(pop, Key{0, true}) == 1);
+    auto own = keyChords;
+    own[3] = "F7";
+    CHECK(matchProgression(own, Key{0, false}) == -1);
 }

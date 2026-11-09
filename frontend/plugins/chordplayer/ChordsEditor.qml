@@ -6,8 +6,9 @@ import QtQuick.Layouts
 // the eight chord strips (ChordStrips). A press plays the strip's chord in the autoplay pattern
 // at the project's tempo until another strip is pressed or the same one again; with autoplay
 // off a strip sounds while held. A MIDI keyboard or KEYS plays the strips too (chords on the
-// white keys C4 .. C5, bass on C2 .. C3), and recording keeps the presses. Everything goes
-// through ChordsWrapper.
+// white keys C4 .. C5, their low / high zones on C0 .. C1 / C6 .. C7 or after the zone keys
+// F#2 G#2 A#2, bass on C2 .. C3), and recording keeps the presses. Everything goes through
+// ChordsWrapper.
 Item {
     id: root
     property var trackModel
@@ -52,7 +53,7 @@ Item {
             PanelButton {
                 objectName: "chordsReset"
                 text: "Reset"
-                tooltip: "Back to the key chords of C major, arpeggio"
+                tooltip: "Back to the key chords of C major, comping"
                 onClicked: bridge.resetToDefaults()
             }
         }
@@ -75,10 +76,47 @@ Item {
                         implicitHeight: 28
                         hoverHighlight: true
                         active: bridge.autoplay === modelData.mode
-                        tooltip: modelData.mode === 0 ? "Autoplay off: a strip sounds while you hold it"
-                                                      : "Autoplay " + modelData.mode + ": " + modelData.title
+                        tooltip: modelData.mode === 0 ? modelData.description
+                                                      : "Autoplay " + modelData.mode + ", " + modelData.title + ": " + modelData.description
                         onClicked: bridge.autoplay = modelData.mode
                     }
+                }
+            }
+            RowLayout {
+                spacing: 6
+                SectionTitle { text: "VOLUME" }
+                ToggleChip {
+                    objectName: "chordsDynamicsEven"
+                    text: "Same"; textSize: 11; leftPadding: 10; rightPadding: 10; implicitHeight: 28
+                    hoverHighlight: true
+                    active: bridge.dynamics === 0
+                    tooltip: "Every note of every chord at the same volume"
+                    onClicked: bridge.dynamics = 0
+                }
+                ToggleChip {
+                    objectName: "chordsDynamicsTop"
+                    text: "Top note"; textSize: 11; leftPadding: 10; rightPadding: 10; implicitHeight: 28
+                    hoverHighlight: true
+                    active: bridge.dynamics === 1
+                    tooltip: "The chord's highest note louder, on every chord (in arpeggios, every note of that name)"
+                    onClicked: bridge.dynamics = 1
+                }
+                ToggleChip {
+                    objectName: "chordsDynamicsMeter"
+                    text: "Meter accents"; textSize: 11; leftPadding: 10; rightPadding: 10; implicitHeight: 28
+                    hoverHighlight: true
+                    active: bridge.dynamics === 2
+                    tooltip: "By the time signature: the bar's first beat loudest, then each group's first beat, the other beats, and the off-beats softest"
+                    onClicked: bridge.dynamics = 2
+                }
+                ToggleChip {
+                    objectName: "chordsBassWithChords"
+                    text: "Bass with chords"; textSize: 11; leftPadding: 10; rightPadding: 10; implicitHeight: 28
+                    hoverHighlight: true
+                    active: bridge.bassWithChords
+                    tooltip: bridge.bassWithChords ? "On: a chord (or its name) plays its bass part too. Click for the right hand only"
+                                                   : "Off: a chord plays the right hand only. Click to add its bass part"
+                    onClicked: bridge.bassWithChords = !bridge.bassWithChords
                 }
             }
             RowLayout {
@@ -91,7 +129,7 @@ Item {
                     currentIndex: bridge.keyTonic
                     onActivated: index => bridge.setKey(index, bridge.keyMinor)
                     ToolTip.visible: hovered
-                    ToolTip.text: "The key the degree buttons and progressions use"
+                    ToolTip.text: "The key: the strips follow it, with the progression in the new key"
                 }
                 ToggleChip {
                     objectName: "chordsKeyMajor"
@@ -112,19 +150,16 @@ Item {
                 spacing: 6
                 SectionTitle { text: "PROGRESSION" }
                 ThemedComboBox {
-                    id: progressionBox
                     objectName: "chordsProgression"
                     implicitWidth: 230
                     model: bridge.progressions
                     textRole: "name"
+                    currentIndex: bridge.currentProgression
+                    displayText: currentIndex >= 0 ? currentText : "Custom"
+                    onActivated: index => bridge.applyProgression(index)
                     ToolTip.visible: hovered
-                    ToolTip.text: currentIndex >= 0 ? bridge.progressions[currentIndex].description : ""
-                }
-                PanelButton {
-                    objectName: "chordsFill"
-                    text: "Fill strips"
-                    tooltip: "Put this progression on the eight strips, in " + bridge.tonicNames[bridge.keyTonic]
-                    onClicked: bridge.applyProgression(progressionBox.currentIndex)
+                    ToolTip.text: currentIndex >= 0 ? bridge.progressions[currentIndex].description + ", in " + bridge.keyName
+                                                    : "Chords of your own. Picking a progression, key or mode replaces them"
                 }
             }
         }
@@ -142,7 +177,7 @@ Item {
             Layout.fillWidth: true
             spacing: 10
             Text {
-                text: "MIDI keyboard / KEYS: chords on the white keys C4–C5, bass on C2–C3 · arm the track (REC) to record what you play"
+                text: "MIDI keyboard / KEYS: chords on the white keys C4–C5 (low zone C0–C1, high C6–C7, or zone keys F#2 G#2 A#2), bass on C2–C3 · arm the track (REC) to record what you play"
                 color: Theme.textMuted; font.pixelSize: Theme.captionSize
                 Layout.fillWidth: true; elide: Text.ElideRight
             }

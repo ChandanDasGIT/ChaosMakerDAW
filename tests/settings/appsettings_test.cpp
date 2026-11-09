@@ -168,3 +168,24 @@ TEST(appsettings, default_record_mode_is_dry_validated_and_round_trips)
     settings.resetToDefaults();
     CHECK(settings.defaultRecordMode() == "dry");
 }
+
+TEST(appsettings, chord_zone_mapping_defaults_to_octaves_is_validated_and_round_trips)
+{
+    AppSettings settings;
+    CHECK(settings.chordZoneMapping() == "octaves");
+    settings.setChordZoneMapping("zonekeys");
+    CHECK(settings.chordZoneMapping() == "zonekeys");
+    settings.setChordZoneMapping("black keys");                   // unknown: ignored
+    CHECK(settings.chordZoneMapping() == "zonekeys");
+    CHECK(settings.exportValue(AppSettings::KeyChordZoneMapping) == "zonekeys");
+
+    AppSettings loaded;
+    CHECK(loaded.deserialize(settings.serialize()));
+    CHECK(loaded.chordZoneMapping() == "zonekeys");
+    loaded.importValue(AppSettings::KeyChordZoneMapping, " octaves ");
+    CHECK(loaded.chordZoneMapping() == "octaves");
+    loaded.importValue(AppSettings::KeyChordZoneMapping, "nonsense");
+    CHECK(loaded.chordZoneMapping() == "octaves");
+    settings.resetToDefaults();
+    CHECK(settings.chordZoneMapping() == "octaves");
+}

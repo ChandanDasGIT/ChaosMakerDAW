@@ -14,6 +14,7 @@ public:
     static constexpr const char* KeyAutoSaveInterval = "autosave/intervalSeconds";
     static constexpr const char* KeyPianoRollPresentation = "ui/pianoRollPresentation";
     static constexpr const char* KeyDefaultRecordMode = "recording/defaultMode";
+    static constexpr const char* KeyChordZoneMapping = "chords/zoneMapping";
     static constexpr const char* KeyTrackListWidth = "ui/trackListWidth";
     static constexpr const char* KeyMixerHeight = "ui/mixerHeight";
     static constexpr const char* KeyPianoRollDockHeight = "ui/pianoRollDockHeight";
@@ -40,6 +41,12 @@ public:
     const std::string& defaultRecordMode() const noexcept { return m_defaultRecordMode; }
     void setDefaultRecordMode(std::string mode) noexcept;
     bool recordDryByDefault() const noexcept { return m_defaultRecordMode == "dry"; }
+
+    // How the Chords track's strips name a chord zone (low / middle / high) in MIDI: "octaves"
+    // (each zone its own octave of trigger keys, the default) or "zonekeys" (F#2 / G#2 / A#2
+    // before a middle-octave press). The player understands both; this picks what is written.
+    const std::string& chordZoneMapping() const noexcept { return m_chordZoneMapping; }
+    void setChordZoneMapping(std::string mapping) noexcept;
 
     // Layout sizes, kept between sessions
     double trackListWidth() const noexcept { return m_trackListWidth; }
@@ -83,6 +90,7 @@ private:
     bool m_restoreSessionOnStartup = false;
     std::string m_pianoRollPresentation = "dock";
     std::string m_defaultRecordMode = "dry";
+    std::string m_chordZoneMapping = "octaves";
     double m_trackListWidth = TrackListWidthLimits.fallback;
     double m_mixerHeight = MixerHeightLimits.fallback;
     double m_pianoRollDockHeight = PianoRollDockHeightLimits.fallback;

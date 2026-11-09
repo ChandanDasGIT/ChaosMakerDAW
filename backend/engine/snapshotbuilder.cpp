@@ -55,8 +55,7 @@ void SnapshotBuilder::syncTrackEq(const Project& project, const MutableEffectRes
         if (fx->instrument && fx->instrument->typeId() == "chords") {
             auto& chordsTrack = static_cast<ChordsInstrument&>(*fx->instrument);
             chordsTrack.piano().setSettings(track->piano);
-            chordsTrack.player().setStrips(chords::playerStrips(track->chords));
-            chordsTrack.player().setAutoplay(track->chords.autoplay);
+            chords::applyTo(chordsTrack.player(), track->chords);
         }
     }
 }

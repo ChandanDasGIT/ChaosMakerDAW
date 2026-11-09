@@ -25,7 +25,7 @@ void AppSettingsWrapper::loadFromPlatform()
                                qs.value(QStringLiteral("ui/pianoRollPresentation")).toString().toStdString());
     }
     for (const char* key : {AppSettings::KeyTrackListWidth, AppSettings::KeyMixerHeight, AppSettings::KeyPianoRollDockHeight,
-                            AppSettings::KeyDefaultRecordMode}) {
+                            AppSettings::KeyDefaultRecordMode, AppSettings::KeyChordZoneMapping}) {
         const QString name = QString::fromLatin1(key);
         if (qs.contains(name)) m_settings.importValue(key, qs.value(name).toString().toStdString());
     }
@@ -87,6 +87,25 @@ void AppSettingsWrapper::setDefaultRecordMode(const QString& mode)
     saveValue(QString::fromLatin1(AppSettings::KeyDefaultRecordMode), mode);
     emit defaultRecordModeChanged();
     emit preferenceSaved(QString::fromLatin1(AppSettings::KeyDefaultRecordMode));
+}
+
+void AppSettingsWrapper::setChordZoneMapping(const QString& mapping)
+{
+    if (m_settings.chordZoneMapping() == mapping.toStdString()) return;
+    m_settings.setChordZoneMapping(mapping.toStdString());       // invalid choices are ignored
+    if (m_settings.chordZoneMapping() != mapping.toStdString()) return;
+    saveValue(QString::fromLatin1(AppSettings::KeyChordZoneMapping), mapping);
+    emit chordZoneMappingChanged();
+    emit preferenceSaved(QString::fromLatin1(AppSettings::KeyChordZoneMapping));
+}
+
+QString AppSettingsWrapper::storedChordZoneMapping()
+{
+    AppSettings settings;
+    QSettings qs;
+    const QString name = QString::fromLatin1(AppSettings::KeyChordZoneMapping);
+    if (qs.contains(name)) settings.importValue(AppSettings::KeyChordZoneMapping, qs.value(name).toString().toStdString());
+    return QString::fromStdString(settings.chordZoneMapping());
 }
 
 QString AppSettingsWrapper::defaultProjectDirectory() const

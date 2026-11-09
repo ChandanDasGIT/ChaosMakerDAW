@@ -932,16 +932,15 @@ void EngineController::attachProject(TrackListWrapper* model) {
             static_cast<ChordsInstrument&>(*it->second.instrument).piano().setSettings(*settings);
         if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
     });
-    // Chords edits (strips, autoplay): straight into the track's player; no playback rebuild.
+    // Chords edits (strips, autoplay, volume, bass with chords): straight into the track's
+    // player; no playback rebuild.
     connect(model, &TrackListWrapper::chordsChanged, this, [this](int trackId) {
         if (!m_project) return;
         const auto* settings = m_project->chords(trackId);
         const auto it = m_trackEffects.find(trackId);
         if (!settings || it == m_trackEffects.end()) return;
         if (it->second.instrument && it->second.instrument->typeId() == "chords") {
-            auto& player = static_cast<ChordsInstrument&>(*it->second.instrument).player();
-            player.setStrips(chords::playerStrips(*settings));
-            player.setAutoplay(settings->autoplay);
+            chords::applyTo(static_cast<ChordsInstrument&>(*it->second.instrument).player(), *settings);
         }
         if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
     });

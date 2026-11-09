@@ -34,8 +34,7 @@ std::vector<MidiNote> renderClip(const Settings& settings, const std::vector<Mid
 
     ChordPlayer player;
     player.prepare(Rate);
-    player.setStrips(playerStrips(settings));
-    player.setAutoplay(settings.autoplay);
+    applyTo(player, settings);
     const std::int64_t origin = sampleOf(clipStartBeat);   // song position of the clip's start
     const std::int64_t length = sampleOf(clipLengthBeats);
     std::map<int, std::int64_t> sounding;                    // key -> start sample (clip-relative)

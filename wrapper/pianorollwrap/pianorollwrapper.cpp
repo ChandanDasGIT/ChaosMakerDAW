@@ -100,12 +100,21 @@ QString PianoRollWrapper::drumName(int note) const {
     if (!m_trackList) return {};
     const auto* track = m_trackList->domain().project().findTrack(m_trackId);
     if (!track) return {};
-    if (track->type == "Chords") {                         // the strip a key plays: "3 · F", "Bass 3 · F"
+    if (track->type == "Chords") {                         // the strip a key plays: "3 · F", "Bass 3 · F", "3 high · F"
+        switch (ChordPlayer::zoneOfKey(note)) {
+        case ChordPlayer::Low: return QStringLiteral("Zone low");
+        case ChordPlayer::Middle: return QStringLiteral("Zone middle");
+        case ChordPlayer::High: return QStringLiteral("Zone high");
+        default: break;
+        }
         bool bass = false;
-        const int strip = ChordPlayer::stripOfKey(note, bass);
+        int zone = -1;
+        const int strip = ChordPlayer::stripOfKey(note, bass, zone);
         if (strip < 0) return {};
         const auto& chord = track->chords.chords[std::size_t(strip)];
-        const QString label = (bass ? QStringLiteral("Bass %1") : QStringLiteral("%1")).arg(strip + 1);
+        QString label = (bass ? QStringLiteral("Bass %1") : QStringLiteral("%1")).arg(strip + 1);
+        if (zone == ChordPlayer::Low) label += QStringLiteral(" low");
+        if (zone == ChordPlayer::High) label += QStringLiteral(" high");
         return chord.empty() ? label : label + QStringLiteral(" \u00b7 ") + QString::fromStdString(chord);
     }
     const auto name = instrumentcatalog::drumName(track->type, note);

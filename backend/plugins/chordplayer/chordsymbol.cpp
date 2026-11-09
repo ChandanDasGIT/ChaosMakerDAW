@@ -186,37 +186,51 @@ std::optional<Chord> romanChord(const Key& key, std::string_view token)
 
 std::span<const Progression> progressions()
 {
-    static constexpr std::array<Progression, 8> List{{
-        {"Key chords (major)", "The key's own chords, I to vii°, and V7", false,
-         {"I", "ii", "iii", "IV", "V", "vi", "vii°", "V7"}},
-        {"Pop I–V–vi–IV", "The four-chord pop song, then ii, iii, V7, IVmaj7", false,
-         {"I", "V", "vi", "IV", "ii", "iii", "V7", "IVmaj7"}},
-        {"Fifties I–vi–IV–V", "Doo-wop, then ii, iii, V7, I7", false,
-         {"I", "vi", "IV", "V", "ii", "iii", "V7", "I7"}},
-        {"Jazz ii–V–I", "ii7 V7 Imaj7, with vi7 iii7 IVmaj7 II7 VI7", false,
-         {"ii7", "V7", "Imaj7", "vi7", "iii7", "IVmaj7", "II7", "VI7"}},
-        {"Key chords (minor)", "The minor key's chords, i to VII, and the major V7", true,
-         {"i", "ii°", "III", "iv", "v", "VI", "VII", "V7"}},
-        {"Andalusian i–VII–VI–V", "Am G F E in A; flamenco and film", true,
-         {"i", "VII", "VI", "V", "iv", "III", "ii°", "V7"}},
-        {"Filmi i–iv–VII–III", "A minor-key film song turn", true,
-         {"i", "iv", "VII", "III", "VI", "ii°", "V", "v"}},
-        {"Filmi I–IV–V–bVII", "Bright major with the flat seven", false,
-         {"I", "IV", "V", "bVII", "vi", "ii", "iii", "V7"}},
+    static constexpr std::array<Progression, 7> List{{
+        {{"Key chords", "Key chords"}, "The key's own chords, first to seventh, then the dominant seventh",
+         {{{"I", "ii", "iii", "IV", "V", "vi", "vii°", "V7"}, {"i", "ii°", "III", "iv", "v", "VI", "VII", "V7"}}}},
+        {{"Pop I–V–vi–IV", "Pop i–v–VI–iv"}, "The four-chord pop song, then four more of the key",
+         {{{"I", "V", "vi", "IV", "ii", "iii", "V7", "IVmaj7"}, {"i", "v", "VI", "iv", "ii°", "III", "V7", "iv7"}}}},
+        {{"Fifties I–vi–IV–V", "Fifties i–VI–iv–v"}, "Doo-wop, then four more of the key",
+         {{{"I", "vi", "IV", "V", "ii", "iii", "V7", "I7"}, {"i", "VI", "iv", "v", "ii°", "III", "V7", "i7"}}}},
+        {{"Jazz ii–V–I", "Jazz iiø–V–i"}, "The jazz turn in sevenths, then five more",
+         {{{"ii7", "V7", "Imaj7", "vi7", "iii7", "IVmaj7", "II7", "VI7"},
+           {"iiø7", "V7", "i7", "VImaj7", "IIImaj7", "iv7", "II7", "VI7"}}}},
+        {{"Andalusian I–vii°–vi–V", "Andalusian i–VII–VI–V"}, "Stepping down to the fifth (Am G F E in A minor); flamenco and film",
+         {{{"I", "vii°", "vi", "V", "IV", "iii", "ii", "V7"}, {"i", "VII", "VI", "V", "iv", "III", "ii°", "V7"}}}},
+        {{"Filmi I–IV–vii°–iii", "Filmi i–iv–VII–III"}, "A film song turn",
+         {{{"I", "IV", "vii°", "iii", "vi", "ii", "V", "V7"}, {"i", "iv", "VII", "III", "VI", "ii°", "V", "v"}}}},
+        {{"Filmi I–IV–V–bVII", "Filmi i–iv–v–VII"}, "With the flat seven",
+         {{{"I", "IV", "V", "bVII", "vi", "ii", "iii", "V7"}, {"i", "iv", "v", "VII", "VI", "ii°", "III", "V7"}}}},
     }};
     return List;
 }
 
-std::vector<Chord> progressionChords(const Progression& progression, int tonic)
+std::vector<Chord> progressionChords(const Progression& progression, const Key& key)
 {
-    const Key key{mod12(tonic), progression.minor};
     std::vector<Chord> out;
-    for (const auto token : progression.tokens) {
+    for (const auto token : progression.tokens[key.minor ? 1 : 0]) {
         auto chord = romanChord(key, token);
         if (!chord) return {};
         out.push_back(std::move(*chord));
     }
     return out;
+}
+
+int matchProgression(std::span<const std::string> strips, const Key& key)
+{
+    const auto list = progressions();
+    for (std::size_t i = 0; i < list.size(); ++i) {
+        const auto chords = progressionChords(list[i], key);
+        if (chords.size() != strips.size()) continue;
+        bool same = true;
+        for (std::size_t k = 0; k < chords.size() && same; ++k) {
+            const auto chord = parse(strips[k]);
+            same = chord && *chord == chords[k];
+        }
+        if (same) return int(i);
+    }
+    return -1;
 }
 
 } // namespace chords

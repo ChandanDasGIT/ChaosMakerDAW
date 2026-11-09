@@ -19,6 +19,22 @@ struct Range {
 
 constexpr Range RightHand{55, 79};
 constexpr Range BassRange{36, 52};        // C2 .. E3
+// The Chords track's three registers for a strip's chord area (zone 0 low, 1 middle, 2 high),
+// an octave apart and set by the chord's root: two octaves up from the root in octave 3, 4 or
+// 5 (C: C3-C5, C4-C6, C5-C7; G: G3-G5, G4-G6, G5-G7).
+constexpr Range zoneRange(int zone, int rootPitchClass) noexcept
+{
+    const int root = 48 + 12 * (zone < 0 ? 0 : zone > 2 ? 2 : zone) + ((rootPitchClass % 12) + 12) % 12;
+    return Range{root, root + 24};
+}
+// The Chords track's bass note is in octave 2 (C2 .. B2); the rest of the bass part (third,
+// fifth, octave) stays within the octave above it: C2 E2 G2 C3 for C, G2 B2 D3 G3 for G.
+constexpr Range ChordsBass{36, 48};
+constexpr Range bassRange(int bassPitchClass) noexcept
+{
+    const int low = ChordsBass.low + ((bassPitchClass % 12) + 12) % 12;
+    return Range{low, low + 12};
+}
 
 // A right-hand voicing without heap memory (the chord player builds these on the audio thread).
 struct Voicing {
