@@ -23,4 +23,11 @@ QtObject {
     // ---- selections (border: Theme.accent) ----
     readonly property color selectionBox:       "#3860cdff" // rubber band over clips
     readonly property color timeRange:          "#2858b7b1" // selected time range
+
+    // ---- volume envelope (restMap G6) ----
+    readonly property color envelopeLine:       "#7fd36b"
+    readonly property color envelopeFill:       "#307fd36b" // shaded area under the line
+    readonly property color envelopeBypassed:   "#6a6a6a"   // line and points while bypassed
+    readonly property color envelopeLaneTop:    "#3a3a3a"   // the lane's top edge
+    readonly property color envelopePointSelected: "#ffffff"
 }

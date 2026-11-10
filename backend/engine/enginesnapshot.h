@@ -4,6 +4,7 @@
 #include "processor/processor.h"
 #include "transport/tempomap.h"
 #include "dsp/trackmeters.h"
+#include "automation/volumeenvelope.h"
 
 #include <cstdint>
 #include <memory>
@@ -34,6 +35,7 @@ struct TrackRender {
     int trackId = 0;
     float gain = 1.0f;
     float panLeft = 1.0f, panRight = 1.0f;                // pan law per channel, times gain
+    automation::VolumeEnvelope envelope;                  // restMap G6: times gain; inactive = no effect
     bool muted = false, soloed = false;
     std::vector<ClipRender> clips;                        // sorted by start
     std::vector<NoteRender> notes;                        // sorted by on

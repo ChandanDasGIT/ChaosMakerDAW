@@ -96,6 +96,7 @@ private:
     void mixMetronome(const AudioIO& io, int offset, int frames, const TempoMap& tempo) noexcept;
     void renderTracks(const AudioIO& io, const EngineSnapshot& snapshot, int frames) noexcept;
     RecordingGroup* m_recordingGroup = nullptr;
+    void fillEnvelopeGain(const TrackRender& track, int count) noexcept;
     void mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames, TrackMeters* liveMeters) noexcept;
     void populateTrackMidi(const TrackRender& track, std::int64_t position, int count, bool loopWrapped, bool includeLiveMidi = true, const MidiBuffer* hwMidi = nullptr, bool routeHwMidi = false) noexcept;
     static bool trackReceivesHwMidi(const TrackRender& track, const EngineSnapshot* snapshot) noexcept;
@@ -123,6 +124,7 @@ private:
     int m_fxBlockFrames = 1024;
     std::array<std::array<float,1024>,2> m_playbackAudio{};
     std::array<std::array<float,1024>,2> m_printedAudio{}, m_liveAudio{};
+    std::array<float,1024> m_envelopeGain{};               // restMap G6: per sample of the current block
     MidiBuffer m_trackMidi;
     struct LiveMidiMessage {
         int trackId = -1;

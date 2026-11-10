@@ -621,3 +621,27 @@ TEST(snapshotbuilder, playback_ends_where_the_last_clip_ends)
     CHECK(build(false, true, TrackKind::Instrument) == 96000);          // recorded audio through FX
     CHECK(build(false, true, TrackKind::Audio) == 96000);               // plain audio
 }
+
+TEST(snapshotbuilder, volume_envelope_reaches_the_track_render)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    project.addTrack(TrackKind::Audio, "Plain");
+    auto& faded = project.addTrack(TrackKind::Audio, "Faded");
+    CHECK(project.addEnvelopePoint(faded.id, 0, automation::envelopescale::unityLevel()) == 0);
+    CHECK(project.addEnvelopePoint(faded.id, 4800, 0.0) == 1);
+
+    auto snapshot = SnapshotBuilder::buildPlaybackSnapshot(project, nullptr, nullptr, false);
+    CHECK(snapshot->tracks.size() == 2);
+    CHECK(!snapshot->tracks[0].envelope.active());
+    const auto& envelope = snapshot->tracks[1].envelope;
+    CHECK(envelope.active());
+    CHECK(envelope.points().size() == 2);
+    CHECK_NEAR(envelope.gainAt(0), 1.0, 1e-9);
+    CHECK_NEAR(envelope.gainAt(4800), 0.0, 1e-9);
+
+    project.setEnvelopeBypassed(faded.id, true);
+    auto bypassed = SnapshotBuilder::buildPlaybackSnapshot(project, nullptr, nullptr, false);
+    CHECK(!bypassed->tracks[1].envelope.active());
+    CHECK_NEAR(bypassed->tracks[1].envelope.gainAt(4800), 1.0, 1e-9);
+}

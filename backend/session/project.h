@@ -10,6 +10,7 @@
 #include "instruments/piano/pianosettings.h"
 #include "instruments/harmonium/harmoniumsettings.h"
 #include "plugins/chordplayer/chordsettings.h"
+#include "automation/volumeenvelope.h"
 
 #include <cstdint>
 #include <array>
@@ -66,6 +67,8 @@ struct Track {
     // Insert effects in processing order (plan 6.1); rules in effectchain.
     std::vector<TrackEffectSlot> effects;
     std::vector<AudioClip> audioClips;
+    // Volume envelope (restMap G6): multiplies the fader; no points = no effect.
+    automation::VolumeEnvelope volumeEnvelope;
 
     bool hasLiveInput() const;
     // MON is offered for a live audio input (guitar, vocal) and for every instrument track,
@@ -126,6 +129,19 @@ public:
     bool setClipGain(int trackId, int clipId, float gainDb, bool continueEdit = false);
     // Replace a clip's pattern notes (origin-relative beats) as one undoable edit.
     bool setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes);
+    // Volume envelope (restMap G6). Adding, moving and removing points and bypass are undoable;
+    // showing the lane and drawing it over the clips are view state and are not. Showing an
+    // envelope with no points adds a start point (sample 0, 0 dB) with no undo step; loading a
+    // project does not.
+    // addEnvelopePoint returns the new point's index, or -1 (see VolumeEnvelope::addPoint).
+    // continueEdit: fold the move into the previous undo step when that step moved the same point
+    // of the same track (one drag = one undo step).
+    int addEnvelopePoint(int trackId, std::int64_t position, double level);
+    bool moveEnvelopePoint(int trackId, int index, std::int64_t position, double level, bool continueEdit = false);
+    bool removeEnvelopePoint(int trackId, int index);
+    bool setEnvelopeBypassed(int trackId, bool bypassed);
+    bool setEnvelopeShown(int trackId, bool shown);
+    bool setEnvelopeOverClips(int trackId, bool overClips);
     struct ClipChange { int trackId; AudioClip clip; bool remove = false; int destinationTrackId = -1; };
     bool editClipGroup(const std::vector<ClipChange>& changes);
     bool canUndo() const { return m_historyPosition > 0; }
@@ -152,8 +168,11 @@ private:
     struct TrackClipEdit { int trackId; std::vector<AudioClip> before, after; };
     // gainClipId: set when the step is a clip gain change, so a fader drag can extend it.
     // removedTrack: set when the step removed a whole track (kept here so undo can restore it).
+    // movedPoint: set when the step moved one envelope point, so a drag can extend it.
+    struct EnvelopeEdit { int trackId; automation::VolumeEnvelope before, after; int movedPoint = -1; };
     struct ClipEdit {
         std::vector<TrackClipEdit> tracks;
+        std::optional<EnvelopeEdit> envelope;
         int gainClipId = -1;
         std::optional<Track> removedTrack;
         std::size_t removedIndex = 0;
@@ -161,6 +180,7 @@ private:
     void pushHistory(ClipEdit edit);
     std::size_t indexOfTrack(int id) const;
     void rememberClipEdit(int trackId, std::vector<AudioClip> before);
+    void rememberEnvelopeEdit(int trackId, automation::VolumeEnvelope before, int movedPoint = -1);
     std::vector<ClipEdit> m_history;
     std::size_t m_historyPosition = 0;
     std::vector<std::unique_ptr<Track>> m_tracks;

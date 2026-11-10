@@ -26,6 +26,7 @@ SnapshotBuilder::Context SnapshotBuilder::Context::fromProject(const Project& pr
         info.monitorEnabled = track->monitorEnabled;
         info.hasLiveInput = track->hasLiveInput();
         info.audioClips = track->audioClips;
+        info.volumeEnvelope = track->volumeEnvelope;
         for (const auto& slot : track->effects) info.effects.push_back(slot.type);
         ctx.tracks.push_back(std::move(info));
     }
@@ -166,6 +167,7 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
         TrackRender render;
         render.trackId = track.id;
         render.gain = track.volume;
+        render.envelope = track.volumeEnvelope;
         const auto pan = panlaw::balance(track.pan);
         render.panLeft = pan.left;
         render.panRight = pan.right;

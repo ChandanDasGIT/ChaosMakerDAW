@@ -549,6 +549,79 @@ void Project::rememberClipEdit(int trackId, std::vector<AudioClip> before)
     pushHistory(std::move(edit));
 }
 
+int Project::addEnvelopePoint(int trackId, std::int64_t position, double level)
+{
+    auto* track = findTrack(trackId);
+    if (!track) return -1;
+    auto before = track->volumeEnvelope;
+    const int index = track->volumeEnvelope.addPoint(position, level);
+    if (index >= 0) rememberEnvelopeEdit(trackId, std::move(before));
+    return index;
+}
+
+bool Project::moveEnvelopePoint(int trackId, int index, std::int64_t position, double level, bool continueEdit)
+{
+    auto* track = findTrack(trackId);
+    if (!track) return false;
+    auto before = track->volumeEnvelope;
+    if (!track->volumeEnvelope.movePoint(index, position, level)) return false;
+    if (track->volumeEnvelope.sameContent(before)) return true;
+    const bool extendLast = continueEdit && m_historyPosition > 0 && m_historyPosition == m_history.size()
+        && m_history.back().envelope && m_history.back().envelope->trackId == trackId
+        && m_history.back().envelope->movedPoint == index;
+    if (extendLast) m_history.back().envelope->after = track->volumeEnvelope;   // keep the original "before"
+    else rememberEnvelopeEdit(trackId, std::move(before), index);
+    return true;
+}
+
+bool Project::removeEnvelopePoint(int trackId, int index)
+{
+    auto* track = findTrack(trackId);
+    if (!track) return false;
+    auto before = track->volumeEnvelope;
+    if (!track->volumeEnvelope.removePoint(index)) return false;
+    rememberEnvelopeEdit(trackId, std::move(before));
+    return true;
+}
+
+bool Project::setEnvelopeBypassed(int trackId, bool bypassed)
+{
+    auto* track = findTrack(trackId);
+    if (!track) return false;
+    if (track->volumeEnvelope.bypassed() == bypassed) return true;
+    auto before = track->volumeEnvelope;
+    track->volumeEnvelope.setBypassed(bypassed);
+    rememberEnvelopeEdit(trackId, std::move(before));
+    return true;
+}
+
+bool Project::setEnvelopeShown(int trackId, bool shown)
+{
+    auto* track = findTrack(trackId);
+    if (!track) return false;
+    // Showing an envelope that has no points gives it a start point at 0 dB (no change in
+    // sound), as part of the view change: not an undo step of its own.
+    if (shown && track->volumeEnvelope.points().empty())
+        track->volumeEnvelope.addPoint(0, automation::envelopescale::unityLevel());
+    track->volumeEnvelope.setShown(shown);
+    return true;
+}
+
+bool Project::setEnvelopeOverClips(int trackId, bool overClips)
+{
+    auto* track = findTrack(trackId);
+    if (!track) return false;
+    track->volumeEnvelope.setOverClips(overClips);
+    return true;
+}
+
+void Project::rememberEnvelopeEdit(int trackId, automation::VolumeEnvelope before, int movedPoint)
+{
+    ClipEdit edit;
+    edit.envelope = EnvelopeEdit{trackId, std::move(before), findTrack(trackId)->volumeEnvelope, movedPoint};
+    pushHistory(std::move(edit));
+}
+
 int Project::undo()
 {
     if (!canUndo()) return -1;
@@ -557,6 +630,10 @@ int Project::undo()
         const auto index = std::min(edit.removedIndex, m_tracks.size());
         m_tracks.insert(m_tracks.begin() + static_cast<std::ptrdiff_t>(index), std::make_unique<Track>(*edit.removedTrack));
         return edit.removedTrack->id;
+    }
+    if (edit.envelope) {
+        if (auto* track = findTrack(edit.envelope->trackId)) track->volumeEnvelope.restoreContent(edit.envelope->before);
+        return edit.envelope->trackId;
     }
     for (const auto& track:edit.tracks) findTrack(track.trackId)->audioClips = track.before;
     return edit.tracks.front().trackId;
@@ -570,6 +647,10 @@ int Project::redo()
         const auto index = indexOfTrack(edit.removedTrack->id);
         if (index < m_tracks.size()) m_tracks.erase(m_tracks.begin() + static_cast<std::ptrdiff_t>(index));
         return edit.removedTrack->id;
+    }
+    if (edit.envelope) {
+        if (auto* track = findTrack(edit.envelope->trackId)) track->volumeEnvelope.restoreContent(edit.envelope->after);
+        return edit.envelope->trackId;
     }
     for (const auto& track:edit.tracks) findTrack(track.trackId)->audioClips = track.after;
     return edit.tracks.front().trackId;

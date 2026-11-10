@@ -558,6 +558,17 @@ void AudioEngine::populateTrackMidi(const TrackRender& track, std::int64_t posit
     m_trackMidi.sort();
 }
 
+void AudioEngine::fillEnvelopeGain(const TrackRender& track, int count) noexcept
+{
+    // restMap G6. Stopped, the level at the playhead also applies to live sound.
+    if (!track.envelope.active()) { std::fill_n(m_envelopeGain.data(), count, 1.0f); return; }
+    if (!m_playing) {
+        std::fill_n(m_envelopeGain.data(), count, float(track.envelope.gainAt(m_position)));
+        return;
+    }
+    for (int i = 0; i < count; ++i) m_envelopeGain[i] = float(track.envelope.gainAt(m_position + i));
+}
+
 void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames, TrackMeters* liveMeters) noexcept
 {
     bool anySolo = false;
@@ -639,11 +650,12 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
                 context.playing = m_playing;
                 for (auto* processor : track.chain) if (processor) processor->process(context);
             }
+            fillEnvelopeGain(track, count);
             for(int c=0;c<2;++c) {
               float peak=0;
               const float gain=track.gain*(c==0 ? track.panLeft : track.panRight);
               for(int i=0;i<count;++i) {
-                const float sample=audible ? (channels[c][i]+m_printedAudio[c][i])*gain : 0.0f;
+                const float sample=audible ? (channels[c][i]+m_printedAudio[c][i])*gain*m_envelopeGain[i] : 0.0f;
                 if(track.meters) {
                     float measured=sample+(live ? m_liveAudio[c][i] : 0.0f);
                     if(std::isfinite(measured)) peak=std::max(peak,std::abs(measured));
@@ -653,7 +665,7 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
               if(track.meters)track.meters->output[c].capturePeak(peak);
             }
             for(int c=2;c<io.output.channelCount;++c) for(int i=0;i<count;++i)
-                if(audible)io.output.channel(c)[offset+i]+=(channels[0][i]+m_printedAudio[0][i])*track.gain;
+                if(audible)io.output.channel(c)[offset+i]+=(channels[0][i]+m_printedAudio[0][i])*track.gain*m_envelopeGain[i];
         }
         m_endNoteOffs = false;                              // sent to every track in this block
         if (!m_playing) {
@@ -808,12 +820,13 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
                 context.playing = m_playing;
                 for(auto* processor:track.chain)if(processor)processor->process(context);
             }
+            fillEnvelopeGain(track, count);
             for(int c=0;c<2;++c) {
                 float peak=0;
                 const float gain=track.gain*(c==0 ? track.panLeft : track.panRight);
                 for(int i=0;i<count;++i) {
                     float value=0;
-                    if(audible)value=(dry[c][i]+m_printedAudio[c][i]+(live && track.monitoring && m_cleanMonitorEnabled ? liveAudio[c][i] : 0))*gain;
+                    if(audible)value=(dry[c][i]+m_printedAudio[c][i]+(live && track.monitoring && m_cleanMonitorEnabled ? liveAudio[c][i] : 0))*gain*m_envelopeGain[i];
                     liveAudio[c][i]=value;
                     if(std::isfinite(value))peak=std::max(peak,std::abs(value));
                 }

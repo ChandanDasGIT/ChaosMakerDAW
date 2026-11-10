@@ -97,6 +97,14 @@ std::string ProjectDocument::serialize(const Project& project,
         json effectsList = json::array();
         for (const auto& slot : track->effects) effectsList.push_back(slot.type);
         trackObj["effects"] = std::move(effectsList);   // insert effects in chain order (plan 6.1)
+        {   // restMap G6; positions as strings like clip timing (64-bit samples)
+            const auto& envelope = track->volumeEnvelope;
+            json pointsJson = json::array();
+            for (const auto& p : envelope.points())
+                pointsJson.push_back({{"position", std::to_string(p.position)}, {"level", p.level}});
+            trackObj["volumeEnvelope"] = {{"points", std::move(pointsJson)}, {"bypassed", envelope.bypassed()},
+                                          {"shown", envelope.shown()}, {"overClips", envelope.overClips()}};
+        }
         trackObj["clips"] = clipsJson;
         tracksJson.push_back(trackObj);
     }
@@ -304,6 +312,37 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             chords::Settings settings;
             if (!chordsjson::fromJson(item["chords"], settings, error)) return false;
             candidate.setTrackChords(track.id, settings);
+        }
+
+        // Optional: projects saved before G6 load without an envelope. Points are rescaled like
+        // clips when the project reopens at another sample rate.
+        if (item.contains("volumeEnvelope")) {
+            const auto& e = item["volumeEnvelope"];
+            bool valid = e.is_object() && e.contains("points") && e["points"].is_array();
+            for (const char* flag : {"bypassed", "shown", "overClips"})
+                if (valid && e.contains(flag) && !e[flag].is_boolean()) valid = false;
+            std::vector<automation::EnvelopePoint> points;
+            if (valid) {
+                for (const auto& pj : e["points"]) {
+                    if (!pj.is_object() || !pj.contains("position") || !pj["position"].is_string()
+                        || !pj.contains("level") || !pj["level"].is_number()) { valid = false; break; }
+                    std::int64_t position = -1;
+                    try { position = std::stoll(pj["position"].get<std::string>()); } catch (...) { valid = false; break; }
+                    if (position < 0 || double(position) > double(INT64_MAX / 4) * std::min(1.0, oldRate / rate)) {
+                        valid = false;
+                        break;
+                    }
+                    points.push_back({position, pj["level"].get<double>()});
+                }
+            }
+            if (!valid || !track.volumeEnvelope.setPoints(std::move(points))) {
+                error = "Invalid volume envelope.";
+                return false;
+            }
+            track.volumeEnvelope.rescale(rate / oldRate);
+            track.volumeEnvelope.setBypassed(e.value("bypassed", false));
+            track.volumeEnvelope.setShown(e.value("shown", false));
+            track.volumeEnvelope.setOverClips(e.value("overClips", false));
         }
 
         for (int i = 0; i < 10; ++i) {

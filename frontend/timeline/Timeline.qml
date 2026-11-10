@@ -133,11 +133,11 @@ Item {
         forceActiveFocus()
         selectionStartX = x; selectionEndX = x
         selectionStartY = y; selectionEndY = y
-        editor.beginSelection(x / beatWidth, y / laneHeight, clips)
+        editor.beginSelection(x / beatWidth, rowCoordinate(y), clips)
     }
     function updateSelection(x, y) {
         selectionEndX = x; selectionEndY = y
-        editor.updateSelection(x / beatWidth, y / laneHeight, Math.abs(x - selectionStartX) > 2)
+        editor.updateSelection(x / beatWidth, rowCoordinate(y), Math.abs(x - selectionStartX) > 2)
     }
     function finishSelection() {
         editor.finishSelection(8 / laneHeight, 10 / laneHeight, 1 / laneHeight)
@@ -149,7 +149,22 @@ Item {
     property var trackModel: null
     property int laneCount: 5
     property int laneHeight: 106
+    property int envelopeLaneHeight: 72   // a volume lane under its track (restMap G6)
     property int rulerHeight: 38
+    // Rows can be taller than laneHeight when a volume lane is shown under the track; the
+    // backend's row layout (TrackLayout via the track model) says where every row is.
+    Binding { target: root.trackModel ? root.trackModel : null; property: "trackRowHeight"; value: root.laneHeight; when: !!root.trackModel }
+    Binding { target: root.trackModel ? root.trackModel : null; property: "envelopeLaneHeight"; value: root.envelopeLaneHeight; when: !!root.trackModel }
+    function rowTop(row) {
+        const tops = root.trackModel ? root.trackModel.rowTops : []
+        if (row < 0 || tops.length === 0) return row * root.laneHeight
+        if (row < tops.length) return tops[row]
+        return tops[tops.length - 1] + (row - tops.length + 1) * root.laneHeight
+    }
+    function rowHeight(row) { return rowTop(row + 1) - rowTop(row) }
+    function rowAt(y) { return root.trackModel ? root.trackModel.rowAtY(y) : Math.floor(y / root.laneHeight) }
+    function rowCoordinate(y) { return root.trackModel ? root.trackModel.rowCoordinate(y) : y / root.laneHeight }
+    readonly property real rowsHeight: root.trackModel ? root.trackModel.layoutHeight : root.laneCount * root.laneHeight
     readonly property real verticalScrollPosition: scroll.contentY
     readonly property real beatUnitWidth: beatWidth * editor.beatUnit
     readonly property real barWidth: beatWidth * editor.beatsPerBar
@@ -264,6 +279,45 @@ Item {
         }
     }
 
+    // The volume envelope's right-click menu (restMap G6).
+    ThemedMenu {
+        id: envelopeMenu
+        objectName: "envelopeMenu"
+        parent: root
+        popupType: Popup.Item
+        width: 180
+        property var lane: null
+        ThemedMenuItem {
+            objectName: "envelopePlacementAction"
+            text: envelopeMenu.lane && envelopeMenu.lane.overClips ? "Show in own lane" : "Show over clips"
+            onTriggered: root.trackModel.setEnvelopeOverClips(envelopeMenu.lane.envelopeTrackId, !envelopeMenu.lane.overClips)
+        }
+        ThemedMenuItem {
+            objectName: "envelopeDeletePointAction"
+            text: "Delete point"
+            enabled: !!envelopeMenu.lane && envelopeMenu.lane.selectedPoint >= 0
+            onTriggered: {
+                const lane = envelopeMenu.lane, point = lane.selectedPoint
+                lane.selectedPoint = -1
+                root.trackModel.removeEnvelopePoint(lane.envelopeTrackId, point)
+            }
+        }
+        ThemedMenuItem {
+            objectName: "envelopeBypassAction"
+            text: "Bypass"
+            checkable: true
+            checked: !!envelopeMenu.lane && envelopeMenu.lane.bypassed
+            onTriggered: root.trackModel.setEnvelopeBypassed(envelopeMenu.lane.envelopeTrackId, !envelopeMenu.lane.bypassed)
+        }
+    }
+    // V shows / hides the selected track's volume envelope.
+    Shortcut {
+        sequence: "V"
+        enabled: root.visible && !root.editingText && !!root.trackModel && root.trackModel.selectedTrackId >= 0
+        autoRepeat: false
+        onActivated: root.trackModel.toggleEnvelopeShown(root.trackModel.selectedTrackId)
+    }
+
     Connections {
         target: root.transport
         function onTransportChanged() {
@@ -308,7 +362,7 @@ Item {
         anchors.fill: parent
         clip: true
         contentWidth: root.contentWidth
-        contentHeight: Math.max(height, root.rulerHeight + root.laneCount * root.laneHeight)
+        contentHeight: Math.max(height, root.rulerHeight + root.rowsHeight)
         boundsBehavior: Flickable.StopAtBounds
         flickableDirection: Flickable.HorizontalFlick
         interactive: false
@@ -336,9 +390,9 @@ Item {
             delegate: Rectangle {
                 readonly property bool isSelected: !!root.trackModel && root.trackModel.indexOfTrack(root.selectedTrackId) === index
                 x: 0
-                y: root.rulerHeight + index * root.laneHeight
+                y: root.rulerHeight + root.rowTop(index)
                 width: root.contentWidth
-                height: root.laneHeight
+                height: root.rowHeight(index)
                 color: isSelected ? Theme.timeline.laneSelected : (index % 2 ? Theme.timeline.laneAlt : Theme.timeline.lane)
                 border.color: isSelected ? Theme.timeline.laneSelectedBorder : Theme.timeline.laneBorder
             }
@@ -352,8 +406,8 @@ Item {
                 required property int trackId
                 required property color trackColour
                 objectName: "timelineLaneColour" + trackId
-                x: 0; y: root.rulerHeight + index * root.laneHeight
-                width: 3; height: root.laneHeight
+                x: 0; y: root.rulerHeight + root.rowTop(index)
+                width: 3; height: root.rowHeight(index)
                 color: trackColour
                 z: 2
             }
@@ -389,7 +443,7 @@ Item {
                 objectName: "clipBlock" + clipId
                 readonly property var preview: editor.previews[String(clipId)] ?? ({})
                 x: (preview.startBeat ?? startBeat) * root.beatWidth + 4
-                y: root.rulerHeight + (preview.laneIndex ?? laneIndex) * root.laneHeight + 8
+                y: root.rulerHeight + root.rowTop(preview.laneIndex ?? laneIndex) + 8
                 width: Math.max(4, (preview.lengthBeats ?? lengthBeats) * root.beatWidth - 8)
                 height: root.laneHeight - 18
                 radius: 4
@@ -530,7 +584,7 @@ Item {
                         if (!(pressedButtons & Qt.LeftButton) || root.recording || (mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier))) return
                         const delta = mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStartX
                         const pointerY = mapToItem(scroll.contentItem, mouse.x, mouse.y).y
-                        editor.updateGroupLane(Math.floor((pointerY-root.rulerHeight)/root.laneHeight)-originalLane)
+                        editor.updateGroupLane(root.rowAt(pointerY-root.rulerHeight)-originalLane)
                         const verticalOnly = root.editLaneDelta !== 0 && Math.abs(delta) < Qt.styleHints.startDragDistance
                         editor.updateDrag(originalBeat, delta / root.beatWidth, verticalOnly)
                     }
@@ -647,7 +701,7 @@ Item {
             x: 0; y: root.rulerHeight; width: root.contentWidth; height: scroll.contentHeight - root.rulerHeight; z: 1
             acceptedButtons: Qt.LeftButton
             onPressed: mouse => {
-                const lane = Math.floor(mouse.y / root.laneHeight)
+                const lane = root.rowAt(mouse.y)
                 if (root.trackModel && lane >= 0 && lane < root.trackModel.count) {
                     root.trackModel.selectTrack(root.trackModel.trackIdAt(lane))
                 }
@@ -658,7 +712,7 @@ Item {
             }
             onReleased: root.finishSelection()
             onCanceled: { editor.cancelSelection() }
-            onDoubleClicked: mouse => editor.createClipAt(mouse.x / root.beatWidth, Math.floor(mouse.y / root.laneHeight))
+            onDoubleClicked: mouse => editor.createClipAt(mouse.x / root.beatWidth, root.rowAt(mouse.y))
         }
         Rectangle {
             objectName: "timelineSelection"
@@ -678,6 +732,40 @@ Item {
             color: Theme.timeline.timeRange; border.color: Theme.accent; z: 2
         }
 
+        // Volume envelopes (restMap G6): in the track's own lane under it, or over its clips.
+        Repeater {
+            model: root.trackModel
+            delegate: VolumeEnvelopeLane {
+                id: envelopeLane
+                required property int index
+                required property int trackId
+                required property bool envelopeShown
+                required property bool envelopeOverClips
+                required property bool envelopeBypassed
+                required property var envelopePoints
+                objectName: "volumeEnvelope" + trackId
+                visible: envelopeShown
+                trackModel: root.trackModel
+                envelopeTrackId: trackId
+                points: envelopePoints
+                bypassed: envelopeBypassed
+                overClips: envelopeOverClips
+                beatWidth: root.beatWidth
+                viewX: scroll.contentX
+                viewWidth: scroll.width
+                x: 0
+                y: root.rulerHeight + root.rowTop(index) + (envelopeOverClips ? 8 : root.laneHeight)
+                width: root.contentWidth
+                height: envelopeOverClips ? root.laneHeight - 18 : root.envelopeLaneHeight
+                z: envelopeOverClips ? 3.5 : 2.5
+                onMenuRequested: (id, x, y) => {
+                    envelopeMenu.lane = envelopeLane
+                    const at = root.mapFromItem(null, x, y)
+                    envelopeMenu.popup(at.x, at.y)
+                }
+            }
+        }
+
         Repeater {
           model: root.recording ? root.transport.recordingTracks : []
           delegate: Rectangle {
@@ -685,7 +773,7 @@ Item {
             objectName: "recordingPreview" + modelData
             visible: !!root.trackModel
             x: root.transport.recordingStartBeats * root.beatWidth
-            y: root.rulerHeight + (root.trackModel ? root.trackModel.indexOfTrack(modelData) : 0) * root.laneHeight + 8
+            y: root.rulerHeight + root.rowTop(root.trackModel ? root.trackModel.indexOfTrack(modelData) : 0) + 8
             width: Math.max(2, root.playhead - x)
             height: root.laneHeight - 18
             color: Theme.recordActiveBg; border.color: Theme.record; radius: 4; z: 3

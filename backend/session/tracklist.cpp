@@ -782,6 +782,77 @@ std::vector<int> TrackList::duplicateClips(const std::vector<int>& ids, double b
     return m_project.addAudioClips(toAdd);
 }
 
+int TrackList::addEnvelopePoint(int trackId, std::int64_t position, double level)
+{
+    if (editsLocked()) return -1;
+    return m_project.addEnvelopePoint(trackId, position, level);
+}
+
+TrackList::Change TrackList::moveEnvelopePoint(int trackId, int index, std::int64_t position, double level, bool continueEdit)
+{
+    const auto* track = m_project.findTrack(trackId);
+    if (editsLocked() || !track) return {};
+    const auto before = track->volumeEnvelope;
+    if (!m_project.moveEnvelopePoint(trackId, index, position, level, continueEdit)) return {};
+    return {true, !track->volumeEnvelope.sameContent(before)};
+}
+
+TrackList::Change TrackList::removeEnvelopePoint(int trackId, int index)
+{
+    if (editsLocked()) return {};
+    const bool ok = m_project.removeEnvelopePoint(trackId, index);
+    return {ok, ok};
+}
+
+TrackList::Change TrackList::setEnvelopeBypassed(int trackId, bool bypassed)
+{
+    const auto* track = m_project.findTrack(trackId);
+    if (editsLocked() || !track) return {};
+    if (track->volumeEnvelope.bypassed() == bypassed) return {true, false};
+    const bool ok = m_project.setEnvelopeBypassed(trackId, bypassed);
+    return {ok, ok};
+}
+
+TrackList::Change TrackList::setEnvelopeShown(int trackId, bool shown)
+{
+    const auto* track = m_project.findTrack(trackId);
+    if (!track) return {};
+    if (track->volumeEnvelope.shown() == shown) return {true, false};
+    return {m_project.setEnvelopeShown(trackId, shown), true};
+}
+
+TrackList::Change TrackList::setEnvelopeOverClips(int trackId, bool overClips)
+{
+    const auto* track = m_project.findTrack(trackId);
+    if (!track) return {};
+    if (track->volumeEnvelope.overClips() == overClips) return {true, false};
+    return {m_project.setEnvelopeOverClips(trackId, overClips), true};
+}
+
+int TrackList::addEnvelopePointAtBeat(int trackId, double beat, double level)
+{
+    const auto position = sampleAtBeat(m_project.tempo(), beat);
+    return position ? addEnvelopePoint(trackId, *position, level) : -1;
+}
+
+TrackList::Change TrackList::moveEnvelopePointAtBeat(int trackId, int index, double beat, double level, bool continueEdit)
+{
+    // A drag past the start stops at 0 instead of being refused.
+    const auto position = sampleAtBeat(m_project.tempo(), std::isfinite(beat) ? std::max(0.0, beat) : beat);
+    if (!position) return {};
+    return moveEnvelopePoint(trackId, index, *position, level, continueEdit);
+}
+
+std::vector<TrackList::EnvelopePointInfo> TrackList::envelopePointBeats(int trackId) const
+{
+    std::vector<EnvelopePointInfo> result;
+    const auto* track = m_project.findTrack(trackId);
+    if (!track) return result;
+    for (const auto& point : track->volumeEnvelope.points())
+        result.push_back({m_project.tempo().beatAt(point.position), point.level});
+    return result;
+}
+
 bool TrackList::undo() {
     if (!canUndo()) return false;
     m_project.undo();  return true;

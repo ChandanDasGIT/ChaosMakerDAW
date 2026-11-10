@@ -56,7 +56,7 @@ Rectangle {
             Layout.fillHeight: true
             clip: true
             contentWidth: width
-            contentHeight: Math.max(height, root.trackModel ? root.trackModel.count * root.laneHeight : 0)
+            contentHeight: Math.max(height, root.trackModel ? root.trackModel.layoutHeight : 0)
             contentY: Math.max(0, Math.min(contentHeight - height, root.scrollOffset))
             interactive: false
             boundsBehavior: Flickable.StopAtBounds
@@ -64,7 +64,7 @@ Rectangle {
             MouseArea {
                 objectName: "emptyTrackArea"
                 x: 0
-                y: root.trackModel ? root.trackModel.count * root.laneHeight : 0
+                y: root.trackModel ? root.trackModel.layoutHeight : 0
                 width: trackScroll.width
                 height: Math.max(0, trackScroll.contentHeight - y)
                 enabled: !!root.trackModel
@@ -106,6 +106,9 @@ Rectangle {
                     required property var eqBands
                     required property var effects
                     required property var clips
+                    required property bool envelopeShown
+                    required property bool envelopeOverClips
+                    required property bool envelopeBypassed
                     property bool renaming: false
                     readonly property bool isSelected: !!root.trackModel && root.trackModel.selectedTrackId === trackCard.trackId
 
@@ -123,7 +126,9 @@ Rectangle {
                         if (nameEditor.activeFocus) trackCard.forceActiveFocus()
                     }
 
-                    y: index * root.laneHeight
+                    // Rows follow the backend layout: a shown volume lane (restMap G6) sits under
+                    // the card and pushes the rows below it down.
+                    y: root.trackModel && index < root.trackModel.rowTops.length ? root.trackModel.rowTops[index] : index * root.laneHeight
                     width: trackScroll.width
                     height: root.laneHeight
                     color: isSelected ? Theme.trackList.rowSelected : (index % 2 ? Theme.trackList.rowAlt : Theme.trackList.row)
@@ -140,6 +145,43 @@ Rectangle {
                     MouseArea {
                         anchors.fill: parent
                         onPressed: if (root.trackModel) root.trackModel.selectTrack(trackCard.trackId)
+                    }
+
+                    // The volume lane's header, beside the lane in the timeline (restMap G6).
+                    Rectangle {
+                        objectName: "envelopeLaneHeader" + trackCard.trackId
+                        visible: trackCard.envelopeShown && !trackCard.envelopeOverClips
+                        y: trackCard.height
+                        width: trackCard.width
+                        height: root.trackModel ? root.trackModel.envelopeLaneHeight : 72
+                        color: trackCard.color
+                        border.color: Theme.divider
+                        Rectangle {
+                            anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                            width: 3
+                            color: trackCard.trackColour
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onPressed: if (root.trackModel) root.trackModel.selectTrack(trackCard.trackId)
+                        }
+                        Text {
+                            anchors.left: parent.left; anchors.leftMargin: 14
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "Volume"
+                            color: trackCard.envelopeBypassed ? Theme.textMuted : Theme.text
+                            font.pixelSize: 11
+                        }
+                        ToggleChip {
+                            objectName: "envelopeBypassButton" + trackCard.trackId
+                            anchors.right: parent.right; anchors.rightMargin: 8
+                            anchors.verticalCenter: parent.verticalCenter
+                            active: trackCard.envelopeBypassed
+                            text: "BYPASS"; textSize: Theme.microSize
+                            implicitWidth: 50; implicitHeight: 22
+                            onClicked: root.trackModel.setEnvelopeBypassed(trackCard.trackId, !active)
+                            tooltip: active ? "Envelope bypassed: the track plays at its fader level" : "Bypass the volume envelope"
+                        }
                     }
 
                     ColumnLayout {
@@ -196,7 +238,7 @@ Rectangle {
                                             reordering = true
                                         if (reordering)
                                             root.dropRow = Math.max(0, Math.min(root.trackModel.count - 1,
-                                                Math.floor(mapToItem(trackScroll.contentItem, mouse.x, mouse.y).y / root.laneHeight)))
+                                                root.trackModel.rowAtY(mapToItem(trackScroll.contentItem, mouse.x, mouse.y).y)))
                                     }
                                     onReleased: {
                                         if (reordering && root.dropRow >= 0)
