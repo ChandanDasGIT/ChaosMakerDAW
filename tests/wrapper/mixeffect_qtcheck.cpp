@@ -194,3 +194,41 @@ TEST(qtmixeffect, the_master_track_has_effects_the_engine_runs_and_chains_carry)
     CHECK(tracks.mixEffect(master, "limiter")->values.at("ceiling") == -4.0f);
     CHECK(!tracks.removeTrack(master));
 }
+
+TEST(qtmixeffect, a_clips_effects_get_processors_that_follow_its_settings)
+{
+    Storage storage;
+    EngineController controller(std::make_unique<SilentDevice>(), false);
+    TrackListWrapper tracks;
+    controller.attachProject(&tracks);
+    const int vocal = tracks.addVocalTrack();
+    auto audio = std::make_shared<AudioData>();
+    audio->path = "take.wav"; audio->sampleRate = 48000; audio->frames = 96000;
+    audio->channels = {std::vector<float>(96000, 0.25f)};
+    CHECK(tracks.attachTake(vocal, 0, audio));
+    const int clip = tracks.project().findTrack(vocal)->audioClips[0].id;
+    CHECK(tracks.canHaveClipEffects(clip));
+    const int id = tracks.clipEffectsId(clip);
+    CHECK(tracks.clipEffectsInfo(clip)["effectsId"].toInt() == id);
+    CHECK(tracks.clipEffectsInfo(clip)["effects"].toList().isEmpty());
+    CHECK(!controller.mixEffectProcessor(id, "compressor", true));          // none until it has one
+    CHECK(tracks.addTrackEffect(id, "compressor") > 0);
+    CHECK(tracks.clips()[0].toMap()["hasEffects"].toBool());
+    CHECK(tracks.clipEffectsInfo(clip)["effects"].toList().size() == 1);
+    auto compressor = controller.mixEffectProcessor(id, "compressor", true);
+    CHECK(compressor != nullptr);
+    MixEffectWrapper page;
+    page.setTrackModel(&tracks);
+    page.setTrackId(id);
+    page.setEffectType("compressor");
+    CHECK(page.setValue("ratio", 12));
+    CHECK(compressor && compressor->parameter("ratio")->get() == 12.0f);
+    // Split for a range: the middle piece is a new clip with its own copy and processors.
+    const int middle = tracks.splitForRangeEffects(vocal, 1.0, 2.0);
+    CHECK(middle > 0 && middle != clip);
+    CHECK(controller.mixEffectProcessor(tracks.clipEffectsId(middle), "compressor", true) != nullptr);
+    CHECK(controller.mixEffectProcessor(tracks.clipEffectsId(middle), "compressor", true) != compressor);
+    // A removed clip's processors go.
+    CHECK(tracks.removeAudioClip(vocal, middle));
+    CHECK(!controller.mixEffectProcessor(tracks.clipEffectsId(middle), "compressor", true));
+}

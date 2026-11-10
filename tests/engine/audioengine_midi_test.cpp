@@ -796,3 +796,36 @@ TEST(audioengine_midi, master_effects_process_the_summed_tracks_before_the_maste
         engine.stop();
     }
 }
+
+TEST(audioengine_midi, a_clips_effects_change_only_that_clips_samples)
+{
+    for (bool multi : {false, true}) {
+        AudioEngine engine{nullptr};
+        engine.deviceChanged(48000.0, 512);
+        auto audio = constantAudio(48000);
+        auto halve = std::make_shared<Halve>();
+        auto snapshot = std::make_unique<EngineSnapshot>();
+        snapshot->multiMonitor = multi;
+        snapshot->tempo.set(120.0, 4, 4, 48000.0);
+        TrackRender track;
+        track.trackId = 1;
+        track.clips.push_back({audio.get(), 0, 256, 0, 0, 0, 1.0f, true});      // plain: 0.5
+        ClipRender effected{audio.get(), 256, 256, 256, 0, 0, 1.0f, true};
+        effected.chain.push_back(halve.get());                                // halved: 0.25
+        track.clips.push_back(effected);
+        snapshot->tracks.push_back(std::move(track));
+        snapshot->keepProcessors.push_back(halve);
+        snapshot->keepAudio.push_back(audio);
+        engine.publishPlayback(std::move(snapshot));
+        CHECK(engine.post({EngineCommand::Type::Play}));
+        float left[512]{}, right[512]{};
+        float* out[]{left, right};
+        AudioIO io{{nullptr, 0, 0}, {out, 2, 512}, nullptr, 512};
+        engine.renderBlock(io);
+        CHECK_NEAR(left[100], 0.5f, 1e-5);
+        CHECK_NEAR(left[255], 0.5f, 1e-5);
+        CHECK_NEAR(left[256], 0.25f, 1e-5);
+        CHECK_NEAR(right[500], 0.25f, 1e-5);
+        engine.stop();
+    }
+}

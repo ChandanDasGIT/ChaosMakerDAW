@@ -14,6 +14,7 @@
 #include "plugins/chordplayer/chordsettings.h"
 #include "automation/volumeenvelope.h"
 #include "plugins/mixfx/mixfxspec.h"
+#include "plugins/effectstate.h"
 
 #include <cstdint>
 #include <array>
@@ -37,6 +38,9 @@ struct AudioClip {
     // the same way; polarity inverted plays the clip upside down (gain times -1).
     bool reversed = false;
     bool polarityInverted = false;
+    // Clip effects (restMap R2): run on this clip's audio before the track's effects. Audio
+    // clips only. Copied with the clip (paste, duplicate, split: each piece its own copy).
+    EffectState fx;
     // Pattern notes. startBeat is measured from the clip's content origin
     // (start - sourceOffset), so trims/splits keep notes fixed in time like audio.
     std::vector<MidiNote> notes;
@@ -44,7 +48,8 @@ struct AudioClip {
 
 enum class TrackKind { Audio, Instrument };
 
-struct Track {
+// A track's effect data (chain, EQ, Chaos EQ, mixing plugins) is its EffectState part.
+struct Track : EffectState {
     int id = 0;
     TrackKind kind = TrackKind::Audio;
     std::string name;
@@ -59,9 +64,6 @@ struct Track {
     float volume = 1.0f;
     float pan = 0.0f; // -1 left .. 0 centre .. +1 right (panlaw::balance)
     float stripWidth = 108.0f; // mixer strip width in px (mixer::defaultStripWidth, clamped by mixer::clampStripWidth)
-    std::array<float, 10> eqGainDb{};
-    // Chaos EQ bands (plan 6.2); heard only while "chaoseq" is on the effect list.
-    chaoseq::Settings chaosEq;
     // Harmonium tracks: stops, bellows, drones... (the harmonium instrument).
     harmonium::Settings harmonium;
     // Drums tracks: room, part levels, tuning, character (the acoustic drum kit).
@@ -72,13 +74,6 @@ struct Track {
     piano::Settings piano;
     // Chords tracks: the eight strips' chords, autoplay and key (its piano uses `piano` above).
     chords::Settings chords;
-    // Mixing plugins' settings by type (restMap G7); heard only while that type is on the
-    // effect list, kept when it is removed. A type not stored here is at its defaults.
-    // (A vector, not a map: Track stays constexpr-constructible.)
-    std::vector<std::pair<std::string, mixfx::Settings>> mixEffects;
-    mixfx::Settings mixEffect(std::string_view type) const;
-    // Insert effects in processing order (plan 6.1); rules in effectchain.
-    std::vector<TrackEffectSlot> effects;
     std::vector<AudioClip> audioClips;
     // Volume envelope (restMap G6): multiplies the fader; no points = no effect.
     automation::VolumeEnvelope volumeEnvelope;
@@ -100,6 +95,18 @@ public:
     // EQ, Chaos EQ, mixing plugins) work on it, but it is never in tracks(): the track list,
     // timeline, mixer lanes, solo / mute and recording never see it.
     static constexpr int MasterTrackId = 2147483000;
+    // Clip effects (restMap R2): an audio clip's effects have this id (base + clip id), so the
+    // same effect calls, plugin pages and FX window work on them.
+    static constexpr int ClipEffectsBase = 1000000000;
+    static constexpr int clipEffectsId(int clipId) noexcept { return ClipEffectsBase + clipId; }
+    static constexpr bool isClipEffectsId(int id) noexcept { return id > ClipEffectsBase && id < MasterTrackId; }
+    // The effect data behind an id: a track's, the master's or a clip's; null for none.
+    EffectState* effects(int id);
+    const EffectState* effects(int id) const;
+    // The owner's type, for the chain rules: a track's type, "Master", or "Clip".
+    std::string effectOwnerType(int id) const;
+    // The clip whose effects an id names, and its track; null for none.
+    const AudioClip* clipOfEffects(int id, int* trackId = nullptr) const;
     Project();
     Track& master() noexcept { return m_master; }
     const Track& master() const noexcept { return m_master; }
@@ -144,6 +151,9 @@ public:
     bool resizeAudioClip(int trackId, int clipId, std::int64_t lengthSamples);
     bool setClipBounds(int trackId, int clipId, std::int64_t start, std::int64_t length, std::int64_t offset);
     int splitAudioClip(int trackId, int clipId, std::int64_t position, std::int64_t sourceOffset);
+    // Joins the last two undo steps into one when both are clip edits of the same one track
+    // (two splits made by one command). False, and nothing changes, otherwise.
+    bool joinLastClipEdits();
     bool canMergeAudioClips(int trackId, int first, int second, double sourceRate) const;
     bool mergeAudioClips(int trackId, int first, int second, double sourceRate);
     bool moveAudioClip(int trackId, int clipId, std::int64_t start);
@@ -205,6 +215,7 @@ private:
     void pushHistory(ClipEdit edit);
     std::size_t indexOfTrack(int id) const;
     void rememberClipEdit(int trackId, std::vector<AudioClip> before);
+    void restoreClips(int trackId, std::vector<AudioClip> clips);
     void rememberEnvelopeEdit(int trackId, automation::VolumeEnvelope before, int movedPoint = -1);
     std::vector<ClipEdit> m_history;
     std::size_t m_historyPosition = 0;

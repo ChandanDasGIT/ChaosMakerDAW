@@ -1,4 +1,5 @@
 #include "project.h"
+#include <utility>
 #include "dsp/panlaw.h"
 #include "mixer/mixerpanel.h"
 #include "instruments/instrumentcatalog.h"
@@ -6,13 +7,6 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-
-mixfx::Settings Track::mixEffect(std::string_view type) const
-{
-    for (const auto& [stored, settings] : mixEffects)
-        if (stored == type) return settings;
-    return mixfx::defaults(type);
-}
 
 bool Track::hasLiveInput() const
 {
@@ -107,6 +101,40 @@ void Project::moveTrack(int from, int to)
     auto track = std::move(m_tracks[static_cast<std::size_t>(from)]);
     m_tracks.erase(m_tracks.begin() + from);
     m_tracks.insert(m_tracks.begin() + to, std::move(track));
+}
+
+EffectState* Project::effects(int id)
+{
+    return const_cast<EffectState*>(std::as_const(*this).effects(id));
+}
+
+const EffectState* Project::effects(int id) const
+{
+    if (isClipEffectsId(id)) {
+        const auto* clip = clipOfEffects(id);
+        return clip ? &clip->fx : nullptr;
+    }
+    return findTrack(id);
+}
+
+std::string Project::effectOwnerType(int id) const
+{
+    if (isClipEffectsId(id)) return "Clip";
+    const auto* track = findTrack(id);
+    return track ? track->type : std::string();
+}
+
+const AudioClip* Project::clipOfEffects(int id, int* trackId) const
+{
+    if (!isClipEffectsId(id)) return nullptr;
+    const int clipId = id - ClipEffectsBase;
+    for (const auto& track : m_tracks)
+        for (const auto& clip : track->audioClips)
+            if (clip.id == clipId) {
+                if (trackId) *trackId = track->id;
+                return &clip;
+            }
+    return nullptr;
 }
 
 Track* Project::findTrack(int id)
@@ -230,7 +258,7 @@ bool Project::setTrackStripWidth(int id, float width)
 
 bool Project::setTrackChaosEq(int id, const chaoseq::Settings& settings)
 {
-    auto* track = findTrack(id);
+    auto* track = effects(id);   // a track, the master or a clip
     if (!track) return false;
     track->chaosEq = chaoseq::sanitize(settings, m_tempo.sampleRate());
     return true;
@@ -238,7 +266,7 @@ bool Project::setTrackChaosEq(int id, const chaoseq::Settings& settings)
 
 bool Project::setTrackMixEffect(int id, std::string_view type, const mixfx::Settings& settings)
 {
-    auto* track = findTrack(id);
+    auto* track = effects(id);   // a track, the master or a clip
     if (!track || !mixfx::find(type)) return false;
     auto clean = mixfx::sanitize(type, settings);
     for (auto& [stored, current] : track->mixEffects)
@@ -289,7 +317,7 @@ bool Project::setTrackChords(int id, const chords::Settings& settings)
 
 bool Project::setTrackEqBand(int id, int band, float gainDb)
 {
-    auto* track = findTrack(id);
+    auto* track = effects(id);   // a track, the master or a clip
     if (!track || band < 0 || band >= static_cast<int>(track->eqGainDb.size()) || !std::isfinite(gainDb))
         return false;
     track->eqGainDb[static_cast<std::size_t>(band)] = std::clamp(gainDb, -12.0f, 12.0f);
@@ -298,7 +326,7 @@ bool Project::setTrackEqBand(int id, int band, float gainDb)
 
 int Project::addTrackEffect(int trackId, const std::string& type)
 {
-    auto* track = findTrack(trackId);
+    auto* track = effects(trackId);   // a track, the master or a clip
     if (!track || !effectchain::canAdd(track->effects, type)) return -1;
     track->effects.push_back({m_nextEffectId++, type});
     return track->effects.back().id;
@@ -306,7 +334,7 @@ int Project::addTrackEffect(int trackId, const std::string& type)
 
 bool Project::removeTrackEffect(int trackId, int effectId)
 {
-    auto* track = findTrack(trackId);
+    auto* track = effects(trackId);   // a track, the master or a clip
     if (!track) return false;
     const auto it = std::find_if(track->effects.begin(), track->effects.end(),
                                  [effectId](const auto& slot) { return slot.id == effectId; });
@@ -317,7 +345,7 @@ bool Project::removeTrackEffect(int trackId, int effectId)
 
 bool Project::moveTrackEffect(int trackId, int effectId, int toIndex)
 {
-    auto* track = findTrack(trackId);
+    auto* track = effects(trackId);   // a track, the master or a clip
     if (!track || toIndex < 0 || toIndex >= static_cast<int>(track->effects.size())) return false;
     const auto it = std::find_if(track->effects.begin(), track->effects.end(),
                                  [effectId](const auto& slot) { return slot.id == effectId; });
@@ -332,9 +360,9 @@ bool Project::moveTrackEffect(int trackId, int effectId, int toIndex)
 
 bool Project::setTrackEffects(int trackId, const std::vector<std::string>& types)
 {
-    auto* track = findTrack(trackId);
+    auto* track = effects(trackId);   // a track, the master or a clip
     if (!track) return false;
-    const auto initial = effectchain::initialEffects(track->type);
+    const auto initial = effectchain::initialEffects(effectOwnerType(trackId));
     const auto isInitial = [&initial](const std::string& type) {
         return std::find(initial.begin(), initial.end(), type) != initial.end();
     };
@@ -458,6 +486,21 @@ int Project::splitAudioClip(int trackId, int clipId, std::int64_t position, std:
     }
     track->audioClips.push_back(right);
     rememberClipEdit(trackId,std::move(before)); return right.id;
+}
+
+bool Project::joinLastClipEdits()
+{
+    if (m_historyPosition < 2 || m_historyPosition != m_history.size()) return false;
+    auto& first = m_history[m_history.size() - 2];
+    auto& last = m_history.back();
+    const auto plain = [](const ClipEdit& e) {
+        return e.tracks.size() == 1 && !e.envelope && !e.removedTrack && e.gainClipId < 0;
+    };
+    if (!plain(first) || !plain(last) || first.tracks.front().trackId != last.tracks.front().trackId) return false;
+    first.tracks.front().after = std::move(last.tracks.front().after);
+    m_history.pop_back();
+    m_historyPosition = m_history.size();
+    return true;
 }
 
 bool Project::canMergeAudioClips(int trackId, int first, int second, double sourceRate) const {
@@ -662,6 +705,18 @@ void Project::rememberEnvelopeEdit(int trackId, automation::VolumeEnvelope befor
     pushHistory(std::move(edit));
 }
 
+void Project::restoreClips(int trackId, std::vector<AudioClip> clips)
+{
+    // Clip effect settings are not part of clip-edit undo (like a track's effects): a clip that
+    // is still there keeps its current effects (restMap R2).
+    auto* track = findTrack(trackId);
+    if (!track) return;
+    for (auto& clip : clips)
+        for (const auto& current : track->audioClips)
+            if (current.id == clip.id) { clip.fx = current.fx; break; }
+    track->audioClips = std::move(clips);
+}
+
 int Project::undo()
 {
     if (!canUndo()) return -1;
@@ -675,7 +730,7 @@ int Project::undo()
         if (auto* track = findTrack(edit.envelope->trackId)) track->volumeEnvelope.restoreContent(edit.envelope->before);
         return edit.envelope->trackId;
     }
-    for (const auto& track:edit.tracks) findTrack(track.trackId)->audioClips = track.before;
+    for (const auto& track:edit.tracks) restoreClips(track.trackId, track.before);
     return edit.tracks.front().trackId;
 }
 
@@ -692,7 +747,7 @@ int Project::redo()
         if (auto* track = findTrack(edit.envelope->trackId)) track->volumeEnvelope.restoreContent(edit.envelope->after);
         return edit.envelope->trackId;
     }
-    for (const auto& track:edit.tracks) findTrack(track.trackId)->audioClips = track.after;
+    for (const auto& track:edit.tracks) restoreClips(track.trackId, track.after);
     return edit.tracks.front().trackId;
 }
 

@@ -75,5 +75,6 @@ std::string TrackEffectsPanel::currentRecordModeDescription() const
 {
     // The master track (G9) records nothing: say what its effects do instead.
     if (m_trackType == "Master") return "On the whole mix, before the master fader";
+    if (m_trackType == "Clip") return "On this clip only, before the track's effects";
     return recordModeDescription(m_recordDry);
 }

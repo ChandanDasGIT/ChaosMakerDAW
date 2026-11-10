@@ -576,6 +576,37 @@ void AudioEngine::applyMasterEffects(const AudioIO& io, const EngineSnapshot& sn
     for (auto* processor : snapshot.masterEffects) if (processor) processor->process(context);
 }
 
+void AudioEngine::mixClipWithEffects(const ClipRender& clip, int count, bool reset, float* const into[2]) noexcept
+{
+    if (!clip.audio || clip.audio->channels.empty()) return;
+    const int first = int(std::clamp<std::int64_t>(clip.start - m_position, 0, count));
+    const int last = int(std::clamp<std::int64_t>(clip.start + clip.length - m_position, 0, count));
+    if (last <= first) return;
+    float* buffer[]{m_clipAudio[0].data(), m_clipAudio[1].data()};
+    std::fill_n(buffer[0], count, 0.0f); std::fill_n(buffer[1], count, 0.0f);
+    for (int i = first; i < last; ++i) {
+        const double source = clip.sourceOffset + double(m_position + i - clip.start) * clip.audio->sampleRate / m_sampleRate;
+        if (source < 0 || source >= clip.audio->frames) continue;
+        const auto at = static_cast<std::size_t>(source);
+        for (int c = 0; c < 2; ++c) {
+            const auto& data = clip.audio->channels[std::min<std::size_t>(c, clip.audio->channels.size() - 1)];
+            if (at >= data.size()) continue;
+            const float next = at + 1 < data.size() ? data[at + 1] : data[at];
+            buffer[c][i] = (data[at] + float(source - at) * (next - data[at])) * clip.gain;
+        }
+    }
+    if (reset) for (auto* processor : clip.chain) if (processor) processor->reset();
+    ProcessContext context;
+    context.audio = {buffer, 2, count};
+    context.sampleRate = m_sampleRate;
+    context.samplePosition = m_position;
+    context.bpm = m_tempoBpm.load(std::memory_order_relaxed);
+    context.playing = m_playing;
+    for (auto* processor : clip.chain) if (processor) processor->process(context);
+    for (int c = 0; c < 2; ++c)
+        for (int i = first; i < last; ++i) into[c][i] += buffer[c][i];
+}
+
 void AudioEngine::fillEnvelopeGain(const TrackRender& track, int count) noexcept
 {
     // restMap G6. Stopped, the level at the playhead also applies to live sound.
@@ -593,6 +624,7 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
     if (snapshot) for (const auto& track : snapshot->tracks) {
         anySolo |= track.soloed;
         if (m_resetPlayback) for (auto* processor : track.chain) if (processor) processor->reset();
+        if (m_resetPlayback) for (const auto& clip : track.clips) for (auto* processor : clip.chain) if (processor) processor->reset();
     }
     m_resetPlayback = false;
     // Stop at the end of the arrangement when the user setting asks for it (metronome included).
@@ -624,6 +656,11 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
             if (m_playing) for (const auto& clip : track.clips) {
                 if (!clip.audio || clip.audio->channels.empty()) continue;
                 const bool dry = !clip.effectsPrinted && !track.chain.empty();
+                if (!clip.chain.empty()) {   // clip effects (restMap R2)
+                    float* into[]{dry ? channels[0] : m_printedAudio[0].data(), dry ? channels[1] : m_printedAudio[1].data()};
+                    mixClipWithEffects(clip, count, blockLoopWrapped, into);
+                    continue;
+                }
                 for (int i=0;i<count;++i) {
                     const auto position=m_position+i;
                     if(position<clip.start || position-clip.start>=clip.length)continue;
@@ -711,6 +748,7 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
     for(const auto& track:snapshot.tracks) {
         anySolo|=track.soloed;
         if(m_resetPlayback)for(auto* processor:track.chain)if(processor)processor->reset();
+        if(m_resetPlayback)for(const auto& clip:track.clips)for(auto* processor:clip.chain)if(processor)processor->reset();
     }
     m_resetPlayback=false;
     if(m_recordingGroup) {
@@ -786,6 +824,12 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
             }
             if(m_playing)for(const auto& clip:track.clips) {
                 if(!clip.audio || clip.audio->channels.empty())continue;
+                if(!clip.chain.empty()) {   // clip effects (restMap R2)
+                    const bool toDry=!clip.effectsPrinted && !track.chain.empty();
+                    float* into[]{toDry ? dry[0] : m_printedAudio[0].data(), toDry ? dry[1] : m_printedAudio[1].data()};
+                    mixClipWithEffects(clip, count, blockLoopWrapped, into);
+                    continue;
+                }
                 for(int i=0;i<count;++i) {
                     const auto at=m_position+i;
                     if(at<clip.start || at-clip.start>=clip.length)continue;

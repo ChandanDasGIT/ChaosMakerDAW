@@ -85,6 +85,9 @@ public:
     // The processor that runs effect `type` for a track (the playback or the monitor instance);
     // null when the track has none for it.
     static std::shared_ptr<Processor> processorFor(const TrackEffects& effects, const std::string& type, bool playback);
+    // Copies an EffectState (EQ bands, Chaos EQ, mixing plugin settings) into a target's
+    // processors: a track's, the master's or a clip's.
+    static void applyEffectState(TrackEffects& effects, const EffectState& state);
     // A prepared monitor and playback instance of each mixing plugin in `types` that the track
     // does not have yet (UI thread); other types are ignored.
     static void ensureMixEffects(TrackEffects& effects, const std::vector<std::string>& types, double sampleRate, int maxFrames);

@@ -96,6 +96,47 @@ std::shared_ptr<const AudioData> TrackList::clipAudio(const AudioClip& clip) con
     return audioFor(clip.reversed ? reversedPoolId(clip.poolId) : clip.poolId);
 }
 
+int TrackList::splitForRangeEffects(int trackId, double startBeat, double endBeat)
+{
+    const auto* track = m_project.findTrack(trackId);
+    const auto from = sampleAtBeat(m_project.tempo(), startBeat);
+    const auto to = sampleAtBeat(m_project.tempo(), endBeat);
+    if (!m_recordingTracks.empty() || !track || !from || !to || *to <= *from) return -1;
+    const AudioClip* best = nullptr;
+    std::int64_t bestOverlap = 0;
+    for (const auto& clip : track->audioClips) {
+        if (isPatternClip(clip)) continue;
+        const std::int64_t overlap = std::min(*to, clip.start + clip.length) - std::max(*from, clip.start);
+        if (overlap > bestOverlap) { best = &clip; bestOverlap = overlap; }
+    }
+    if (!best) return -1;
+    const int original = best->id;
+    const std::int64_t clipStart = best->start, clipEnd = best->start + best->length;
+    const double beatsPerSample = m_project.tempo().bpm() / (60.0 * m_project.tempo().sampleRate());
+    int middle = original, splits = 0;
+    if (*from > clipStart) {
+        middle = splitClipAtBeat(trackId, original, double(*from) * beatsPerSample);
+        if (middle < 0) return -1;
+        ++splits;
+    }
+    if (*to < clipEnd) {
+        if (splitClipAtBeat(trackId, middle, double(*to) * beatsPerSample) < 0) {
+            if (splits) undo();
+            return -1;
+        }
+        ++splits;
+    }
+    if (splits == 2) m_project.joinLastClipEdits();   // one command, one undo step
+    return middle;
+}
+
+bool TrackList::canHaveClipEffects(int clipId) const
+{
+    if (!m_recordingTracks.empty()) return false;
+    const auto* clip = m_project.clipOfEffects(Project::clipEffectsId(clipId));
+    return clip && !isPatternClip(*clip);
+}
+
 bool TrackList::canApplyClipTool(const std::vector<int>& ids) const
 {
     if (!m_recordingTracks.empty()) return false;
@@ -335,7 +376,7 @@ TrackList::Change TrackList::setChaosEq(int id, const chaoseq::Settings& setting
 }
 std::optional<mixfx::Settings> TrackList::mixEffect(int id, std::string_view type) const
 {
-    const auto* track = m_project.findTrack(id);
+    const auto* track = m_project.effects(id);   // a track, the master or a clip
     if (!track || !mixfx::find(type)) return std::nullopt;
     return track->mixEffect(type);
 }
@@ -370,6 +411,7 @@ TrackList::Change TrackList::setChords(int id, const chords::Settings& settings)
 }
 int TrackList::addTrackEffect(int trackId, const std::string& type)
 {
+    if (Project::isClipEffectsId(trackId) && !canHaveClipEffects(trackId - Project::ClipEffectsBase)) return -1;   // audio clips only (R2)
     return trackLocked(trackId) ? -1 : m_project.addTrackEffect(trackId, type);
 }
 TrackList::Change TrackList::removeTrackEffect(int trackId, int effectId)
@@ -434,7 +476,8 @@ std::vector<TrackList::ClipInfo> TrackList::clips() const
                 m_project.tempo().beatAt(clip.start + clip.length) - start,
                 clip.poolId.empty() ? "Audio clip" : std::filesystem::path(clip.poolId).filename().string(),
                 track.colour, clip.effectsPrinted, clip.gainDb, !blank,
-                blank ? clipNotes(track.id, clip.id) : std::vector<MidiNote>{}, clip.reversed, clip.polarityInverted});
+                blank ? clipNotes(track.id, clip.id) : std::vector<MidiNote>{}, clip.reversed, clip.polarityInverted,
+                clip.fx});
         }
     }
     return result;
@@ -770,6 +813,7 @@ bool TrackList::copyClips(const std::vector<int>& ids)
         item.effectsPrinted = c.clip.effectsPrinted;
         item.reversed = c.clip.reversed;
         item.polarityInverted = c.clip.polarityInverted;
+        item.fx = c.clip.fx;
         item.trackOffset = c.row - minRow;
         item.notes = c.clip.notes;
         m_clipboard.push_back(std::move(item));
@@ -818,6 +862,7 @@ std::vector<int> TrackList::pasteClips(int targetTrackId, double targetBeat)
         clip.effectsPrinted = item.effectsPrinted;
         clip.reversed = item.reversed;
         clip.polarityInverted = item.polarityInverted;
+        clip.fx = item.fx;
         clip.notes = item.notes;
         toAdd.emplace_back(destTrackId, std::move(clip));
     }

@@ -2454,6 +2454,53 @@ private slots:
         QVERIFY(!visualItem(window->contentItem(),"clipPolarityAction")->isEnabled());
         QTest::keyClick(window,Qt::Key_Escape);
     }
+    void effects_on_a_selection_split_the_clip_and_open_its_own_effects() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks); tracks.setSampleRate(48000);
+        const int vocal=tracks.addVocalTrack();
+        auto audio=std::make_shared<AudioData>(); audio->path="voice.wav"; audio->sampleRate=48000; audio->frames=960000;
+        audio->channels={std::vector<float>(960000,0.2f)}; audio->buildWaveform();
+        QVERIFY(tracks.attachTake(vocal,0,audio));
+        const int clip=tracks.project().findTrack(vocal)->audioClips[0].id;
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); });
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true); QTest::qWait(30);
+        QVERIFY(tracks.selectTrack(vocal));
+        // Select 2..4 beats (1..2 s) by dragging on the empty area under the clip.
+        const double beatWidth=timeline->property("beatWidth").toDouble();
+        const auto at=[&](double beat,double y) { return timeline->mapToScene(QPointF(beat*beatWidth,y)).toPoint(); };
+        timeline->setProperty("timeRangeStartBeat",2.0); timeline->setProperty("timeRangeEndBeat",4.0);
+        QTRY_VERIFY(timeline->property("rangeEndBeat").toDouble()>timeline->property("rangeStartBeat").toDouble());
+        auto* block=visualItem(timeline,"clipBlock"+QString::number(clip)); QVERIFY(block);
+        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,block->mapToScene(QPointF(30,40)).toPoint());
+        auto* action=visualItem(window->contentItem(),"effectsOnSelectionAction"); QVERIFY(action);
+        QTRY_VERIFY(action->isVisible()); QVERIFY(action->isEnabled());
+        QTest::qWait(300); click(action);
+        QTRY_COMPARE(tracks.project().findTrack(vocal)->audioClips.size(),std::size_t(3));
+        auto* panel=qobject_cast<QQuickWindow*>(visualObject(window->contentItem(),"clipEffectsPanel")); QVERIFY(panel);
+        QTRY_VERIFY(panel->isVisible());
+        QVERIFY(panel->title().endsWith("(clip) · Effects"));
+        auto* exportButton=visualItem(panel->contentItem(),"exportChainButton"); QVERIFY(exportButton); QVERIFY(!exportButton->isVisible());
+        const int middle=panel->property("clipId").toInt();
+        const auto* piece=tracks.domain().findClip(vocal,middle); QVERIFY(piece);
+        QCOMPARE(piece->start,std::int64_t(48000)); QCOMPARE(piece->length,std::int64_t(48000));
+        auto* add=visualItem(panel->contentItem(),"addEffectButton"); QVERIFY(add); click(add);
+        QQuickItem* choice=nullptr;
+        QTRY_VERIFY((choice=visualItem(panel->contentItem(),"addEffect_compressor")) && choice->isVisible());
+        QTest::qWait(30); choice=visualItem(panel->contentItem(),"addEffect_compressor"); click(choice);
+        QTRY_COMPARE(tracks.domain().findClip(vocal,middle)->fx.effects.size(),std::size_t(1));
+        QTRY_VERIFY(visualItem(panel->contentItem(),"trackMixEffect") && visualItem(panel->contentItem(),"trackMixEffect")->isVisible());
+        QVERIFY(tracks.project().findTrack(vocal)->effects.empty());   // the track's chain is untouched
+        auto* badge=visualItem(timeline,"clipEffectsBadge"+QString::number(middle)); QTRY_VERIFY(badge && badge->isVisible());
+        QVERIFY(!visualItem(timeline,"clipEffectsBadge"+QString::number(clip))->isVisible());
+        auto* close=visualItem(panel->contentItem(),"closeTrackEffects"); click(close); QTRY_VERIFY(!panel->isVisible());
+        click(badge); QTRY_VERIFY(panel->isVisible());               // the badge opens them again
+        click(visualItem(panel->contentItem(),"closeTrackEffects")); QTRY_VERIFY(!panel->isVisible());
+        QVERIFY(tracks.undo());                                       // the split goes back in one step
+        QTRY_COMPARE(tracks.project().findTrack(vocal)->audioClips.size(),std::size_t(1));
+        timeline->setProperty("timeRangeStartBeat",0.0); timeline->setProperty("timeRangeEndBeat",0.0);
+        Q_UNUSED(at);
+    }
     void delay_page_shows_its_cards_and_edits_the_track() {
         checkMixEffectPage("delay",{"Time","Repeats","Output"},"feedback","division",false);
     }

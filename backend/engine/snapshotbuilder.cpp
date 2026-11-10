@@ -69,24 +69,34 @@ void SnapshotBuilder::remakeMixEffects(TrackEffects& effects, double sampleRate,
     ensureMixEffects(effects, types, sampleRate, maxFrames);
 }
 
+void SnapshotBuilder::applyEffectState(TrackEffects& fx, const EffectState& state)
+{
+    for (int band = 0; band < 10; ++band) {
+        if (fx.eq) fx.eq->setBandGain(band, state.eqGainDb[std::size_t(band)]);
+        if (fx.playbackEq) fx.playbackEq->setBandGain(band, state.eqGainDb[std::size_t(band)]);
+    }
+    if (fx.chaosEq) fx.chaosEq->setSettings(state.chaosEq);
+    if (fx.playbackChaosEq) fx.playbackChaosEq->setSettings(state.chaosEq);
+    for (auto* set : {&fx.mixEffects, &fx.playbackMixEffects})
+        for (auto& [type, effect] : *set)
+            if (effect) effect->apply(state.mixEffect(type));
+}
+
 void SnapshotBuilder::syncTrackEq(const Project& project, const MutableEffectResolver& effectLookup)
 {
     if (!effectLookup) return;
+    // Clip effects (restMap R2): each clip that has some.
+    for (const auto& track : project.tracks())
+        for (const auto& clip : track->audioClips)
+            if (clip.fx.hasEffects())
+                if (auto* fx = effectLookup(Project::clipEffectsId(clip.id))) applyEffectState(*fx, clip.fx);
     std::vector<const Track*> all;
     for (const auto& track : project.tracks()) all.push_back(track.get());
     all.push_back(&project.master());   // the master track's EQs and plugins too (G9)
     for (const auto* track : all) {
         auto* fx = effectLookup(track->id);
         if (!fx) continue;
-        for (int band = 0; band < 10; ++band) {
-            if (fx->eq) fx->eq->setBandGain(band, track->eqGainDb[band]);
-            if (fx->playbackEq) fx->playbackEq->setBandGain(band, track->eqGainDb[band]);
-        }
-        if (fx->chaosEq) fx->chaosEq->setSettings(track->chaosEq);
-        if (fx->playbackChaosEq) fx->playbackChaosEq->setSettings(track->chaosEq);
-        for (auto* set : {&fx->mixEffects, &fx->playbackMixEffects})
-            for (auto& [type, effect] : *set)
-                if (effect) effect->apply(track->mixEffect(type));
+        applyEffectState(*fx, *track);
         if (fx->instrument && fx->instrument->typeId() == "harmonium")
             static_cast<Harmonium&>(*fx->instrument).setSettings(track->harmonium);
         if (fx->instrument && fx->instrument->typeId() == "drumkit")
@@ -255,9 +265,21 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
                 clip.fadeIn,
                 clip.fadeOut,
                 static_cast<float>(std::pow(10.0, clip.gainDb / 20.0)) * (clip.polarityInverted ? -1.0f : 1.0f),
-                clip.effectsPrinted
+                clip.effectsPrinted,
+                {}
             });
             snapshot->keepAudio.push_back(std::move(audio));
+            // Clip effects (restMap R2): the playback instances, in the clip's order.
+            if (clip.fx.hasEffects() && effectResolver) {
+                if (const auto* clipFx = effectResolver(Project::clipEffectsId(clip.id))) {
+                    for (const auto& slot : clip.fx.effects) {
+                        auto processor = processorFor(*clipFx, slot.type, true);
+                        if (!processor) continue;
+                        render.clips.back().chain.push_back(processor.get());
+                        snapshot->keepProcessors.push_back(std::move(processor));
+                    }
+                }
+            }
         }
 
         std::stable_sort(render.clips.begin(), render.clips.end(), [](const ClipRender& a, const ClipRender& b) {

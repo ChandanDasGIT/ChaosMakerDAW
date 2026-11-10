@@ -67,6 +67,13 @@ ToolButton {
         }
 
         ThemedMenuSeparator {}
+        ThemedMenuItem {
+            objectName: "editEffectsOnSelectionItem"
+            text: "Effects on selection…"
+            enabled: root.hasTimeline && root.timeline.menuCanEffectsOnSelection
+            onTriggered: root.timeline.effectsOnSelection(-1)
+        }
+        ThemedMenuSeparator {}
 
         ThemedMenuItem {
             objectName: "editCutItem"

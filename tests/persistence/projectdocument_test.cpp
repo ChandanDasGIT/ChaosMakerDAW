@@ -508,3 +508,34 @@ TEST(projectdocument, clip_tool_flags_round_trip_and_are_optional)
     c["reversed"] = "yes";
     CHECK(!ProjectDocument::deserialize(text.dump(), loaded, error, 48000.0));
 }
+
+TEST(projectdocument, clip_effects_round_trip_and_are_optional)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    auto& track = project.addTrack(TrackKind::Audio, "Vox");
+    AudioClip clip;
+    clip.poolId = "take";
+    clip.length = 1000;
+    const int id = project.addAudioClip(track.id, clip);
+    CHECK(project.setTrackEffects(Project::clipEffectsId(id), {"chaoseq", "compressor"}));
+    auto compressor = mixfx::defaults(mixfx::Compressor);
+    compressor.values["ratio"] = 7;
+    CHECK(project.setTrackMixEffect(Project::clipEffectsId(id), mixfx::Compressor, compressor));
+    TrackList::MediaPaths paths;
+    paths.insert("take");
+    const std::string json = ProjectDocument::serialize(project, paths, {""});
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(json, loaded, error, 48000.0));
+    const auto& back = loaded.project.tracks()[0]->audioClips[0];
+    CHECK(back.fx.effects.size() == 2 && back.fx.effects[1].type == "compressor");
+    CHECK(back.fx.mixEffect(mixfx::Compressor).values.at("ratio") == 7.0f);
+    auto text = nlohmann::json::parse(json);
+    auto& c = text["project"]["tracks"][0]["clips"][0];
+    c["effects"] = {{"effects", {"guitarsuite"}}};
+    CHECK(!ProjectDocument::deserialize(text.dump(), loaded, error, 48000.0));
+    c.erase("effects");                                         // saved before R2
+    CHECK(ProjectDocument::deserialize(text.dump(), loaded, error, 48000.0));
+    CHECK(!loaded.project.tracks()[0]->audioClips[0].fx.hasEffects());
+}
