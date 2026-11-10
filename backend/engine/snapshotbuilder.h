@@ -34,7 +34,8 @@ public:
         std::shared_ptr<ChaosEq> chaosEq;
         std::shared_ptr<ChaosEq> playbackChaosEq;
         // The mixing plugins (restMap G7) by type, the same way: each runs only when its type
-        // is on the list. Made by makeMixEffects(); settings copied by syncTrackEq.
+        // is on the list. Made by ensureMixEffects() when a type first goes on the list (they
+        // can hold seconds of audio), remade by remakeMixEffects(); settings by syncTrackEq.
         std::map<std::string, std::shared_ptr<MixEffect>, std::less<>> mixEffects;
         std::map<std::string, std::shared_ptr<MixEffect>, std::less<>> playbackMixEffects;
         std::shared_ptr<Processor> chain;
@@ -80,8 +81,12 @@ public:
     using ChannelConnector = std::function<int(const std::string& source)>;
     using ErrorCallback = std::function<std::string()>;
 
-    // A fresh, prepared monitor and playback instance of every mixing plugin (UI thread).
-    static void makeMixEffects(TrackEffects& effects, double sampleRate, int maxFrames);
+    // A prepared monitor and playback instance of each mixing plugin in `types` that the track
+    // does not have yet (UI thread); other types are ignored.
+    static void ensureMixEffects(TrackEffects& effects, const std::vector<std::string>& types, double sampleRate, int maxFrames);
+    // Fresh instances of the mixing plugins the track has (a new device: the old ones may still
+    // be playing on the audio thread, so they are replaced, never prepared again).
+    static void remakeMixEffects(TrackEffects& effects, double sampleRate, int maxFrames);
     // Copy each track's EQ settings (10-band and Chaos EQ) into its EQ processors
     static void syncTrackEq(const Project& project, const MutableEffectResolver& effectLookup);
     static void syncTrackEq(const Project& project, std::unordered_map<int, TrackEffects>& effects);

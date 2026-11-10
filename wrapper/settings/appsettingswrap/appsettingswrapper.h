@@ -20,6 +20,9 @@ class AppSettingsWrapper : public QObject {
     Q_PROPERTY(QString defaultProjectDirectory READ defaultProjectDirectory WRITE setDefaultProjectDirectory NOTIFY defaultProjectDirectoryChanged)
     Q_PROPERTY(bool autoSaveEnabled READ autoSaveEnabled WRITE setAutoSaveEnabled NOTIFY autoSaveChanged)
     Q_PROPERTY(int autoSaveIntervalSeconds READ autoSaveIntervalSeconds WRITE setAutoSaveIntervalSeconds NOTIFY autoSaveChanged)
+    // The timeline's magnets for the playhead and the time selection (off by default).
+    Q_PROPERTY(bool snapPlayhead READ snapPlayhead WRITE setSnapPlayhead NOTIFY timelineSnapChanged)
+    Q_PROPERTY(bool snapSelection READ snapSelection WRITE setSnapSelection NOTIFY timelineSnapChanged)
     // Main window layout, kept between sessions. The window sets these once a splitter drag ends.
     Q_PROPERTY(double trackListWidth READ trackListWidth WRITE setTrackListWidth NOTIFY layoutSizesChanged)
     Q_PROPERTY(double mixerHeight READ mixerHeight WRITE setMixerHeight NOTIFY layoutSizesChanged)
@@ -52,6 +55,10 @@ public:
 
     int autoSaveIntervalSeconds() const noexcept { return m_settings.autoSaveIntervalSeconds(); }
     void setAutoSaveIntervalSeconds(int seconds);
+    bool snapPlayhead() const noexcept { return m_settings.snapPlayhead(); }
+    void setSnapPlayhead(bool on);
+    bool snapSelection() const noexcept { return m_settings.snapSelection(); }
+    void setSnapSelection(bool on);
 
     double trackListWidth() const noexcept { return m_settings.trackListWidth(); }
     void setTrackListWidth(double width);
@@ -73,6 +80,7 @@ signals:
     void chordZoneMappingChanged();
     void defaultProjectDirectoryChanged();
     void autoSaveChanged();
+    void timelineSnapChanged();
     void layoutSizesChanged();
     void preferenceSaved(const QString& key);
 

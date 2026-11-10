@@ -189,3 +189,21 @@ TEST(appsettings, chord_zone_mapping_defaults_to_octaves_is_validated_and_round_
     settings.resetToDefaults();
     CHECK(settings.chordZoneMapping() == "octaves");
 }
+
+TEST(appsettings, the_timeline_magnets_are_off_by_default_and_round_trip)
+{
+    AppSettings settings;
+    CHECK(!settings.snapPlayhead() && !settings.snapSelection());
+    settings.setSnapPlayhead(true);
+    CHECK(settings.exportValue(AppSettings::KeySnapPlayhead) == "true");
+    CHECK(settings.exportValue(AppSettings::KeySnapSelection) == "false");
+    AppSettings copy;
+    CHECK(copy.deserialize(settings.serialize()));
+    CHECK(copy.snapPlayhead() && !copy.snapSelection());
+    copy.importValue(AppSettings::KeySnapSelection, "true");
+    CHECK(copy.snapSelection());
+    copy.importValue(AppSettings::KeySnapSelection, "nonsense");
+    CHECK(!copy.snapSelection());
+    copy.resetToDefaults();
+    CHECK(!copy.snapPlayhead() && !copy.snapSelection());
+}

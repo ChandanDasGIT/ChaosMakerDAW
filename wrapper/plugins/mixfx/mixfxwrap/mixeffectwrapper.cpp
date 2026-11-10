@@ -102,8 +102,8 @@ QVariantList MixEffectWrapper::cards() const
 
 bool MixEffectWrapper::hasMeter() const
 {
-    // The dynamics plugins turn things down; the reverbs do not.
-    return m_type == QLatin1String("compressor") || m_type == QLatin1String("deesser");
+    const auto* spec = mixfx::find(m_type.toStdString());
+    return spec && spec->meter;   // the ones that turn the track down
 }
 
 QVariantMap MixEffectWrapper::values() const

@@ -660,8 +660,13 @@ TEST(snapshotbuilder, a_mixing_plugin_runs_at_its_place_in_the_chain_with_the_tr
     SnapshotBuilder::TrackEffects fx;
     fx.chaosEq = std::make_shared<ChaosEq>();
     fx.playbackChaosEq = std::make_shared<ChaosEq>();
-    SnapshotBuilder::makeMixEffects(fx, 48000.0, 256);
-    CHECK(fx.mixEffects.size() == mixfx::all().size() && fx.playbackMixEffects.size() == mixfx::all().size());
+    SnapshotBuilder::ensureMixEffects(fx, {"chaoseq", "compressor"}, 48000.0, 256);
+    CHECK(fx.mixEffects.size() == 1 && fx.playbackMixEffects.size() == 1);   // only what is on the chain
+    const auto first = fx.mixEffects.at("compressor");
+    SnapshotBuilder::ensureMixEffects(fx, {"compressor"}, 48000.0, 256);
+    CHECK(fx.mixEffects.at("compressor") == first);                         // kept, not made again
+    SnapshotBuilder::remakeMixEffects(fx, 48000.0, 256);
+    CHECK(fx.mixEffects.size() == 1 && fx.mixEffects.at("compressor") != first);   // a new device: fresh
     std::unordered_map<int, SnapshotBuilder::TrackEffects> effects{{vocal.id, fx}};
     SnapshotBuilder::syncTrackEq(project, effects);
     CHECK(fx.mixEffects.at("compressor")->parameter("ratio")->get() == 10.0f);

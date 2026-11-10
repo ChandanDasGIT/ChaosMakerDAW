@@ -232,6 +232,52 @@ ToolButton {
             }
 
             Text {
+                text: "Timeline"
+                color: Theme.text
+                font.pixelSize: Theme.bodySize
+                font.bold: true
+            }
+
+            ColumnLayout {
+                spacing: 8
+                Text {
+                    text: "Off: the playhead and the time selection go exactly where you click and drag. On: they land on the snap grid. Clips snap either way."
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.smallSize
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                }
+                CheckBox {
+                    id: snapPlayheadBox
+                    objectName: "snapPlayheadSetting"
+                    text: "Snap playhead to grid"
+                    checked: appSettingsBridge.snapPlayhead
+                    onToggled: appSettingsBridge.snapPlayhead = checked
+                    contentItem: Text {
+                        text: snapPlayheadBox.text
+                        color: Theme.text
+                        font.pixelSize: Theme.bodySize
+                        leftPadding: snapPlayheadBox.indicator.width + 6
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+                CheckBox {
+                    id: snapSelectionBox
+                    objectName: "snapSelectionSetting"
+                    text: "Snap time selection to grid"
+                    checked: appSettingsBridge.snapSelection
+                    onToggled: appSettingsBridge.snapSelection = checked
+                    contentItem: Text {
+                        text: snapSelectionBox.text
+                        color: Theme.text
+                        font.pixelSize: Theme.bodySize
+                        leftPadding: snapSelectionBox.indicator.width + 6
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
+
+            Text {
                 text: "Piano Roll Display"
                 color: Theme.text
                 font.pixelSize: Theme.bodySize

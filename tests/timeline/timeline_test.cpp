@@ -1,4 +1,5 @@
 #include "testkit.h"
+#include <cmath>
 #include "timeline/timeline.h"
 
 TEST(timeline, snap_modes_respect_meter_direction_and_free_nudge_duration)
@@ -48,6 +49,7 @@ TEST(timeline, overlap_selection_repeat_acknowledgement_and_busy_rules_are_backe
     editor.beginSelection(0, 0, true); editor.updateSelection(4, 2, true);
     editor.finishSelection(8.0 / 106, 10.0 / 106, 1.0 / 106);
     CHECK(editor.selectedIds() == std::vector<int>({x, y}));
+    editor.setSnapSelection(true);   // the magnet on: the range lands on the grid
     editor.beginSelection(1.2, 0, false); editor.updateSelection(3.2, 0, true);
     const auto range = editor.finishSelection(0, 0, 0);
     CHECK(range && range->start == 1 && range->end == 4);
@@ -73,4 +75,29 @@ TEST(timeline, one_sample_low_tempo_clip_does_not_produce_an_inverted_trim_range
     CHECK(editor.editDelta() == 0);
     const auto preview = editor.previews();
     CHECK(preview[0].start == 0 && preview[0].length > 0);
+}
+
+TEST(timeline, the_playhead_and_the_time_selection_snap_only_with_their_magnets_on)
+{
+    TrackList tracks; tracks.addAudioTrack();
+    Timeline editor; editor.setTracks(&tracks);
+    CHECK(!editor.snapPlayhead() && !editor.snapSelection());   // off by default
+    CHECK(editor.playheadBeat(2.37) == 2.37);
+    CHECK(editor.playheadBeat(-3) == 0.0);
+    CHECK(editor.playheadBeat(std::nan("")) == 0.0);
+    editor.beginSelection(3.2, 0, false); editor.updateSelection(1.2, 0, true);   // dragged right to left
+    const auto free = editor.finishSelection(0, 0, 0);
+    CHECK(free && free->start == 1.2 && free->end == 3.2);
+
+    editor.setSnapPlayhead(true);
+    CHECK(editor.playheadBeat(2.37) == 2.0);                    // the beat grid (snap mode 1)
+    editor.setSnapMode(6);                                       // the grid itself off: still exact
+    CHECK(editor.playheadBeat(2.37) == 2.37);
+    editor.setSnapMode(1);
+    editor.setSnapSelection(true);
+    editor.beginSelection(1.2, 0, false); editor.updateSelection(3.2, 0, true);
+    const auto snapped = editor.finishSelection(0, 0, 0);
+    CHECK(snapped && snapped->start == 1 && snapped->end == 4);
+    // Clips keep snapping whatever the magnets say.
+    CHECK(editor.snap(2.37) == 2.0);
 }

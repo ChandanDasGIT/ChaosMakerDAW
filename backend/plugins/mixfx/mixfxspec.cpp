@@ -80,11 +80,62 @@ constexpr std::array<Control, 15> chaosVerbControls{{
     {"trebleDecay", "Treble decay", K::Slider, 0.1f, 1, 0.5f, "x", {}, "Tone"},
 }};
 
-constexpr std::array<Spec, 4> specs{{
-    {Compressor, "Compressor", compressorControls},
-    {DeEsser, "De-esser", deEsserControls},
-    {Reverb, "Reverb", reverbControls},
-    {ChaosVerb, "Chaos Verb", chaosVerbControls},
+constexpr std::array<std::string_view, 7> delayDivisions{
+    "1/2", "1/4", "1/4 dotted", "1/8", "1/8 dotted", "1/8 triplet", "1/16"};
+
+// Echoes. Synced: the time is a note length at the song's tempo; otherwise Time in ms.
+// Ping-pong bounces the repeats between left and right. Low / high cut darken and thin each
+// repeat, like a tape or analog delay.
+constexpr std::array<Control, 8> delayControls{{
+    {"sync", "Sync to BPM", K::Switch, 0, 1, 1, "", {}, "Time"},
+    {"division", "Note", K::Choice, 0, 6, 1, "", delayDivisions, "Time"},
+    {"time", "Time", K::Slider, 1, 2000, 375, "ms", {}, "Time"},
+    {"pingPong", "Ping-pong", K::Switch, 0, 1, 0, "", {}, "Time"},
+    {"feedback", "Feedback", K::Slider, 0, 95, 35, "%", {}, "Repeats"},
+    {"lowCut", "Low cut", K::Slider, 20, 1000, 150, "Hz", {}, "Repeats"},
+    {"highCut", "High cut", K::Slider, 1000, 20000, 6000, "Hz", {}, "Repeats"},
+    {"mix", "Mix", K::Slider, 0, 100, 25, "%", {}, "Output"},
+}};
+
+// A ceiling: Gain pushes the track up into it, and nothing goes over it (a short look-ahead
+// sees peaks coming). Release is how fast it lets go.
+constexpr std::array<Control, 3> limiterControls{{
+    {"gain", "Gain", K::Slider, 0, 24, 0, "dB", {}, "Limiter"},
+    {"ceiling", "Ceiling", K::Slider, -12, 0, -1, "dB", {}, "Limiter"},
+    {"release", "Release", K::Slider, 1, 1000, 100, "ms", {}, "Limiter"},
+}};
+
+constexpr std::array<std::string_view, 3> saturationTypes{"Tape", "Tube", "Clip"};
+
+// Tape: smooth and round. Tube: warm, adds even harmonics. Clip: edgy, flat-topped. The level
+// stays about the same as Drive goes up; Tone tilts the result darker or brighter.
+constexpr std::array<Control, 5> saturationControls{{
+    {"type", "Type", K::Choice, 0, 2, 0, "", saturationTypes, "Character"},
+    {"drive", "Drive", K::Slider, 0, 24, 6, "dB", {}, "Character"},
+    {"tone", "Tone", K::Slider, 0, 100, 50, "%", {}, "Character"},
+    {"output", "Output", K::Slider, -24, 6, 0, "dB", {}, "Output"},
+    {"mix", "Mix", K::Slider, 0, 100, 100, "%", {}, "Output"},
+}};
+
+// Silences what is under Threshold (room noise, headphone bleed between phrases). Range is how
+// far it closes; Hold keeps it open through short gaps.
+constexpr std::array<Control, 5> gateControls{{
+    {"threshold", "Threshold", K::Slider, -80, 0, -50, "dB", {}, "Gate"},
+    {"range", "Range", K::Slider, 0, 80, 40, "dB", {}, "Gate"},
+    {"attack", "Attack", K::Slider, 0.1f, 50, 1, "ms", {}, "Timing"},
+    {"hold", "Hold", K::Slider, 0, 500, 50, "ms", {}, "Timing"},
+    {"release", "Release", K::Slider, 5, 2000, 150, "ms", {}, "Timing"},
+}};
+
+constexpr std::array<Spec, 8> specs{{
+    {Compressor, "Compressor", compressorControls, true},
+    {DeEsser, "De-esser", deEsserControls, true},
+    {Reverb, "Reverb", reverbControls, false},
+    {ChaosVerb, "Chaos Verb", chaosVerbControls, false},
+    {Delay, "Delay", delayControls, false},
+    {Limiter, "Limiter", limiterControls, true},
+    {Saturation, "Saturation", saturationControls, false},
+    {Gate, "Gate", gateControls, true},
 }};
 
 bool whole(ControlKind kind) { return kind == K::Choice || kind == K::Switch; }

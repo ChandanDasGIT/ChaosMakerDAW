@@ -156,6 +156,29 @@ Window {
                         color: Theme.textMuted
                         font.pixelSize: 11
                     }
+                    // A long chain scrolls (wheel or scroll bar; a drag moves a row) so Add FX
+                    // always stays in the window.
+                    Flickable {
+                        id: chainScroll
+                        objectName: "effectChainScroll"
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.preferredHeight: chainArea.implicitHeight
+                        Layout.maximumHeight: chainArea.implicitHeight
+                        Layout.minimumHeight: Math.min(chainArea.implicitHeight, 2 * chainArea.rowStep)
+                        contentWidth: width
+                        contentHeight: chainArea.implicitHeight
+                        clip: true
+                        interactive: false
+                        boundsBehavior: Flickable.StopAtBounds
+                        ScrollBar.vertical: ScrollBar { policy: chainScroll.contentHeight > chainScroll.height + 1 ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff }
+                        WheelHandler {
+                            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                            onWheel: event => {
+                                const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y / 2
+                                chainScroll.contentY = Math.max(0, Math.min(chainScroll.contentHeight - chainScroll.height, chainScroll.contentY - delta))
+                            }
+                        }
                     Item {
                         id: chainArea
                         objectName: "effectChain"
@@ -163,7 +186,8 @@ Window {
                         readonly property real rowStep: rowHeight + 4
                         // Drop position while a row is dragged (-1: not dragging).
                         property int dropIndex: -1
-                        Layout.fillWidth: true
+                        width: chainScroll.width - (chainScroll.contentHeight > chainScroll.height + 1 ? 10 : 0)
+                        height: implicitHeight
                         implicitHeight: Math.max(0, root.effects.length * rowStep - 4)
                         Repeater {
                             model: root.effects
@@ -257,6 +281,7 @@ Window {
                             y: chainArea.dropIndex * chainArea.rowStep - 3
                         }
                     }
+                    }
                     PanelButton {
                         id: addEffectButton
                         objectName: "addEffectButton"
@@ -271,7 +296,20 @@ Window {
                             width: 196
                             padding: 6
                             background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
-                            contentItem: Column {
+                            // The list scrolls when it is taller than the room under the button
+                            // (the mixing plugins made it long).
+                            contentItem: Flickable {
+                                id: addEffectList
+                                objectName: "addEffectList"
+                                implicitWidth: 184
+                                implicitHeight: Math.min(effectColumn.implicitHeight,
+                                    Math.max(140, root.height - addEffectButton.mapToItem(null, 0, addEffectButton.height).y - 32))
+                                contentHeight: effectColumn.implicitHeight
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+                                ScrollBar.vertical: ScrollBar { policy: addEffectList.contentHeight > addEffectList.height + 1 ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff }
+                              Column {
+                                id: effectColumn
                                 spacing: 2
                                 Repeater {
                                     model: root.addableEffects
@@ -294,6 +332,7 @@ Window {
                                         }
                                     }
                                 }
+                              }
                             }
                         }
                     }

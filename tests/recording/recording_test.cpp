@@ -2,6 +2,8 @@
 #include "engine/audioengine.h"
 #include <filesystem>
 #include <unistd.h>
+#include <chrono>
+#include <thread>
 
 namespace {
 void process(AudioEngine& engine, const AudioIO& io) noexcept RT_SAFE { engine.renderBlock(io); }
@@ -248,4 +250,23 @@ TEST(recording, midi_take_recording_captures_hardware_midi_events) {
     CHECK(midiRec.notes()[0].on == 110);
     CHECK(midiRec.notes()[0].off == 248);
     CHECK(midiRec.notes()[0].velocity == 110);
+}
+
+TEST(recording, the_live_waveform_follows_what_the_take_writes)
+{
+    Fixture f; auto take=std::make_unique<TakeRecorder>(f.path,48000);
+    for(int i=0;i<128;++i) f.input[i]=(i%2 ? 0.75f : -0.25f);
+    CHECK(take->livePeaks().summary(8).empty());               // nothing recorded yet
+    EngineCommand record; record.type=EngineCommand::Type::StartRecording; record.recorder=take.get();
+    CHECK(f.engine.post(record));
+    for(int i=0;i<20;++i) f.run();
+    // The disk thread catches up within a moment; the waveform grows as it writes.
+    for(int i=0;i<500 && take->livePeaks().frames()<20*128;++i) std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    CHECK(take->livePeaks().frames()==20*128);
+    const auto live=take->livePeaks().summary(4);
+    CHECK(live.size()==4);
+    for(const auto& [low,high]:live) { CHECK(low==-0.25f); CHECK(high==0.75f); }
+    f.command(EngineCommand::Type::Stop); f.run();
+    take->wait();
+    CHECK(take->audio()->frames==take->livePeaks().frames());
 }

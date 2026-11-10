@@ -40,6 +40,10 @@ public:
     void setRecordStartBeat(double beat) noexcept { m_recordStartBeat = beat; }
     std::size_t takeCount() const noexcept { return m_takes.size() + m_midiTakes.size(); }
 
+    // The waveform of the take being recorded on a track so far: `bins` (min, max) pairs; empty
+    // when the track has no audio take running (UI thread).
+    std::vector<std::pair<float, float>> livePeaks(int trackId, int bins, double from = 0.0, double to = 1.0) const;
+
     bool countInMessagePending() const noexcept { return m_countInMessagePending; }
     void clearCountInMessagePending() noexcept { m_countInMessagePending = false; }
 

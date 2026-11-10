@@ -3,6 +3,10 @@
 #include "plugins/deesser/deesser.h"
 #include "plugins/reverb/roomreverb.h"
 #include "plugins/chaosverb/chaosverb.h"
+#include "plugins/delay/mixdelay.h"
+#include "plugins/limiter/limiter.h"
+#include "plugins/saturation/saturation.h"
+#include "plugins/gate/gate.h"
 
 namespace mixfx {
 
@@ -14,6 +18,10 @@ std::shared_ptr<MixEffect> create(std::string_view type)
     if (type == DeEsser) return std::make_shared<::DeEsser>();
     if (type == Reverb) return std::make_shared<RoomReverb>();
     if (type == ChaosVerb) return std::make_shared<::ChaosVerb>();
+    if (type == Delay) return std::make_shared<MixDelay>();
+    if (type == Limiter) return std::make_shared<::Limiter>();
+    if (type == Saturation) return std::make_shared<::Saturation>();
+    if (type == Gate) return std::make_shared<::Gate>();
     return nullptr;
 }
 

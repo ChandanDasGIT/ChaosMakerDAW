@@ -253,8 +253,24 @@ void Timeline::updateSelection(double beat, double lane, bool dragged)
     if (!m_selecting || !std::isfinite(beat) || !std::isfinite(lane)) return;
     m_endBeat = beat; m_endLane = lane; m_dragged = dragged;
 }
-double Timeline::rangeStart() const { return m_selecting && !m_clipSelection ? snap(std::min(m_startBeat, m_endBeat), "floor") : m_range.start; }
-double Timeline::rangeEnd() const { return m_selecting && !m_clipSelection && m_dragged ? snap(std::max(m_startBeat, m_endBeat), "ceil") : m_range.end; }
+double Timeline::rangeStart() const
+{
+    if (!m_selecting || m_clipSelection) return m_range.start;
+    const double start = std::max(0.0, std::min(m_startBeat, m_endBeat));
+    return m_snapSelection ? snap(start, "floor") : start;
+}
+double Timeline::rangeEnd() const
+{
+    if (!m_selecting || m_clipSelection || !m_dragged) return m_range.end;
+    const double end = std::max(0.0, std::max(m_startBeat, m_endBeat));
+    return m_snapSelection ? snap(end, "ceil") : end;
+}
+double Timeline::playheadBeat(double beat) const
+{
+    if (!std::isfinite(beat)) return 0.0;
+    beat = std::max(0.0, beat);
+    return m_snapPlayhead ? std::max(0.0, snap(beat)) : beat;
+}
 std::optional<Timeline::RepeatRange> Timeline::finishSelection(double topInset, double bottomInset, double padding)
 {
     if (!m_selecting) return std::nullopt;

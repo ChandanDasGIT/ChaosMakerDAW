@@ -6,13 +6,17 @@
 #include <array>
 
 namespace {
-constexpr std::array<EffectDefinition, 12> catalog{{
+constexpr std::array<EffectDefinition, 16> catalog{{
     {effectchain::Eq, "Equalizer", "10-band tone shaping", true, true},
     {effectchain::ChaosEq, "Chaos EQ", "Parametric EQ, up to 24 bands", true, true},
     {mixfx::Compressor, "Compressor", "Evens out loud and quiet parts", true, true},
     {mixfx::DeEsser, "De-esser", "Tames harsh s and sh sounds", true, true},
     {mixfx::Reverb, "Reverb", "Room, plate or hall", true, true},
     {mixfx::ChaosVerb, "Chaos Verb", "Lush reverb: spaces, eras and movement", true, true},
+    {mixfx::Delay, "Delay", "Echoes in time with the song", true, true},
+    {mixfx::Limiter, "Limiter", "A ceiling nothing goes over", true, true},
+    {mixfx::Saturation, "Saturation", "Warmth and grit", true, true},
+    {mixfx::Gate, "Gate", "Silences noise between phrases", true, true},
     {effectchain::GuitarSuite, "GuitarSuite", "Pedals and signal chain", false, false},
     {effectchain::Harmonium, "Harmonium", "Stops, bellows and drones", false, false},
     {effectchain::DrumKit, "Drum kit", "Room, levels and character", false, false},

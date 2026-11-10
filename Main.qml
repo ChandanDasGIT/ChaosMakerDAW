@@ -182,6 +182,8 @@ Window {
                 timeSignature: EngineController.numerator
                 timeSignatureDenominator: EngineController.denominator
                 laneCount: trackModel.count
+                snapPlayhead: window.layoutSettings.snapPlayhead
+                snapSelection: window.layoutSettings.snapSelection
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 onOpenPianoRollRequested: (trackId, clipId, label, lengthBeats) => {
