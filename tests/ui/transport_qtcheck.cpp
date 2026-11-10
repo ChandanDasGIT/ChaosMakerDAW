@@ -2980,13 +2980,43 @@ private slots:
         QTRY_COMPARE(envelope.points().size(),std::size_t(1));
         QVERIFY(tracks.undo()); QCOMPARE(envelope.points().size(),std::size_t(2));
 
+        // Shift+right-click a point: its curve shape menu (restMap G6b).
+        point=visualItem(timeline,"envelopePoint"+QString::number(a)+"_0"); QVERIFY(point);
+        const QPoint startCentre=point->mapToScene(QPointF(point->width()/2,point->height()/2)).toPoint();
+        QTest::mouseClick(window,Qt::RightButton,Qt::ShiftModifier,startCentre);
+        QCOMPARE(envelope.points().size(),std::size_t(2));   // not deleted
+        auto* linear=visualItem(window->contentItem(),"envelopeShape_linear"); QVERIFY(linear);
+        QTRY_VERIFY(linear->isVisible());
+        QVERIFY(linear->property("checked").toBool()); QVERIFY(linear->isEnabled());
+        auto* smooth=visualItem(window->contentItem(),"envelopeShape_smooth"); QVERIFY(smooth);
+        QVERIFY(!smooth->property("checked").toBool());
+        QTest::qWait(300);   // as below: the menu finishes opening first
+        click(smooth);
+        QTRY_VERIFY(envelope.points()[0].shape==automation::CurveShape::Smooth);
+        QTRY_VERIFY(!linear->isVisible());
+        QTest::mouseClick(window,Qt::RightButton,Qt::ShiftModifier,startCentre);
+        QTRY_VERIFY(smooth->isVisible());
+        QVERIFY(smooth->property("checked").toBool()); QVERIFY(!linear->property("checked").toBool());
+        QTest::keyClick(window,Qt::Key_Escape); QTRY_VERIFY(!smooth->isVisible());
+        QVERIFY(tracks.undo()); QVERIFY(envelope.points()[0].shape==automation::CurveShape::Linear);
+        QVERIFY(tracks.redo());
+        // The last point has no curve after it: shapes greyed out; Delete point works.
+        point=visualItem(timeline,"envelopePoint"+QString::number(a)+"_1"); QVERIFY(point);
+        QTest::mouseClick(window,Qt::RightButton,Qt::ShiftModifier,point->mapToScene(QPointF(point->width()/2,point->height()/2)).toPoint());
+        QTRY_VERIFY(smooth->isVisible()); QVERIFY(!smooth->isEnabled());
+        auto* deletePoint=visualItem(window->contentItem(),"envelopePointDeleteAction"); QVERIFY(deletePoint);
+        QTest::qWait(300);   // let the menu finish opening: a click straight away is sometimes lost
+        click(deletePoint);
+        QTRY_COMPARE(envelope.points().size(),std::size_t(1));
+        QVERIFY(tracks.undo()); QCOMPARE(envelope.points().size(),std::size_t(2));
+
         // The menu: bypass, then over the clips (the lane goes away, the rows close up).
-        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,area->mapToScene(QPointF(10*beatWidth,60)).toPoint());
+        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,area->mapToScene(QPointF(5*beatWidth,60)).toPoint());
         auto* bypass=visualItem(window->contentItem(),"envelopeBypassAction"); QVERIFY(bypass);
         QTRY_VERIFY(bypass->isVisible()); click(bypass);
         QTRY_VERIFY(envelope.bypassed());
         QVERIFY(tracks.undo()); QVERIFY(!envelope.bypassed());
-        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,area->mapToScene(QPointF(10*beatWidth,60)).toPoint());
+        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,area->mapToScene(QPointF(5*beatWidth,60)).toPoint());
         auto* placement=visualItem(window->contentItem(),"envelopePlacementAction"); QVERIFY(placement);
         QTRY_VERIFY(placement->isVisible()); click(placement);
         QTRY_VERIFY(envelope.overClips());

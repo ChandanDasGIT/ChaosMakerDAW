@@ -729,3 +729,26 @@ TEST(audioengine_midi, volume_envelope_fades_the_track_and_bypass_leaves_it_alon
         CHECK_NEAR(boosted[100], float(0.5 * std::pow(10.0, 6.0 / 20.0)), 1e-4);
     }
 }
+
+TEST(audioengine_midi, volume_envelope_curve_shapes_sound_as_drawn)
+{
+    using automation::CurveShape;
+    using automation::envelopescale::unityLevel;
+    for (bool multi : {false, true}) {
+        for (auto shape : {CurveShape::Smooth, CurveShape::FastStart, CurveShape::FastEnd, CurveShape::Hold}) {
+            automation::VolumeEnvelope envelope;
+            CHECK(envelope.addPoint(0, unityLevel()) == 0);
+            CHECK(envelope.addPoint(400, 0.2) == 1);
+            CHECK(envelope.setPointShape(0, shape));
+            const auto out = renderWithEnvelope(multi, envelope);
+            for (int i = 0; i < 512; ++i)
+                CHECK_NEAR(out[i], float(0.5 * envelope.gainAt(i)), 1e-5);
+            if (shape == CurveShape::Hold) {
+                CHECK_NEAR(out[399], 0.5f, 1e-5);   // holds 0 dB up to the next point
+                CHECK(out[400] < 0.05f);            // then jumps
+            }
+            if (shape == CurveShape::Smooth) CHECK(out[20] > 0.49f);   // eases out of the first point
+            if (shape == CurveShape::FastStart) CHECK(out[100] < 0.5f * float(automation::envelopescale::gainForLevel(unityLevel() + (0.2 - unityLevel()) * 0.25)));
+        }
+    }
+}

@@ -804,6 +804,15 @@ TrackList::Change TrackList::removeEnvelopePoint(int trackId, int index)
     return {ok, ok};
 }
 
+TrackList::Change TrackList::setEnvelopePointShape(int trackId, int index, automation::CurveShape shape)
+{
+    const auto* track = m_project.findTrack(trackId);
+    if (editsLocked() || !track) return {};
+    const auto before = track->volumeEnvelope;
+    if (!m_project.setEnvelopePointShape(trackId, index, shape)) return {};
+    return {true, !track->volumeEnvelope.sameContent(before)};
+}
+
 TrackList::Change TrackList::setEnvelopeBypassed(int trackId, bool bypassed)
 {
     const auto* track = m_project.findTrack(trackId);
@@ -849,7 +858,45 @@ std::vector<TrackList::EnvelopePointInfo> TrackList::envelopePointBeats(int trac
     const auto* track = m_project.findTrack(trackId);
     if (!track) return result;
     for (const auto& point : track->volumeEnvelope.points())
-        result.push_back({m_project.tempo().beatAt(point.position), point.level});
+        result.push_back({m_project.tempo().beatAt(point.position), point.level, point.shape});
+    return result;
+}
+
+double TrackList::envelopeLevelAtBeat(int trackId, double beat) const
+{
+    const auto* track = m_project.findTrack(trackId);
+    if (!track) return automation::envelopescale::unityLevel();
+    const auto position = sampleAtBeat(m_project.tempo(), std::isfinite(beat) ? std::max(0.0, beat) : 0.0);
+    return track->volumeEnvelope.levelAt(position.value_or(0));
+}
+
+std::vector<TrackList::EnvelopeCurveSample> TrackList::envelopeCurve(int trackId, double fromBeat, double toBeat, int steps) const
+{
+    std::vector<EnvelopeCurveSample> result;
+    const auto* track = m_project.findTrack(trackId);
+    if (!track || !std::isfinite(fromBeat) || !std::isfinite(toBeat) || toBeat < fromBeat || steps < 1 || steps > 100000)
+        return result;
+    const auto& tempo = m_project.tempo();
+    const auto& envelope = track->volumeEnvelope;
+    const auto levelAt = [&](double beat) {
+        return envelope.levelAt(sampleAtBeat(tempo, std::max(0.0, beat)).value_or(0));
+    };
+    result.reserve(std::size_t(steps) + 1 + 2 * envelope.points().size());
+    for (int i = 0; i <= steps; ++i) {
+        const double beat = fromBeat + (toBeat - fromBeat) * i / steps;
+        result.push_back({beat, levelAt(beat)});
+    }
+    for (const auto& point : envelope.points()) {
+        const double beat = tempo.beatAt(point.position);
+        if (beat < fromBeat || beat > toBeat) continue;
+        if (point.position > 0) {
+            const double before = tempo.beatAt(point.position - 1);
+            if (before >= fromBeat) result.push_back({before, envelope.levelAt(point.position - 1)});
+        }
+        result.push_back({beat, point.level});
+    }
+    std::stable_sort(result.begin(), result.end(),
+        [](const EnvelopeCurveSample& a, const EnvelopeCurveSample& b) { return a.beat < b.beat; });
     return result;
 }
 

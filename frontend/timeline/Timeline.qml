@@ -307,7 +307,56 @@ Item {
             text: "Bypass"
             checkable: true
             checked: !!envelopeMenu.lane && envelopeMenu.lane.bypassed
-            onTriggered: root.trackModel.setEnvelopeBypassed(envelopeMenu.lane.envelopeTrackId, !envelopeMenu.lane.bypassed)
+            onTriggered: {
+                root.trackModel.setEnvelopeBypassed(envelopeMenu.lane.envelopeTrackId, !envelopeMenu.lane.bypassed)
+                checked = Qt.binding(() => !!envelopeMenu.lane && envelopeMenu.lane.bypassed)
+            }
+        }
+    }
+    // Shift+right-click on an envelope point: the curve from it to the next point (restMap G6b).
+    // The last point has no curve after it, so its shapes are greyed out.
+    ThemedMenu {
+        id: envelopePointMenu
+        objectName: "envelopePointMenu"
+        parent: root
+        popupType: Popup.Item
+        width: 160
+        property var lane: null
+        property int point: -1
+        readonly property var pointData: lane && point >= 0 && point < lane.points.length ? lane.points[point] : null
+        readonly property bool hasCurve: !!lane && point >= 0 && point < lane.points.length - 1
+        readonly property var shapes: root.trackModel ? root.trackModel.envelopeShapes : []
+        function choose(i) {
+            if (lane && i < shapes.length) root.trackModel.setEnvelopePointShape(lane.envelopeTrackId, point, shapes[i].id)
+        }
+        // One entry per shape, from the backend's list, in front of the separator.
+        Instantiator {
+            model: envelopePointMenu.shapes
+            delegate: ThemedMenuItem {
+                required property var modelData
+                required property int index
+                function current() { return !!envelopePointMenu.pointData && envelopePointMenu.pointData.shape === modelData.id }
+                objectName: "envelopeShape_" + modelData.id
+                text: modelData.name
+                checkable: true
+                enabled: envelopePointMenu.hasCurve
+                checked: current()
+                // A click toggles "checked" itself: put the binding back after choosing.
+                onTriggered: { envelopePointMenu.choose(index); checked = Qt.binding(current) }
+            }
+            onObjectAdded: (index, object) => envelopePointMenu.insertItem(index, object)
+            onObjectRemoved: (index, object) => envelopePointMenu.removeItem(object)
+        }
+        ThemedMenuSeparator {}
+        ThemedMenuItem {
+            objectName: "envelopePointDeleteAction"
+            text: "Delete point"
+            onTriggered: {
+                const lane = envelopePointMenu.lane, point = envelopePointMenu.point
+                if (!lane) return
+                lane.selectedPoint = -1
+                root.trackModel.removeEnvelopePoint(lane.envelopeTrackId, point)
+            }
         }
     }
     // V shows / hides the selected track's volume envelope.
@@ -762,6 +811,12 @@ Item {
                     envelopeMenu.lane = envelopeLane
                     const at = root.mapFromItem(null, x, y)
                     envelopeMenu.popup(at.x, at.y)
+                }
+                onPointMenuRequested: (point, x, y) => {
+                    envelopePointMenu.lane = envelopeLane
+                    envelopePointMenu.point = point
+                    const at = root.mapFromItem(null, x, y)
+                    envelopePointMenu.popup(at.x, at.y)
                 }
             }
         }

@@ -157,6 +157,7 @@ public:
     int addEnvelopePoint(int trackId, std::int64_t position, double level);   // index, or -1
     Change moveEnvelopePoint(int trackId, int index, std::int64_t position, double level, bool continueEdit = false);
     Change removeEnvelopePoint(int trackId, int index);
+    Change setEnvelopePointShape(int trackId, int index, automation::CurveShape shape);
     Change setEnvelopeBypassed(int trackId, bool bypassed);
     Change setEnvelopeShown(int trackId, bool shown);
     Change setEnvelopeOverClips(int trackId, bool overClips);
@@ -164,8 +165,15 @@ public:
     // A nonfinite beat is refused; so is a negative one when adding (a move stops at 0).
     int addEnvelopePointAtBeat(int trackId, double beat, double level);
     Change moveEnvelopePointAtBeat(int trackId, int index, double beat, double level, bool continueEdit = false);
-    struct EnvelopePointInfo { double beat; double level; };
+    struct EnvelopePointInfo { double beat; double level; automation::CurveShape shape; };
     std::vector<EnvelopePointInfo> envelopePointBeats(int trackId) const;   // empty for a bad id
+    // The envelope's level at a beat (what the engine plays there; unity with no points).
+    double envelopeLevelAtBeat(int trackId, double beat) const;
+    // The line to draw from fromBeat to toBeat: `steps` + 1 evenly spaced (beat, level) samples,
+    // plus every point in the range and the sample just before it, so corners and Hold jumps
+    // are exact. Sorted by beat; empty for a bad track or range.
+    struct EnvelopeCurveSample { double beat; double level; };
+    std::vector<EnvelopeCurveSample> envelopeCurve(int trackId, double fromBeat, double toBeat, int steps) const;
     bool removeAudioClip(int trackId, int clipId);
     bool copyClips(const std::vector<int>& ids);
     std::vector<int> cutClips(const std::vector<int>& ids);

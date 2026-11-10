@@ -15,6 +15,7 @@
 #include <QJsonDocument>
 
 #include <QVariant>
+#include <QPointF>
 #include <QStringList>
 #include <algorithm>
 #include <cmath>
@@ -142,6 +143,40 @@ bool TrackListWrapper::removeEnvelopePoint(int trackId, int point)
     const auto change = m_state.removeEnvelopePoint(trackId, point);
     if (change.changed) { notifyEnvelope(trackId, {EnvelopePointsRole}); emit historyChanged(); }
     return change.accepted;
+}
+
+bool TrackListWrapper::setEnvelopePointShape(int trackId, int point, const QString& shape)
+{
+    const auto known = automation::curveShapeFromId(shape.toStdString());
+    if (!known) return false;
+    const auto change = m_state.setEnvelopePointShape(trackId, point, *known);
+    if (change.changed) { notifyEnvelope(trackId, {EnvelopePointsRole}); emit historyChanged(); }
+    return change.accepted;
+}
+
+QVariantList TrackListWrapper::envelopeShapes() const
+{
+    static const char* const names[automation::curveShapeCount] = {"Linear", "Smooth", "Fast start", "Fast end", "Hold"};
+    QVariantList result;
+    for (int i = 0; i < automation::curveShapeCount; ++i) {
+        const auto id = automation::curveShapeId(static_cast<automation::CurveShape>(i));
+        result.append(QVariantMap{{QStringLiteral("id"), QString::fromUtf8(id.data(), qsizetype(id.size()))},
+                                  {QStringLiteral("name"), QString::fromUtf8(names[i])}});
+    }
+    return result;
+}
+
+double TrackListWrapper::envelopeLevelAt(int trackId, double beat) const
+{
+    return m_state.envelopeLevelAtBeat(trackId, beat);
+}
+
+QVariantList TrackListWrapper::envelopeCurve(int trackId, double fromBeat, double toBeat, int steps) const
+{
+    QVariantList result;
+    for (const auto& sample : m_state.envelopeCurve(trackId, fromBeat, toBeat, steps))
+        result.append(QPointF(sample.beat, sample.level));
+    return result;
 }
 
 bool TrackListWrapper::setEnvelopeBypassed(int trackId, bool bypassed)
@@ -286,7 +321,11 @@ QVariant TrackListWrapper::data(const QModelIndex& index, int role) const
     case EnvelopePointsRole: {
         QVariantList result;
         for (const auto& point : m_state.envelopePointBeats(track.id))
-            result.append(QVariantMap{{QStringLiteral("beat"), point.beat}, {QStringLiteral("level"), point.level}});
+        {
+            const auto shape = automation::curveShapeId(point.shape);
+            result.append(QVariantMap{{QStringLiteral("beat"), point.beat}, {QStringLiteral("level"), point.level},
+                                      {QStringLiteral("shape"), QString::fromUtf8(shape.data(), qsizetype(shape.size()))}});
+        }
         return result;
     }
     default:

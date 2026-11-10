@@ -366,6 +366,7 @@ TEST(projectdocument, volume_envelope_round_trips_is_optional_and_rescales_with_
     auto& track = project.addTrack(TrackKind::Audio, "Vox");
     CHECK(project.addEnvelopePoint(track.id, 0, 0.25) == 0);
     CHECK(project.addEnvelopePoint(track.id, 9'000'000'000LL, 1.0) == 1);   // past 32 bits
+    CHECK(project.setEnvelopePointShape(track.id, 0, automation::CurveShape::FastEnd));
     project.setEnvelopeBypassed(track.id, true);
     project.setEnvelopeShown(track.id, true);
     project.setEnvelopeOverClips(track.id, true);
@@ -376,7 +377,7 @@ TEST(projectdocument, volume_envelope_round_trips_is_optional_and_rescales_with_
     CHECK(ProjectDocument::deserialize(json, loaded, error, 48000.0));
     const auto& envelope = loaded.project.tracks()[0]->volumeEnvelope;
     CHECK(envelope.points().size() == 2);
-    CHECK(envelope.points()[0] == (automation::EnvelopePoint{0, 0.25}));
+    CHECK(envelope.points()[0] == (automation::EnvelopePoint{0, 0.25, automation::CurveShape::FastEnd}));
     CHECK(envelope.points()[1] == (automation::EnvelopePoint{9'000'000'000LL, 1.0}));
     CHECK(envelope.bypassed() && envelope.shown() && envelope.overClips());
     CHECK(!loaded.project.canUndo());
@@ -392,7 +393,12 @@ TEST(projectdocument, volume_envelope_round_trips_is_optional_and_rescales_with_
     CHECK(ProjectDocument::deserialize(document(""), loaded, error, 48000.0));   // saved before G6
     CHECK(loaded.project.tracks()[0]->volumeEnvelope.points().empty());
     CHECK(!loaded.project.tracks()[0]->volumeEnvelope.shown());
-    // Saved shown with no points: opens as saved (the start point comes only from showing it).
+    // Points saved before G6b have no shape: straight lines. An unknown shape does not load.
+    CHECK(ProjectDocument::deserialize(document(R"(,"volumeEnvelope":{"points":[{"position":"0","level":0.5}]})"), loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->volumeEnvelope.points()[0].shape == automation::CurveShape::Linear);
+    CHECK(!ProjectDocument::deserialize(document(R"(,"volumeEnvelope":{"points":[{"position":"0","level":0.5,"shape":"bezier"}]})"), loaded, error, 48000.0));
+    CHECK(!ProjectDocument::deserialize(document(R"(,"volumeEnvelope":{"points":[{"position":"0","level":0.5,"shape":3}]})"), loaded, error, 48000.0));
+        // Saved shown with no points: opens as saved (the start point comes only from showing it).
     CHECK(ProjectDocument::deserialize(document(R"(,"volumeEnvelope":{"points":[],"shown":true})"), loaded, error, 48000.0));
     CHECK(loaded.project.tracks()[0]->volumeEnvelope.shown());
     CHECK(loaded.project.tracks()[0]->volumeEnvelope.points().empty());
