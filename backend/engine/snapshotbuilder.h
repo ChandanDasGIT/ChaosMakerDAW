@@ -60,6 +60,7 @@ public:
             bool monitorEnabled = false;
             bool hasLiveInput = false;
             std::vector<AudioClip> audioClips;
+            automation::VolumeEnvelope volumeEnvelope;
             std::vector<std::string> effects; // effect types in processing order
         };
         std::vector<TrackInfo> tracks;

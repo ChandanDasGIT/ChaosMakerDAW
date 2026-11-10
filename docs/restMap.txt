@@ -13,13 +13,165 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
                 [L] will do later (the user's choice; section H)   [-] dropped (the user)
 
 
-NEXT UP (2026-11-10): C6 other instruments (A1-A3, D5-D7 and F3 done); import and export
-last. Start here when the user says "let's continue". Plans first, one step at
-a time.
+NEXT UP (2026-11-10), the user's order:
+  1. G6 volume envelope: all 5 steps DONE 2026-11-10, NOT COMMITTED yet (the user to try it
+     and say when to commit).
+  2. G7 mixing plugins (compressor, VintageVerb-style reverb, de-esser, plain reverb ...).
+  3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
+     reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
+     inside this group is to be confirmed with the user.
+  4. C6 other instruments (strings first was suggested; not chosen yet), C11 synth.
+  5. G18-G21 (live pitch monitor, guitar tone analyzer, drum pattern analyzer, chord / BPM
+     analyzer; G20 and G21 share their analysis foundation).
+  6. Import and export (E, F2).
+  7. U6 guitar FX panel UI, at the very end.
+Start here when the user says "let's continue". Plans first, one step at a time.
 
 OPEN — everything not finished, in the order the user wants it done (import and export last).
 Done items stay further down as the record.
 ------------------------------------------------------------------------------------------------
+-- Mixing (asked 2026-11-10)
+[x] G6  Volume envelope per track, like Reaper's. DONE 2026-11-10 (steps 1-5, uncommitted).
+        The user's choices: its own lane under the track by default, switchable to "over the
+        clips" from the right-click menu; the envelope MULTIPLIES the fader (0 dB on the line =
+        no change; the fader stays an overall level).
+        Behaviour:
+        - V shows / hides the selected track's Volume lane (under the track, in the timeline and
+          the track list). Flat line at 0 dB, shaded area, a "Volume" label and one bypass
+          toggle (Reaper's circle and power icon do the same thing; one toggle).
+        - Double-click the line: a point at the mouse. Drag a point in time and level (not past
+          its neighbours; dB readout while dragging). Right-click a point: delete.
+        - Right-click menu: Show over clips / Show in own lane, Delete point, Bypass.
+        - Range -inf .. +6 dB on a fader-shaped scale; the engine follows the same scale between
+          points, so the line drawn is what is heard. No points or bypassed: no effect.
+        - Stopped: the level at the playhead also applies to live sound.
+        - Points in samples like clips (stay with the audio when the BPM changes); rescaled when
+          a project reopens at another sample rate (like D5).
+        - Undoable: add / move / delete points, bypass. Not undoable (view): show / hide, lane
+          vs over clips. Saved in the project; older projects open without one.
+        Steps (stop after each for the user's go-ahead):
+        1. Backend model, undo, saving. New backend/automation/volumeenvelope.h/.cpp (points,
+           bypass / shown / over-clips, dB <-> height scale, level at a position, editing
+           rules). Edit backend/session/project.h/.cpp, backend/session/tracklist.h/.cpp,
+           backend/persistence/projectdocument.cpp. Tests: new tests/automation/
+           volumeenvelope_test.cpp; tests/session/tracklist_test.cpp,
+           tests/persistence/projectdocument_test.cpp.
+        2. Playback. backend/engine/enginesnapshot.h, snapshotbuilder.cpp, audioengine.cpp: the
+           level per sample in both places track gain is applied (playback and while
+           recording). Tests: tests/engine/snapshotbuilder_test.cpp,
+           tests/engine/audioengine_midi_test.cpp (a fade fades; bypass / no points unchanged).
+        3. Row layout and wrapper. Rows are a fixed 106 px today; new backend/timeline/
+           tracklayout.h/.cpp (row positions with optional envelope lanes, pointer -> row /
+           lane), so the timeline's clip drag and box selection keep working.
+           wrapper/session/tracklistwrap/tracklistwrapper.h/.cpp: envelope roles, actions,
+           layout. Tests: new tests/timeline/tracklayout_test.cpp, new
+           tests/wrapper/volumeenvelope_qtcheck.cpp (qtvolumeenvelope in CMakeLists.txt).
+        4. UI. New frontend/timeline/VolumeEnvelopeLane.qml (line, area, points, mouse; used in
+           the lane and over clips). Edit frontend/timeline/Timeline.qml (variable rows, lanes,
+           V) and frontend/session/TrackList.qml (the Volume lane header and toggle); nothing
+           else on these views changes look. New QML file in the transporttests list.
+           Tests (transport_ui): V, double-click / drag / right-click delete, bypass, the
+           over-clips switch, rows aligned, existing timeline tests. Then the app run with
+           throwaway settings (empty log).
+        5. Docs: this entry.
+        Done as built:
+        - automation::VolumeEnvelope (backend/automation/volumeenvelope): points in samples,
+          fader-shaped scale gain = 2 * level^3 (0 dB about 0.79 up), levelAt / gainAt.
+        - Engine: TrackRender::envelope (copied by SnapshotBuilder); AudioEngine::fillEnvelopeGain
+          fills a per-sample gain for the block in mixPlayback and renderTracks (recording);
+          stopped = the playhead's level, so live sound follows it too.
+        - backend/timeline/tracklayout: row tops with optional envelope lanes; rowAt (a lane
+          belongs to its track), inEnvelopeLane, rowCoordinate (the clip box selection's row
+          units: a lane is its row's bottom edge, so a box drawn in a lane selects no clips).
+        - TrackList: addEnvelopePointAtBeat / moveEnvelopePointAtBeat (a move stops at beat 0) /
+          envelopePointBeats. TrackListWrapper: roles envelopeShown / envelopeOverClips /
+          envelopeBypassed / envelopePoints ([{beat, level}]); the actions; envelopeDbText;
+          trackRowHeight / envelopeLaneHeight (set by Timeline.qml), rowTops, layoutHeight,
+          rowAtY, inEnvelopeLane, rowCoordinate. Undo / redo and tempo changes refresh the roles.
+        - frontend/timeline/VolumeEnvelopeLane.qml: line (only the visible part painted), shaded
+          area in the own lane, points (count model, so a drag keeps its grab), double-click
+          adds, drag moves (dB tooltip; one undo step), right-click a point deletes. Over the
+          clips the lane takes the mouse only near the line, so clips keep their drag and cursor.
+          Timeline.qml: rows from the layout, V, the menu (Show over clips / Show in own lane,
+          Delete point = the selected point, Bypass). TrackList.qml: cards at the layout's row
+          tops and a "Volume" header with a BYPASS chip under a card whose lane is shown.
+        - Colours: Theme.timeline.envelope* (TimelineColors.qml).
+        - Start point (the user, 2026-11-10): showing a lane whose envelope has no points adds one
+          at sample 0, 0 dB (Project::setEnvelopeShown), as part of the view change, not an undo
+          step. An ordinary point (move / delete); deleting every point and showing again gives a
+          new one. Loading a project never adds it (saved state opens as saved).
+        Tests: backendtests volumeenvelope, tracklayout, snapshotbuilder
+        volume_envelope_reaches_the_track_render, audioengine_midi
+        volume_envelope_fades_the_track_and_bypass_leaves_it_alone, tracklist, projectdocument;
+        wrappertests qtvolumeenvelope; transport_ui
+        volume_envelope_lane_edits_points_bypasses_and_keeps_rows_aligned. App run with throwaway
+        settings: empty log.
+        Not now: curve shapes other than straight lines, pan / FX parameter envelopes, lane
+        height resizing.
+[ ] G7  More plugins (the user, 2026-11-10): for any track, mostly for vocals. Today a track's
+        FX list offers only the 10-band EQ, Chaos EQ and gain; the guitar pedals (incl. a
+        compressor and a reverb) live inside GuitarSuite only. Wanted:
+        - a good compressor;
+        - a good alternative to Valhalla VintageVerb (lush algorithmic reverb with modes /
+          eras / colour);
+        - a de-esser;
+        - a reverb (a plainer room / plate / hall);
+        - "etc": other vocal / mixing tools; ask the user which (e.g. delay, saturation,
+          limiter, gate) when this is planned.
+        Not planned yet: plan with the user first (which one first, controls, look of each FX
+        page, renders to listen to). Hand-written DSP (from-scratch rule).
+
+-- From the Reaper comparison (the user picked these, 2026-11-10; none planned yet)
+[ ] G8  Clip fades and crossfades. AudioClip already has fadeIn / fadeOut (samples) but no
+        wrapper action or UI sets them. Wanted: Reaper-style fade handles in a clip's top
+        corners (drag to set), automatic short crossfade where two clips overlap, undoable,
+        saved. Check whether the engine already applies fadeIn / fadeOut when planning.
+[ ] G9  Effects on the master track. The engine has a master chain (EngineSnapshot::
+        masterChain, SnapshotBuilder::buildMasterChainSnapshot) but the UI offers no way to put
+        effects on it. Wanted: an FX list for the master like a track's (e.g. a limiter or glue
+        compressor from G7 before export).
+[ ] G10 Recording latency compensation. Recorded takes are not shifted by the interface's round
+        trip. tools/latencytest (F3) measures it; plan: use JACK's reported latency plus an
+        optional measured offset (a setting), applied when a take is placed.
+[ ] G11 Punch in / out and loop recording with takes (comping): record only inside a range;
+        several passes over a loop kept as takes on one clip; pick the best parts.
+[ ] G12 Tempo and meter changes inside a song (the project has one BPM and one meter today;
+        TempoMap is a single tempo). Affects the ruler, grid, metronome, piano roll, Chords
+        and drum grooves, and saving.
+[ ] G13 Noise reduction (mostly vocals): learn the noise from a silent part (room, hiss, hum),
+        then remove it from the take. Hand-written spectral subtraction / gating.
+[ ] G14 Clip tools: reverse, normalise, and a polarity (phase) flip per clip or per track.
+[ ] G15 Time selection (Reaper's drag on empty timeline): mark a range, then cut / copy / delete
+        everything in it across all tracks. Today editing works on selected clips.
+[ ] G16 Customisable keyboard shortcuts, and an undo history list to click back through.
+[ ] G17 Tap tempo: set the BPM by tapping a key.
+
+-- New tools (the user, 2026-11-10; none planned yet)
+[ ] G18 Live pitch monitor FX (for vocals): a scrolling graph of the sung pitch against the
+        notes / the key while singing or playing back, with cents off. Can reuse the guitar
+        tuner's pitch detection (backend/instruments/guitar/plugins/tuner).
+[ ] G19 Guitar tone analyzer: analyse a reference guitar recording and suggest GuitarSuite
+        settings that sound close (tone balance, gain / distortion amount, cab character), or
+        match automatically by searching amp / cab / EQ settings against the reference
+        (offline, like fxrender --analyze). Works best on an isolated guitar stem; a full mix
+        needs the guitar separated first, which is out of reach without ML (from-scratch rule).
+[ ] G20 Drum pattern analyzer: find kick / snare / hi-hat hits and the tempo in a drum
+        recording or loop (onset detection + spectral bands), quantise them, and make a drum
+        groove (G1) or a pattern clip from them. The user wants it to work on whole SONGS too
+        (a drum stem is the fallback if that is too much). Plan: stage 1 drum stems / loops
+        (reliable); stage 2 songs: first pull the drums forward with harmonic / percussive
+        separation (median filtering of the spectrogram, hand-written, no ML), then the same
+        detection. On songs, tempo and beat grid should be reliable and hi-hat / snare fair;
+        the kick under a bass is the hardest. The result is a draft to fix in the piano roll.
+[ ] G21 Chord and BPM analyzer (the user, 2026-11-10): from a song, find the BPM / beat grid,
+        the key and the chords. Hand-written: tempo from the onset envelope (shared with G20);
+        chords from a chromagram (12 pitch classes per beat, the harmonic part from G20's
+        separation), matched against chord templates (major, minor, then 7ths ...) and smoothed
+        over time (Viterbi); key from the chord / pitch-class profile. Output: the chords on the
+        timeline and / or into a Chords track's strips (G3 / G4), BPM into the project.
+        Good on clear pop / rock / folk chords; weaker on jazz chords, inversions, heavy
+        distortion. G20 and G21 share one analysis foundation (FFT, onsets, tempo, separation).
+
 -- Checks in the real app, need the user (was section B)
 [?] B1  Clip gain drag, then Ctrl+Z.
 [?] B2  Delete a track that has a pedalboard, then Ctrl+Z (pedalboard comes back).
@@ -52,6 +204,8 @@ Done items stay further down as the record.
           closes).
 [ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
         model), mapped in instrumentfactory.cpp.
+[ ] C11 A synth instrument (the user, 2026-11-10): a hand-written subtractive synth (oscillators,
+        filter, envelopes, LFO, presets) as its own track type. Not planned yet.
 [ ] C8  Credits: the user's rule (2026-11-07): no third-party credit or attribution of any
         kind in the GitHub repo. So no courtesy credits, no "Third-party sounds" README
         section. The first choices need none (Gogodze Phu Vol II is CC0, Splendid is public
@@ -108,6 +262,11 @@ the piano) and is reused here.
         cabinet IRs too), then drag and drop.
 [ ] F2  Phase 13: Export and finish — offline render of the whole song (backend/render is
         empty), export controls, final verification.
+
+-- At the end (the user, 2026-11-10)
+[ ] U6  A better UI for the guitar FX panel (GuitarSuite: pedal cards, amp, cabinet, tuner).
+        Not planned yet: ask the user what bothers them and what it should look like first
+        (see the no-unasked-redesign rule; this one is asked).
 
 
 DONE (the record, newest first)

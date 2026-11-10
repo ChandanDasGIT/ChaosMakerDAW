@@ -418,3 +418,91 @@ TEST(tracklist, the_picker_groups_guitars_and_drums_by_kind)
     CHECK(tracks.project().findTrack(kit)->name == "Electronic Drums 1");
     CHECK(tracks.addTrackChoice("group:Drums") == -1 && tracks.addTrackChoice("Guitar") == -1);
 }
+
+TEST(tracklist, volume_envelope_edits_are_undoable_and_the_view_state_is_not)
+{
+    TrackList tracks;
+    const int id = tracks.addAudioTrack();
+    const auto& envelope = tracks.project().findTrack(id)->volumeEnvelope;
+    CHECK(envelope.points().empty() && !envelope.shown());
+
+    CHECK(tracks.addEnvelopePoint(id, 1000, 0.5) == 0);
+    // View state, no undo step (the five undos below reach the start); with a point already
+    // there, showing adds no start point.
+    CHECK(tracks.setEnvelopeShown(id, true).changed);
+    CHECK(tracks.setEnvelopeOverClips(id, true).changed);
+    CHECK(envelope.points().size() == 1);
+    CHECK(tracks.addEnvelopePoint(id, 2000, 0.8) == 1);
+    CHECK(tracks.addEnvelopePoint(-5, 0, 0.5) == -1);
+    // One drag (many moves of the same point) is one undo step.
+    CHECK(tracks.moveEnvelopePoint(id, 0, 1100, 0.4).changed);
+    CHECK(tracks.moveEnvelopePoint(id, 0, 1200, 0.3, true).changed);
+    CHECK(tracks.moveEnvelopePoint(id, 0, 1300, 0.2, true).changed);
+    CHECK(!tracks.moveEnvelopePoint(id, 0, 1300, 0.2, true).changed);
+    CHECK(tracks.setEnvelopeBypassed(id, true).changed);
+    CHECK(!tracks.setEnvelopeBypassed(id, true).changed);
+    CHECK(tracks.removeEnvelopePoint(id, 1).changed);
+    CHECK(!tracks.removeEnvelopePoint(id, 5).accepted);
+
+    CHECK(tracks.undo()); CHECK(envelope.points().size() == 2);   // remove
+    CHECK(tracks.undo()); CHECK(!envelope.bypassed());            // bypass
+    CHECK(tracks.undo());                                         // the whole drag
+    CHECK(envelope.points()[0] == (automation::EnvelopePoint{1000, 0.5}));
+    CHECK(envelope.shown() && envelope.overClips());              // undo leaves the view alone
+    CHECK(tracks.undo()); CHECK(envelope.points().size() == 1);
+    CHECK(tracks.undo()); CHECK(envelope.points().empty());
+    CHECK(!tracks.canUndo());
+    for (int i = 0; i < 4; ++i) CHECK(tracks.redo());
+    CHECK(envelope.points()[0] == (automation::EnvelopePoint{1300, 0.2}) && envelope.bypassed());
+    CHECK(tracks.redo()); CHECK(envelope.points().size() == 1);
+
+    // Clip edits and envelope edits share one history.
+    const int clip = tracks.addClipAtBeat(id, 0, 4);
+    CHECK(clip > 0);
+    CHECK(tracks.undo()); CHECK(tracks.project().findTrack(id)->audioClips.empty());
+    CHECK(envelope.points().size() == 1);
+
+    // While recording, the undoable edits are refused; the view still switches.
+    tracks.lockRecordingTrack(id);
+    CHECK(tracks.addEnvelopePoint(id, 5000, 0.5) == -1);
+    CHECK(!tracks.moveEnvelopePoint(id, 0, 10, 0.5).accepted);
+    CHECK(!tracks.removeEnvelopePoint(id, 0).accepted);
+    CHECK(!tracks.setEnvelopeBypassed(id, false).accepted);
+    CHECK(tracks.setEnvelopeShown(id, false).changed);
+    tracks.lockRecordingTrack(-1);
+
+    // Removing the track keeps its envelope for undo.
+    CHECK(tracks.removeTrack(id));
+    CHECK(tracks.undo());
+    CHECK(tracks.project().findTrack(id)->volumeEnvelope.points().size() == 1);
+}
+
+TEST(tracklist, showing_an_empty_envelope_adds_a_start_point_at_zero_db)
+{
+    TrackList tracks;
+    const int id = tracks.addAudioTrack();
+    const auto& envelope = tracks.project().findTrack(id)->volumeEnvelope;
+    CHECK(tracks.setEnvelopeShown(id, true).changed);
+    CHECK(envelope.points().size() == 1);
+    CHECK(envelope.points()[0].position == 0);
+    CHECK_NEAR(envelope.points()[0].level, automation::envelopescale::unityLevel(), 1e-12);
+    CHECK_NEAR(envelope.gainAt(123456), 1.0, 1e-12);   // no change in sound
+    CHECK(!tracks.canUndo());                          // part of the view change
+
+    // An ordinary point: it can be moved and deleted.
+    CHECK(tracks.moveEnvelopePoint(id, 0, 500, 0.5).changed);
+    CHECK(tracks.removeEnvelopePoint(id, 0).changed);
+    CHECK(envelope.points().empty());
+    // Hiding and showing again gives a new start point; hiding alone adds nothing.
+    CHECK(tracks.setEnvelopeShown(id, false).changed);
+    CHECK(envelope.points().empty());
+    CHECK(tracks.setEnvelopeShown(id, true).changed);
+    CHECK(envelope.points().size() == 1 && envelope.points()[0].position == 0);
+
+    // With points already there, nothing is added.
+    const int other = tracks.addAudioTrack();
+    CHECK(tracks.addEnvelopePoint(other, 48000, 0.3) == 0);
+    CHECK(tracks.setEnvelopeShown(other, true).changed);
+    const auto& otherEnvelope = tracks.project().findTrack(other)->volumeEnvelope;
+    CHECK(otherEnvelope.points().size() == 1 && otherEnvelope.points()[0].position == 48000);
+}

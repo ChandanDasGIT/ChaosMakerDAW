@@ -73,6 +73,122 @@ TrackListWrapper::TrackListWrapper(QObject* parent)
     connect(this, &TrackListWrapper::harmoniumChanged, this, &TrackListWrapper::syncKeyShift);
     connect(this, &TrackListWrapper::pianoChanged, this, &TrackListWrapper::syncKeyShift);
     connect(this, &TrackListWrapper::projectChanged, this, &TrackListWrapper::syncKeyShift);
+    // The row layout follows the rows and each track's envelope lane (restMap G6).
+    connect(this, &QAbstractItemModel::dataChanged, this, &TrackListWrapper::syncLayout);
+    connect(this, &QAbstractItemModel::rowsInserted, this, &TrackListWrapper::syncLayout);
+    connect(this, &QAbstractItemModel::rowsRemoved, this, &TrackListWrapper::syncLayout);
+    connect(this, &QAbstractItemModel::rowsMoved, this, &TrackListWrapper::syncLayout);
+    connect(this, &QAbstractItemModel::modelReset, this, &TrackListWrapper::syncLayout);
+}
+
+void TrackListWrapper::syncLayout()
+{
+    std::vector<bool> lanes;
+    lanes.reserve(m_project.tracks().size());
+    for (const auto& track : m_project.tracks())
+        lanes.push_back(track->volumeEnvelope.shown() && !track->volumeEnvelope.overClips());
+    if (lanes.size() == static_cast<std::size_t>(m_layout.count())) {
+        bool same = true;
+        for (int i = 0; i < m_layout.count() && same; ++i) same = lanes[std::size_t(i)] == m_layout.hasEnvelopeLane(i);
+        if (same) return;
+    }
+    m_layout.setRows(std::move(lanes));
+    emit layoutChanged();
+}
+
+void TrackListWrapper::setTrackRowHeight(double height)
+{
+    if (height == m_layout.trackHeight()) return;
+    m_layout.setTrackHeight(height);
+    emit layoutChanged();
+}
+
+void TrackListWrapper::setEnvelopeLaneHeight(double height)
+{
+    if (height == m_layout.envelopeHeight()) return;
+    m_layout.setEnvelopeHeight(height);
+    emit layoutChanged();
+}
+
+QVariantList TrackListWrapper::rowTops() const
+{
+    QVariantList result;
+    for (double top : m_layout.rowTops()) result.append(top);
+    return result;
+}
+
+void TrackListWrapper::notifyEnvelope(int trackId, const QList<int>& roles)
+{
+    const int row = rowForTrackId(trackId);
+    if (row >= 0) emit dataChanged(index(row), index(row), roles);
+}
+
+int TrackListWrapper::addEnvelopePoint(int trackId, double beat, double level)
+{
+    const int point = m_state.addEnvelopePointAtBeat(trackId, beat, level);
+    if (point >= 0) { notifyEnvelope(trackId, {EnvelopePointsRole}); emit historyChanged(); }
+    return point;
+}
+
+bool TrackListWrapper::moveEnvelopePoint(int trackId, int point, double beat, double level, bool continueEdit)
+{
+    const auto change = m_state.moveEnvelopePointAtBeat(trackId, point, beat, level, continueEdit);
+    if (change.changed) { notifyEnvelope(trackId, {EnvelopePointsRole}); emit historyChanged(); }
+    return change.accepted;
+}
+
+bool TrackListWrapper::removeEnvelopePoint(int trackId, int point)
+{
+    const auto change = m_state.removeEnvelopePoint(trackId, point);
+    if (change.changed) { notifyEnvelope(trackId, {EnvelopePointsRole}); emit historyChanged(); }
+    return change.accepted;
+}
+
+bool TrackListWrapper::setEnvelopeBypassed(int trackId, bool bypassed)
+{
+    const auto change = m_state.setEnvelopeBypassed(trackId, bypassed);
+    if (change.changed) { notifyEnvelope(trackId, {EnvelopeBypassedRole}); emit historyChanged(); }
+    return change.accepted;
+}
+
+bool TrackListWrapper::setEnvelopeShown(int trackId, bool shown)
+{
+    const auto change = m_state.setEnvelopeShown(trackId, shown);
+    // Showing may also add the start point (restMap G6).
+    if (change.changed) notifyEnvelope(trackId, {EnvelopeShownRole, EnvelopePointsRole});
+    return change.accepted;
+}
+
+bool TrackListWrapper::toggleEnvelopeShown(int trackId)
+{
+    const auto* track = m_project.findTrack(trackId);
+    return track && setEnvelopeShown(trackId, !track->volumeEnvelope.shown());
+}
+
+bool TrackListWrapper::setEnvelopeOverClips(int trackId, bool overClips)
+{
+    const auto change = m_state.setEnvelopeOverClips(trackId, overClips);
+    if (change.changed) notifyEnvelope(trackId, {EnvelopeOverClipsRole});
+    return change.accepted;
+}
+
+double TrackListWrapper::envelopeDb(double level) const
+{
+    return automation::envelopescale::dbForLevel(level);
+}
+
+QString TrackListWrapper::envelopeDbText(double level) const
+{
+    const double db = envelopeDb(level);
+    if (!std::isfinite(db) || db <= -150.0) return QStringLiteral("-inf dB");
+    const double shown = std::round(db * 10.0) / 10.0;
+    return (shown > 0 ? QStringLiteral("+") : QString()) + QString::number(shown == 0 ? 0.0 : shown, 'f', 1)
+        + QStringLiteral(" dB");
+}
+
+double TrackListWrapper::envelopeUnityLevel() const
+{
+    return automation::envelopescale::unityLevel();
 }
 
 int TrackListWrapper::selectedKeyShift() const
@@ -161,6 +277,18 @@ QVariant TrackListWrapper::data(const QModelIndex& index, int role) const
         }
         return result;
     }
+    case EnvelopeShownRole:
+        return track.volumeEnvelope.shown();
+    case EnvelopeOverClipsRole:
+        return track.volumeEnvelope.overClips();
+    case EnvelopeBypassedRole:
+        return track.volumeEnvelope.bypassed();
+    case EnvelopePointsRole: {
+        QVariantList result;
+        for (const auto& point : m_state.envelopePointBeats(track.id))
+            result.append(QVariantMap{{QStringLiteral("beat"), point.beat}, {QStringLiteral("level"), point.level}});
+        return result;
+    }
     default:
         return {};
     }
@@ -188,7 +316,11 @@ QHash<int, QByteArray> TrackListWrapper::roleNames() const
         {LiveInputRole, "hasLiveInput"},
         {CanMonitorRole, "canMonitor"},
         {RecordsWithFxRole, "recordsWithFx"},
-        {RecordDryRole, "recordDry"}
+        {RecordDryRole, "recordDry"},
+        {EnvelopeShownRole, "envelopeShown"},
+        {EnvelopeOverClipsRole, "envelopeOverClips"},
+        {EnvelopeBypassedRole, "envelopeBypassed"},
+        {EnvelopePointsRole, "envelopePoints"}
     };
 }
 
@@ -786,7 +918,9 @@ bool TrackListWrapper::undo()
         return ok;
     }
     if (!m_state.undo()) return false;
-    notifyClipEdit(-1); return true;
+    notifyClipEdit(-1);
+    if (count() > 0) emit dataChanged(index(0), index(count() - 1), {EnvelopePointsRole, EnvelopeBypassedRole});
+    return true;
 }
 bool TrackListWrapper::redo()
 {
@@ -799,12 +933,18 @@ bool TrackListWrapper::redo()
         return ok;
     }
     if (!m_state.redo()) return false;
-    notifyClipEdit(-1); return true;
+    notifyClipEdit(-1);
+    if (count() > 0) emit dataChanged(index(0), index(count() - 1), {EnvelopePointsRole, EnvelopeBypassedRole});
+    return true;
 }
 
 void TrackListWrapper::setTempo(double bpm, int numerator, int denominator)
 {
-    if (m_state.setTempo(bpm, numerator, denominator)) { emit contentEndBeatsChanged(); emit clipsChanged(); }
+    if (m_state.setTempo(bpm, numerator, denominator)) {
+        emit contentEndBeatsChanged(); emit clipsChanged();
+        // Envelope points stay in samples, so their beats follow the tempo (restMap G6).
+        if (count() > 0) emit dataChanged(index(0), index(count() - 1), {EnvelopePointsRole});
+    }
 }
 
 void TrackListWrapper::setEqPresetError(const QString& error) {

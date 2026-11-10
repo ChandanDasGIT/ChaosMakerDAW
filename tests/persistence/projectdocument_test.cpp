@@ -358,3 +358,53 @@ TEST(projectdocument, track_effects_round_trip_old_files_get_defaults_and_bad_li
         CHECK(error == "Invalid track effects.");
     }
 }
+
+TEST(projectdocument, volume_envelope_round_trips_is_optional_and_rescales_with_the_rate)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    auto& track = project.addTrack(TrackKind::Audio, "Vox");
+    CHECK(project.addEnvelopePoint(track.id, 0, 0.25) == 0);
+    CHECK(project.addEnvelopePoint(track.id, 9'000'000'000LL, 1.0) == 1);   // past 32 bits
+    project.setEnvelopeBypassed(track.id, true);
+    project.setEnvelopeShown(track.id, true);
+    project.setEnvelopeOverClips(track.id, true);
+    const std::string json = ProjectDocument::serialize(project, {}, {""});
+
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(json, loaded, error, 48000.0));
+    const auto& envelope = loaded.project.tracks()[0]->volumeEnvelope;
+    CHECK(envelope.points().size() == 2);
+    CHECK(envelope.points()[0] == (automation::EnvelopePoint{0, 0.25}));
+    CHECK(envelope.points()[1] == (automation::EnvelopePoint{9'000'000'000LL, 1.0}));
+    CHECK(envelope.bypassed() && envelope.shown() && envelope.overClips());
+    CHECK(!loaded.project.canUndo());
+
+    CHECK(ProjectDocument::deserialize(json, loaded, error, 96000.0));
+    CHECK(loaded.project.tracks()[0]->volumeEnvelope.points()[1].position == 18'000'000'000LL);
+
+    const auto document = [](const std::string& field) {
+        return R"({"format":"ChaosMakerProject","version":2,"project":{"version":1,"bpm":120.0,
+            "sampleRate":48000.0,"numerator":4,"denominator":4,"tracks":[{"name":"T1","type":"Audio",
+            "volume":1.0)" + field + R"(,"eq":[0,0,0,0,0,0,0,0,0,0],"clips":[]}]},"trackEffects":[""]})";
+    };
+    CHECK(ProjectDocument::deserialize(document(""), loaded, error, 48000.0));   // saved before G6
+    CHECK(loaded.project.tracks()[0]->volumeEnvelope.points().empty());
+    CHECK(!loaded.project.tracks()[0]->volumeEnvelope.shown());
+    // Saved shown with no points: opens as saved (the start point comes only from showing it).
+    CHECK(ProjectDocument::deserialize(document(R"(,"volumeEnvelope":{"points":[],"shown":true})"), loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->volumeEnvelope.shown());
+    CHECK(loaded.project.tracks()[0]->volumeEnvelope.points().empty());
+    for (const char* bad : {R"(,"volumeEnvelope":[])", R"(,"volumeEnvelope":{})",
+                            R"(,"volumeEnvelope":{"points":[{"position":10,"level":0.5}]})",
+                            R"(,"volumeEnvelope":{"points":[{"position":"-1","level":0.5}]})",
+                            R"(,"volumeEnvelope":{"points":[{"position":"x","level":0.5}]})",
+                            R"(,"volumeEnvelope":{"points":[{"position":"5","level":1.5}]})",
+                            R"(,"volumeEnvelope":{"points":[{"position":"5","level":0.5},{"position":"5","level":0.5}]})",
+                            R"(,"volumeEnvelope":{"points":[],"bypassed":"yes"})"}) {
+        error.clear();
+        CHECK(!ProjectDocument::deserialize(document(bad), loaded, error, 48000.0));
+        CHECK(error == "Invalid volume envelope.");
+    }
+}

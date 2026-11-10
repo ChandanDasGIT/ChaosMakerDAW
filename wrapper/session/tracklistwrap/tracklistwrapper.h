@@ -9,6 +9,7 @@
 #include <QJsonObject>
 #include <QSet>
 #include "engine/enginesnapshot.h"
+#include "timeline/tracklayout.h"
 #include <QtQml/qqmlregistration.h>
 #include <functional>
 
@@ -40,6 +41,14 @@ class TrackListWrapper : public QAbstractListModel {
     Q_PROPERTY(bool newTrackRecordDry READ newTrackRecordDry WRITE setNewTrackRecordDry NOTIFY newTrackRecordDryChanged)
     Q_PROPERTY(double masterVolume READ masterVolume WRITE setMasterVolume NOTIFY masterVolumeChanged)
     Q_PROPERTY(bool masterMuted READ masterMuted WRITE setMasterMuted NOTIFY masterMutedChanged)
+    // Row layout (restMap G6): a track's part, plus its volume lane when shown in its own lane.
+    // Heights are set by the views; rowTops has count + 1 values (the last is the total height).
+    Q_PROPERTY(double trackRowHeight READ trackRowHeight WRITE setTrackRowHeight NOTIFY layoutChanged)
+    Q_PROPERTY(double envelopeLaneHeight READ envelopeLaneHeight WRITE setEnvelopeLaneHeight NOTIFY layoutChanged)
+    Q_PROPERTY(QVariantList rowTops READ rowTops NOTIFY layoutChanged)
+    Q_PROPERTY(double layoutHeight READ layoutHeight NOTIFY layoutChanged)
+    // The envelope's level (0..1) of 0 dB, where a new envelope's line sits.
+    Q_PROPERTY(double envelopeUnityLevel READ envelopeUnityLevel CONSTANT)
 
 public:
     enum Role {
@@ -62,7 +71,12 @@ public:
         ColourRole,
         PanRole,
         StripWidthRole,
-        EffectsRole   // insert effects in chain order: [{id, type, title, subtitle, removable}] (plan 6.1)
+        EffectsRole,  // insert effects in chain order: [{id, type, title, subtitle, removable}] (plan 6.1)
+        // Volume envelope (restMap G6). Points: [{beat, level}] in time order, level 0..1.
+        EnvelopeShownRole,
+        EnvelopeOverClipsRole,
+        EnvelopeBypassedRole,
+        EnvelopePointsRole
     };
     Q_ENUM(Role)
 
@@ -204,6 +218,33 @@ public:
     Q_INVOKABLE QVariantList duplicateClips(const QVariantList& ids, double beatOffset = 0.0);
     Q_INVOKABLE void setTempo(double bpm, int numerator, int denominator);
 
+    // Volume envelope (restMap G6), in project beats. Points, moves and bypass are undoable (one
+    // drag = one undo step with continueEdit); shown and over clips are view state.
+    Q_INVOKABLE int addEnvelopePoint(int trackId, double beat, double level);   // index, or -1
+    Q_INVOKABLE bool moveEnvelopePoint(int trackId, int index, double beat, double level, bool continueEdit = false);
+    Q_INVOKABLE bool removeEnvelopePoint(int trackId, int index);
+    Q_INVOKABLE bool setEnvelopeBypassed(int trackId, bool bypassed);
+    Q_INVOKABLE bool setEnvelopeShown(int trackId, bool shown);
+    Q_INVOKABLE bool toggleEnvelopeShown(int trackId);
+    Q_INVOKABLE bool setEnvelopeOverClips(int trackId, bool overClips);
+    // The fader-shaped scale: a level's dB and its readout ("-inf dB", "+1.5 dB", "-12.0 dB").
+    Q_INVOKABLE double envelopeDb(double level) const;
+    Q_INVOKABLE QString envelopeDbText(double level) const;
+    double envelopeUnityLevel() const;
+
+    double trackRowHeight() const { return m_layout.trackHeight(); }
+    void setTrackRowHeight(double height);
+    double envelopeLaneHeight() const { return m_layout.envelopeHeight(); }
+    void setEnvelopeLaneHeight(double height);
+    QVariantList rowTops() const;
+    double layoutHeight() const { return m_layout.totalHeight(); }
+    // Pointer y (from the top of the first row) -> row, its envelope lane included; past the
+    // rows it continues at trackRowHeight steps.
+    Q_INVOKABLE int rowAtY(double y) const { return m_layout.rowAt(y); }
+    Q_INVOKABLE bool inEnvelopeLane(double y) const { return m_layout.inEnvelopeLane(y); }
+    // y in the row units the timeline's box selection uses (see TrackLayout::rowCoordinate).
+    Q_INVOKABLE double rowCoordinate(double y) const { return m_layout.rowCoordinate(y); }
+
 signals:
     void selectedTrackChanged(int trackId);
     void selectedKeyShiftChanged(int semitones);
@@ -228,6 +269,7 @@ signals:
     void newTrackRecordDryChanged();
     void masterVolumeChanged();
     void masterMutedChanged();
+    void layoutChanged();
 
 private:
     void notifyClipEdit(int trackId);
@@ -239,6 +281,9 @@ private:
     void setEqPresetError(const QString& error);
     bool applyEqBands(int trackId, const std::array<float,10>& bands);
     void syncSelectionState();
+    void syncLayout();
+    void notifyEnvelope(int trackId, const QList<int>& roles);
+    TrackLayout m_layout;
     QString m_eqPresetError;
     int rowForTrackId(int trackId) const;
     int appendTrack(const std::function<int()>& insert);

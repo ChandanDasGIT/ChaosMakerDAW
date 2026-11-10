@@ -152,6 +152,20 @@ public:
     double clipLengthBeats(int trackId, int clipId) const;
     Change setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes);
     bool isPatternClip(const AudioClip& clip) const;
+    // Volume envelope (restMap G6), positions in project samples. The undoable edits are refused
+    // while recording (like clip edits); show / hide and over clips are view state and always work.
+    int addEnvelopePoint(int trackId, std::int64_t position, double level);   // index, or -1
+    Change moveEnvelopePoint(int trackId, int index, std::int64_t position, double level, bool continueEdit = false);
+    Change removeEnvelopePoint(int trackId, int index);
+    Change setEnvelopeBypassed(int trackId, bool bypassed);
+    Change setEnvelopeShown(int trackId, bool shown);
+    Change setEnvelopeOverClips(int trackId, bool overClips);
+    // The same edits in project beats (what the timeline draws); the points stay in samples.
+    // A nonfinite beat is refused; so is a negative one when adding (a move stops at 0).
+    int addEnvelopePointAtBeat(int trackId, double beat, double level);
+    Change moveEnvelopePointAtBeat(int trackId, int index, double beat, double level, bool continueEdit = false);
+    struct EnvelopePointInfo { double beat; double level; };
+    std::vector<EnvelopePointInfo> envelopePointBeats(int trackId) const;   // empty for a bad id
     bool removeAudioClip(int trackId, int clipId);
     bool copyClips(const std::vector<int>& ids);
     std::vector<int> cutClips(const std::vector<int>& ids);

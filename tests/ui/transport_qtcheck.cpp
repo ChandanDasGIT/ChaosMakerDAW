@@ -2920,6 +2920,95 @@ private slots:
         QTest::mouseMove(window,end); QTest::mouseRelease(window,Qt::LeftButton,Qt::ShiftModifier,end);
         QCOMPARE(selectedIds(timeline).size(),3);
     }
+    void volume_envelope_lane_edits_points_bypasses_and_keeps_rows_aligned() {
+        TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
+        const int clipB=tracks.addClipAtBeat(b,0,2);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        auto* trackList=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(trackList);
+        const auto restore=qScopeGuard([&] {
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+            trackList->setVisible(false); trackList->setProperty("trackModel",QVariant());
+        });
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        QTest::qWait(20);
+        const auto& envelope=tracks.project().findTrack(a)->volumeEnvelope;
+        auto* block=visualItem(timeline,"clipBlock"+QString::number(clipB)); QVERIFY(block);
+        QCOMPARE(block->y(),38.0+106+8);
+
+        // V shows the selected track's lane under it; the rows below move down.
+        QVERIFY(tracks.selectTrack(a)); timeline->forceActiveFocus();
+        const bool undoBeforeV=tracks.canUndo(),redoBeforeV=tracks.canRedo();
+        QTest::keyClick(window,Qt::Key_V);
+        QTRY_VERIFY(envelope.shown());
+        auto* lane=visualItem(timeline,"volumeEnvelope"+QString::number(a)); QVERIFY(lane); QVERIFY(lane->isVisible());
+        QCOMPARE(lane->y(),38.0+106);
+        QCOMPARE(lane->height(),72.0);
+        QTRY_COMPARE(block->y(),38.0+106+72+8);
+        // The new lane starts with one point at the start, on the 0 dB line.
+        QCOMPARE(envelope.points().size(),std::size_t(1));
+        QCOMPARE(envelope.points()[0].position,qint64(0));
+        auto* startPoint=visualItem(timeline,"envelopePoint"+QString::number(a)+"_0"); QVERIFY(startPoint);
+        QCOMPARE(startPoint->x()+startPoint->width()/2,0.0);
+        QVERIFY(std::abs(startPoint->y()+startPoint->height()/2-(1-tracks.envelopeUnityLevel())*72)<0.5);
+        QCOMPARE(tracks.canUndo(),undoBeforeV); QCOMPARE(tracks.canRedo(),redoBeforeV);   // no undo step of its own
+
+        // Double-click: a point at the mouse (2 beats in, half way up the lane).
+        const double beatWidth=timeline->property("beatWidth").toDouble();
+        auto* area=visualItem(timeline,"envelopeArea"+QString::number(a)); QVERIFY(area);
+        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,area->mapToScene(QPointF(2*beatWidth,36)).toPoint());
+        QTRY_COMPARE(envelope.points().size(),std::size_t(2));
+        QVERIFY(std::abs(envelope.points()[1].position-48000)<=600);
+        QVERIFY(std::abs(envelope.points()[1].level-0.5)<0.03);
+
+        // Drag it right and up: one undo step.
+        auto* point=visualItem(timeline,"envelopePoint"+QString::number(a)+"_1"); QVERIFY(point);
+        const QPoint from=point->mapToScene(QPointF(point->width()/2,point->height()/2)).toPoint();
+        const QPoint to=from+QPoint(int(beatWidth),-18);
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,from);
+        QTest::mouseMove(window,from+QPoint(int(beatWidth)/2,-9));
+        QTest::mouseMove(window,to);
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,to);
+        QVERIFY(std::abs(envelope.points()[1].position-72000)<=1200);
+        QVERIFY(std::abs(envelope.points()[1].level-0.75)<0.03);
+        QVERIFY(tracks.undo());
+        QVERIFY(std::abs(envelope.points()[1].position-48000)<=600);
+        QVERIFY(tracks.redo());
+
+        // Right-click a point: deleted (undoable).
+        point=visualItem(timeline,"envelopePoint"+QString::number(a)+"_1"); QVERIFY(point);
+        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,point->mapToScene(QPointF(point->width()/2,point->height()/2)).toPoint());
+        QTRY_COMPARE(envelope.points().size(),std::size_t(1));
+        QVERIFY(tracks.undo()); QCOMPARE(envelope.points().size(),std::size_t(2));
+
+        // The menu: bypass, then over the clips (the lane goes away, the rows close up).
+        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,area->mapToScene(QPointF(10*beatWidth,60)).toPoint());
+        auto* bypass=visualItem(window->contentItem(),"envelopeBypassAction"); QVERIFY(bypass);
+        QTRY_VERIFY(bypass->isVisible()); click(bypass);
+        QTRY_VERIFY(envelope.bypassed());
+        QVERIFY(tracks.undo()); QVERIFY(!envelope.bypassed());
+        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,area->mapToScene(QPointF(10*beatWidth,60)).toPoint());
+        auto* placement=visualItem(window->contentItem(),"envelopePlacementAction"); QVERIFY(placement);
+        QTRY_VERIFY(placement->isVisible()); click(placement);
+        QTRY_VERIFY(envelope.overClips());
+        QTRY_COMPARE(block->y(),38.0+106+8);
+        QCOMPARE(lane->y(),38.0+8);
+        QVERIFY(envelope.points().size()==2);   // the view change kept the points and was not an undo step
+
+        // Back in its own lane: the track list leaves the same room, with the Volume header.
+        QVERIFY(tracks.setEnvelopeOverClips(a,false));
+        timeline->setVisible(false);
+        trackList->setProperty("trackModel",QVariant::fromValue(&tracks)); trackList->setVisible(true);
+        QTest::qWait(20);
+        auto* header=visualItem(trackList,"envelopeLaneHeader"+QString::number(a)); QVERIFY(header);
+        QVERIFY(header->isVisible()); QCOMPARE(header->height(),72.0);
+        auto* card=visualItem(trackList,"trackColourAccent"+QString::number(b)); QVERIFY(card);
+        QCOMPARE(card->parentItem()->y(),106.0+72);
+        auto* bypassChip=visualItem(trackList,"envelopeBypassButton"+QString::number(a)); QVERIFY(bypassChip);
+        click(bypassChip); QTRY_VERIFY(envelope.bypassed());
+        QVERIFY(tracks.toggleEnvelopeShown(a));
+        QTRY_VERIFY(!header->isVisible());
+        QTRY_COMPARE(card->parentItem()->y(),106.0);
+    }
     void undo_redo_buttons_restore_deleted_clips() {
         TrackListWrapper tracks;
         auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);

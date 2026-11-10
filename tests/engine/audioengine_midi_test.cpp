@@ -3,6 +3,7 @@
 #include "processor/processor.h"
 #include "plugins/testsynth/testsynth.h"
 
+#include <cmath>
 #include <vector>
 
 namespace {
@@ -656,5 +657,75 @@ TEST(audioengine_midi, a_processor_that_keeps_running_is_processed_while_stopped
         runner->running = false;
         for (int i = 0; i < 4; ++i) renderEngine(engine, 128);
         CHECK(runner->processCalls == calls);                       // idle again
+    }
+}
+
+namespace {
+std::shared_ptr<const AudioData> constantAudio(int frames)
+{
+    auto data = std::make_shared<AudioData>();
+    data->sampleRate = 48000;
+    data->frames = frames;
+    data->channels = {std::vector<float>(frames, 0.5f), std::vector<float>(frames, 0.5f)};
+    return data;
+}
+
+// One audio track playing a constant 0.5 clip under the given envelope; returns 512 rendered
+// left-channel samples (the track at the fader's 1.0, centre pan).
+std::vector<float> renderWithEnvelope(bool multi, const automation::VolumeEnvelope& envelope, bool play = true)
+{
+    AudioEngine engine{nullptr};
+    engine.deviceChanged(48000.0, 512);
+    auto audio = constantAudio(48000);
+    auto snapshot = std::make_unique<EngineSnapshot>();
+    snapshot->multiMonitor = multi;
+    snapshot->tempo.set(120.0, 4, 4, 48000.0);
+    TrackRender track;
+    track.trackId = 1;
+    track.clips.push_back({audio.get(), 0, 48000, 0, 0, 0, 1.0f, true});
+    track.envelope = envelope;
+    snapshot->tracks.push_back(std::move(track));
+    snapshot->keepAudio.push_back(audio);
+    engine.publishPlayback(std::move(snapshot));
+    if (play) CHECK(engine.post({EngineCommand::Type::Play}));
+    float left[512]{}, right[512]{};
+    float* out[]{left, right};
+    AudioIO io{{nullptr, 0, 0}, {out, 2, 512}, nullptr, 512};
+    engine.renderBlock(io);
+    engine.stop();
+    return {left, left + 512};
+}
+} // namespace
+
+TEST(audioengine_midi, volume_envelope_fades_the_track_and_bypass_leaves_it_alone)
+{
+    using automation::envelopescale::unityLevel;
+    for (bool multi : {false, true}) {
+        automation::VolumeEnvelope none;
+        const auto plain = renderWithEnvelope(multi, none);
+        CHECK_NEAR(plain[0], 0.5f, 1e-5);
+        CHECK_NEAR(plain[511], 0.5f, 1e-5);
+
+        // A fade from 0 dB at sample 0 to silence at sample 512.
+        automation::VolumeEnvelope fade;
+        CHECK(fade.addPoint(0, unityLevel()) == 0);
+        CHECK(fade.addPoint(512, 0.0) == 1);
+        const auto faded = renderWithEnvelope(multi, fade);
+        CHECK_NEAR(faded[0], 0.5f, 1e-5);
+        for (int i = 1; i < 512; ++i) {
+            CHECK(faded[i] <= faded[i - 1] + 1e-7f);   // only goes down
+            CHECK_NEAR(faded[i], float(0.5 * fade.gainAt(i)), 1e-5);   // the drawn line's scale
+        }
+        CHECK(faded[500] < 0.001f);
+
+        fade.setBypassed(true);
+        const auto bypassed = renderWithEnvelope(multi, fade);
+        for (int i = 0; i < 512; ++i) CHECK_NEAR(bypassed[i], plain[i], 1e-6);
+
+        // A boost: +6 dB everywhere doubles the level (0.5 -> about 1.0).
+        automation::VolumeEnvelope boost;
+        boost.addPoint(0, 1.0);
+        const auto boosted = renderWithEnvelope(multi, boost);
+        CHECK_NEAR(boosted[100], float(0.5 * std::pow(10.0, 6.0 / 20.0)), 1e-4);
     }
 }
