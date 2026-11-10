@@ -1,13 +1,18 @@
 #include "effectchain.h"
 #include "instruments/instrumentcatalog.h"
+#include "plugins/mixfx/mixfxspec.h"
 
 #include <algorithm>
 #include <array>
 
 namespace {
-constexpr std::array<EffectDefinition, 8> catalog{{
+constexpr std::array<EffectDefinition, 12> catalog{{
     {effectchain::Eq, "Equalizer", "10-band tone shaping", true, true},
     {effectchain::ChaosEq, "Chaos EQ", "Parametric EQ, up to 24 bands", true, true},
+    {mixfx::Compressor, "Compressor", "Evens out loud and quiet parts", true, true},
+    {mixfx::DeEsser, "De-esser", "Tames harsh s and sh sounds", true, true},
+    {mixfx::Reverb, "Reverb", "Room, plate or hall", true, true},
+    {mixfx::ChaosVerb, "Chaos Verb", "Lush reverb: spaces, eras and movement", true, true},
     {effectchain::GuitarSuite, "GuitarSuite", "Pedals and signal chain", false, false},
     {effectchain::Harmonium, "Harmonium", "Stops, bellows and drones", false, false},
     {effectchain::DrumKit, "Drum kit", "Room, levels and character", false, false},

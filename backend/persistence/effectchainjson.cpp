@@ -5,6 +5,7 @@
 #include "drumkitjson.h"
 #include "electrodrumsjson.h"
 #include "harmoniumjson.h"
+#include "mixfxjson.h"
 #include "pianojson.h"
 #include "plugins/effectchain.h"
 #include "plugins/eq/tenbandeq.h"
@@ -98,6 +99,9 @@ ChainFile capture(const Track& track, const json& guitarSuite)
         } else if (slot.type == effectchain::GuitarSuite) {
             e.settings = guitarSuite.is_object() ? guitarSuite : json::object();
         }
+        else if (mixfx::find(slot.type)) {
+            e.settings = mixfxjson::toJson(track.mixEffect(slot.type));
+        }
         chain.effects.push_back(std::move(e));
     }
     return chain;
@@ -164,6 +168,11 @@ bool planImport(const Track& target, const ChainFile& chain, ImportPlan& plan, s
             p.chords = v;
         } else if (e.type == effectchain::GuitarSuite) {
             if (!s.empty()) p.guitarSuite = s;               // the pedalboard checks itself on load
+        }
+        else if (mixfx::find(e.type)) {
+            mixfx::Settings v;
+            if (!mixfxjson::fromJson(e.type, s, v, why)) return bad(why);
+            p.mixEffects[e.type] = v;
         }
         fromFile.push_back(e.type);
         p.kept.push_back(title);

@@ -14,8 +14,9 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 
 
 NEXT UP (2026-11-10), the user's order:
-  1. G6 volume envelope committed (0597318); G6b curve shapes DONE 2026-11-10, not committed.
-  2. G7 mixing plugins (compressor, VintageVerb-style reverb, de-esser, plain reverb ...).
+  1. G6 volume envelope committed (0597318); G6b curve shapes committed (758f523).
+  2. G7 mixing plugins: compressor, de-esser, reverb, Chaos Verb DONE 2026-11-10, NOT
+     COMMITTED (the user is testing). Still to pick: the "etc" tools (delay, saturation...).
   3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
      reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
      inside this group is to be confirmed with the user.
@@ -131,18 +132,55 @@ Done items stay further down as the record.
         volume_envelope_lane_edits_points_bypasses_and_keeps_rows_aligned (Shift+right-click
         menu; waits 300 ms for the menu to open before clicking: an immediate click was
         sometimes lost in the test). App run with throwaway settings: empty log.
-[ ] G7  More plugins (the user, 2026-11-10): for any track, mostly for vocals. Today a track's
-        FX list offers only the 10-band EQ, Chaos EQ and gain; the guitar pedals (incl. a
-        compressor and a reverb) live inside GuitarSuite only. Wanted:
-        - a good compressor;
-        - a good alternative to Valhalla VintageVerb (lush algorithmic reverb with modes /
-          eras / colour);
-        - a de-esser;
-        - a reverb (a plainer room / plate / hall);
-        - "etc": other vocal / mixing tools; ask the user which (e.g. delay, saturation,
-          limiter, gate) when this is planned.
-        Not planned yet: plan with the user first (which one first, controls, look of each FX
-        page, renders to listen to). Hand-written DSP (from-scratch rule).
+[x] G7  Mixing plugins for any track, mostly for vocals (the user, 2026-11-10). DONE 2026-11-10
+        (uncommitted): Compressor, De-esser, Reverb, Chaos Verb (the VintageVerb-style lush
+        reverb; name chosen by the user). The "etc" tools (delay, saturation, limiter, gate...)
+        are still to be picked by the user.
+        - backend/plugins/mixfx/mixfxspec: each plugin's controls once (slider / choice / switch,
+          range, default, unit, card); Settings {bypassed, values}; defaults / sanitize.
+          mixeffect: the base processor (parameters from the spec + "bypass", a 20 ms bypass
+          crossfade, a fully bypassed effect does no work and restarts clean, reductionDb for
+          meters). mixfxfactory: create(type).
+        - Compressor (plugins/compressor/mixcompressor, class MixCompressor: the guitar pedal is
+          Compressor): Clean (peak), Smooth (RMS, release up to 3x slower while held), Punchy
+          (feedback; slope ratio - 1 so the ratio means the same, step capped so the loop
+          settles); soft knee (plugins/dynamics/gaincomputer), detector low cut, auto makeup =
+          half of a full-scale signal's reduction, linear Mix (parallel compression).
+        - De-esser (plugins/deesser): a 12 dB/oct high-pass at Frequency detects; Split mode is a
+          dynamic 24 dB/oct high shelf centred on Frequency (a "band + (g - 1)" split was tried:
+          the high-pass's phase near its corner made it barely cut); Wide dips everything;
+          Listen plays the detected band; Range caps the cut.
+        - Reverb (plugins/reverb/roomreverb, class RoomReverb) and Chaos Verb
+          (plugins/chaosverb): 8-line feedback delay networks with a Hadamard mix
+          (plugins/reverb/reverbcore: Delay, Allpass, OnePole, hadamard8, decayGain). Both mix
+          equal-power (the wet part does not correlate with the dry track). Reverb: Room / Plate
+          / Hall shapes, input allpasses, early reflections, damping in the loop, low / high cut
+          and width on the wet only. Chaos Verb: 7 modes x 3 colours (1970s dark and steady,
+          1980s bright and moving, Now full range), modulated line lengths, a diffuser per
+          line, 3-band decay (Bass / Treble decay multipliers), Early / late balance.
+        - Track::mixEffects (a vector of {type, settings}: Track stays constexpr-constructible),
+          Track::mixEffect(type) (defaults when never set); Project::setTrackMixEffect,
+          TrackList::mixEffect / setMixEffect (not undoable, like the EQs). Saved as
+          "mixEffects" in the project (optional), and in .chaosfx chains (planImport ->
+          ImportPlan::mixEffects; EngineController::importEffectChain applies them).
+        - Engine: SnapshotBuilder::TrackEffects::mixEffects / playbackMixEffects (every plugin,
+          made by makeMixEffects, settings by syncTrackEq), placed in the chain by type.
+          TrackListWrapper::mixEffectChanged -> EngineController applies to both instances (no
+          playback rebuild). EngineController::mixEffectReductionDb for the meter.
+        - wrapper/plugins/mixfx/mixfxwrap/MixEffectWrapper: cards / values / bypassed /
+          formatValue / step / reductionDb (polled ~30/s while metering).
+          frontend/plugins/mixfx/MixEffectEditor.qml: one page for all four, GuitarSuite look
+          (pedal cards, "name | slider | value" rows, double-click resets, ON / BYP chip, a gain
+          reduction card for the compressor and de-esser). TrackEffectsPanel shows it for any
+          type TrackListWrapper::isMixEffect says.
+        - tools/fxrender takes "mix.<type>:param=value,..."; renders of local-reference/voice/
+          voice.wav in renders/mixfx/ (git-ignored): compressor 1-4, deesser 0-2, reverb 1-3,
+          chaosverb 1-7, 00-voice-dry for comparison.
+        Tests: backendtests mixfxspec, mixcompressor, deesser, roomreverb, chaosverb, mixfxjson,
+        effectchain, effectchainjson, projectdocument, snapshotbuilder; wrappertests qtmixeffect;
+        transport_ui compressor / deesser / reverb / chaosverb _page_shows_its_cards_and_edits_the_track
+        (shared checkMixEffectPage) and track_effects_switch_in_place... (the picker now offers
+        the four). App run (offscreen, throwaway settings): empty log.
 
 -- From the Reaper comparison (the user picked these, 2026-11-10; none planned yet)
 [ ] G8  Clip fades and crossfades. AudioClip already has fadeIn / fadeOut (samples) but no

@@ -4,6 +4,7 @@
 #include "processor/trackinput.h"
 #include "plugins/eq/tenbandeq.h"
 #include "plugins/chaoseq/chaoseq.h"
+#include "plugins/mixfx/mixeffect.h"
 #include "session/project.h"
 #include "dsp/trackmeters.h"
 
@@ -15,6 +16,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <map>
 #include <vector>
 
 class SnapshotBuilder {
@@ -31,6 +33,10 @@ public:
         // Chaos EQ (plan 6.2), the same way: runs only when "chaoseq" is on the list.
         std::shared_ptr<ChaosEq> chaosEq;
         std::shared_ptr<ChaosEq> playbackChaosEq;
+        // The mixing plugins (restMap G7) by type, the same way: each runs only when its type
+        // is on the list. Made by makeMixEffects(); settings copied by syncTrackEq.
+        std::map<std::string, std::shared_ptr<MixEffect>, std::less<>> mixEffects;
+        std::map<std::string, std::shared_ptr<MixEffect>, std::less<>> playbackMixEffects;
         std::shared_ptr<Processor> chain;
         std::shared_ptr<Processor> playbackChain;
         int inputChannel = -1;
@@ -74,6 +80,8 @@ public:
     using ChannelConnector = std::function<int(const std::string& source)>;
     using ErrorCallback = std::function<std::string()>;
 
+    // A fresh, prepared monitor and playback instance of every mixing plugin (UI thread).
+    static void makeMixEffects(TrackEffects& effects, double sampleRate, int maxFrames);
     // Copy each track's EQ settings (10-band and Chaos EQ) into its EQ processors
     static void syncTrackEq(const Project& project, const MutableEffectResolver& effectLookup);
     static void syncTrackEq(const Project& project, std::unordered_map<int, TrackEffects>& effects);

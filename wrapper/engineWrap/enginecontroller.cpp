@@ -159,6 +159,26 @@ EngineController::~EngineController()
     m_recordingController.shutdown(nullptr, nullptr);
 }
 
+double EngineController::mixEffectReductionDb(int trackId, const QString& type) const
+{
+    const auto it = m_trackEffects.find(trackId);
+    if (it == m_trackEffects.end()) return 0.0;
+    float db = 0.0f;
+    for (const auto* set : {&it->second.mixEffects, &it->second.playbackMixEffects})
+        if (const auto effect = set->find(type.toStdString()); effect != set->end() && effect->second)
+            db = std::max(db, effect->second->reductionDb());
+    return db;
+}
+
+std::shared_ptr<MixEffect> EngineController::mixEffectProcessor(int trackId, const QString& type, bool playback) const
+{
+    const auto it = m_trackEffects.find(trackId);
+    if (it == m_trackEffects.end()) return nullptr;
+    const auto& set = playback ? it->second.playbackMixEffects : it->second.mixEffects;
+    const auto effect = set.find(type.toStdString());
+    return effect == set.end() ? nullptr : effect->second;
+}
+
 std::array<std::shared_ptr<ChaosEq>, 2> EngineController::chaosEqProcessors(int trackId) const
 {
     const auto it = m_trackEffects.find(trackId);
@@ -249,6 +269,7 @@ void EngineController::bindTrackEffects(int trackId, GuitarSuiteModel* model)
     fx.playbackEq = std::make_shared<TenBandEq>(); fx.playbackEq->prepare(rate, frames);
     fx.chaosEq = std::make_shared<ChaosEq>(); fx.chaosEq->prepare(rate, frames);
     fx.playbackChaosEq = std::make_shared<ChaosEq>(); fx.playbackChaosEq->prepare(rate, frames);
+    SnapshotBuilder::makeMixEffects(fx, rate, frames);   // restMap G7
     fx.model->configure(rate, frames);
     if (m_project) {
         const auto* track = m_project->project().findTrack(trackId);
@@ -450,6 +471,7 @@ bool EngineController::setBufferSize(int frames)
         fx.playbackEq=std::make_shared<TenBandEq>(); fx.playbackEq->prepare(m_engine->sampleRate(),frames);
         fx.chaosEq=std::make_shared<ChaosEq>(); fx.chaosEq->prepare(m_engine->sampleRate(),frames);
         fx.playbackChaosEq=std::make_shared<ChaosEq>(); fx.playbackChaosEq->prepare(m_engine->sampleRate(),frames);
+        SnapshotBuilder::makeMixEffects(fx, m_engine->sampleRate(), frames);   // fresh: the old ones may be playing
         fx.model->configure(m_engine->sampleRate(), frames);
         if (fx.instrument && m_project) {
             if (const auto* track = m_project->project().findTrack(id))
@@ -898,6 +920,17 @@ void EngineController::attachProject(TrackListWrapper* model) {
         if (!settings || it == m_trackEffects.end()) return;
         if (it->second.chaosEq) it->second.chaosEq->setSettings(*settings);
         if (it->second.playbackChaosEq) it->second.playbackChaosEq->setSettings(*settings);
+        if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
+    });
+    // Mixing plugin edits (restMap G7): into the track's processors; no playback rebuild.
+    connect(model, &TrackListWrapper::mixEffectChanged, this, [this](int trackId, const QString& type) {
+        if (!m_project) return;
+        const auto settings = m_project->domain().mixEffect(trackId, type.toStdString());
+        const auto it = m_trackEffects.find(trackId);
+        if (!settings || it == m_trackEffects.end()) return;
+        for (auto* set : {&it->second.mixEffects, &it->second.playbackMixEffects})
+            if (const auto effect = set->find(type.toStdString()); effect != set->end() && effect->second)
+                effect->second->apply(*settings);
         if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
     });
     // Harmonium edits: straight into the track's instrument; no playback rebuild.
@@ -1390,6 +1423,7 @@ QVariantMap EngineController::importEffectChain(int trackId, const QUrl& file)
     if (plan.electrodrums) m_project->setElectroDrums(trackId, *plan.electrodrums);
     if (plan.piano) m_project->setPiano(trackId, *plan.piano);
     if (plan.chords) m_project->setChords(trackId, *plan.chords);
+    for (const auto& [type, settings] : plan.mixEffects) m_project->setMixEffect(trackId, QString::fromStdString(type), settings);
     if (pedals && plan.guitarSuite && !pedals->restoreSessionData(QByteArray::fromStdString(plan.guitarSuite->dump())))
         return chainResult(false, QStringLiteral("The effects were replaced, but the GuitarSuite pedalboard in the file did not load."),
                            plan.kept, plan.skipped, chain.trackType);

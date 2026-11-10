@@ -5,6 +5,7 @@
 #include "instruments/harmonium/harmonium.h"
 #include "instruments/piano/piano.h"
 #include "dsp/panlaw.h"
+#include "plugins/mixfx/mixfxfactory.h"
 
 SnapshotBuilder::Context SnapshotBuilder::Context::fromProject(const Project& project)
 {
@@ -33,6 +34,20 @@ SnapshotBuilder::Context SnapshotBuilder::Context::fromProject(const Project& pr
     return ctx;
 }
 
+void SnapshotBuilder::makeMixEffects(TrackEffects& effects, double sampleRate, int maxFrames)
+{
+    effects.mixEffects.clear();
+    effects.playbackMixEffects.clear();
+    for (const auto& spec : mixfx::all()) {
+        for (auto* set : {&effects.mixEffects, &effects.playbackMixEffects}) {
+            auto effect = mixfx::create(spec.type);
+            if (!effect) continue;
+            effect->prepare(sampleRate, maxFrames);
+            set->emplace(std::string(spec.type), std::move(effect));
+        }
+    }
+}
+
 void SnapshotBuilder::syncTrackEq(const Project& project, const MutableEffectResolver& effectLookup)
 {
     if (!effectLookup) return;
@@ -45,6 +60,9 @@ void SnapshotBuilder::syncTrackEq(const Project& project, const MutableEffectRes
         }
         if (fx->chaosEq) fx->chaosEq->setSettings(track->chaosEq);
         if (fx->playbackChaosEq) fx->playbackChaosEq->setSettings(track->chaosEq);
+        for (auto* set : {&fx->mixEffects, &fx->playbackMixEffects})
+            for (auto& [type, effect] : *set)
+                if (effect) effect->apply(track->mixEffect(type));
         if (fx->instrument && fx->instrument->typeId() == "harmonium")
             static_cast<Harmonium&>(*fx->instrument).setSettings(track->harmonium);
         if (fx->instrument && fx->instrument->typeId() == "drumkit")
@@ -252,6 +270,10 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
                         if (type == effectchain::Eq) processor = playback ? fx->playbackEq : fx->eq;
                         else if (type == effectchain::ChaosEq) processor = playback ? fx->playbackChaosEq : fx->chaosEq;
                         else if (type == effectchain::GuitarSuite) processor = playback ? fx->playbackChain : fx->chain;
+                        else {
+                            const auto& set = playback ? fx->playbackMixEffects : fx->mixEffects;
+                            if (const auto it = set.find(type); it != set.end()) processor = it->second;
+                        }
                         if (!processor) continue;
                         out.push_back(processor.get());
                         snapshot->keepProcessors.push_back(std::move(processor));

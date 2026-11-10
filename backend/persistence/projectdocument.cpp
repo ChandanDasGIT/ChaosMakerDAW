@@ -1,5 +1,6 @@
 #include "projectdocument.h"
 #include "chaoseqjson.h"
+#include "mixfxjson.h"
 #include "drumkitjson.h"
 #include "electrodrumsjson.h"
 #include "pianojson.h"
@@ -88,6 +89,11 @@ std::string ProjectDocument::serialize(const Project& project,
         trackObj["recordDry"] = track->recordDry;
         trackObj["eq"] = eqJson;
         trackObj["chaosEq"] = chaoseqjson::toJson(track->chaosEq);   // plan 6.2
+        if (!track->mixEffects.empty()) {   // restMap G7
+            json mix = json::object();
+            for (const auto& [type, settings] : track->mixEffects) mix[type] = mixfxjson::toJson(settings);
+            trackObj["mixEffects"] = std::move(mix);
+        }
         if (track->type == "Harmonium") trackObj["harmonium"] = harmoniumjson::toJson(track->harmonium);
         if (track->type == "Drums") trackObj["drumkit"] = drumkitjson::toJson(track->drumkit);
         if (track->type == "Electronic Drums")
@@ -280,6 +286,17 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             if (!valid || !candidate.setTrackEffects(track.id, types)) {
                 error = "Invalid track effects.";
                 return false;
+            }
+        }
+
+        // Optional: files saved before the mixing plugins (restMap G7) have none.
+        if (item.contains("mixEffects")) {
+            const auto& mix = item["mixEffects"];
+            if (!mix.is_object()) { error = "Invalid mixing effect settings."; return false; }
+            for (const auto& [type, settingsJson] : mix.items()) {
+                mixfx::Settings settings;
+                if (!mixfxjson::fromJson(type, settingsJson, settings, error)) return false;
+                candidate.setTrackMixEffect(track.id, type, settings);
             }
         }
 

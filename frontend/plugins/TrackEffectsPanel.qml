@@ -317,7 +317,8 @@ Window {
                             : root.selectedEffect === "drumkit" ? 4
                             : root.selectedEffect === "electrodrums" ? 5
                             : root.selectedEffect === "piano" ? 6
-                            : root.selectedEffect === "chords" ? 7 : 8
+                            : root.selectedEffect === "chords" ? 7
+                            : root.trackModel && root.trackModel.isMixEffect(root.selectedEffect) ? 8 : 9
                 Tenbandeq {
                     trackModel: root.trackModel
                     trackId: root.trackId
@@ -391,6 +392,15 @@ Window {
                         trackId: root.trackId
                         trackName: root.trackName
                     }
+                }
+                // The mixing plugins (restMap G7) share one page, filled from the backend spec.
+                MixEffectEditor {
+                    objectName: "trackMixEffect"
+                    trackModel: root.trackModel
+                    trackId: root.trackId
+                    trackName: root.trackName
+                    effectType: root.trackModel && root.trackModel.isMixEffect(root.selectedEffect) ? root.selectedEffect : ""
+                    active: root.visible && effectType !== ""
                 }
                 Item {
                     Text {

@@ -6,6 +6,9 @@
 #include "instruments/piano/pianosettings.h"
 #include "plugins/chaoseq/chaoseqsettings.h"
 #include "plugins/chordplayer/chordsettings.h"
+#include "plugins/mixfx/mixfxspec.h"
+
+#include <map>
 
 #include <nlohmann/json.hpp>
 
@@ -65,6 +68,7 @@ struct ImportPlan {
     std::optional<piano::Settings> piano;
     std::optional<chords::Settings> chords;
     std::optional<nlohmann::json> guitarSuite;
+    std::map<std::string, mixfx::Settings> mixEffects;   // restMap G7, by type
 };
 // False (and nothing planned) when an effect that applies has settings that do not read.
 bool planImport(const Track& target, const ChainFile& chain, ImportPlan& plan, std::string& error);

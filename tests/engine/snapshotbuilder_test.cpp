@@ -645,3 +645,37 @@ TEST(snapshotbuilder, volume_envelope_reaches_the_track_render)
     CHECK(!bypassed->tracks[1].envelope.active());
     CHECK_NEAR(bypassed->tracks[1].envelope.gainAt(4800), 1.0, 1e-9);
 }
+
+TEST(snapshotbuilder, a_mixing_plugin_runs_at_its_place_in_the_chain_with_the_tracks_settings)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    auto& vocal = project.addTrack(TrackKind::Audio, "Vox");
+    vocal.type = "Vocal";
+    CHECK(project.setTrackEffects(vocal.id, {"chaoseq", "compressor"}));
+    auto settings = mixfx::defaults(mixfx::Compressor);
+    settings.values["ratio"] = 10;
+    CHECK(project.setTrackMixEffect(vocal.id, mixfx::Compressor, settings));
+
+    SnapshotBuilder::TrackEffects fx;
+    fx.chaosEq = std::make_shared<ChaosEq>();
+    fx.playbackChaosEq = std::make_shared<ChaosEq>();
+    SnapshotBuilder::makeMixEffects(fx, 48000.0, 256);
+    CHECK(fx.mixEffects.size() == mixfx::all().size() && fx.playbackMixEffects.size() == mixfx::all().size());
+    std::unordered_map<int, SnapshotBuilder::TrackEffects> effects{{vocal.id, fx}};
+    SnapshotBuilder::syncTrackEq(project, effects);
+    CHECK(fx.mixEffects.at("compressor")->parameter("ratio")->get() == 10.0f);
+    CHECK(fx.playbackMixEffects.at("compressor")->parameter("ratio")->get() == 10.0f);
+
+    auto snapshot = SnapshotBuilder::buildPlaybackSnapshot(project, nullptr,
+        [&](int id) -> const SnapshotBuilder::TrackEffects* { return id == vocal.id ? &fx : nullptr; }, false);
+    const auto& chain = snapshot->tracks[0].monitorChain;
+    CHECK(chain.size() == 2);
+    CHECK(chain.size() == 2 && chain[0] == fx.chaosEq.get() && chain[1] == fx.mixEffects.at("compressor").get());
+
+    // Off the list: it does not run.
+    CHECK(project.setTrackEffects(vocal.id, {"chaoseq"}));
+    auto without = SnapshotBuilder::buildPlaybackSnapshot(project, nullptr,
+        [&](int id) -> const SnapshotBuilder::TrackEffects* { return id == vocal.id ? &fx : nullptr; }, false);
+    CHECK(without->tracks[0].monitorChain.size() == 1);
+}

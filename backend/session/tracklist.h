@@ -99,6 +99,10 @@ public:
     Change setStripWidth(int id, double width);
     Change setEqBand(int id, int band, double gainDb);
     Change setChaosEq(int id, const chaoseq::Settings& settings);
+    // Mixing plugins (restMap G7): a track's settings for one type (defaults when never set);
+    // nullopt for a bad track or type. Not undoable, like the EQs.
+    std::optional<mixfx::Settings> mixEffect(int id, std::string_view type) const;
+    Change setMixEffect(int id, std::string_view type, const mixfx::Settings& settings);
     Change setHarmonium(int id, const harmonium::Settings& settings);
     Change setDrumKit(int id, const drumkit::Settings& settings);
     Change setElectroDrums(int id, const electrodrums::Settings& settings);

@@ -92,6 +92,10 @@ public:
     // The track's two Chaos EQ processors (monitor, playback); null entries when the track has
     // none yet. For ChaosEqWrapper's analyzer. Instances are replaced when the buffer changes.
     std::array<std::shared_ptr<ChaosEq>, 2> chaosEqProcessors(int trackId) const;
+    // Mixing plugins (restMap G7): the gain reduction now (dB, the larger of the monitor and
+    // playback instances) for a page's meter, and the processors themselves (tests).
+    Q_INVOKABLE double mixEffectReductionDb(int trackId, const QString& type) const;
+    std::shared_ptr<MixEffect> mixEffectProcessor(int trackId, const QString& type, bool playback) const;
     // The instrument track's instrument; null for other tracks. It is prepared once, when it is
     // made, and replaced (never re-prepared) when the buffer changes: the audio thread may be
     // running it.

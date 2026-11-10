@@ -259,6 +259,19 @@ TrackList::Change TrackList::setChaosEq(int id, const chaoseq::Settings& setting
 {
     return result(m_project.setTrackChaosEq(id, settings));
 }
+std::optional<mixfx::Settings> TrackList::mixEffect(int id, std::string_view type) const
+{
+    const auto* track = m_project.findTrack(id);
+    if (!track || !mixfx::find(type)) return std::nullopt;
+    return track->mixEffect(type);
+}
+TrackList::Change TrackList::setMixEffect(int id, std::string_view type, const mixfx::Settings& settings)
+{
+    const auto before = mixEffect(id, type);
+    if (!before) return {};
+    if (!m_project.setTrackMixEffect(id, type, settings)) return {};
+    return {true, *before != *mixEffect(id, type)};
+}
 TrackList::Change TrackList::setHarmonium(int id, const harmonium::Settings& settings)
 {
     return result(m_project.setTrackHarmonium(id, settings));

@@ -351,7 +351,7 @@ TEST(projectdocument, track_effects_round_trip_old_files_get_defaults_and_bad_li
     for (const auto& [type, field] : std::vector<std::pair<std::string, std::string>>{
              {"Vocal", R"(,"effects":["guitarsuite"])"},   // only guitars have GuitarSuite
              {"Vocal", R"(,"effects":["eq","eq"])"},       // each effect at most once
-             {"Vocal", R"(,"effects":["reverb"])"},        // unknown effect
+             {"Vocal", R"(,"effects":["flanger"])"},       // unknown effect
              {"Vocal", R"(,"effects":"eq")"},              // not a list
              {"Vocal", R"(,"effects":[1])"}}) {            // not a type name
         CHECK(!ProjectDocument::deserialize(document(type, field), loaded, error, 48000.0));
@@ -413,4 +413,34 @@ TEST(projectdocument, volume_envelope_round_trips_is_optional_and_rescales_with_
         CHECK(!ProjectDocument::deserialize(document(bad), loaded, error, 48000.0));
         CHECK(error == "Invalid volume envelope.");
     }
+}
+
+TEST(projectdocument, mixing_plugin_settings_round_trip_and_are_optional)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    auto& track = project.addTrack(TrackKind::Audio, "Vox");
+    auto settings = mixfx::defaults(mixfx::Compressor);
+    settings.values["threshold"] = -24;
+    settings.bypassed = true;
+    CHECK(project.setTrackMixEffect(track.id, mixfx::Compressor, settings));
+    CHECK(!project.setTrackMixEffect(track.id, "eq", settings));
+    const std::string json = ProjectDocument::serialize(project, {}, {""});
+
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(json, loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->mixEffect(mixfx::Compressor) == settings);
+
+    const auto document = [](const std::string& field) {
+        return R"({"format":"ChaosMakerProject","version":2,"project":{"version":1,"bpm":120.0,
+            "sampleRate":48000.0,"numerator":4,"denominator":4,"tracks":[{"name":"T1","type":"Audio",
+            "volume":1.0)" + field + R"(,"eq":[0,0,0,0,0,0,0,0,0,0],"clips":[]}]},"trackEffects":[""]})";
+    };
+    CHECK(ProjectDocument::deserialize(document(""), loaded, error, 48000.0));   // saved before G7
+    CHECK(loaded.project.tracks()[0]->mixEffects.empty());
+    CHECK(loaded.project.tracks()[0]->mixEffect(mixfx::Compressor) == mixfx::defaults(mixfx::Compressor));
+    for (const char* bad : {R"(,"mixEffects":[])", R"(,"mixEffects":{"flanger":{}})",
+                            R"(,"mixEffects":{"compressor":{"values":{"ratio":"x"}}})"})
+        CHECK(!ProjectDocument::deserialize(document(bad), loaded, error, 48000.0));
 }

@@ -1,4 +1,6 @@
 #include <QtTest>
+#include <QStyleHints>
+#include "plugins/mixfx/mixfxspec.h"
 #include "wrapper/engineWrap/enginecontroller.h"
 #include "wrapper/settings/appsettingswrap/appsettingswrapper.h"
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
@@ -1126,7 +1128,12 @@ private slots:
         addEffectFromPicker("eq");
         QVERIFY(visualItem(window->contentItem(),"addEffectButton")->isEnabled());            // Chaos EQ is still offered
         addEffectFromPicker("chaoseq");
+        QVERIFY(visualItem(window->contentItem(),"addEffectButton")->isEnabled());            // the mixing plugins (G7)
+        for(const char* mix:{"compressor","deesser","reverb","chaosverb"}) addEffectFromPicker(mix);
         QVERIFY(!visualItem(window->contentItem(),"addEffectButton")->isEnabled());           // nothing left to add
+        for(const char* mix:{"compressor","deesser","reverb","chaosverb"}) {                    // back to the guitar's chain
+            click(visualItem(window->contentItem(),QString("removeEffect_")+mix)); QTRY_VERIFY(!row(mix));
+        }
         click(visualItem(window->contentItem(),"removeEffect_chaoseq"));
         QTRY_VERIFY(!row("chaoseq"));
         click(row("guitarsuite")); QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("guitarsuite"));
@@ -2287,6 +2294,68 @@ private slots:
         // Closed: the analyzer stops listening.
         QTRY_VERIFY(!controller->chaosEqProcessors(vocal)[0]->analyzerListening());
         list->setVisible(false); list->setProperty("trackModel",QVariant());
+    }
+    // A mixing plugin's page (restMap G7), as a user meets it: added from the picker on a vocal
+    // track, its cards shown, a slider moved and reset, a choice picked, bypass switched.
+    void checkMixEffectPage(const QString& type,const QStringList& cards,const QString& slider,const QString& choice,bool meter) {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks); const int vocal=tracks.addVocalTrack();
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        const auto restore=qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel",QVariant()); });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QTest::qWait(30);
+        auto* fxButton=visualItem(list,"trackFxButton"+QString::number(vocal)); QVERIFY(fxButton); click(fxButton);
+        auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(vocal)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        addEffectFromPicker(type);
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),type);
+        auto* page=visualItem(window->contentItem(),"trackMixEffect"); QVERIFY(page); QTRY_VERIFY(page->isVisible());
+        for(const auto& card:cards) {
+            auto* item=visualItem(page,"mixEffectCard_"+card); QVERIFY2(item,qPrintable(card)); QTRY_VERIFY(item->isVisible());
+        }
+        auto* meterCard=visualItem(page,"mixEffectMeter"); QVERIFY(meterCard); QCOMPARE(meterCard->isVisible(),meter);
+        const auto settings=[&] { return *tracks.mixEffect(vocal,type.toStdString()); };
+        const auto defaults=mixfx::defaults(type.toStdString());
+        // Click near the slider's right end: the value jumps there, the engine follows.
+        auto* bar=visualItem(page,type+"."+slider); QVERIFY(bar); QTRY_VERIFY(bar->isVisible());
+        QTest::mouseClick(fxWindow(),Qt::LeftButton,Qt::NoModifier,bar->mapToScene(QPointF(bar->width()*0.9,bar->height()/2)).toPoint());
+        QTRY_VERIFY(settings().values.at(slider.toStdString())!=defaults.values.at(slider.toStdString()));
+        QTRY_COMPARE(controller->mixEffectProcessor(vocal,type,true)->parameter(slider.toStdString())->get(),
+                     settings().values.at(slider.toStdString()));
+        auto* valueText=visualItem(page,type+"."+slider+".value"); QVERIFY(valueText);
+        QVERIFY(!valueText->property("text").toString().isEmpty());
+        // Double-click: back to its default.
+        QTest::qWait(qApp->styleHints()->mouseDoubleClickInterval()+50);
+        QTest::mouseDClick(fxWindow(),Qt::LeftButton,Qt::NoModifier,bar->mapToScene(QPointF(bar->width()*0.9,bar->height()/2)).toPoint());
+        QTRY_COMPARE(settings().values.at(slider.toStdString()),defaults.values.at(slider.toStdString()));
+        // A choice: pick its second entry.
+        if(!choice.isEmpty()) {
+            auto* combo=visualItem(page,type+"."+choice+".choice"); QVERIFY(combo); QVERIFY(combo->isVisible());
+            QMetaObject::invokeMethod(combo,"activated",Q_ARG(int,1));
+            QTRY_COMPARE(settings().values.at(choice.toStdString()),1.0f);
+            combo->setProperty("currentIndex",1);
+        }
+        // Bypass on the header, then back on.
+        auto* bypass=visualItem(page,"mixEffectBypass"); QVERIFY(bypass);
+        click(bypass); QTRY_VERIFY(settings().bypassed);
+        QCOMPARE(bypass->property("text").toString(),QString("BYP"));
+        QTRY_COMPARE(controller->mixEffectProcessor(vocal,type,false)->parameter("bypass")->get(),1.0f);
+        click(bypass); QTRY_VERIFY(!settings().bypassed);
+        if(auto* quick=qobject_cast<QQuickWindow*>(fxWindow())) QVERIFY(quick->grabWindow().save("/tmp/chaosmaker-mixfx-"+type+".png"));
+        auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!panel->property("visible").toBool());
+    }
+    void compressor_page_shows_its_cards_and_edits_the_track() {
+        checkMixEffectPage("compressor",{"Compressor","Timing","Output"},"threshold","style",true);
+    }
+    void deesser_page_shows_its_cards_and_edits_the_track() {
+        checkMixEffectPage("deesser",{"Detection","Reduction"},"frequency","mode",true);
+    }
+    void reverb_page_shows_its_cards_and_edits_the_track() {
+        checkMixEffectPage("reverb",{"Space","Tone","Output"},"decay","type",false);
+    }
+    void chaosverb_page_shows_its_cards_and_edits_the_track() {
+        checkMixEffectPage("chaosverb",{"Character","Space","Movement","Tone"},"decay","mode",false);
     }
     void double_click_empty_track_area_adds_vocals_without_interfering_with_renaming() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
