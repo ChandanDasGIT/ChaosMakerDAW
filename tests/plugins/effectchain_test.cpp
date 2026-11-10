@@ -34,16 +34,17 @@ TEST(effectchain, eq_is_added_once_and_guitarsuite_is_fixed)
     CHECK(!effectchain::canAdd(chain, "guitarsuite"));   // only placed on guitar tracks at creation
     CHECK(!effectchain::canAdd(chain, "flanger"));       // unknown type
     using Types = std::vector<std::string_view>;
-    CHECK(effectchain::addableEffects(chain) == (Types{"eq", "chaoseq", "compressor", "deesser", "reverb", "chaosverb"}));   // picker order
+    CHECK(effectchain::addableEffects(chain) == (Types{"eq", "chaoseq", "compressor", "deesser", "reverb", "chaosverb", "delay", "limiter", "saturation", "gate"}));   // picker order
     chain.push_back({1, "eq"});
     CHECK(!effectchain::canAdd(chain, "eq"));            // one set of EQ bands per track
-    CHECK(effectchain::addableEffects(chain) == (Types{"chaoseq", "compressor", "deesser", "reverb", "chaosverb"}));
+    CHECK(effectchain::addableEffects(chain) == (Types{"chaoseq", "compressor", "deesser", "reverb", "chaosverb", "delay", "limiter", "saturation", "gate"}));
     chain.push_back({2, "chaoseq"});                     // Chaos EQ sits beside the 10-band EQ
     CHECK(!effectchain::canAdd(chain, "chaoseq"));
     chain.push_back({3, "compressor"});                  // mixing plugins (restMap G7), once each
     chain.push_back({4, "deesser"});
     chain.push_back({5, "reverb"});
     chain.push_back({6, "chaosverb"});
+    for (const char* type : {"delay", "limiter", "saturation", "gate"}) chain.push_back({int(chain.size()) + 1, type});
     CHECK(!effectchain::canAdd(chain, "compressor"));
     CHECK(effectchain::canRemove("compressor"));
     CHECK(effectchain::addableEffects(chain).empty());

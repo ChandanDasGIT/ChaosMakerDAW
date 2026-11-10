@@ -73,6 +73,7 @@ void TakeRecorder::run() {
             for (std::size_t i = 0; i < count; i += m_channels)
                 for (unsigned c = 0; c < m_channels; ++c)
                     result->channels[c].push_back(buffer[i + c]);
+            m_livePeaks.append(buffer.data(), count / m_channels, m_channels);
             result->frames += std::int64_t(count / m_channels);
         }
         result->buildWaveform();

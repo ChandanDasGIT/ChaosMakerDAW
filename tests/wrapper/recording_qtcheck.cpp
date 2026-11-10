@@ -919,3 +919,33 @@ TEST(qtrecording, instrument_is_prepared_once_and_replaced_when_the_buffer_chang
     controller.sendLiveNoteOff(piano,60);
     controller.shutdownSession();
 }
+
+TEST(qtrecording, the_waveform_of_a_take_grows_while_it_records) {
+    Storage storage;
+    auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
+    EngineController controller(std::move(device),false); TrackListWrapper tracks;
+    controller.attachProject(&tracks);
+    const int vocal=tracks.addVocalTrack(); CHECK(setCaptureAndMonitor(tracks,vocal,true));
+    tick(); io->process();
+    CHECK(controller.recordingWaveform(vocal,10).isEmpty());   // not recording
+    for(int i=0;i<128;++i) io->input[i]=(i%2 ? 0.5f : -0.5f);
+    controller.transportAction("record"); io->process();
+    CHECK(controller.recording());
+    const auto framesShown=[&] {
+        QVariantList peaks; for(int i=0;i<100 && (peaks=controller.recordingWaveform(vocal,4)).isEmpty();++i) tick(5);
+        return peaks;
+    };
+    for(int i=0;i<8;++i) io->process();
+    auto first=framesShown();
+    CHECK(first.size()==4);
+    if(!first.isEmpty()) { CHECK_NEAR(first[0].toList()[0].toDouble(),-0.5,1e-6); CHECK_NEAR(first[0].toList()[1].toDouble(),0.5,1e-6); }
+    for(int i=0;i<200;++i) io->process();
+    tick(30);
+    CHECK(controller.recordingWaveform(vocal,4,0.5,1.0).size()==4);   // a part of it
+    CHECK(controller.recordingWaveform(9999,4).isEmpty());
+    controller.transportAction("stop"); io->process();
+    for(int i=0;i<100 && controller.takeBusy();++i) tick(10);
+    CHECK(controller.recordingWaveform(vocal,4).isEmpty());          // the clip takes over
+    CHECK(tracks.clips().size()==1);
+    controller.shutdownSession();
+}

@@ -111,6 +111,10 @@ public:
     int countInBeatsRemaining() const;
     bool takeBusy() const { return m_recordingController.isBusy(); }
     QVariantList recordingTracks() const;
+    // The waveform recorded so far on a track, [[min, max], ...] in `bins` columns covering
+    // from..to (0..1 of what is recorded), for the timeline's recording box (live, like
+    // Reaper); empty when the track is not recording audio.
+    Q_INVOKABLE QVariantList recordingWaveform(int trackId, int bins, double from = 0.0, double to = 1.0) const;
     QVariantList monitoredTracks() const;
     double positionBeats() const;
     double positionSeconds() const;

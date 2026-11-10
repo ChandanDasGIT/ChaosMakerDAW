@@ -8,6 +8,9 @@ Item {
     property int timeSignatureDenominator: 4
     property real bpm: 120
     property alias snapMode: editor.snapMode // Backend-owned bars/beats/subdivision/off choice.
+    // The magnets for the playhead and the time selection (Preferences > Timeline; off by default).
+    property alias snapPlayhead: editor.snapPlayhead
+    property alias snapSelection: editor.snapSelection
     TimelineWrapper {
         id: editor
         trackModel: root.trackModel ?? null
@@ -744,9 +747,12 @@ Item {
             cursorShape: Qt.PointingHandCursor
         }
 
-        // Dragging selects a range. Navigation is through the scrollbars, not by dragging
-        // the arrangement background.
+        // Dragging selects a range, and the playhead follows the pointer (also while playing)
+        // and stays where the mouse is let go, like Reaper's edit cursor; a click puts it there.
+        // Shift-drag box-selects clips and leaves the playhead alone. Navigation is through the
+        // scrollbars, not by dragging the arrangement background.
         MouseArea {
+            objectName: "timelineBackground"
             x: 0; y: root.rulerHeight; width: root.contentWidth; height: scroll.contentHeight - root.rulerHeight; z: 1
             acceptedButtons: Qt.LeftButton
             onPressed: mouse => {
@@ -754,10 +760,14 @@ Item {
                 if (root.trackModel && lane >= 0 && lane < root.trackModel.count) {
                     root.trackModel.selectTrack(root.trackModel.trackIdAt(lane))
                 }
-                root.beginSelection(mouse.x, mouse.y, !!(mouse.modifiers & Qt.ShiftModifier))
+                const clips = !!(mouse.modifiers & Qt.ShiftModifier)
+                root.beginSelection(mouse.x, mouse.y, clips)
+                if (!clips) editor.seek(mouse.x / root.beatWidth)
             }
             onPositionChanged: mouse => {
-                if (pressed) { root.updateSelection(mouse.x, mouse.y) }
+                if (!pressed) return
+                root.updateSelection(mouse.x, mouse.y)
+                if (!root.clipSelectionDrag) editor.seek(Math.max(0, mouse.x) / root.beatWidth)
             }
             onReleased: root.finishSelection()
             onCanceled: { editor.cancelSelection() }
@@ -824,6 +834,7 @@ Item {
         Repeater {
           model: root.recording ? root.transport.recordingTracks : []
           delegate: Rectangle {
+            id: recordingBox
             required property int modelData
             objectName: "recordingPreview" + modelData
             visible: !!root.trackModel
@@ -833,6 +844,35 @@ Item {
             height: root.laneHeight - 18
             color: Theme.recordActiveBg; border.color: Theme.record; radius: 4; z: 3
             Text { anchors.left: parent.left; anchors.leftMargin: 8; anchors.top: parent.top; anchors.topMargin: 8; text: "Recording…"; color: Theme.text }
+            // The take's waveform as it is recorded (live, like Reaper's), laid out like a clip's.
+            // Only the visible part is fetched and painted; it refreshes as the box grows.
+            Canvas {
+                id: liveWaveform
+                objectName: "recordingWaveform" + recordingBox.modelData
+                x: Math.max(0, scroll.contentX - recordingBox.x)
+                y: 30
+                width: Math.max(0, Math.min(recordingBox.width, scroll.contentX + scroll.width - recordingBox.x) - x)
+                height: Math.max(0, recordingBox.height - 38)
+                property var peaks: width >= 1 && recordingBox.width > 0
+                    ? root.transport.recordingWaveform(recordingBox.modelData, Math.ceil(width),
+                                                       x / recordingBox.width, Math.min(1, (x + width) / recordingBox.width))
+                    : []
+                onPeaksChanged: requestPaint()
+                onHeightChanged: requestPaint()
+                onPaint: {
+                    const ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.strokeStyle = Theme.timeline.waveform
+                    ctx.lineWidth = 1
+                    ctx.beginPath()
+                    for (let i = 0; i < peaks.length; ++i) {
+                        const px = (i + 0.5) * width / peaks.length
+                        ctx.moveTo(px, height * (0.5 - Math.min(1, peaks[i][1]) * 0.48))
+                        ctx.lineTo(px, height * (0.5 - Math.max(-1, peaks[i][0]) * 0.48) + 1)
+                    }
+                    ctx.stroke()
+                }
+            }
           }
         }
         Rectangle { objectName: "timelinePlayhead"; x: root.playhead; y: 0; width: 2; height: scroll.contentHeight; color: Theme.record; z: 4 }

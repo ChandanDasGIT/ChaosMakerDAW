@@ -14,6 +14,10 @@ inline constexpr std::string_view Compressor = "compressor";
 inline constexpr std::string_view DeEsser = "deesser";
 inline constexpr std::string_view Reverb = "reverb";
 inline constexpr std::string_view ChaosVerb = "chaosverb";
+inline constexpr std::string_view Delay = "delay";
+inline constexpr std::string_view Limiter = "limiter";
+inline constexpr std::string_view Saturation = "saturation";
+inline constexpr std::string_view Gate = "gate";
 
 enum class ControlKind {
     Slider,   // a value between min and max
@@ -37,6 +41,7 @@ struct Spec {
     std::string_view type;
     std::string_view title;
     std::span<const Control> controls;
+    bool meter = false;   // turns the track down: its page shows a gain-reduction meter
 };
 
 std::span<const Spec> all();

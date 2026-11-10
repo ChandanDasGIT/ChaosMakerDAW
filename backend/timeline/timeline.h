@@ -18,6 +18,14 @@ public:
     void setMeter(int numerator, int denominator);
     void setBpm(double bpm);
     void setSnapMode(int mode);
+    // The magnets for the playhead and the time selection (the user's settings; both off by
+    // default): when off they go exactly where the pointer is. Clips snap either way.
+    void setSnapPlayhead(bool on) { m_snapPlayhead = on; }
+    void setSnapSelection(bool on) { m_snapSelection = on; }
+    bool snapPlayhead() const { return m_snapPlayhead; }
+    bool snapSelection() const { return m_snapSelection; }
+    // Where a click or drag at `beat` puts the playhead (never before 0).
+    double playheadBeat(double beat) const;
     int snapMode() const { return m_snapMode; }
     double snapStep() const;
     double beatUnit() const { return 4.0 / m_denominator; }
@@ -95,6 +103,7 @@ private:
     int m_snapMode = 1, m_numerator = 4, m_denominator = 4;
     double m_bpm = 120;
     bool m_busy = false, m_loading = false, m_recording = false;
+    bool m_snapPlayhead = false, m_snapSelection = false;
     std::vector<int> m_selectedIds;
     int m_selectedClipId = -1, m_selectedTrackId = -1;
     std::string m_operation;

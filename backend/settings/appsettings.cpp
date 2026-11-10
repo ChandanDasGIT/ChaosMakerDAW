@@ -118,6 +118,8 @@ void AppSettings::resetToDefaults() noexcept {
     m_defaultProjectDirectory.clear();
     m_autoSaveEnabled = true;
     m_autoSaveIntervalSeconds = 60;
+    m_snapPlayhead = false;
+    m_snapSelection = false;
     m_lastError.clear();
 }
 
@@ -144,6 +146,10 @@ void AppSettings::importValue(std::string_view key, std::string_view value) {
         else setPianoRollDockHeight(size);
     } else if (key == KeyDefaultProjectDir) {
         m_defaultProjectDirectory = trim(value);
+    } else if (key == KeySnapPlayhead) {
+        m_snapPlayhead = parseBool(value, false);
+    } else if (key == KeySnapSelection) {
+        m_snapSelection = parseBool(value, false);
     } else if (key == KeyAutoSaveEnabled) {
         m_autoSaveEnabled = parseBool(value, true);
     } else if (key == KeyAutoSaveInterval) {
@@ -176,6 +182,8 @@ std::string AppSettings::exportValue(std::string_view key) const {
     if (key == KeyAutoSaveEnabled) {
         return m_autoSaveEnabled ? "true" : "false";
     }
+    if (key == KeySnapPlayhead) return m_snapPlayhead ? "true" : "false";
+    if (key == KeySnapSelection) return m_snapSelection ? "true" : "false";
     if (key == KeyAutoSaveInterval) {
         return std::to_string(m_autoSaveIntervalSeconds);
     }
@@ -194,6 +202,8 @@ std::string AppSettings::serialize() const {
     ss << KeyDefaultProjectDir << "=" << m_defaultProjectDirectory << "\n";
     ss << KeyAutoSaveEnabled << "=" << (m_autoSaveEnabled ? "true" : "false") << "\n";
     ss << KeyAutoSaveInterval << "=" << m_autoSaveIntervalSeconds << "\n";
+    ss << KeySnapPlayhead << "=" << (m_snapPlayhead ? "true" : "false") << "\n";
+    ss << KeySnapSelection << "=" << (m_snapSelection ? "true" : "false") << "\n";
     return ss.str();
 }
 

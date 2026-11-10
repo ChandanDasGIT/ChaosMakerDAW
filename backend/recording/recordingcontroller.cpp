@@ -333,3 +333,10 @@ void RecordingController::shutdown(
     }
     completeTake(attachCallback, attachMidiCallback, unlockCallback);
 }
+
+std::vector<std::pair<float, float>> RecordingController::livePeaks(int trackId, int bins, double from, double to) const
+{
+    const auto it = m_takes.find(trackId);
+    if (it == m_takes.end() || !it->second) return {};
+    return it->second->livePeaks().summary(bins, from, to);
+}

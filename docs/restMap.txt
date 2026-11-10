@@ -15,8 +15,10 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 
 NEXT UP (2026-11-10), the user's order:
   1. G6 volume envelope committed (0597318); G6b curve shapes committed (758f523).
-  2. G7 mixing plugins: compressor, de-esser, reverb, Chaos Verb DONE 2026-11-10, NOT
-     COMMITTED (the user is testing). Still to pick: the "etc" tools (delay, saturation...).
+  2. G7 mixing plugins committed (0910415). R1 live recording waveform, G7b extras (delay,
+     limiter, saturation, gate) and T1 free playhead / selection magnets DONE 2026-11-10,
+     NOT COMMITTED (the user is testing). Open question from the user: effects on a time
+     range (Reaper-style); plan it with G15.
   3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
      reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
      inside this group is to be confirmed with the user.
@@ -182,6 +184,59 @@ Done items stay further down as the record.
         (shared checkMixEffectPage) and track_effects_switch_in_place... (the picker now offers
         the four). App run (offscreen, throwaway settings): empty log.
 
+[x] G7b The G7 extras (the user, 2026-11-10: "the four you suggested"). DONE 2026-11-10
+        (uncommitted): Delay, Limiter, Saturation, Gate, on the same mixfx system (spec, base,
+        page; Spec::meter now says which pages show the gain-reduction meter).
+        - Delay (plugins/delay, class MixDelay): Sync to BPM with a Note (1/2 .. 1/16, dotted,
+          triplet; ProcessContext::bpm) or Time in ms (up to 4 s), feedback through low / high
+          cut each repeat, ping-pong (input on the left, repeats cross), equal-power mix; a moving
+          time glides (60 ms) like tape.
+        - Limiter (plugins/limiter): Gain into a Ceiling with a 1 ms look-ahead (min held over
+          L + 1 samples, then a moving average over L, so the gain is down before each peak
+          leaves the delay), Release, a final clip as a safety net. latencySamples() = 1 ms;
+          the engine does not compensate plugin latency yet (G10 is recording latency only).
+        - Saturation (plugins/saturation): Tape / Tube (even harmonics) / Clip curves, 2x
+          oversampled (the guitar suite's 47-tap half-band, 23 samples; the dry path is delayed
+          to match so Mix does not comb); the curve's gain at -12 dBFS is taken back off so
+          Drive adds colour, not level; Tone = eqband tilt shelf at 1 kHz, +-6 dB at the ends.
+        - Gate (plugins/gate): Threshold with 4 dB hysteresis, Range, Attack, Hold, Release,
+          peak follower detector; starts closed.
+        - Mixing plugin processors are now made only when their type is on a track's chain
+          (SnapshotBuilder::ensureMixEffects in syncTrackEffects; remakeMixEffects on a new
+          device): the delay alone holds seconds of audio per instance.
+        Renders in renders/mixfx/: delay 1-3, limiter-1-plus18db, saturation 1-3, gate-1.
+        Tests: backendtests mixextras (+ mixfxspec, effectchain, snapshotbuilder updated);
+        transport_ui delay / limiter / saturation / gate _page_shows_its_cards_and_edits_the_track.
+[x] R1  Live waveform while recording, like Reaper (the user, 2026-11-10). DONE 2026-11-10
+        (uncommitted). backend/recording/livepeaks: the take's disk thread appends a (min, max)
+        per 256 frames (all channels) under a mutex; summary(bins, from, to) at any width and
+        range. TakeRecorder::livePeaks(), RecordingController::livePeaks(trackId, ...),
+        EngineController::recordingWaveform(trackId, bins, from, to). Timeline.qml: a Canvas in
+        each "Recording..." box, laid out like a clip's waveform, fetching only the visible part
+        as the box grows. Audio takes only (MIDI takes: not asked).
+        Tests: backendtests livepeaks, recording the_live_waveform_follows_what_the_take_writes;
+        wrappertests qtrecording the_waveform_of_a_take_grows_while_it_records; transport_ui
+        timeline_shows_each_recording_lane... (the mic's box draws its waveform).
+[x] T1  Free playhead and time selection, like Reaper (the user, 2026-11-10). DONE 2026-11-10
+        (uncommitted). The playhead and the time selection go exactly where you click / drag;
+        a drag on the empty timeline moves the playhead with the pointer (also while playing:
+        playback jumps along) and leaves it where the mouse is let go; a click on an empty spot
+        and on the ruler puts it there; Shift-drag (clip box selection) leaves it alone.
+        Preferences > Timeline: "Snap playhead to grid" and "Snap time selection to grid", both
+        off by default (AppSettings timeline/snapPlayhead, timeline/snapSelection), using the
+        Snap grid when on; clips snap as before. Timeline::playheadBeat, setSnapPlayhead /
+        setSnapSelection; TimelineWrapper snapPlayhead / snapSelection; Main.qml binds them.
+        Also: the FX window's chain column and the Add FX picker scroll when long (13 effect
+        types now; with ~10 on a track, Add FX had been pushed out of the window).
+        Fixed alongside: TrackList.qml card y was undefined for a removed card (index -1).
+        Not yet (the user asked; to plan): effects on a time range (split + clip FX, or render
+        an effect into the selection, or FX parameter envelopes) - see G15.
+        Tests: backendtests timeline the_playhead_and_the_time_selection_snap_only_with_their
+        _magnets_on, appsettings the_timeline_magnets...; transport_ui the_playhead_follows
+        _clicks_and_drags..., preferences_offer_the_playhead_and_selection_magnets,
+        removing_reordering_and_undoing_tracks_keeps_the_track_list_free_of_qml_warnings; the
+        snap tests turn the selection magnet on; click() scrolls lists so the target is in view.
+        Full transport_ui 155/155 offscreen; app log empty (empty profile and a session copy).
 -- From the Reaper comparison (the user picked these, 2026-11-10; none planned yet)
 [ ] G8  Clip fades and crossfades. AudioClip already has fadeIn / fadeOut (samples) but no
         wrapper action or UI sets them. Wanted: Reaper-style fade handles in a clip's top

@@ -2,6 +2,7 @@
 #include "core/audiodata.h"
 #include "core/audioview.h"
 #include "rt/rtaudioring.h"
+#include "recording/livepeaks.h"
 #include <atomic>
 #include <fstream>
 #include <memory>
@@ -26,6 +27,8 @@ public:
     std::shared_ptr<const AudioData> audio() const { return result; } // only after done()/wait()
     const std::string& error() const { return failure; } // only after done()/wait()
     std::int64_t startSample = 0; // read only after done()
+    // What has been written so far, for a waveform while recording (any thread).
+    const LivePeaks& livePeaks() const noexcept { return m_livePeaks; }
 private:
     const Source m_source;
     const unsigned m_channels;
@@ -37,6 +40,7 @@ private:
     std::thread worker;
     std::shared_ptr<AudioData> result;
     std::string failure;
+    LivePeaks m_livePeaks;
 };
 // Reads our mono/stereo float32 take WAVs; validates before publishing audio.
 std::shared_ptr<const AudioData> loadTakeWav(const std::string& path);

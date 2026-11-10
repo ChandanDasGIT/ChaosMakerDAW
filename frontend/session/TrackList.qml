@@ -127,8 +127,10 @@ Rectangle {
                     }
 
                     // Rows follow the backend layout: a shown volume lane (restMap G6) sits under
-                    // the card and pushes the rows below it down.
-                    y: root.trackModel && index < root.trackModel.rowTops.length ? root.trackModel.rowTops[index] : index * root.laneHeight
+                    // the card and pushes the rows below it down. A card being removed has
+                    // index -1 for a moment; it keeps a plain position then.
+                    y: root.trackModel && index >= 0 && index < root.trackModel.rowTops.length
+                       ? root.trackModel.rowTops[index] : Math.max(0, index) * root.laneHeight
                     width: trackScroll.width
                     height: root.laneHeight
                     color: isSelected ? Theme.trackList.rowSelected : (index % 2 ? Theme.trackList.rowAlt : Theme.trackList.row)

@@ -12,6 +12,9 @@ class TimelineWrapper : public QObject {
     QML_ELEMENT
     Q_PROPERTY(TrackListWrapper* trackModel READ trackModel WRITE setTrackModel NOTIFY trackModelChanged)
     Q_PROPERTY(int snapMode READ snapMode WRITE setSnapMode NOTIFY stateChanged)
+    // The magnets for the playhead and the time selection (Preferences > Timeline).
+    Q_PROPERTY(bool snapPlayhead READ snapPlayhead WRITE setSnapPlayhead NOTIFY stateChanged)
+    Q_PROPERTY(bool snapSelection READ snapSelection WRITE setSnapSelection NOTIFY stateChanged)
     Q_PROPERTY(int numerator READ numerator WRITE setNumerator NOTIFY stateChanged)
     Q_PROPERTY(int denominator READ denominator WRITE setDenominator NOTIFY stateChanged)
     Q_PROPERTY(double bpm READ bpm WRITE setBpm NOTIFY stateChanged)
@@ -53,6 +56,10 @@ public:
     void setTrackModel(TrackListWrapper* tracks);
     int snapMode() const { return m_timeline.snapMode(); }
     void setSnapMode(int mode) { m_timeline.setSnapMode(mode); emit stateChanged(); }
+    bool snapPlayhead() const { return m_timeline.snapPlayhead(); }
+    void setSnapPlayhead(bool on) { if (on != snapPlayhead()) { m_timeline.setSnapPlayhead(on); emit stateChanged(); } }
+    bool snapSelection() const { return m_timeline.snapSelection(); }
+    void setSnapSelection(bool on) { if (on != snapSelection()) { m_timeline.setSnapSelection(on); emit stateChanged(); } }
     int numerator() const { return m_timeline.numerator(); }
     int denominator() const { return m_timeline.denominator(); }
     double bpm() const { return m_timeline.bpm(); }
@@ -126,7 +133,7 @@ public:
     Q_INVOKABLE void cancelEdit() { m_timeline.cancelEdit(); emit stateChanged(); }
     Q_INVOKABLE void commitGroupEdit();
     Q_INVOKABLE void nudgeClips(int direction);
-    Q_INVOKABLE void seek(double beat) { emit seekRequested(m_timeline.snap(beat)); }
+    Q_INVOKABLE void seek(double beat) { emit seekRequested(m_timeline.playheadBeat(beat)); }
     Q_INVOKABLE void createClipAt(double beat, int lane);
     Q_INVOKABLE bool canSplit(int track, int clip, double beat) const { return m_timeline.canSplit(track, clip, beat); }
     Q_INVOKABLE double clipEndBeat(int track, int clip) const { return m_timeline.clipEndBeat(track, clip); }

@@ -25,7 +25,8 @@ void AppSettingsWrapper::loadFromPlatform()
                                qs.value(QStringLiteral("ui/pianoRollPresentation")).toString().toStdString());
     }
     for (const char* key : {AppSettings::KeyTrackListWidth, AppSettings::KeyMixerHeight, AppSettings::KeyPianoRollDockHeight,
-                            AppSettings::KeyDefaultRecordMode, AppSettings::KeyChordZoneMapping}) {
+                            AppSettings::KeyDefaultRecordMode, AppSettings::KeyChordZoneMapping,
+                            AppSettings::KeySnapPlayhead, AppSettings::KeySnapSelection}) {
         const QString name = QString::fromLatin1(key);
         if (qs.contains(name)) m_settings.importValue(key, qs.value(name).toString().toStdString());
     }
@@ -59,7 +60,7 @@ void AppSettingsWrapper::saveToPlatform()
     qs.setValue(QStringLiteral("autosave/enabled"), m_settings.autoSaveEnabled());
     qs.setValue(QStringLiteral("autosave/intervalSeconds"), m_settings.autoSaveIntervalSeconds());
     for (const char* key : {AppSettings::KeyTrackListWidth, AppSettings::KeyMixerHeight, AppSettings::KeyPianoRollDockHeight,
-                            AppSettings::KeyDefaultRecordMode})
+                            AppSettings::KeyDefaultRecordMode, AppSettings::KeySnapPlayhead, AppSettings::KeySnapSelection})
         qs.setValue(QString::fromLatin1(key), QString::fromStdString(m_settings.exportValue(key)));
     qs.sync();
 }
@@ -122,6 +123,24 @@ void AppSettingsWrapper::setDefaultProjectDirectory(const QString& path)
         emit defaultProjectDirectoryChanged();
         emit preferenceSaved(QString::fromLatin1(AppSettings::KeyDefaultProjectDir));
     }
+}
+
+void AppSettingsWrapper::setSnapPlayhead(bool on)
+{
+    if (m_settings.snapPlayhead() == on) return;
+    m_settings.setSnapPlayhead(on);
+    saveValue(QString::fromLatin1(AppSettings::KeySnapPlayhead), QString::fromStdString(m_settings.exportValue(AppSettings::KeySnapPlayhead)));
+    emit timelineSnapChanged();
+    emit preferenceSaved(QString::fromLatin1(AppSettings::KeySnapPlayhead));
+}
+
+void AppSettingsWrapper::setSnapSelection(bool on)
+{
+    if (m_settings.snapSelection() == on) return;
+    m_settings.setSnapSelection(on);
+    saveValue(QString::fromLatin1(AppSettings::KeySnapSelection), QString::fromStdString(m_settings.exportValue(AppSettings::KeySnapSelection)));
+    emit timelineSnapChanged();
+    emit preferenceSaved(QString::fromLatin1(AppSettings::KeySnapSelection));
 }
 
 void AppSettingsWrapper::setAutoSaveEnabled(bool enabled)

@@ -269,7 +269,6 @@ void EngineController::bindTrackEffects(int trackId, GuitarSuiteModel* model)
     fx.playbackEq = std::make_shared<TenBandEq>(); fx.playbackEq->prepare(rate, frames);
     fx.chaosEq = std::make_shared<ChaosEq>(); fx.chaosEq->prepare(rate, frames);
     fx.playbackChaosEq = std::make_shared<ChaosEq>(); fx.playbackChaosEq->prepare(rate, frames);
-    SnapshotBuilder::makeMixEffects(fx, rate, frames);   // restMap G7
     fx.model->configure(rate, frames);
     if (m_project) {
         const auto* track = m_project->project().findTrack(trackId);
@@ -317,6 +316,10 @@ void EngineController::syncTrackEffects()
             auto& fx = m_trackEffects[track->id];
             if (!fx.instrument) fx.instrument = preparedInstrument(track->type, rate, frames);
         }
+        // Mixing plugins (restMap G7) are made when they first go on the chain.
+        std::vector<std::string> types;
+        for (const auto& slot : track->effects) types.push_back(slot.type);
+        SnapshotBuilder::ensureMixEffects(m_trackEffects[track->id], types, rate, frames);
     }
     SnapshotBuilder::syncTrackEq(m_project->project(), [this](int id) {
         auto it = m_trackEffects.find(id);
@@ -471,7 +474,7 @@ bool EngineController::setBufferSize(int frames)
         fx.playbackEq=std::make_shared<TenBandEq>(); fx.playbackEq->prepare(m_engine->sampleRate(),frames);
         fx.chaosEq=std::make_shared<ChaosEq>(); fx.chaosEq->prepare(m_engine->sampleRate(),frames);
         fx.playbackChaosEq=std::make_shared<ChaosEq>(); fx.playbackChaosEq->prepare(m_engine->sampleRate(),frames);
-        SnapshotBuilder::makeMixEffects(fx, m_engine->sampleRate(), frames);   // fresh: the old ones may be playing
+        SnapshotBuilder::remakeMixEffects(fx, m_engine->sampleRate(), frames);   // fresh: the old ones may be playing
         fx.model->configure(m_engine->sampleRate(), frames);
         if (fx.instrument && m_project) {
             if (const auto* track = m_project->project().findTrack(id))
@@ -1117,6 +1120,12 @@ QVariantList EngineController::monitoredTracks() const {
         const auto it=m_trackEffects.find(track->id);
         if(track->hasLiveInput() && track->monitorEnabled && it!=m_trackEffects.end() && it->second.inputChannel>=0)result.push_back(track->id);
     }
+    return result;
+}
+QVariantList EngineController::recordingWaveform(int trackId, int bins, double from, double to) const {
+    QVariantList result;
+    for (const auto& [low, high] : m_recordingController.livePeaks(trackId, std::clamp(bins, 0, 20000), from, to))
+        result.push_back(QVariantList{low, high});
     return result;
 }
 QVariantList EngineController::recordingTracks() const {

@@ -1129,9 +1129,15 @@ private slots:
         QVERIFY(visualItem(window->contentItem(),"addEffectButton")->isEnabled());            // Chaos EQ is still offered
         addEffectFromPicker("chaoseq");
         QVERIFY(visualItem(window->contentItem(),"addEffectButton")->isEnabled());            // the mixing plugins (G7)
-        for(const char* mix:{"compressor","deesser","reverb","chaosverb"}) addEffectFromPicker(mix);
+        for(const char* mix:{"compressor","deesser","reverb","chaosverb","delay","limiter","saturation","gate"}) addEffectFromPicker(mix);
         QVERIFY(!visualItem(window->contentItem(),"addEffectButton")->isEnabled());           // nothing left to add
-        for(const char* mix:{"compressor","deesser","reverb","chaosverb"}) {                    // back to the guitar's chain
+        {   // a long chain scrolls: Add FX stays inside the window
+            auto* add=visualItem(window->contentItem(),"addEffectButton");
+            QVERIFY(add->mapToScene(QPointF(0,add->height())).y()<=add->window()->height());
+            auto* chainScroll=visualItem(window->contentItem(),"effectChainScroll"); QVERIFY(chainScroll);
+            QVERIFY(chainScroll->property("contentHeight").toDouble()>=chainScroll->height());
+        }
+        for(const char* mix:{"compressor","deesser","reverb","chaosverb","delay","limiter","saturation","gate"}) {                    // back to the guitar's chain
             click(visualItem(window->contentItem(),QString("removeEffect_")+mix)); QTRY_VERIFY(!row(mix));
         }
         click(visualItem(window->contentItem(),"removeEffect_chaoseq"));
@@ -2357,6 +2363,18 @@ private slots:
     void chaosverb_page_shows_its_cards_and_edits_the_track() {
         checkMixEffectPage("chaosverb",{"Character","Space","Movement","Tone"},"decay","mode",false);
     }
+    void delay_page_shows_its_cards_and_edits_the_track() {
+        checkMixEffectPage("delay",{"Time","Repeats","Output"},"feedback","division",false);
+    }
+    void limiter_page_shows_its_cards_and_edits_the_track() {
+        checkMixEffectPage("limiter",{"Limiter"},"ceiling","",true);
+    }
+    void saturation_page_shows_its_cards_and_edits_the_track() {
+        checkMixEffectPage("saturation",{"Character","Output"},"drive","type",false);
+    }
+    void gate_page_shows_its_cards_and_edits_the_track() {
+        checkMixEffectPage("gate",{"Gate","Timing"},"threshold","",true);
+    }
     void double_click_empty_track_area_adds_vocals_without_interfering_with_renaming() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks);
@@ -2705,8 +2723,10 @@ private slots:
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         const auto restore=qScopeGuard([&] {
             timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); timeline->setProperty("snapMode",1);
+            timeline->setProperty("snapSelection",false);
             controller->setMeter(4,4); controller->setRepeatRange(0,0);
         });
+        timeline->setProperty("snapSelection",true);   // ranges on the grid: the selection magnet on
         timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
         openQuickSettings(); auto* picker=visualItem(window->contentItem(),"snapGridSelector"); QVERIFY(picker);
         click(picker); QTest::keyClick(window,Qt::Key_Home);
@@ -2873,6 +2893,75 @@ private slots:
         QTRY_COMPARE(scroll->property("contentX").toDouble(),0.0);
         controller.shutdownSession();
     }
+    void the_playhead_follows_clicks_and_drags_off_the_grid_unless_its_magnet_is_on() {
+        auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller.attachProject(&tracks); const int track=tracks.addAudioTrack();
+        tracks.addClipAtBeat(track,0,16);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] {
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+            timeline->setProperty("transport",QVariant::fromValue(EngineController::instance()));
+            timeline->setProperty("snapPlayhead",false); timeline->setProperty("snapSelection",false);
+        });
+        timeline->setProperty("transport",QVariant::fromValue(&controller));
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true); QTest::qWait(30);
+        const double beatWidth=timeline->property("beatWidth").toDouble();
+        const auto at=[&](double x,double y=300) { return timeline->mapToScene(QPointF(x,y)).toPoint(); };
+        const auto beatAt=[&](double x) { return x/beatWidth; };
+        // A click on an empty spot: the playhead goes exactly there (not to a beat).
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,at(70)); io->process();
+        QTRY_VERIFY(std::abs(controller.positionBeats()-beatAt(70))<0.01);
+        // A drag: the playhead follows the pointer and stays where the mouse is let go; the
+        // selection's edges are exactly where the drag went.
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at(100)); io->process();
+        QTest::mouseMove(window,at(160)); io->process();
+        QTRY_VERIFY(std::abs(controller.positionBeats()-beatAt(160))<0.01);
+        QTest::mouseMove(window,at(230)); io->process();
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,at(230)); io->process();
+        QTRY_VERIFY(std::abs(controller.positionBeats()-beatAt(230))<0.01);
+        QVERIFY(std::abs(timeline->property("rangeStartBeat").toDouble()-beatAt(100))<0.01);
+        QVERIFY(std::abs(timeline->property("rangeEndBeat").toDouble()-beatAt(230))<0.01);
+        // While playing, playback jumps along with the drag.
+        controller.transportAction("play"); io->process(); QVERIFY(controller.playing());
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at(300)); io->process();
+        QTest::mouseMove(window,at(340)); io->process(); io->process();
+        QTRY_VERIFY(std::abs(controller.positionBeats()-beatAt(340))<0.1);
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,at(340)); io->process();
+        QVERIFY(controller.playing());
+        controller.transportAction("stop"); io->process();
+        // The ruler too.
+        const QPoint rulerPoint=timeline->mapToScene(QPointF(130,10)).toPoint();
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,rulerPoint); io->process();
+        QTRY_VERIFY(std::abs(controller.positionBeats()-beatAt(130))<0.01);
+        // Magnets on: both land on the beat grid.
+        timeline->setProperty("snapPlayhead",true); timeline->setProperty("snapSelection",true);
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,at(70)); io->process();
+        QTRY_COMPARE(controller.positionBeats(),std::round(beatAt(70)));
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,at(100));
+        QTest::mouseMove(window,at(230)); QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,at(230)); io->process();
+        QCOMPARE(timeline->property("rangeStartBeat").toDouble(),std::floor(beatAt(100)));
+        QCOMPARE(timeline->property("rangeEndBeat").toDouble(),std::ceil(beatAt(230)));
+        QTRY_COMPARE(controller.positionBeats(),std::round(beatAt(230)));
+        controller.shutdownSession();
+    }
+    void preferences_offer_the_playhead_and_selection_magnets() {
+        auto* settings=visualObject(window->contentItem(),"appSettingsBridge"); QVERIFY(settings);
+        const auto restore=qScopeGuard([&] { settings->setProperty("snapPlayhead",false); settings->setProperty("snapSelection",false); });
+        QVERIFY(!settings->property("snapPlayhead").toBool()); QVERIFY(!settings->property("snapSelection").toBool());
+        auto* button=visualItem(window->contentItem(),"settingsButton"); QVERIFY(button); click(button);
+        auto* prefs=visualItem(window->contentItem(),"preferencesSetting"); QTRY_VERIFY(prefs && prefs->isVisible()); click(prefs);
+        auto* playhead=visualItem(window->contentItem(),"snapPlayheadSetting"); QTRY_VERIFY(playhead && playhead->isVisible());
+        auto* selection=visualItem(window->contentItem(),"snapSelectionSetting"); QVERIFY(selection);
+        click(playhead); QTRY_VERIFY(settings->property("snapPlayhead").toBool());
+        click(selection); QTRY_VERIFY(settings->property("snapSelection").toBool());
+        QSettings saved; QCOMPARE(saved.value("timeline/snapPlayhead").toString(),QString("true"));
+        QCOMPARE(saved.value("timeline/snapSelection").toString(),QString("true"));
+        click(playhead); QTRY_VERIFY(!settings->property("snapPlayhead").toBool());
+        QTest::keyClick(window,Qt::Key_Escape);
+        auto* popup=window->findChild<QObject*>("preferencesPopup"); QVERIFY(popup);
+        QTRY_VERIFY(!popup->property("visible").toBool());
+    }
     void normal_drag_selects_grid_range_and_repeat_stays_inside_it() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
@@ -2883,7 +2972,9 @@ private slots:
             timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
             timeline->setProperty("transport",QVariant::fromValue(EngineController::instance()));
             window->setProperty("transport",QVariant::fromValue(EngineController::instance()));
+            timeline->setProperty("snapSelection",false);
         });
+        timeline->setProperty("snapSelection",true);   // ranges on the grid: the selection magnet on
         timeline->setProperty("transport",QVariant::fromValue(&controller));
         timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
         window->setProperty("transport",QVariant::fromValue(&controller)); QTest::qWait(30);
@@ -2897,6 +2988,8 @@ private slots:
         QCOMPARE(timeline->property("rangeEndBeat").toDouble(),4.0);
         QCOMPARE(selectedIds(timeline).size(),0);
         auto* repeat=visualItem(window->contentItem(),"transport_repeat"); QVERIFY(repeat); click(repeat);
+        // The drag left the playhead where the mouse was let go; start from zero for the lead-in.
+        controller.seekBeat(0); io->process();
         QVERIFY(controller.repeating()); controller.transportAction("play");
         io->process(); QCOMPARE(controller.positionSeconds(),128.0/48000); // Play the lead-in from zero.
         bool wrapped=false; double previous=controller.positionBeats();
@@ -2988,6 +3081,24 @@ private slots:
         QTest::mousePress(window,Qt::LeftButton,Qt::ShiftModifier,start);
         QTest::mouseMove(window,end); QTest::mouseRelease(window,Qt::LeftButton,Qt::ShiftModifier,end);
         QCOMPARE(selectedIds(timeline).size(),3);
+    }
+    void removing_reordering_and_undoing_tracks_keeps_the_track_list_free_of_qml_warnings() {
+        // A removed card has index -1 for a moment; its position must not become undefined.
+        QTest::failOnWarning(QRegularExpression("Unable to assign|TypeError|ReferenceError"));
+        TrackListWrapper tracks; const int a=tracks.addVocalTrack(),b=tracks.addAudioTrack(); tracks.addVocalTrack();
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        const auto restore=qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel",QVariant()); });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QTest::qWait(30);
+        QVERIFY(tracks.toggleEnvelopeShown(a));                    // a lane, so rows have different heights
+        QTest::qWait(10);
+        QVERIFY(tracks.removeTrack(b)); QTest::qWait(10);
+        QVERIFY(tracks.undo()); QTest::qWait(10);                  // the removal comes back
+        QVERIFY(tracks.redo()); QTest::qWait(10);
+        QVERIFY(tracks.moveTrack(a,1)); QTest::qWait(10);
+        QVERIFY(tracks.removeTrack(a)); QTest::qWait(10);
+        auto* card=visualItem(list,"trackColourAccent"+QString::number(tracks.trackIdAt(0))); QVERIFY(card);
+        QCOMPARE(card->parentItem()->y(),0.0);
     }
     void volume_envelope_lane_edits_points_bypasses_and_keeps_rows_aligned() {
         TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
@@ -3661,6 +3772,16 @@ private slots:
         auto* first=visualItem(timeline,"recordingPreview"+QString::number(a));
         auto* second=visualItem(timeline,"recordingPreview"+QString::number(b)); QVERIFY(second);
         QCOMPARE(second->y()-first->y(),timeline->property("laneHeight").toDouble());
+        // The mic's take draws its waveform in the box as it records (live, like Reaper's).
+        io->inputB=0.6f;
+        for(int i=0;i<40;++i) io->process();
+        auto* live=visualItem(timeline,"recordingWaveform"+QString::number(b)); QVERIFY(live);
+        QTRY_VERIFY(live->width()>0 && !live->property("peaks").toList().isEmpty());
+        QTRY_VERIFY([&] {
+            for(int i=0;i<4;++i) io->process();   // the box grows, the peaks are fetched again
+            for(const auto& peak:live->property("peaks").toList()) if(peak.toList()[1].toDouble()>0.5) return true;
+            return false;
+        }());
         QVERIFY(tracks.setRecordArmed(a,false)); io->process();
         QTRY_VERIFY(!visualItem(timeline,"recordingPreview"+QString::number(a)));
         QVERIFY(visualItem(timeline,"recordingPreview"+QString::number(b))); QVERIFY(controller.recording());
@@ -4624,15 +4745,34 @@ private:
         return window;
     }
     // Clicks the item's middle in whichever window shows it (the FX panel has its own).
+    // Scrolls every scrolling list around `item` so it is in view, as a user would before
+    // clicking it (long lists such as the FX chain and the Add FX picker scroll).
+    static void scrollIntoView(QQuickItem* item) {
+        for(auto* p=item->parentItem();p;p=p->parentItem()) {
+            if(!p->inherits("QQuickFlickable")) continue;
+            auto* content=qvariant_cast<QQuickItem*>(p->property("contentItem")); if(!content) continue;
+            const double top=item->mapToItem(content,QPointF(0,0)).y(), bottom=top+item->height();
+            const double y=p->property("contentY").toDouble(), h=p->height();
+            const double maxY=std::max(0.0,p->property("contentHeight").toDouble()-h);
+            if(top<y) p->setProperty("contentY",std::clamp(top,0.0,maxY));
+            else if(bottom>y+h) p->setProperty("contentY",std::clamp(bottom-h,0.0,maxY));
+        }
+        QCoreApplication::processEvents();
+    }
     void click(QQuickItem* item) {
+        scrollIntoView(item);
         QWindow* target=item->window()?static_cast<QWindow*>(item->window()):static_cast<QWindow*>(window);
         QTest::mouseClick(target,Qt::LeftButton,Qt::NoModifier,item->mapToScene(QPointF(item->width()/2,item->height()/2)).toPoint());
     }
     // Adds an effect through the open FX panel's "+ Add FX" picker, as a user would.
     void addEffectFromPicker(const QString& type) {
+        // The picker closes after each pick; open it again only once it has (quick repeated
+        // picks could click while it was still closing).
+        if(auto* popup=visualObject(window->contentItem(),"addEffectPopup")) QTRY_VERIFY(!popup->property("visible").toBool());
         auto* add=visualItem(window->contentItem(),"addEffectButton"); QVERIFY(add); QVERIFY(add->isEnabled()); click(add);
         QQuickItem* choice=nullptr;
-        QTRY_VERIFY((choice=visualItem(window->contentItem(),"addEffect_"+type)) && choice->isVisible());
+        QTRY_VERIFY2((choice=visualItem(window->contentItem(),"addEffect_"+type)) && choice->isVisible(),
+                     qPrintable("the picker offers no " + type));
         // The picker's rows are rebuilt when the track or chain changes; let the list lay out
         // (a frame) and look the row up again, or the click can land on a row's old position.
         QTest::qWait(30);

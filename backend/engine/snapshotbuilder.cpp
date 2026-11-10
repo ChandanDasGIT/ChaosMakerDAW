@@ -34,18 +34,27 @@ SnapshotBuilder::Context SnapshotBuilder::Context::fromProject(const Project& pr
     return ctx;
 }
 
-void SnapshotBuilder::makeMixEffects(TrackEffects& effects, double sampleRate, int maxFrames)
+void SnapshotBuilder::ensureMixEffects(TrackEffects& effects, const std::vector<std::string>& types, double sampleRate, int maxFrames)
 {
-    effects.mixEffects.clear();
-    effects.playbackMixEffects.clear();
-    for (const auto& spec : mixfx::all()) {
+    for (const auto& type : types) {
+        if (!mixfx::isMixEffect(type)) continue;
         for (auto* set : {&effects.mixEffects, &effects.playbackMixEffects}) {
-            auto effect = mixfx::create(spec.type);
+            if (set->count(type)) continue;
+            auto effect = mixfx::create(type);
             if (!effect) continue;
             effect->prepare(sampleRate, maxFrames);
-            set->emplace(std::string(spec.type), std::move(effect));
+            set->emplace(type, std::move(effect));
         }
     }
+}
+
+void SnapshotBuilder::remakeMixEffects(TrackEffects& effects, double sampleRate, int maxFrames)
+{
+    std::vector<std::string> types;
+    for (const auto& [type, effect] : effects.mixEffects) types.push_back(type);
+    effects.mixEffects.clear();
+    effects.playbackMixEffects.clear();
+    ensureMixEffects(effects, types, sampleRate, maxFrames);
 }
 
 void SnapshotBuilder::syncTrackEq(const Project& project, const MutableEffectResolver& effectLookup)

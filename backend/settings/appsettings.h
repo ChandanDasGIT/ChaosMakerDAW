@@ -18,6 +18,8 @@ public:
     static constexpr const char* KeyTrackListWidth = "ui/trackListWidth";
     static constexpr const char* KeyMixerHeight = "ui/mixerHeight";
     static constexpr const char* KeyPianoRollDockHeight = "ui/pianoRollDockHeight";
+    static constexpr const char* KeySnapPlayhead = "timeline/snapPlayhead";
+    static constexpr const char* KeySnapSelection = "timeline/snapSelection";
 
     // Main window layout (pixels). Setters clamp into these ranges; non-finite values are ignored.
     struct SizeLimits { double min, max, fallback; };
@@ -69,6 +71,13 @@ public:
     int autoSaveIntervalSeconds() const noexcept { return m_autoSaveIntervalSeconds; }
     bool setAutoSaveIntervalSeconds(int seconds) noexcept;
 
+    // The timeline's magnets (both off by default): the playhead and the time selection land on
+    // the snap grid only when these are on. Clips snap to the grid either way.
+    bool snapPlayhead() const noexcept { return m_snapPlayhead; }
+    void setSnapPlayhead(bool on) noexcept { m_snapPlayhead = on; }
+    bool snapSelection() const noexcept { return m_snapSelection; }
+    void setSnapSelection(bool on) noexcept { m_snapSelection = on; }
+
     // Defaults and validation
     void resetToDefaults() noexcept;
     static bool validateAutoSaveInterval(int seconds) noexcept;
@@ -97,5 +106,7 @@ private:
     std::string m_defaultProjectDirectory;
     bool m_autoSaveEnabled = true;
     int m_autoSaveIntervalSeconds = 60;
+    bool m_snapPlayhead = false;
+    bool m_snapSelection = false;
     mutable std::string m_lastError;
 };
