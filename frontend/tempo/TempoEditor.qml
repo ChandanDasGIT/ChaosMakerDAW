@@ -6,6 +6,9 @@ Rectangle {
     id: root
     property real value: 120
     signal valueEdited(real value)
+    readonly property int tapCount: editor.tapCount
+    // Tap tempo (restMap G17): from the second tap, the BPM follows the taps.
+    function tap() { editor.tap() }
     implicitWidth: 124
     implicitHeight: 29
     radius: 6

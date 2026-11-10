@@ -271,6 +271,27 @@ Item {
             enabled: root.canMergeSelection
             onTriggered: root.trackModel.mergeSelectedClips(root.selectedClipIds)
         }
+        ThemedMenuSeparator {}
+        // Clip tools (restMap G14), on every selected audio clip; one undo step each.
+        ThemedMenuItem {
+            objectName: "clipReverseAction"
+            text: "Reverse"
+            enabled: !!root.trackModel && !root.recording && root.trackModel.canApplyClipTool(root.selectedClipIds)
+            onTriggered: root.trackModel.applyClipTool(root.selectedClipIds, "reverse")
+        }
+        ThemedMenuItem {
+            objectName: "clipNormaliseAction"
+            text: "Normalise (peak to 0 dB)"
+            enabled: !!root.trackModel && !root.recording && root.trackModel.canApplyClipTool(root.selectedClipIds)
+            onTriggered: root.trackModel.applyClipTool(root.selectedClipIds, "normalise")
+        }
+        ThemedMenuItem {
+            objectName: "clipPolarityAction"
+            text: "Invert polarity"
+            enabled: !!root.trackModel && !root.recording && root.trackModel.canApplyClipTool(root.selectedClipIds)
+            onTriggered: root.trackModel.applyClipTool(root.selectedClipIds, "invertPolarity")
+        }
+        ThemedMenuSeparator {}
         ThemedMenuItem {
             id: deleteClipAction
             text: root.selectedClipIds.length > 1 ? "Delete selected clips" : "Delete"
@@ -492,6 +513,8 @@ Item {
                 required property color trackColour
                 required property bool isRecorded
                 required property var notes
+                required property bool reversed
+                required property bool polarityInverted
                 objectName: "clipBlock" + clipId
                 readonly property var preview: editor.previews[String(clipId)] ?? ({})
                 x: (preview.startBeat ?? startBeat) * root.beatWidth + 4
@@ -506,7 +529,8 @@ Item {
                 Text {
                     anchors.left: parent.left; anchors.leftMargin: 10
                     anchors.top: parent.top; anchors.topMargin: 8
-                    text: label + (clipItem.effectsPrinted ? "" : " · Dry"); color: Theme.timeline.clipLabel; font.pixelSize: 11
+                    text: label + (clipItem.effectsPrinted ? "" : " · Dry") + (clipItem.reversed ? " · Reversed" : "")
+                          + (clipItem.polarityInverted ? " · Ø" : ""); color: Theme.timeline.clipLabel; font.pixelSize: 11
                     elide: Text.ElideRight
                     width: Math.max(0, parent.width - 20)
                 }

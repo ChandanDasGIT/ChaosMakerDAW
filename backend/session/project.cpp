@@ -28,6 +28,15 @@ int Track::keyShift() const
     return 0;
 }
 
+Project::Project()
+{
+    m_master.id = MasterTrackId;
+    m_master.kind = TrackKind::Audio;
+    m_master.name = "Master";
+    m_master.type = "Master";
+    m_master.colour = "#58b7b1";
+}
+
 Track& Project::addTrack(TrackKind kind, const std::string& name, const std::string& type)
 {
     auto track = std::make_unique<Track>();
@@ -102,6 +111,7 @@ void Project::moveTrack(int from, int to)
 
 Track* Project::findTrack(int id)
 {
+    if (id == MasterTrackId) return &m_master;
     const auto it = std::find_if(m_tracks.begin(), m_tracks.end(), [id](const auto& track) {
         return track->id == id;
     });
@@ -110,6 +120,7 @@ Track* Project::findTrack(int id)
 
 const Track* Project::findTrack(int id) const
 {
+    if (id == MasterTrackId) return &m_master;
     const auto it = std::find_if(m_tracks.begin(), m_tracks.end(), [id](const auto& track) {
         return track->id == id;
     });
@@ -462,6 +473,7 @@ bool Project::canMergeAudioClips(int trackId, int first, int second, double sour
     return a->start+a->length==b->start && a->poolId==b->poolId
         && a->sourceOffset+std::llround(a->length*sourceRate/m_tempo.sampleRate())==b->sourceOffset
         && a->effectsPrinted==b->effectsPrinted && a->gainDb==b->gainDb
+        && a->reversed==b->reversed && a->polarityInverted==b->polarityInverted
         && a->fadeOut==0 && b->fadeIn==0;
 }
 

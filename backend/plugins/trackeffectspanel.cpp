@@ -73,5 +73,7 @@ void TrackEffectsPanel::setChain(std::vector<std::string> chain)
 
 std::string TrackEffectsPanel::currentRecordModeDescription() const
 {
+    // The master track (G9) records nothing: say what its effects do instead.
+    if (m_trackType == "Master") return "On the whole mix, before the master fader";
     return recordModeDescription(m_recordDry);
 }

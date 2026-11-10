@@ -91,11 +91,25 @@ Rectangle {
             spacing: 2
             enabled: !(root.transport && root.transport.countingIn)
             Text { text: "BPM"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
-            TempoEditor {
-                Layout.preferredWidth: 124
-                Layout.preferredHeight: 29
-                value: root.bpm
-                onValueEdited: value => root.bpmEdited(value)
+            RowLayout {
+                spacing: 4
+                TempoEditor {
+                    id: tempoEditor
+                    Layout.preferredWidth: 124
+                    Layout.preferredHeight: 29
+                    value: root.bpm
+                    onValueEdited: value => root.bpmEdited(value)
+                }
+                // Tap tempo (restMap G17): tap in time; a pause over 2 s starts a new count.
+                ToggleChip {
+                    objectName: "tapTempo"
+                    text: "TAP"; textSize: 9
+                    implicitWidth: 34; implicitHeight: 29
+                    active: tempoEditor.tapCount > 0 && pressed
+                    hoverHighlight: true
+                    onPressed: tempoEditor.tap()
+                    tooltip: "Tap in time to set the BPM (Shift+T); a pause starts a new count"
+                }
             }
         }
 
@@ -127,5 +141,13 @@ Rectangle {
                 onTransportAction: action => root.transportAction(action)
             }
         }
+    }
+
+    // Shift+T taps the tempo (plain T plays a note when the typing keyboard is on).
+    Shortcut {
+        sequence: "Shift+T"
+        enabled: !(root.transport && root.transport.countingIn)
+        autoRepeat: false
+        onActivated: tempoEditor.tap()
     }
 }

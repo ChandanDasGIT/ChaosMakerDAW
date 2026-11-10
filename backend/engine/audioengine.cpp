@@ -558,6 +558,24 @@ void AudioEngine::populateTrackMidi(const TrackRender& track, std::int64_t posit
     m_trackMidi.sort();
 }
 
+void AudioEngine::applyMasterEffects(const AudioIO& io, const EngineSnapshot& snapshot, int offset, int count) noexcept
+{
+    // restMap G9: the master track's effects on the summed tracks of this block.
+    if (snapshot.masterEffects.empty() || io.output.channelCount <= 0 || count <= 0) return;
+    float* channels[]{io.output.channel(0) + offset, io.output.channel(std::min(1, io.output.channelCount - 1)) + offset};
+    ProcessContext context;
+    context.audio = {channels, std::min(2, io.output.channelCount), count};
+    context.sampleRate = m_sampleRate;
+    context.samplePosition = m_position;
+    context.beat = snapshot.tempo.beatAt(m_position);
+    context.bpm = m_tempoBpm.load(std::memory_order_relaxed);
+    context.beatsPerBar = snapshot.tempo.beatsPerBar();
+    context.timeSigNumerator = snapshot.tempo.numerator();
+    context.timeSigDenominator = snapshot.tempo.denominator();
+    context.playing = m_playing;
+    for (auto* processor : snapshot.masterEffects) if (processor) processor->process(context);
+}
+
 void AudioEngine::fillEnvelopeGain(const TrackRender& track, int count) noexcept
 {
     // restMap G6. Stopped, the level at the playhead also applies to live sound.
@@ -676,6 +694,7 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
             }
             if (m_ringOut > 0) m_ringOut = std::max<std::int64_t>(0, m_ringOut - count);
         }
+        if (snapshot) applyMasterEffects(io, *snapshot, offset, count);
         mixMetronome(io,offset,count,snapshot ? snapshot->tempo : TempoMap{});
         if (m_playing) m_position=std::min<std::int64_t>(INT64_MAX/2,m_position+count);
         offset+=count;
@@ -844,6 +863,7 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
             }
             if (m_ringOut > 0) m_ringOut = std::max<std::int64_t>(0, m_ringOut - count);
         }
+        applyMasterEffects(io, snapshot, offset, count);
         mixMetronome(io,offset,count,snapshot.tempo);
         if(m_playing)m_position=std::min<std::int64_t>(INT64_MAX/2,m_position+count);
         if (m_countInTarget>=0 && m_position>=m_countInTarget) m_countInTarget=-1;

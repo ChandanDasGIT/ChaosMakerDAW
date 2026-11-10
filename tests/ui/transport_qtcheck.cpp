@@ -2363,6 +2363,97 @@ private slots:
     void chaosverb_page_shows_its_cards_and_edits_the_track() {
         checkMixEffectPage("chaosverb",{"Character","Space","Movement","Tone"},"decay","mode",false);
     }
+    void the_master_strip_opens_the_master_effects_and_a_limiter_goes_on_the_mix() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks); tracks.addVocalTrack();
+        auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
+        const auto restore=qScopeGuard([&] { mixer->setVisible(false); mixer->setProperty("trackModel",QVariant()); });
+        mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true); QTest::qWait(30);
+        auto* fxButton=visualItem(mixer,"mixerMasterFx"); QVERIFY(fxButton); QVERIFY(fxButton->isVisible());
+        auto* strip=visualItem(mixer,"mixerMasterStrip"); QVERIFY(strip);
+        const QRectF button=fxButton->mapRectToItem(strip,QRectF(0,0,fxButton->width(),fxButton->height()));
+        QVERIFY(button.left()>=0 && button.right()<=strip->width());   // fits on the strip
+        QVERIFY(window->grabWindow().save("/tmp/chaosmaker-master-strip.png"));
+        click(fxButton);
+        auto* panel=qobject_cast<QQuickWindow*>(visualObject(window->contentItem(),"masterEffectsPanel")); QVERIFY(panel);
+        QTRY_VERIFY(panel->isVisible());
+        QCOMPARE(panel->title(),QString("Master · Effects"));
+        auto* add=visualItem(panel->contentItem(),"addEffectButton"); QVERIFY(add); QVERIFY(add->isEnabled());
+        click(add);
+        QQuickItem* choice=nullptr;
+        QTRY_VERIFY((choice=visualItem(panel->contentItem(),"addEffect_limiter")) && choice->isVisible());
+        QVERIFY(!visualItem(panel->contentItem(),"addEffect_guitarsuite"));
+        QTest::qWait(30); choice=visualItem(panel->contentItem(),"addEffect_limiter"); click(choice);
+        QTRY_COMPARE(tracks.project().master().effects.size(),std::size_t(1));
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("limiter"));
+        auto* page=visualItem(panel->contentItem(),"trackMixEffect"); QVERIFY(page); QTRY_VERIFY(page->isVisible());
+        QVERIFY(visualItem(page,"mixEffectCard_Limiter"));
+        QVERIFY(visualItem(page,"mixEffectMeter")->isVisible());
+        QTRY_VERIFY(controller->mixEffectProcessor(tracks.masterTrackId(),"limiter",true));
+        QCOMPARE(tracks.count(),1);
+        auto* close=visualItem(panel->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!panel->isVisible());
+    }
+    void tap_tempo_sets_the_bpm_from_the_chip_and_shift_t() {
+        auto* controller=EngineController::instance();
+        const auto restore=qScopeGuard([&] { controller->setBpm(120); });
+        controller->setBpm(120);
+        auto* tap=visualItem(window->contentItem(),"tapTempo"); QVERIFY(tap); QVERIFY(tap->isVisible());
+        QTest::qWait(2200);                                     // a fresh count
+        for(int i=0;i<4;++i) { click(tap); QTest::qWait(400); } // 400 ms apart: 150 BPM
+        QVERIFY2(std::abs(controller->bpm()-150.0)<12.0, qPrintable(QString::number(controller->bpm())));
+        QTest::qWait(2200);
+        window->requestActivate(); auto* other=visualItem(window->contentItem(),"otherFocus"); if(other) other->forceActiveFocus();
+        for(int i=0;i<4;++i) { QTest::keyClick(window,Qt::Key_T,Qt::ShiftModifier); QTest::qWait(600); }   // 100 BPM
+        QVERIFY2(std::abs(controller->bpm()-100.0)<8.0, qPrintable(QString::number(controller->bpm())));
+        auto* field=visualItem(window->contentItem(),"bpmField"); QVERIFY(field);
+        QTRY_COMPARE(field->property("text").toString(),QString::number(controller->bpm()));
+    }
+    void clip_menu_reverses_normalises_and_inverts_audio_clips() {
+        TrackListWrapper tracks; tracks.setSampleRate(48000);
+        const int audioTrack=tracks.addAudioTrack(), harmonium=tracks.addInstrumentTrackOfType("Harmonium");
+        auto audio=std::make_shared<AudioData>(); audio->path="tone.wav"; audio->sampleRate=48000; audio->frames=96000;
+        audio->channels={std::vector<float>(96000,0.0f)};
+        for(int i=0;i<96000;++i) audio->channels[0][std::size_t(i)]=0.5f*std::sin(float(i)*0.05f)*float(i)/96000.0f;
+        audio->buildWaveform();
+        QVERIFY(tracks.attachTake(audioTrack,0,audio));
+        const int clip=tracks.project().findTrack(audioTrack)->audioClips[0].id;
+        const int pattern=tracks.addClipAtBeat(harmonium,0,2);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); });
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true); QTest::qWait(30);
+        const auto menuOn=[&](int id) {
+            auto* block=visualItem(timeline,"clipBlock"+QString::number(id)); QVERIFY(block);
+            click(block);
+            QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,block->mapToScene(QPointF(30,30)).toPoint());
+            QTRY_VERIFY(visualItem(window->contentItem(),"clipReverseAction")->isVisible());
+        };
+        const auto pick=[&](const char* name) {
+            QTest::qWait(300);   // let the menu finish opening
+            auto* item=visualItem(window->contentItem(),name); QVERIFY(item); QVERIFY(item->isEnabled()); click(item);
+        };
+        const auto label=[&] {
+            auto* block=visualItem(timeline,"clipBlock"+QString::number(clip));
+            for(auto* child:block->childItems()) if(child->property("text").isValid()) return child->property("text").toString();
+            return QString();
+        };
+        menuOn(clip); pick("clipReverseAction");
+        QTRY_VERIFY(tracks.project().findTrack(audioTrack)->audioClips[0].reversed);
+        QTRY_VERIFY(label().contains("Reversed"));
+        menuOn(clip); pick("clipPolarityAction");
+        QTRY_VERIFY(tracks.project().findTrack(audioTrack)->audioClips[0].polarityInverted);
+        QTRY_VERIFY(label().contains(QString::fromUtf8("Ø")));
+        menuOn(clip); pick("clipNormaliseAction");
+        QTRY_VERIFY(tracks.project().findTrack(audioTrack)->audioClips[0].gainDb>5.0f);   // a 0.5 peak: +6 dB
+        QVERIFY(tracks.undo()); QVERIFY(tracks.undo()); QVERIFY(tracks.undo());
+        QTRY_VERIFY(!label().contains("Reversed"));
+        // A pattern clip has no audio to reverse: the items are greyed out.
+        menuOn(pattern);
+        QVERIFY(!visualItem(window->contentItem(),"clipReverseAction")->isEnabled());
+        QVERIFY(!visualItem(window->contentItem(),"clipNormaliseAction")->isEnabled());
+        QVERIFY(!visualItem(window->contentItem(),"clipPolarityAction")->isEnabled());
+        QTest::keyClick(window,Qt::Key_Escape);
+    }
     void delay_page_shows_its_cards_and_edits_the_track() {
         checkMixEffectPage("delay",{"Time","Repeats","Output"},"feedback","division",false);
     }

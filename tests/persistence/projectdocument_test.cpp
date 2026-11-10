@@ -1,4 +1,5 @@
 #include "testkit.h"
+#include <nlohmann/json.hpp>
 #include "persistence/projectdocument.h"
 #include <filesystem>
 #include <fstream>
@@ -443,4 +444,67 @@ TEST(projectdocument, mixing_plugin_settings_round_trip_and_are_optional)
     for (const char* bad : {R"(,"mixEffects":[])", R"(,"mixEffects":{"flanger":{}})",
                             R"(,"mixEffects":{"compressor":{"values":{"ratio":"x"}}})"})
         CHECK(!ProjectDocument::deserialize(document(bad), loaded, error, 48000.0));
+}
+
+TEST(projectdocument, the_master_tracks_effects_round_trip_and_are_optional)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    project.addTrack(TrackKind::Audio, "Vox");
+    const int master = Project::MasterTrackId;
+    CHECK(project.setTrackEffects(master, {"eq", "compressor", "limiter"}));
+    CHECK(project.setTrackEqBand(master, 2, -4.5f));
+    auto limiter = mixfx::defaults(mixfx::Limiter);
+    limiter.values["ceiling"] = -2;
+    CHECK(project.setTrackMixEffect(master, mixfx::Limiter, limiter));
+    const std::string json = ProjectDocument::serialize(project, {}, {""});
+
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(json, loaded, error, 48000.0));
+    const auto& back = loaded.project.master();
+    CHECK(back.effects.size() == 3 && back.effects[2].type == "limiter");
+    CHECK(back.eqGainDb[2] == -4.5f);
+    CHECK(back.mixEffect(mixfx::Limiter).values.at("ceiling") == -2.0f);
+    CHECK(loaded.project.tracks().size() == 1);
+
+    const auto document = [](const std::string& field) {
+        return R"({"format":"ChaosMakerProject","version":2,"project":{"version":1,"bpm":120.0,
+            "sampleRate":48000.0,"numerator":4,"denominator":4)" + field + R"(,"tracks":[{"name":"T1","type":"Audio",
+            "volume":1.0,"eq":[0,0,0,0,0,0,0,0,0,0],"clips":[]}]},"trackEffects":[""]})";
+    };
+    CHECK(ProjectDocument::deserialize(document(""), loaded, error, 48000.0));   // saved before G9
+    CHECK(loaded.project.master().effects.empty());
+    for (const char* bad : {R"(,"master":[])", R"(,"master":{"effects":["guitarsuite"]})",
+                            R"(,"master":{"effects":["eq","eq"]})", R"(,"master":{"eq":[1,2]})",
+                            R"(,"master":{"mixEffects":{"limiter":{"values":{"ceiling":"x"}}}})"})
+        CHECK(!ProjectDocument::deserialize(document(bad), loaded, error, 48000.0));
+}
+
+TEST(projectdocument, clip_tool_flags_round_trip_and_are_optional)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    auto& track = project.addTrack(TrackKind::Audio, "Vox");
+    AudioClip clip;
+    clip.poolId = "take";
+    clip.length = 1000;
+    clip.reversed = true;
+    clip.polarityInverted = true;
+    CHECK(project.addAudioClip(track.id, clip) > 0);
+    TrackList::MediaPaths paths;
+    paths.insert("take");
+    const std::string json = ProjectDocument::serialize(project, paths, {""});
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(json, loaded, error, 48000.0));
+    const auto& back = loaded.project.tracks()[0]->audioClips[0];
+    CHECK(back.reversed && back.polarityInverted);
+    auto text = nlohmann::json::parse(json);
+    auto& c = text["project"]["tracks"][0]["clips"][0];
+    c.erase("reversed"); c.erase("polarityInverted");           // saved before G14
+    CHECK(ProjectDocument::deserialize(text.dump(), loaded, error, 48000.0));
+    CHECK(!loaded.project.tracks()[0]->audioClips[0].reversed && !loaded.project.tracks()[0]->audioClips[0].polarityInverted);
+    c["reversed"] = "yes";
+    CHECK(!ProjectDocument::deserialize(text.dump(), loaded, error, 48000.0));
 }

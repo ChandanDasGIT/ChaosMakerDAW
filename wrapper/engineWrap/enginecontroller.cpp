@@ -321,6 +321,13 @@ void EngineController::syncTrackEffects()
         for (const auto& slot : track->effects) types.push_back(slot.type);
         SnapshotBuilder::ensureMixEffects(m_trackEffects[track->id], types, rate, frames);
     }
+    {   // The master track's effects (G9), made like a track's.
+        const auto& master = m_project->project().master();
+        trackEffects(master.id);
+        std::vector<std::string> types;
+        for (const auto& slot : master.effects) types.push_back(slot.type);
+        SnapshotBuilder::ensureMixEffects(m_trackEffects[master.id], types, rate, frames);
+    }
     SnapshotBuilder::syncTrackEq(m_project->project(), [this](int id) {
         auto it = m_trackEffects.find(id);
         return it != m_trackEffects.end() ? &it->second : nullptr;

@@ -173,6 +173,30 @@ Rectangle {
                     }
 
                     ToolButton {
+                        objectName: "mixerMasterFx"
+                        text: "FX"
+                        implicitWidth: 30
+                        implicitHeight: 22
+                        enabled: !!root.trackModel
+                        onClicked: masterEffects.open()
+                        contentItem: Text {
+                            text: parent.text
+                            color: root.trackModel && root.trackModel.masterEffects.length > 0 ? Theme.accent : Theme.textMuted
+                            font.pixelSize: 9
+                            font.bold: true
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        background: Rectangle {
+                            radius: 3
+                            color: parent.down ? Theme.controlBgActive : parent.hovered ? Theme.controlBgHover : Theme.controlBg
+                            border.color: root.trackModel && root.trackModel.masterEffects.length > 0 ? Theme.accent : Theme.controlBorder
+                        }
+                        ToolTip.visible: hovered
+                        ToolTip.text: "Effects on the whole mix (master)"
+                    }
+
+                    ToolButton {
                         text: "CLR"
                         implicitWidth: 34
                         implicitHeight: 22
@@ -514,5 +538,19 @@ Rectangle {
             }
             ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
         }
+    }
+
+    // The master track's FX window (restMap G9): the same window as a track's.
+    TrackEffectsPanel {
+        id: masterEffects
+        objectName: "masterEffectsPanel"
+        trackModel: root.trackModel
+        trackId: root.trackModel ? root.trackModel.masterTrackId : -1
+        trackName: "Master"
+        trackType: "Master"
+        eqBands: root.trackModel ? root.trackModel.masterEqBands : []
+        effects: root.trackModel ? root.trackModel.masterEffects : []
+        hasLiveInput: false
+        recordDry: false
     }
 }

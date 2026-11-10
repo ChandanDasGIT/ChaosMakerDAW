@@ -684,3 +684,27 @@ TEST(snapshotbuilder, a_mixing_plugin_runs_at_its_place_in_the_chain_with_the_tr
         [&](int id) -> const SnapshotBuilder::TrackEffects* { return id == vocal.id ? &fx : nullptr; }, false);
     CHECK(without->tracks[0].monitorChain.size() == 1);
 }
+
+TEST(snapshotbuilder, the_master_tracks_effects_run_on_the_mix_in_order)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    project.addTrack(TrackKind::Audio, "Vox");
+    CHECK(project.setTrackEffects(Project::MasterTrackId, {"chaoseq", "limiter"}));
+    auto limiter = mixfx::defaults(mixfx::Limiter);
+    limiter.values["ceiling"] = -6;
+    CHECK(project.setTrackMixEffect(Project::MasterTrackId, mixfx::Limiter, limiter));
+    SnapshotBuilder::TrackEffects master;
+    master.chaosEq = std::make_shared<ChaosEq>();
+    master.playbackChaosEq = std::make_shared<ChaosEq>();
+    SnapshotBuilder::ensureMixEffects(master, {"chaoseq", "limiter"}, 48000.0, 256);
+    std::unordered_map<int, SnapshotBuilder::TrackEffects> effects{{Project::MasterTrackId, master}};
+    SnapshotBuilder::syncTrackEq(project, effects);
+    CHECK(master.playbackMixEffects.at("limiter")->parameter("ceiling")->get() == -6.0f);
+    auto snapshot = SnapshotBuilder::buildPlaybackSnapshot(project, nullptr,
+        [&](int id) -> const SnapshotBuilder::TrackEffects* { return id == Project::MasterTrackId ? &master : nullptr; }, false);
+    CHECK(snapshot->masterEffects.size() == 2);
+    CHECK(snapshot->masterEffects.size() == 2 && snapshot->masterEffects[0] == master.playbackChaosEq.get()
+          && snapshot->masterEffects[1] == master.playbackMixEffects.at("limiter").get());
+    CHECK(snapshot->tracks.size() == 1);   // the master is not a track of the mix
+}

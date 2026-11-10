@@ -32,6 +32,11 @@ struct AudioClip {
     std::int64_t fadeOut = 0;
     float gainDb = 0.0f;
     bool effectsPrinted = true;
+    // Clip tools (restMap G14), non-destructive. A reversed clip reads a reversed copy of its
+    // audio (TrackList::clipAudio), so sourceOffset counts in that copy and trims / splits work
+    // the same way; polarity inverted plays the clip upside down (gain times -1).
+    bool reversed = false;
+    bool polarityInverted = false;
     // Pattern notes. startBeat is measured from the clip's content origin
     // (start - sourceOffset), so trims/splits keep notes fixed in time like audio.
     std::vector<MidiNote> notes;
@@ -90,6 +95,14 @@ struct Track {
 
 class Project {
 public:
+    // The master track (restMap G9): its insert effects run on the whole mix, before the master
+    // fader. It has this fixed id; findTrack() finds it, so the effect calls (add, remove, move,
+    // EQ, Chaos EQ, mixing plugins) work on it, but it is never in tracks(): the track list,
+    // timeline, mixer lanes, solo / mute and recording never see it.
+    static constexpr int MasterTrackId = 2147483000;
+    Project();
+    Track& master() noexcept { return m_master; }
+    const Track& master() const noexcept { return m_master; }
     Track& addTrack(TrackKind kind, const std::string& name, const std::string& type = {});
     // Removing a track is an undoable step: undo puts it back (same id, position and content).
     void removeTrack(int id);
@@ -196,6 +209,7 @@ private:
     std::vector<ClipEdit> m_history;
     std::size_t m_historyPosition = 0;
     std::vector<std::unique_ptr<Track>> m_tracks;
+    Track m_master;
     TempoMap m_tempo;
     float m_masterVolume = 1.0f;
     bool m_masterMuted = false;
