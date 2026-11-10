@@ -41,6 +41,40 @@ double levelForDb(double db) noexcept
 double unityLevel() noexcept { return std::cbrt(1.0 / maxGain()); }
 } // namespace envelopescale
 
+double curveProgress(CurveShape shape, double t) noexcept
+{
+    t = std::isfinite(t) ? std::clamp(t, 0.0, 1.0) : 0.0;
+    switch (shape) {
+    case CurveShape::Linear: return t;
+    case CurveShape::Smooth: return t * t * (3.0 - 2.0 * t);
+    case CurveShape::FastStart: { const double u = 1.0 - t; return 1.0 - u * u * u; }
+    case CurveShape::FastEnd: return t * t * t;
+    case CurveShape::Hold: return t >= 1.0 ? 1.0 : 0.0;
+    }
+    return t;
+}
+
+namespace {
+constexpr std::string_view shapeIds[curveShapeCount] = {"linear", "smooth", "fastStart", "fastEnd", "hold"};
+bool knownShape(CurveShape shape) noexcept
+{
+    const int value = static_cast<int>(shape);
+    return value >= 0 && value < curveShapeCount;
+}
+}
+
+std::string_view curveShapeId(CurveShape shape) noexcept
+{
+    return knownShape(shape) ? shapeIds[static_cast<int>(shape)] : shapeIds[0];
+}
+
+std::optional<CurveShape> curveShapeFromId(std::string_view id) noexcept
+{
+    for (int i = 0; i < curveShapeCount; ++i)
+        if (shapeIds[i] == id) return static_cast<CurveShape>(i);
+    return std::nullopt;
+}
+
 double VolumeEnvelope::levelAt(std::int64_t position) const noexcept
 {
     if (m_points.empty()) return envelopescale::unityLevel();
@@ -51,7 +85,7 @@ double VolumeEnvelope::levelAt(std::int64_t position) const noexcept
     const auto& b = *next;
     const auto& a = *(next - 1);
     const double t = double(position - a.position) / double(b.position - a.position);
-    return a.level + (b.level - a.level) * t;
+    return a.level + (b.level - a.level) * curveProgress(a.shape, t);
 }
 
 double VolumeEnvelope::gainAt(std::int64_t position) const noexcept
@@ -88,11 +122,18 @@ bool VolumeEnvelope::removePoint(int index)
     return true;
 }
 
+bool VolumeEnvelope::setPointShape(int index, CurveShape shape)
+{
+    if (index < 0 || index >= static_cast<int>(m_points.size()) || !knownShape(shape)) return false;
+    m_points[static_cast<std::size_t>(index)].shape = shape;
+    return true;
+}
+
 bool VolumeEnvelope::setPoints(std::vector<EnvelopePoint> points)
 {
     for (std::size_t i = 0; i < points.size(); ++i) {
         const auto& p = points[i];
-        if (p.position < 0 || !std::isfinite(p.level) || p.level < 0.0 || p.level > 1.0
+        if (p.position < 0 || !std::isfinite(p.level) || p.level < 0.0 || p.level > 1.0 || !knownShape(p.shape)
             || (i > 0 && p.position <= points[i - 1].position))
             return false;
     }
@@ -106,7 +147,7 @@ void VolumeEnvelope::rescale(double ratio)
     std::vector<EnvelopePoint> scaled;
     scaled.reserve(m_points.size());
     for (const auto& p : m_points) {
-        const EnvelopePoint moved{std::llround(double(p.position) * ratio), p.level};
+        const EnvelopePoint moved{std::llround(double(p.position) * ratio), p.level, p.shape};
         if (!scaled.empty() && scaled.back().position >= moved.position) scaled.back() = moved;
         else scaled.push_back(moved);
     }

@@ -139,6 +139,8 @@ public:
     int addEnvelopePoint(int trackId, std::int64_t position, double level);
     bool moveEnvelopePoint(int trackId, int index, std::int64_t position, double level, bool continueEdit = false);
     bool removeEnvelopePoint(int trackId, int index);
+    // The curve from a point to the next (restMap G6b); undoable. False for a bad track / index.
+    bool setEnvelopePointShape(int trackId, int index, automation::CurveShape shape);
     bool setEnvelopeBypassed(int trackId, bool bypassed);
     bool setEnvelopeShown(int trackId, bool shown);
     bool setEnvelopeOverClips(int trackId, bool overClips);

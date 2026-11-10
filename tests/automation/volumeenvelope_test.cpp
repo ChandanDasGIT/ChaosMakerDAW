@@ -105,3 +105,68 @@ TEST(volumeenvelope, restoring_content_keeps_the_view_state)
     b.restoreContent(a);
     CHECK(b.sameContent(a) && b.shown() && b.overClips());
 }
+
+TEST(volumeenvelope, curve_shapes_run_from_the_point_to_the_next)
+{
+    using automation::CurveShape;
+    using automation::curveProgress;
+    for (int i = 0; i < automation::curveShapeCount; ++i) {
+        const auto shape = static_cast<CurveShape>(i);
+        CHECK(curveProgress(shape, 0.0) == 0.0);
+        CHECK(curveProgress(shape, 1.0) == 1.0);
+        double last = 0.0;
+        for (double t = 0.0; t <= 1.0; t += 0.01) {   // never turns back
+            const double p = curveProgress(shape, t);
+            CHECK(p >= last - 1e-12 && p >= 0.0 && p <= 1.0);
+            last = p;
+        }
+        CHECK(automation::curveShapeFromId(automation::curveShapeId(shape)) == shape);
+    }
+    CHECK_NEAR(curveProgress(CurveShape::Linear, 0.25), 0.25, 1e-12);
+    CHECK_NEAR(curveProgress(CurveShape::Smooth, 0.5), 0.5, 1e-12);
+    CHECK(curveProgress(CurveShape::Smooth, 0.1) < 0.1 && curveProgress(CurveShape::Smooth, 0.9) > 0.9);
+    CHECK(curveProgress(CurveShape::FastStart, 0.25) > 0.5);
+    CHECK(curveProgress(CurveShape::FastEnd, 0.75) < 0.5);
+    CHECK(curveProgress(CurveShape::Hold, 0.999) == 0.0);
+    CHECK(!automation::curveShapeFromId("bezier"));
+    CHECK(!automation::curveShapeFromId(""));
+}
+
+TEST(volumeenvelope, a_points_shape_bends_its_segment_and_survives_edits)
+{
+    using automation::CurveShape;
+    VolumeEnvelope envelope;
+    CHECK(envelope.addPoint(0, 0.0) == 0);
+    CHECK(envelope.addPoint(1000, 1.0) == 1);
+    CHECK(envelope.points()[0].shape == CurveShape::Linear);   // new points are straight
+    CHECK_NEAR(envelope.levelAt(250), 0.25, 1e-12);
+
+    CHECK(envelope.setPointShape(0, CurveShape::Hold));
+    CHECK(envelope.levelAt(999) == 0.0);
+    CHECK(envelope.levelAt(1000) == 1.0);
+    CHECK(envelope.setPointShape(0, CurveShape::FastStart));
+    CHECK(envelope.levelAt(250) > 0.5);
+    CHECK(envelope.setPointShape(1, CurveShape::Smooth));       // the last point: nothing to bend
+    CHECK(envelope.levelAt(5000) == 1.0);
+    CHECK(!envelope.setPointShape(2, CurveShape::Linear));
+    CHECK(!envelope.setPointShape(-1, CurveShape::Linear));
+    CHECK(!envelope.setPointShape(0, static_cast<CurveShape>(99)));
+
+    // Moving and rescaling keep the shape; a point added inside the segment is straight and the
+    // earlier point keeps its shape up to it.
+    CHECK(envelope.movePoint(0, 10, 0.1));
+    CHECK(envelope.points()[0].shape == CurveShape::FastStart);
+    envelope.rescale(2.0);
+    CHECK(envelope.points()[0].shape == CurveShape::FastStart && envelope.points()[1].shape == CurveShape::Smooth);
+    CHECK(envelope.addPoint(1000, 0.5) == 1);
+    CHECK(envelope.points()[0].shape == CurveShape::FastStart && envelope.points()[1].shape == CurveShape::Linear);
+
+    // The shape is part of the undoable content; an unknown shape does not load.
+    VolumeEnvelope copy;
+    copy.restoreContent(envelope);
+    CHECK(copy.sameContent(envelope));
+    CHECK(copy.setPointShape(0, CurveShape::Linear));
+    CHECK(!copy.sameContent(envelope));
+    CHECK(!copy.setPoints({{0, 0.5, static_cast<CurveShape>(7)}}));
+    CHECK(copy.points().size() == 3);
+}

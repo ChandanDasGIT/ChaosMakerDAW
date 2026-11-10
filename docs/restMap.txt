@@ -14,8 +14,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 
 
 NEXT UP (2026-11-10), the user's order:
-  1. G6 volume envelope: all 5 steps DONE 2026-11-10, NOT COMMITTED yet (the user to try it
-     and say when to commit).
+  1. G6 volume envelope committed (0597318); G6b curve shapes DONE 2026-11-10, not committed.
   2. G7 mixing plugins (compressor, VintageVerb-style reverb, de-esser, plain reverb ...).
   3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
      reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
@@ -108,6 +107,30 @@ Done items stay further down as the record.
         settings: empty log.
         Not now: curve shapes other than straight lines, pan / FX parameter envelopes, lane
         height resizing.
+[x] G6b Envelope curve shapes (the user, 2026-11-10). DONE 2026-11-10 (uncommitted).
+        Each point has the shape of the curve to the next point: Linear (default, new points),
+        Smooth (S-curve), Fast start, Fast end, Hold (flat, then a jump at the next point); no
+        Bezier for now. Right-click a point still deletes it; Shift+right-click a point opens its
+        shape menu (current one ticked; greyed for the last point, which has no curve after it)
+        with "Delete point".
+        - automation::CurveShape, curveProgress (in level space, so the curve is what is heard),
+          ids "linear" / "smooth" / "fastStart" / "fastEnd" / "hold"; EnvelopePoint::shape;
+          setPointShape; moves and rescales keep the shape.
+        - Undoable (Project / TrackList setEnvelopePointShape; refused while recording). Saved as
+          "shape" per point; older points open as Linear; an unknown shape does not load.
+        - Engine: no change (levelAt follows the shape per sample).
+        - TrackList::envelopeCurve / envelopeLevelAtBeat: the lane draws backend samples (every
+          2 px, points and the sample before each point exact), so QML has no curve maths.
+          TrackListWrapper: envelopeShapes [{id, name}], setEnvelopePointShape(id), envelopeCurve
+          [QPointF(beat, level)], envelopeLevelAt; the points role carries "shape".
+        - Timeline.qml envelopePointMenu (items made by an Instantiator from envelopeShapes); the
+          Bypass item's tick binding is restored after a click.
+        Tests: backendtests volumeenvelope (shapes), tracklist
+        an_envelope_points_curve_shape_is_one_undo_step, projectdocument, audioengine_midi
+        volume_envelope_curve_shapes_sound_as_drawn; wrappertests qtvolumeenvelope; transport_ui
+        volume_envelope_lane_edits_points_bypasses_and_keeps_rows_aligned (Shift+right-click
+        menu; waits 300 ms for the menu to open before clicking: an immediate click was
+        sometimes lost in the test). App run with throwaway settings: empty log.
 [ ] G7  More plugins (the user, 2026-11-10): for any track, mostly for vocals. Today a track's
         FX list offers only the 10-band EQ, Chaos EQ and gain; the guitar pedals (incl. a
         compressor and a reverb) live inside GuitarSuite only. Wanted:

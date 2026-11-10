@@ -584,6 +584,16 @@ bool Project::removeEnvelopePoint(int trackId, int index)
     return true;
 }
 
+bool Project::setEnvelopePointShape(int trackId, int index, automation::CurveShape shape)
+{
+    auto* track = findTrack(trackId);
+    if (!track) return false;
+    auto before = track->volumeEnvelope;
+    if (!track->volumeEnvelope.setPointShape(index, shape)) return false;
+    if (!track->volumeEnvelope.sameContent(before)) rememberEnvelopeEdit(trackId, std::move(before));
+    return true;
+}
+
 bool Project::setEnvelopeBypassed(int trackId, bool bypassed)
 {
     auto* track = findTrack(trackId);

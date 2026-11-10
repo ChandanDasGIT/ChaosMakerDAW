@@ -3,12 +3,13 @@ import QtQuick.Controls
 
 // A track's volume envelope (restMap G6): the line, its shaded area and its points. Used in the
 // track's own lane under the clips and drawn over the clips; levels are 0 (bottom, -inf dB) ..
-// 1 (top, +6 dB) on the backend's fader-shaped scale, so straight lines here are what is heard.
+// 1 (top, +6 dB) on the backend's fader-shaped scale. The line (straight or curved, G6b) is
+// sampled from the backend, so what is drawn is what is heard.
 Item {
     id: lane
     property var trackModel: null
     property int envelopeTrackId: -1
-    property var points: []          // [{beat, level}] in time order
+    property var points: []          // [{beat, level, shape}] in time order
     property bool bypassed: false
     property bool overClips: false
     property real beatWidth: 1
@@ -16,6 +17,8 @@ Item {
     property real viewWidth: 0
     property int selectedPoint: -1
     signal menuRequested(int trackId, real x, real y)
+    // Shift+right-click on a point: its curve shape menu (scene coordinates).
+    signal pointMenuRequested(int index, real x, real y)
 
     readonly property real unityLevel: trackModel ? trackModel.envelopeUnityLevel : 0.8
     readonly property color lineColour: bypassed ? Theme.timeline.envelopeBypassed : Theme.timeline.envelopeLine
@@ -23,18 +26,7 @@ Item {
     function yForLevel(level) { return (1 - level) * height }
     function levelForY(y) { return Math.max(0, Math.min(1, 1 - y / Math.max(1, height))) }
     function levelAtX(x) {
-        if (points.length === 0) return unityLevel
-        const beat = x / beatWidth
-        if (beat <= points[0].beat) return points[0].level
-        const last = points[points.length - 1]
-        if (beat >= last.beat) return last.level
-        for (let i = 1; i < points.length; ++i) {
-            if (beat <= points[i].beat) {
-                const a = points[i - 1], b = points[i]
-                return a.level + (b.level - a.level) * (beat - a.beat) / Math.max(1e-12, b.beat - a.beat)
-            }
-        }
-        return last.level
+        return trackModel ? trackModel.envelopeLevelAt(envelopeTrackId, x / beatWidth) : unityLevel
     }
     // Over the clips, only the pointer near the line belongs to the envelope; the rest (presses
     // and the hand cursor) stays with the clips.
@@ -66,13 +58,18 @@ Item {
             const ctx = getContext("2d")
             ctx.clearRect(0, 0, width, height)
             if (width <= 0) return
-            // Corners of the line inside the view: its ends plus every point in between.
-            const corners = [{ x: 0, y: lane.yForLevel(lane.levelAtX(x)) }]
-            for (const p of lane.points) {
-                const px = p.beat * lane.beatWidth - x
-                if (px > 0 && px < width) corners.push({ x: px, y: lane.yForLevel(p.level) })
+            // The line inside the view, sampled every 2 px by the backend (points and Hold jumps
+            // exact), so curves follow their shapes.
+            const samples = lane.trackModel
+                ? lane.trackModel.envelopeCurve(lane.envelopeTrackId, x / lane.beatWidth,
+                                                (x + width) / lane.beatWidth, Math.max(1, Math.ceil(width / 2)))
+                : []
+            const corners = []
+            for (const s of samples) corners.push({ x: s.x * lane.beatWidth - x, y: lane.yForLevel(s.y) })
+            if (corners.length === 0) {
+                const y = lane.yForLevel(lane.unityLevel)
+                corners.push({ x: 0, y: y }, { x: width, y: y })
             }
-            corners.push({ x: width, y: lane.yForLevel(lane.levelAtX(x + width)) })
             if (!lane.overClips) {
                 ctx.fillStyle = lane.bypassed ? Qt.rgba(0.4, 0.4, 0.4, 0.15) : Theme.timeline.envelopeFill
                 ctx.beginPath()
@@ -161,8 +158,13 @@ Item {
                 }
                 onReleased: dragging = false
                 onCanceled: dragging = false
-                // Right-click a point: delete it.
+                // Right-click a point: delete it. Shift+right-click: its curve shape menu.
                 onClicked: mouse => {
+                    if (mouse.button === Qt.RightButton && (mouse.modifiers & Qt.ShiftModifier)) {
+                        const at = mapToItem(null, mouse.x, mouse.y)
+                        lane.pointMenuRequested(pointItem.index, at.x, at.y)
+                        return
+                    }
                     if (mouse.button === Qt.RightButton && lane.trackModel) {
                         // This delegate goes away during the removal: nothing after it here.
                         const owner = lane, point = pointItem.index

@@ -1,6 +1,7 @@
 #include "testkit.h"
 #include "wrapper/session/tracklistwrap/tracklistwrapper.h"
 
+#include <QPointF>
 #include <QVariantMap>
 
 #include <cmath>
@@ -115,4 +116,48 @@ TEST(qtvolumeenvelope, envelope_beats_follow_a_tempo_change)
     const auto list = tracks.data(tracks.index(0), TrackListWrapper::EnvelopePointsRole).toList();
     CHECK_NEAR(list[0].toMap()["beat"].toDouble(), 2.0, 1e-9);   // same sample, half the tempo
     CHECK(tracks.project().findTrack(track)->volumeEnvelope.points()[0].position == 96000);
+}
+
+TEST(qtvolumeenvelope, curve_shapes_are_chosen_by_id_and_the_drawn_curve_is_the_played_one)
+{
+    TrackListWrapper tracks;
+    const int track = tracks.addAudioTrack();
+    const auto shapes = tracks.envelopeShapes();
+    CHECK(shapes.size() == 5);
+    QStringList ids, names;
+    for (const auto& s : shapes) { ids << s.toMap()["id"].toString(); names << s.toMap()["name"].toString(); }
+    CHECK(ids == QStringList({"linear", "smooth", "fastStart", "fastEnd", "hold"}));
+    CHECK(names == QStringList({"Linear", "Smooth", "Fast start", "Fast end", "Hold"}));
+
+    CHECK(tracks.addEnvelopePoint(track, 0.0, 0.2) == 0);
+    CHECK(tracks.addEnvelopePoint(track, 4.0, 0.9) == 1);
+    CHECK(tracks.data(tracks.index(0), TrackListWrapper::EnvelopePointsRole).toList()[0].toMap()["shape"].toString() == "linear");
+    CHECK(tracks.setEnvelopePointShape(track, 0, "hold"));
+    CHECK(!tracks.setEnvelopePointShape(track, 0, "bezier"));
+    CHECK(!tracks.setEnvelopePointShape(track, 9, "smooth"));
+    CHECK(tracks.data(tracks.index(0), TrackListWrapper::EnvelopePointsRole).toList()[0].toMap()["shape"].toString() == "hold");
+
+    // Hold: flat until the next point, then the jump, exactly at the point.
+    CHECK_NEAR(tracks.envelopeLevelAt(track, 3.99), 0.2, 1e-12);
+    CHECK_NEAR(tracks.envelopeLevelAt(track, 4.0), 0.9, 1e-12);
+    const auto curve = tracks.envelopeCurve(track, 0.0, 8.0, 16);
+    CHECK(curve.size() >= 17);
+    double last = -1;
+    bool jump = false;
+    for (int i = 0; i < curve.size(); ++i) {
+        const QPointF p = curve[i].toPointF();
+        CHECK(p.x() >= last);
+        last = p.x();
+        CHECK_NEAR(p.y(), tracks.envelopeLevelAt(track, p.x()), 1e-9);
+        if (i > 0 && std::abs(p.x() - curve[i - 1].toPointF().x()) < 1e-3 && p.y() - curve[i - 1].toPointF().y() > 0.6) jump = true;
+    }
+    CHECK(jump);   // the sample just before the point and the point itself: a vertical step
+
+    CHECK(tracks.setEnvelopePointShape(track, 0, "smooth"));
+    const double quarter = tracks.envelopeLevelAt(track, 1.0);
+    CHECK(quarter < 0.2 + 0.7 * 0.25);   // eases out of the first point
+    CHECK(tracks.undo());
+    CHECK(tracks.data(tracks.index(0), TrackListWrapper::EnvelopePointsRole).toList()[0].toMap()["shape"].toString() == "hold");
+    CHECK(tracks.envelopeCurve(track, 2.0, 1.0, 4).isEmpty());
+    CHECK(tracks.envelopeCurve(-5, 0.0, 1.0, 4).isEmpty());
 }

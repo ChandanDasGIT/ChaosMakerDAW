@@ -101,7 +101,8 @@ std::string ProjectDocument::serialize(const Project& project,
             const auto& envelope = track->volumeEnvelope;
             json pointsJson = json::array();
             for (const auto& p : envelope.points())
-                pointsJson.push_back({{"position", std::to_string(p.position)}, {"level", p.level}});
+                pointsJson.push_back({{"position", std::to_string(p.position)}, {"level", p.level},
+                                      {"shape", std::string(automation::curveShapeId(p.shape))}});
             trackObj["volumeEnvelope"] = {{"points", std::move(pointsJson)}, {"bypassed", envelope.bypassed()},
                                           {"shown", envelope.shown()}, {"overClips", envelope.overClips()}};
         }
@@ -332,7 +333,15 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
                         valid = false;
                         break;
                     }
-                    points.push_back({position, pj["level"].get<double>()});
+                    // "shape" is optional: projects saved before G6b have straight lines.
+                    auto shape = automation::CurveShape::Linear;
+                    if (pj.contains("shape")) {
+                        const auto known = pj["shape"].is_string()
+                            ? automation::curveShapeFromId(pj["shape"].get<std::string>()) : std::nullopt;
+                        if (!known) { valid = false; break; }
+                        shape = *known;
+                    }
+                    points.push_back({position, pj["level"].get<double>(), shape});
                 }
             }
             if (!valid || !track.volumeEnvelope.setPoints(std::move(points))) {

@@ -49,6 +49,8 @@ class TrackListWrapper : public QAbstractListModel {
     Q_PROPERTY(double layoutHeight READ layoutHeight NOTIFY layoutChanged)
     // The envelope's level (0..1) of 0 dB, where a new envelope's line sits.
     Q_PROPERTY(double envelopeUnityLevel READ envelopeUnityLevel CONSTANT)
+    // The curve shapes a point can have, in menu order: [{id, name}] (restMap G6b).
+    Q_PROPERTY(QVariantList envelopeShapes READ envelopeShapes CONSTANT)
 
 public:
     enum Role {
@@ -72,7 +74,8 @@ public:
         PanRole,
         StripWidthRole,
         EffectsRole,  // insert effects in chain order: [{id, type, title, subtitle, removable}] (plan 6.1)
-        // Volume envelope (restMap G6). Points: [{beat, level}] in time order, level 0..1.
+        // Volume envelope (restMap G6). Points: [{beat, level, shape}] in time order, level
+        // 0..1, shape an id from envelopeShapes (the curve to the next point).
         EnvelopeShownRole,
         EnvelopeOverClipsRole,
         EnvelopeBypassedRole,
@@ -223,6 +226,13 @@ public:
     Q_INVOKABLE int addEnvelopePoint(int trackId, double beat, double level);   // index, or -1
     Q_INVOKABLE bool moveEnvelopePoint(int trackId, int index, double beat, double level, bool continueEdit = false);
     Q_INVOKABLE bool removeEnvelopePoint(int trackId, int index);
+    // Undoable; false for an unknown shape id, a bad track or point, or while recording.
+    Q_INVOKABLE bool setEnvelopePointShape(int trackId, int index, const QString& shape);
+    QVariantList envelopeShapes() const;
+    // What the line is at a beat, and the line to draw over a range: [QPointF(beat, level)]
+    // (see TrackList::envelopeCurve), so the drawn curve is the one the engine plays.
+    Q_INVOKABLE double envelopeLevelAt(int trackId, double beat) const;
+    Q_INVOKABLE QVariantList envelopeCurve(int trackId, double fromBeat, double toBeat, int steps) const;
     Q_INVOKABLE bool setEnvelopeBypassed(int trackId, bool bypassed);
     Q_INVOKABLE bool setEnvelopeShown(int trackId, bool shown);
     Q_INVOKABLE bool toggleEnvelopeShown(int trackId);

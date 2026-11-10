@@ -506,3 +506,28 @@ TEST(tracklist, showing_an_empty_envelope_adds_a_start_point_at_zero_db)
     const auto& otherEnvelope = tracks.project().findTrack(other)->volumeEnvelope;
     CHECK(otherEnvelope.points().size() == 1 && otherEnvelope.points()[0].position == 48000);
 }
+
+TEST(tracklist, an_envelope_points_curve_shape_is_one_undo_step)
+{
+    using automation::CurveShape;
+    TrackList tracks;
+    const int id = tracks.addAudioTrack();
+    CHECK(tracks.addEnvelopePoint(id, 0, 0.2) == 0);
+    CHECK(tracks.addEnvelopePoint(id, 48000, 0.9) == 1);
+    const auto& envelope = tracks.project().findTrack(id)->volumeEnvelope;
+
+    CHECK(tracks.setEnvelopePointShape(id, 0, CurveShape::Smooth).changed);
+    CHECK(!tracks.setEnvelopePointShape(id, 0, CurveShape::Smooth).changed);   // same shape: no step
+    CHECK(!tracks.setEnvelopePointShape(id, 7, CurveShape::Hold).accepted);
+    CHECK(!tracks.setEnvelopePointShape(-3, 0, CurveShape::Hold).accepted);
+    CHECK(tracks.envelopePointBeats(id)[0].shape == CurveShape::Smooth);
+    CHECK(tracks.undo());
+    CHECK(envelope.points()[0].shape == CurveShape::Linear && envelope.points().size() == 2);
+    CHECK(tracks.redo());
+    CHECK(envelope.points()[0].shape == CurveShape::Smooth);
+
+    tracks.lockRecordingTrack(id);   // refused while recording, like the other envelope edits
+    CHECK(!tracks.setEnvelopePointShape(id, 0, CurveShape::Hold).accepted);
+    tracks.lockRecordingTrack(-1);
+    CHECK(envelope.points()[0].shape == CurveShape::Smooth);
+}
