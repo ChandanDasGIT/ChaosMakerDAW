@@ -7,6 +7,13 @@
 #include <cmath>
 #include <limits>
 
+mixfx::Settings Track::mixEffect(std::string_view type) const
+{
+    for (const auto& [stored, settings] : mixEffects)
+        if (stored == type) return settings;
+    return mixfx::defaults(type);
+}
+
 bool Track::hasLiveInput() const
 {
     if (kind == TrackKind::Audio) return true;
@@ -215,6 +222,17 @@ bool Project::setTrackChaosEq(int id, const chaoseq::Settings& settings)
     auto* track = findTrack(id);
     if (!track) return false;
     track->chaosEq = chaoseq::sanitize(settings, m_tempo.sampleRate());
+    return true;
+}
+
+bool Project::setTrackMixEffect(int id, std::string_view type, const mixfx::Settings& settings)
+{
+    auto* track = findTrack(id);
+    if (!track || !mixfx::find(type)) return false;
+    auto clean = mixfx::sanitize(type, settings);
+    for (auto& [stored, current] : track->mixEffects)
+        if (stored == type) { current = std::move(clean); return true; }
+    track->mixEffects.emplace_back(std::string(type), std::move(clean));
     return true;
 }
 

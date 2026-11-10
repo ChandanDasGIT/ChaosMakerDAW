@@ -157,3 +157,31 @@ TEST(effectchainjson, instrument_pages_only_apply_to_the_same_instrument)
     badEq.effects.push_back({"eq", {{"gains", json::array({99, 0, 0, 0, 0, 0, 0, 0, 0, 0})}}});
     CHECK(!chainjson::planImport(*tracks.project().findTrack(second), badEq, plan, error));
 }
+
+TEST(effectchainjson, a_mixing_plugin_travels_with_its_settings)
+{
+    TrackList tracks;
+    const int vocal = tracks.addVocalTrack();
+    CHECK(tracks.addTrackEffect(vocal, "compressor") >= 0);
+    auto settings = *tracks.mixEffect(vocal, "compressor");
+    settings.values["ratio"] = 8;
+    settings.bypassed = true;
+    CHECK(tracks.setMixEffect(vocal, "compressor", settings).changed);
+
+    const auto chain = chainjson::capture(*tracks.project().findTrack(vocal));
+    CHECK(types(chain) == std::vector<std::string>{"compressor"});
+    chainjson::ChainFile back;
+    std::string error;
+    CHECK(chainjson::fromJson(chainjson::toJson(chain), back, error));
+
+    const int other = tracks.addAudioTrack();
+    chainjson::ImportPlan plan;
+    CHECK(chainjson::planImport(*tracks.project().findTrack(other), back, plan, error));
+    CHECK(plan.addTypes == std::vector<std::string>{"compressor"});
+    CHECK(plan.mixEffects.count("compressor") == 1);
+    CHECK(plan.mixEffects["compressor"].values.at("ratio") == 8.0f && plan.mixEffects["compressor"].bypassed);
+
+    back.effects[0].settings = json{{"values", {{"ratio", "loud"}}}};
+    CHECK(!chainjson::planImport(*tracks.project().findTrack(other), back, plan, error));
+    CHECK(error.find("Compressor") != std::string::npos);
+}

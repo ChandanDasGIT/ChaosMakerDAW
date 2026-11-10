@@ -1,6 +1,8 @@
 #pragma once
 
 #include <optional>
+#include <utility>
+#include <string_view>
 #include "transport/tempomap.h"
 #include "midi/midinote.h"
 #include "plugins/effectchain.h"
@@ -11,6 +13,7 @@
 #include "instruments/harmonium/harmoniumsettings.h"
 #include "plugins/chordplayer/chordsettings.h"
 #include "automation/volumeenvelope.h"
+#include "plugins/mixfx/mixfxspec.h"
 
 #include <cstdint>
 #include <array>
@@ -64,6 +67,11 @@ struct Track {
     piano::Settings piano;
     // Chords tracks: the eight strips' chords, autoplay and key (its piano uses `piano` above).
     chords::Settings chords;
+    // Mixing plugins' settings by type (restMap G7); heard only while that type is on the
+    // effect list, kept when it is removed. A type not stored here is at its defaults.
+    // (A vector, not a map: Track stays constexpr-constructible.)
+    std::vector<std::pair<std::string, mixfx::Settings>> mixEffects;
+    mixfx::Settings mixEffect(std::string_view type) const;
     // Insert effects in processing order (plan 6.1); rules in effectchain.
     std::vector<TrackEffectSlot> effects;
     std::vector<AudioClip> audioClips;
@@ -100,6 +108,8 @@ public:
     bool setTrackEqBand(int id, int band, float gainDb);
     // Not undoable, like the 10-band EQ. The settings are sanitised for the project rate.
     bool setTrackChaosEq(int id, const chaoseq::Settings& settings);
+    // False for a bad track or a type that is not a mixing plugin; values are sanitized.
+    bool setTrackMixEffect(int id, std::string_view type, const mixfx::Settings& settings);
     // Not undoable either, like the instrument knobs of other DAWs. The settings are sanitised.
     bool setTrackHarmonium(int id, const harmonium::Settings& settings);
     bool setTrackDrumKit(int id, const drumkit::Settings& settings);   // the same way

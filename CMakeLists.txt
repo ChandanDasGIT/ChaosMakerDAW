@@ -117,7 +117,7 @@ endforeach()
 if(DAW_BUILD_APP)
     add_executable(wrappertests
         tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp tests/wrapper/clipediting_qtcheck.cpp
-        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp tests/wrapper/volumeenvelope_qtcheck.cpp
+        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp tests/wrapper/volumeenvelope_qtcheck.cpp tests/wrapper/mixeffect_qtcheck.cpp
         wrapper/pianorollwrap/pianorollwrapper.cpp wrapper/pianorollwrap/pianorollwrapper.h
         wrapper/pianorollwrap/pianorollnotemodel.cpp wrapper/pianorollwrap/pianorollnotemodel.h
         wrapper/engineWrap/enginecontroller.cpp wrapper/engineWrap/enginecontroller.h
@@ -132,6 +132,7 @@ if(DAW_BUILD_APP)
         wrapper/engine/playbackcontrolswrap/playbackcontrolswrapper.cpp wrapper/engine/playbackcontrolswrap/playbackcontrolswrapper.h
         wrapper/engine/audioenginewrap/audioenginewrapper.cpp wrapper/engine/audioenginewrap/audioenginewrapper.h
         wrapper/plugins/chaoseq/chaoseqwrap/chaoseqwrapper.cpp wrapper/plugins/chaoseq/chaoseqwrap/chaoseqwrapper.h
+        wrapper/plugins/mixfx/mixfxwrap/mixeffectwrapper.cpp wrapper/plugins/mixfx/mixfxwrap/mixeffectwrapper.h
         wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.cpp wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.h
         wrapper/instruments/drums/drumkitwrap/drumkitwrapper.cpp wrapper/instruments/drums/drumkitwrap/drumkitwrapper.h
         wrapper/instruments/drums/groovewrap/drumgroovewrapper.cpp wrapper/instruments/drums/groovewrap/drumgroovewrapper.h
@@ -161,6 +162,7 @@ if(DAW_BUILD_APP)
     add_test(NAME qtpiano COMMAND wrappertests qtpiano)
     add_test(NAME qtvirtualkeyboard COMMAND wrappertests qtvirtualkeyboard)
     add_test(NAME qtvolumeenvelope COMMAND wrappertests qtvolumeenvelope)
+    add_test(NAME qtmixeffect COMMAND wrappertests qtmixeffect)
 endif()
 
 # Exercise actual mouse/keyboard tempo editing when Qt Test is available.
@@ -192,7 +194,7 @@ if(DAW_BUILD_APP)
                       frontend/transportbar/VirtualKeyboard.qml
                       frontend/plugins/TrackEffectsPanel.qml frontend/plugins/eq/Tenbandeq.qml frontend/plugins/chaoseq/ChaosEqEditor.qml
                       frontend/plugins/chordplayer/ChordsEditor.qml frontend/plugins/chordplayer/ChordStrips.qml
-                      frontend/session/TrackList.qml frontend/timeline/Timeline.qml frontend/timeline/VolumeEnvelopeLane.qml
+                      frontend/session/TrackList.qml frontend/timeline/Timeline.qml frontend/timeline/VolumeEnvelopeLane.qml frontend/plugins/mixfx/MixEffectEditor.qml
                       frontend/mixer/MixerPanel.qml
                       frontend/dsp/StereoLevelMeter.qml
                       frontend/dsp/LevelMeter.qml

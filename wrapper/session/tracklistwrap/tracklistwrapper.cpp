@@ -614,6 +614,23 @@ const chaoseq::Settings* TrackListWrapper::chaosEq(int trackId) const
     return track ? &track->chaosEq : nullptr;
 }
 
+std::optional<mixfx::Settings> TrackListWrapper::mixEffect(int trackId, std::string_view type) const
+{
+    return m_state.mixEffect(trackId, type);
+}
+
+bool TrackListWrapper::setMixEffect(int trackId, const QString& type, const mixfx::Settings& settings)
+{
+    const auto change = m_state.setMixEffect(trackId, type.toStdString(), settings);
+    if (change.changed) emit mixEffectChanged(trackId, type);
+    return change.accepted;
+}
+
+bool TrackListWrapper::isMixEffect(const QString& type) const
+{
+    return mixfx::find(type.toStdString()) != nullptr;
+}
+
 bool TrackListWrapper::setChaosEq(int trackId, const chaoseq::Settings& settings)
 {
     const auto change = m_state.setChaosEq(trackId, settings);

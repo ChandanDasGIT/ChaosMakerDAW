@@ -174,6 +174,11 @@ public:
     // Chords tracks (strips, autoplay, key), for ChordsWrapper: chordsChanged.
     const chords::Settings* chords(int trackId) const;           // null unless a Chords track
     bool setChords(int trackId, const chords::Settings& settings);
+    // Mixing plugins (restMap G7), for MixEffectWrapper the same way: mixEffectChanged, not
+    // dataChanged. Not undoable.
+    std::optional<mixfx::Settings> mixEffect(int trackId, std::string_view type) const;
+    bool setMixEffect(int trackId, const QString& type, const mixfx::Settings& settings);
+    Q_INVOKABLE bool isMixEffect(const QString& type) const;
     Q_INVOKABLE bool resetTrackEq(int trackId);
     bool newTrackRecordDry() const { return m_newTrackRecordDry; }
     void setNewTrackRecordDry(bool dry);
@@ -268,6 +273,7 @@ signals:
     void electroDrumsChanged(int trackId);
     void pianoChanged(int trackId);
     void chordsChanged(int trackId);
+    void mixEffectChanged(int trackId, const QString& type);
     void eqPresetErrorChanged();
     void countChanged();
     void contentEndBeatsChanged();

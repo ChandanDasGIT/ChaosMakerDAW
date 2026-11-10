@@ -1,5 +1,7 @@
 // fxrender: runs a dry guitar recording through guitar suite pedals, offline, and writes the
-// result as a 32-bit float WAV. For listening tests (plan 6.3); not part of the app.
+// result as a 32-bit float WAV. For listening tests (plan 6.3); not part of the app. The mixing
+// plugins (restMap G7) work the same way as "mix.compressor", "mix.deesser", "mix.reverb" and
+// "mix.chaosverb".
 //
 //   fxrender <in.wav> <out.wav> [--ir <cabinet.wav>] [--rms <dBFS>] <pedal>[:param=value,...] ...
 //
@@ -20,6 +22,7 @@
 #include "instruments/guitar/audiofile/impulsewav.h"
 #include "instruments/guitar/plugins/cabinet/cabinet.h"
 #include "instruments/guitar/plugins/guitarsuite/pedalregistry.h"
+#include "plugins/mixfx/mixfxfactory.h"
 #include "processor/processor.h"
 
 #include <algorithm>
@@ -130,6 +133,7 @@ std::shared_ptr<Processor> makePedal(const std::string& spec, const std::string&
     const std::string type = spec.substr(0, colon);
     std::shared_ptr<Processor> pedal;
     if (type == "pedal.cabinet" && !irPath.empty()) pedal = std::make_shared<Cabinet>(loadImpulseWav(irPath, rate));
+    else if (type.rfind("mix.", 0) == 0) pedal = mixfx::create(type.substr(4));   // restMap G7: mix.compressor, ...
     else pedal = PedalRegistry::create(type);
     if (!pedal) throw std::runtime_error("unknown pedal " + type);
     if (colon == std::string::npos) return pedal;
