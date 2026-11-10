@@ -5,6 +5,7 @@
 #include "session/project.h"
 #include "core/audiodata.h"
 
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <span>
@@ -27,6 +28,8 @@ public:
         double gainDb = 0.0;
         bool isRecorded = false;
         std::vector<MidiNote> notes; // clip-relative beats (0 = clip start); may lie outside the clip
+        bool reversed = false;
+        bool polarityInverted = false;
     };
     struct ClipboardClip {
         std::string poolId;
@@ -37,6 +40,8 @@ public:
         std::int64_t fadeOut = 0;
         float gainDb = 0.0f;
         bool effectsPrinted = true;
+        bool reversed = false;
+        bool polarityInverted = false;
         int trackOffset = 0;
         std::vector<MidiNote> notes; // origin-relative, as stored in AudioClip
     };
@@ -55,6 +60,17 @@ public:
     const AudioMap& audio() const { return m_audio; }
     MediaPaths& mediaPaths() { return m_mediaPaths; }
     const MediaPaths& mediaPaths() const { return m_mediaPaths; }
+    // The audio a clip plays: its file, or for a reversed clip a reversed copy of it (made
+    // once, kept in memory, never written). Any thread.
+    std::shared_ptr<const AudioData> clipAudio(const AudioClip& clip) const;
+    // The pool id the engine asks for when a clip is reversed (audioFor understands it).
+    static std::string reversedPoolId(const std::string& poolId);
+    // Clip tools (restMap G14) on the given clips, one undo step. Audio clips only: pattern
+    // clips among them are left alone. Reverse and InvertPolarity flip their flag (again: back);
+    // Normalise sets the clip gain so its loudest sample reaches 0 dBFS (like Reaper).
+    enum class ClipTool { Reverse, InvertPolarity, Normalise };
+    bool canApplyClipTool(const std::vector<int>& ids) const;
+    Change applyClipTool(const std::vector<int>& ids, ClipTool tool);
     std::shared_ptr<const AudioData> audioFor(const std::string& path) const;
     void replaceDocument(Project project, AudioMap audio, MediaPaths paths);
     void adoptDocument(TrackList&& candidate);
@@ -205,6 +221,13 @@ private:
     double offsetBeats(const AudioClip& clip) const;
     Project m_project;
     AudioMap m_audio;
+    // Reversed copies of audio files (G14), by pool id. Shared, so copying a TrackList keeps
+    // one cache; the mutex because the engine's snapshot builder may ask from a worker thread.
+    struct ReversedCache {
+        std::mutex mutex;
+        std::unordered_map<std::string, std::shared_ptr<const AudioData>> copies;
+    };
+    std::shared_ptr<ReversedCache> m_reversed = std::make_shared<ReversedCache>();
     MediaPaths m_mediaPaths;
     std::unordered_set<int> m_recordingTracks;
     std::optional<bool> m_newTrackRecordDry;

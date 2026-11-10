@@ -752,3 +752,47 @@ TEST(audioengine_midi, volume_envelope_curve_shapes_sound_as_drawn)
         }
     }
 }
+
+namespace {
+class Halve final : public Processor {
+public:
+    std::string typeId() const override { return "test.halve"; }
+    void prepare(double, int) override {}
+    void reset() noexcept override {}
+    void process(ProcessContext& context) noexcept override {
+        for (int c = 0; c < context.audio.channelCount; ++c)
+            for (int i = 0; i < context.audio.frames; ++i) context.audio.channel(c)[i] *= 0.5f;
+    }
+};
+}
+
+TEST(audioengine_midi, master_effects_process_the_summed_tracks_before_the_master_fader)
+{
+    for (bool multi : {false, true}) {
+        AudioEngine engine{nullptr};
+        engine.deviceChanged(48000.0, 512);
+        auto audio = constantAudio(48000);
+        auto halve = std::make_shared<Halve>();
+        auto snapshot = std::make_unique<EngineSnapshot>();
+        snapshot->multiMonitor = multi;
+        snapshot->tempo.set(120.0, 4, 4, 48000.0);
+        for (int id : {1, 2}) {   // two tracks of 0.5: the mix is 1.0, halved by the master
+            TrackRender track;
+            track.trackId = id;
+            track.clips.push_back({audio.get(), 0, 48000, 0, 0, 0, 1.0f, true});
+            snapshot->tracks.push_back(std::move(track));
+        }
+        snapshot->masterEffects.push_back(halve.get());
+        snapshot->keepProcessors.push_back(halve);
+        snapshot->keepAudio.push_back(audio);
+        engine.publishPlayback(std::move(snapshot));
+        CHECK(engine.post({EngineCommand::Type::Play}));
+        float left[512]{}, right[512]{};
+        float* out[]{left, right};
+        AudioIO io{{nullptr, 0, 0}, {out, 2, 512}, nullptr, 512};
+        engine.renderBlock(io);
+        CHECK_NEAR(left[100], 0.5f, 1e-5);
+        CHECK_NEAR(right[400], 0.5f, 1e-5);
+        engine.stop();
+    }
+}

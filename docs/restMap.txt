@@ -15,10 +15,9 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 
 NEXT UP (2026-11-10), the user's order:
   1. G6 volume envelope committed (0597318); G6b curve shapes committed (758f523).
-  2. G7 mixing plugins committed (0910415). R1 live recording waveform, G7b extras (delay,
-     limiter, saturation, gate) and T1 free playhead / selection magnets DONE 2026-11-10,
-     NOT COMMITTED (the user is testing). Open question from the user: effects on a time
-     range (Reaper-style); plan it with G15.
+  2. R1, G7b, T1 committed (b85b32f). G9 master effects, G17 tap tempo, G14 clip tools DONE
+     2026-11-11, NOT COMMITTED (the user is testing). Open from the user: effects on a time
+     range (Reaper-style); plan it with G15. Then G8 (fades) and the rest of G8-G17.
   3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
      reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
      inside this group is to be confirmed with the user.
@@ -242,10 +241,23 @@ Done items stay further down as the record.
         wrapper action or UI sets them. Wanted: Reaper-style fade handles in a clip's top
         corners (drag to set), automatic short crossfade where two clips overlap, undoable,
         saved. Check whether the engine already applies fadeIn / fadeOut when planning.
-[ ] G9  Effects on the master track. The engine has a master chain (EngineSnapshot::
-        masterChain, SnapshotBuilder::buildMasterChainSnapshot) but the UI offers no way to put
-        effects on it. Wanted: an FX list for the master like a track's (e.g. a limiter or glue
-        compressor from G7 before export).
+[x] G9  Effects on the master track. DONE 2026-11-11 (uncommitted). The mixer's MASTER strip
+        has an FX button (lit when the master has effects) opening the same FX window as a
+        track's, "Master · Effects": EQ, Chaos EQ and the eight mixing plugins, export / import
+        chain. They run on the summed tracks before the master fader and before the metronome.
+        - Project::MasterTrackId (2147483000) and Project::master(): a Track that findTrack()
+          finds but tracks() never lists, so every effect call, the plugin pages, saving and
+          chains work on it unchanged; TrackList::canRemoveTrack only takes listed tracks.
+        - Saved as project "master": {effects, eq, chaosEq, mixEffects}; older files: none.
+        - SnapshotBuilder::processorFor, Context::masterEffects, EngineSnapshot::masterEffects;
+          AudioEngine::applyMasterEffects (both mix paths). EngineController makes the master's
+          processors in syncTrackEffects; syncTrackEq covers it.
+        - TrackListWrapper masterTrackId / masterEffects / masterEqBands / masterChanged (master
+          edits emit it plus projectChanged; a model reset too). TrackEffectsPanel subtitle for
+          the master: "On the whole mix, before the master fader".
+        Tests: tracklist the_master_track..., projectdocument the_master_tracks_effects...,
+        snapshotbuilder the_master_tracks_effects_run..., audioengine_midi master_effects...,
+        wrappertests qtmixeffect the_master_track..., transport_ui the_master_strip_opens...
 [ ] G10 Recording latency compensation. Recorded takes are not shifted by the interface's round
         trip. tools/latencytest (F3) measures it; plan: use JACK's reported latency plus an
         optional measured offset (a setting), applied when a take is placed.
@@ -256,11 +268,27 @@ Done items stay further down as the record.
         and drum grooves, and saving.
 [ ] G13 Noise reduction (mostly vocals): learn the noise from a silent part (room, hiss, hum),
         then remove it from the take. Hand-written spectral subtraction / gating.
-[ ] G14 Clip tools: reverse, normalise, and a polarity (phase) flip per clip or per track.
+[x] G14 Clip tools. DONE 2026-11-11 (uncommitted). The clip menu: Reverse, Normalise (peak to
+        0 dBFS, like Reaper; the user chose it), Invert polarity (clip only; the user chose no
+        track Ø). On every selected audio clip, one undo step; pattern clips: greyed out.
+        - AudioClip::reversed / polarityInverted, saved (optional). A reversed clip reads a
+          reversed copy of its file (TrackList::clipAudio / reversedPoolId; made once, cached,
+          thread-safe), its sourceOffset counted in the copy, so trims, splits, merges and the
+          waveform work unchanged; polarity = negative ClipRender gain. Clipboard keeps both;
+          clips with different flags do not merge. The clip label shows " · Reversed" / " · Ø".
+        - TrackList::canApplyClipTool / applyClipTool (editClipGroup); TrackListWrapper
+          canApplyClipTool / applyClipTool("reverse" | "invertPolarity" | "normalise").
+        Tests: tracklist clip_tools..., projectdocument clip_tool_flags..., wrappertests
+        qtclipediting a_reversed_clip_plays..., transport_ui clip_menu_reverses...
 [ ] G15 Time selection (Reaper's drag on empty timeline): mark a range, then cut / copy / delete
         everything in it across all tracks. Today editing works on selected clips.
 [ ] G16 Customisable keyboard shortcuts, and an undo history list to click back through.
-[ ] G17 Tap tempo: set the BPM by tapping a key.
+[x] G17 Tap tempo. DONE 2026-11-11 (uncommitted). A TAP chip beside the BPM box and Shift+T
+        (plain T plays a note with the typing keyboard on). backend/tempo/taptempo: the average
+        of up to 8 intervals, a pause over 2 s starts a new count, a gap 25 % off the average is
+        a new pace (counted from the previous tap), rounded to 0.1 BPM, 20..300.
+        TempoEditorWrapper tap() / tapAt(seconds) / tapCount, proposing the BPM like a typed one.
+        Tests: backendtests taptempo; transport_ui tap_tempo_sets_the_bpm_from_the_chip_and_shift_t.
 
 -- New tools (the user, 2026-11-10; none planned yet)
 [ ] G18 Live pitch monitor FX (for vocals): a scrolling graph of the sung pitch against the

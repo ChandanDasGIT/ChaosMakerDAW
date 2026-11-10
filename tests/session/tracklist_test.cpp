@@ -531,3 +531,88 @@ TEST(tracklist, an_envelope_points_curve_shape_is_one_undo_step)
     tracks.lockRecordingTrack(-1);
     CHECK(envelope.points()[0].shape == CurveShape::Smooth);
 }
+
+TEST(tracklist, the_master_track_takes_effects_but_is_never_a_track)
+{
+    TrackList tracks;
+    const int vocal = tracks.addVocalTrack();
+    const int master = Project::MasterTrackId;
+    CHECK(tracks.project().findTrack(master) == &tracks.project().master());
+    CHECK(tracks.project().tracks().size() == 1);               // not in the list
+    CHECK(tracks.project().master().effects.empty());
+    const int limiter = tracks.addTrackEffect(master, "limiter");
+    CHECK(limiter > 0);
+    CHECK(tracks.addTrackEffect(master, "chaoseq") > 0);
+    CHECK(tracks.addTrackEffect(master, "guitarsuite") < 0);   // instrument pages are not offered
+    CHECK(tracks.moveTrackEffect(master, limiter, 1).accepted);
+    CHECK(tracks.project().master().effects[1].type == "limiter");
+    auto settings = *tracks.mixEffect(master, "limiter");
+    settings.values["ceiling"] = -3;
+    CHECK(tracks.setMixEffect(master, "limiter", settings).changed);
+    CHECK(tracks.setEqBand(master, 3, 2.0).accepted);
+    CHECK(!tracks.removeTrack(master));                          // it cannot be removed or moved
+    CHECK(!tracks.moveTrack(master, 0));
+    CHECK(tracks.project().tracks().size() == 1 && tracks.project().tracks()[0]->id == vocal);
+    CHECK(tracks.removeTrackEffect(master, limiter).accepted);
+    CHECK(tracks.project().master().effects.size() == 1);
+}
+
+namespace {
+std::shared_ptr<AudioData> rampAudio(std::int64_t frames)
+{
+    auto audio = std::make_shared<AudioData>();
+    audio->sampleRate = 48000;
+    audio->frames = frames;
+    audio->channels.assign(1, std::vector<float>(std::size_t(frames)));
+    for (std::int64_t i = 0; i < frames; ++i) audio->channels[0][std::size_t(i)] = 0.25f * float(i) / float(frames);
+    audio->buildWaveform();
+    return audio;
+}
+}
+
+TEST(tracklist, clip_tools_reverse_flip_and_normalise_audio_clips_in_one_undo_step)
+{
+    using Tool = TrackList::ClipTool;
+    TrackList tracks;
+    tracks.setSampleRate(48000);
+    const int track = tracks.addAudioTrack();
+    tracks.audio()["take.wav"] = rampAudio(48000);
+    const int clip = tracks.addAudioClip(track, "take.wav", 0, 12000, 6000);   // samples 6000..18000
+    const int pattern = tracks.addClipAtBeat(tracks.addInstrumentTrackOfType("Harmonium"), 0, 4);
+    const auto find = [&]() -> const AudioClip& { return *tracks.findClip(track, clip); };
+    const auto original = find();
+
+    CHECK(tracks.canApplyClipTool({clip}) && !tracks.canApplyClipTool({pattern}));
+    CHECK(!tracks.applyClipTool({pattern}, Tool::Reverse).accepted);
+    CHECK(tracks.applyClipTool({clip, pattern}, Tool::Reverse).changed);   // the pattern clip is left alone
+    CHECK(find().reversed && find().sourceOffset == 48000 - 18000);
+    // The reversed copy: its stretch is the same samples, backwards.
+    const auto reversed = tracks.clipAudio(find());
+    CHECK(reversed && reversed != tracks.audioFor("take.wav"));
+    CHECK(reversed->channels[0][std::size_t(find().sourceOffset)] == tracks.audioFor("take.wav")->channels[0][17999]);
+    CHECK(tracks.clipAudio(find()) == reversed);                             // made once
+    CHECK(tracks.applyClipTool({clip}, Tool::Reverse).changed);              // and back again
+    CHECK(find().sourceOffset == original.sourceOffset && !find().reversed);
+
+    CHECK(tracks.applyClipTool({clip}, Tool::InvertPolarity).changed);
+    CHECK(find().polarityInverted);
+    CHECK(tracks.applyClipTool({clip}, Tool::Normalise).changed);
+    // The loudest sample of 6000..18000 is 0.25 * 17999 / 48000: up to 0 dBFS.
+    CHECK_NEAR(find().gainDb, -20.0 * std::log10(0.25 * 17999.0 / 48000.0), 1e-3);
+    CHECK(!tracks.applyClipTool({clip}, Tool::Normalise).changed);         // already there
+    CHECK(tracks.undo());
+    CHECK(find().gainDb == 0.0f && find().polarityInverted);
+    CHECK(tracks.undo() && tracks.undo() && tracks.undo());
+    CHECK(find().sourceOffset == original.sourceOffset && !find().reversed && !find().polarityInverted);
+
+    // Copy and paste keep the flags; clips with different flags do not merge.
+    CHECK(tracks.applyClipTool({clip}, Tool::Reverse).changed);
+    CHECK(tracks.copyClips({clip}));
+    const auto pasted = tracks.pasteClips(track, 8.0);
+    CHECK(pasted.size() == 1 && tracks.findClip(track, pasted[0])->reversed);
+    const int right = tracks.splitClipAtBeat(track, clip, 0.125);
+    CHECK(right > 0);
+    CHECK(tracks.canMergeClips(track, clip, right));
+    CHECK(tracks.applyClipTool({right}, Tool::InvertPolarity).changed);
+    CHECK(!tracks.canMergeClips(track, clip, right));
+}

@@ -62,10 +62,83 @@ std::optional<std::int64_t> sampleAtBeat(const TempoMap& tempo, double beat)
 }
 }
 
+namespace {
+constexpr std::string_view reversedSuffix = "\x1freversed";
+}
+
+std::string TrackList::reversedPoolId(const std::string& poolId)
+{
+    return poolId + std::string(reversedSuffix);
+}
+
 std::shared_ptr<const AudioData> TrackList::audioFor(const std::string& path) const
 {
+    if (path.size() > reversedSuffix.size() && path.ends_with(reversedSuffix)) {
+        const std::string base = path.substr(0, path.size() - reversedSuffix.size());
+        const auto original = audioFor(base);
+        if (!original) return nullptr;
+        std::lock_guard lock(m_reversed->mutex);
+        auto& copy = m_reversed->copies[base];
+        if (!copy || copy->frames != original->frames) {
+            auto reversed = std::make_shared<AudioData>(*original);
+            for (auto& channel : reversed->channels) std::reverse(channel.begin(), channel.end());
+            reversed->buildWaveform();
+            copy = std::move(reversed);
+        }
+        return copy;
+    }
     const auto found = m_audio.find(path);
     return found == m_audio.end() ? nullptr : found->second;
+}
+
+std::shared_ptr<const AudioData> TrackList::clipAudio(const AudioClip& clip) const
+{
+    return audioFor(clip.reversed ? reversedPoolId(clip.poolId) : clip.poolId);
+}
+
+bool TrackList::canApplyClipTool(const std::vector<int>& ids) const
+{
+    if (!m_recordingTracks.empty()) return false;
+    for (const auto& track : m_project.tracks())
+        for (const auto& clip : track->audioClips)
+            if (std::find(ids.begin(), ids.end(), clip.id) != ids.end() && !isPatternClip(clip) && audioFor(clip.poolId))
+                return true;
+    return false;
+}
+
+TrackList::Change TrackList::applyClipTool(const std::vector<int>& ids, ClipTool tool)
+{
+    if (!canApplyClipTool(ids)) return {};
+    std::vector<Project::ClipChange> changes;
+    for (const auto& track : m_project.tracks()) {
+        for (const auto& original : track->audioClips) {
+            if (std::find(ids.begin(), ids.end(), original.id) == ids.end() || isPatternClip(original)) continue;
+            const auto audio = clipAudio(original);
+            if (!audio || audio->frames <= 0) continue;
+            auto clip = original;
+            const double ratio = audio->sampleRate / m_project.tempo().sampleRate();
+            const std::int64_t used = std::min<std::int64_t>(audio->frames - clip.sourceOffset, std::llround(double(clip.length) * ratio));
+            if (tool == ClipTool::Reverse) {
+                // The same stretch of the file, counted from the other end of the reversed copy.
+                clip.sourceOffset = std::max<std::int64_t>(0, audio->frames - (clip.sourceOffset + used));
+                clip.reversed = !clip.reversed;
+            } else if (tool == ClipTool::InvertPolarity) {
+                clip.polarityInverted = !clip.polarityInverted;
+            } else {
+                float peak = 0.0f;
+                for (const auto& channel : audio->channels)
+                    for (std::int64_t i = clip.sourceOffset; i < clip.sourceOffset + used && i < std::int64_t(channel.size()); ++i)
+                        peak = std::max(peak, std::abs(channel[std::size_t(i)]));
+                if (peak <= 0.0f || !std::isfinite(peak)) continue;   // silence: nothing to normalise
+                clip.gainDb = std::clamp(-20.0f * std::log10(peak), -120.0f, 24.0f);
+                if (clip.gainDb == original.gainDb) continue;
+            }
+            changes.push_back({track->id, clip, false, track->id});
+        }
+    }
+    if (changes.empty()) return {true, false};
+    if (!m_project.editClipGroup(changes)) return {};
+    return {true, true};
 }
 
 void TrackList::replaceDocument(Project project, AudioMap audio, MediaPaths paths)
@@ -183,7 +256,8 @@ bool TrackList::selectClip(int trackId, int clipId)
     selectTrack(trackId);
     return true;
 }
-bool TrackList::canRemoveTrack(int id) const { return !trackLocked(id) && m_project.findTrack(id); }
+// Only a track in the list: the master track (G9) is found by id but cannot be removed.
+bool TrackList::canRemoveTrack(int id) const { return !trackLocked(id) && indexOfTrack(id) >= 0; }
 bool TrackList::removeTrack(int id)
 {
     if (!canRemoveTrack(id)) return false;
@@ -360,7 +434,7 @@ std::vector<TrackList::ClipInfo> TrackList::clips() const
                 m_project.tempo().beatAt(clip.start + clip.length) - start,
                 clip.poolId.empty() ? "Audio clip" : std::filesystem::path(clip.poolId).filename().string(),
                 track.colour, clip.effectsPrinted, clip.gainDb, !blank,
-                blank ? clipNotes(track.id, clip.id) : std::vector<MidiNote>{}});
+                blank ? clipNotes(track.id, clip.id) : std::vector<MidiNote>{}, clip.reversed, clip.polarityInverted});
         }
     }
     return result;
@@ -555,6 +629,7 @@ bool TrackList::canMergeClips(int trackId, int first, int second) const {
     if (isPatternClip(*a) && isPatternClip(*b)) {
         if (a->start>b->start)std::swap(a,b);
         return a->start+a->length==b->start && a->effectsPrinted==b->effectsPrinted && a->gainDb==b->gainDb
+            && a->reversed==b->reversed && a->polarityInverted==b->polarityInverted
             && a->fadeOut==0 && b->fadeIn==0;
     }
     const auto audio=audioFor(a->poolId);
@@ -693,6 +768,8 @@ bool TrackList::copyClips(const std::vector<int>& ids)
         item.fadeOut = c.clip.fadeOut;
         item.gainDb = c.clip.gainDb;
         item.effectsPrinted = c.clip.effectsPrinted;
+        item.reversed = c.clip.reversed;
+        item.polarityInverted = c.clip.polarityInverted;
         item.trackOffset = c.row - minRow;
         item.notes = c.clip.notes;
         m_clipboard.push_back(std::move(item));
@@ -739,6 +816,8 @@ std::vector<int> TrackList::pasteClips(int targetTrackId, double targetBeat)
         clip.fadeOut = item.fadeOut;
         clip.gainDb = item.gainDb;
         clip.effectsPrinted = item.effectsPrinted;
+        clip.reversed = item.reversed;
+        clip.polarityInverted = item.polarityInverted;
         clip.notes = item.notes;
         toAdd.emplace_back(destTrackId, std::move(clip));
     }

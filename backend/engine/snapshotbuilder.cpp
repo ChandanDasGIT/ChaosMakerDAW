@@ -1,4 +1,5 @@
 #include "engine/snapshotbuilder.h"
+#include "session/tracklist.h"
 #include "instruments/chords/chordsinstrument.h"
 #include "instruments/drums/drumkit.h"
 #include "instruments/electrodrums/electrodrums.h"
@@ -31,7 +32,18 @@ SnapshotBuilder::Context SnapshotBuilder::Context::fromProject(const Project& pr
         for (const auto& slot : track->effects) info.effects.push_back(slot.type);
         ctx.tracks.push_back(std::move(info));
     }
+    for (const auto& slot : project.master().effects) ctx.masterEffects.push_back(slot.type);
     return ctx;
+}
+
+std::shared_ptr<Processor> SnapshotBuilder::processorFor(const TrackEffects& fx, const std::string& type, bool playback)
+{
+    if (type == effectchain::Eq) return playback ? fx.playbackEq : fx.eq;
+    if (type == effectchain::ChaosEq) return playback ? fx.playbackChaosEq : fx.chaosEq;
+    if (type == effectchain::GuitarSuite) return playback ? fx.playbackChain : fx.chain;
+    const auto& set = playback ? fx.playbackMixEffects : fx.mixEffects;
+    if (const auto it = set.find(type); it != set.end()) return it->second;
+    return nullptr;
 }
 
 void SnapshotBuilder::ensureMixEffects(TrackEffects& effects, const std::vector<std::string>& types, double sampleRate, int maxFrames)
@@ -60,7 +72,10 @@ void SnapshotBuilder::remakeMixEffects(TrackEffects& effects, double sampleRate,
 void SnapshotBuilder::syncTrackEq(const Project& project, const MutableEffectResolver& effectLookup)
 {
     if (!effectLookup) return;
-    for (const auto& track : project.tracks()) {
+    std::vector<const Track*> all;
+    for (const auto& track : project.tracks()) all.push_back(track.get());
+    all.push_back(&project.master());   // the master track's EQs and plugins too (G9)
+    for (const auto* track : all) {
         auto* fx = effectLookup(track->id);
         if (!fx) continue;
         for (int band = 0; band < 10; ++band) {
@@ -229,7 +244,8 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
             }
 
             if (!audioResolver) continue;
-            auto audio = audioResolver(clip.poolId);
+            // A reversed clip plays a reversed copy of its file (restMap G14).
+            auto audio = audioResolver(clip.reversed ? TrackList::reversedPoolId(clip.poolId) : clip.poolId);
             if (!audio) continue;
             render.clips.push_back({
                 audio.get(),
@@ -238,7 +254,7 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
                 clip.sourceOffset,
                 clip.fadeIn,
                 clip.fadeOut,
-                static_cast<float>(std::pow(10.0, clip.gainDb / 20.0)),
+                static_cast<float>(std::pow(10.0, clip.gainDb / 20.0)) * (clip.polarityInverted ? -1.0f : 1.0f),
                 clip.effectsPrinted
             });
             snapshot->keepAudio.push_back(std::move(audio));
@@ -275,14 +291,7 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
                 // that is not on the list does not run.
                 const auto addEffects = [&](std::vector<Processor*>& out, bool playback) {
                     for (const auto& type : track.effects) {
-                        std::shared_ptr<Processor> processor;
-                        if (type == effectchain::Eq) processor = playback ? fx->playbackEq : fx->eq;
-                        else if (type == effectchain::ChaosEq) processor = playback ? fx->playbackChaosEq : fx->chaosEq;
-                        else if (type == effectchain::GuitarSuite) processor = playback ? fx->playbackChain : fx->chain;
-                        else {
-                            const auto& set = playback ? fx->playbackMixEffects : fx->mixEffects;
-                            if (const auto it = set.find(type); it != set.end()) processor = it->second;
-                        }
+                        auto processor = processorFor(*fx, type, playback);
                         if (!processor) continue;
                         out.push_back(processor.get());
                         snapshot->keepProcessors.push_back(std::move(processor));
@@ -313,6 +322,18 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
         }
 
         snapshot->tracks.push_back(std::move(render));
+    }
+
+    // The master track's effects (G9), on the summed mix: the playback instances, in order.
+    if (effectResolver && !context.masterEffects.empty()) {
+        if (const auto* master = effectResolver(Project::MasterTrackId)) {
+            for (const auto& type : context.masterEffects) {
+                auto processor = processorFor(*master, type, true);
+                if (!processor) continue;
+                snapshot->masterEffects.push_back(processor.get());
+                snapshot->keepProcessors.push_back(std::move(processor));
+            }
+        }
     }
 
     return snapshot;

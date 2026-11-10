@@ -1,5 +1,6 @@
 #include "testkit.h"
 #include "wrapper/session/tracklistwrap/tracklistwrapper.h"
+#include "engine/audioengine.h"
 
 TEST(qtclipediting, delete_resize_undo_redo_preserve_audio_ids_and_other_tracks) {
     TrackListWrapper tracks;
@@ -305,4 +306,33 @@ TEST(qtclipediting, undoing_a_track_removal_announces_the_row) {
     CHECK(removed == 1 && tracks.count() == 2);
     CHECK(resets == 0);                                       // only that row changed
     CHECK(tracks.trackIdAt(0) == a && tracks.trackIdAt(1) == c);
+}
+
+TEST(qtclipediting, a_reversed_clip_plays_and_draws_backwards_and_an_inverted_one_upside_down) {
+    TrackListWrapper tracks; tracks.setSampleRate(48000); const int track=tracks.addAudioTrack();
+    auto audio=std::make_shared<AudioData>(); audio->path="ramp.wav"; audio->sampleRate=48000; audio->frames=4800;
+    audio->channels={std::vector<float>(4800)};
+    for(int i=0;i<4800;++i) audio->channels[0][std::size_t(i)]=float(i)/4800.0f;
+    audio->buildWaveform();
+    CHECK(tracks.attachTake(track,0,audio)); const int clip=tracks.project().findTrack(track)->audioClips[0].id;
+    const auto forward=tracks.clipWaveform(track,clip,8);
+    CHECK(tracks.canApplyClipTool({clip}));
+    CHECK(tracks.applyClipTool({clip},"reverse"));
+    CHECK(!tracks.applyClipTool({clip},"sideways"));
+    CHECK(tracks.clips()[0].toMap()["reversed"].toBool());
+    const auto backward=tracks.clipWaveform(track,clip,8);
+    CHECK(backward.size()==8 && forward.size()==8);
+    if(backward.size()==8 && forward.size()==8)
+        CHECK(backward[0].toList()[1].toDouble()>backward[7].toList()[1].toDouble());   // loud end first now
+    CHECK(tracks.applyClipTool({clip},"invertPolarity"));
+    // Play it: the samples come out backwards and negated.
+    auto snapshot=tracks.playbackSnapshot();
+    CHECK(snapshot->tracks[0].clips[0].gain<0);
+    AudioEngine engine{nullptr}; engine.deviceChanged(48000,256);
+    engine.publishPlayback(std::move(snapshot)); CHECK(engine.post({EngineCommand::Type::Play}));
+    float left[256]{}, right[256]{}; float* out[]{left,right};
+    engine.renderBlock({{nullptr,0,0},{out,2,256},nullptr,256});
+    CHECK(std::abs(left[0]-(-4799.0f/4800.0f))<1e-4f);
+    CHECK(std::abs(left[100]-(-4699.0f/4800.0f))<1e-4f);
+    engine.stop();
 }

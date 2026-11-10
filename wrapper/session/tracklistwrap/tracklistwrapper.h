@@ -41,6 +41,12 @@ class TrackListWrapper : public QAbstractListModel {
     Q_PROPERTY(bool newTrackRecordDry READ newTrackRecordDry WRITE setNewTrackRecordDry NOTIFY newTrackRecordDryChanged)
     Q_PROPERTY(double masterVolume READ masterVolume WRITE setMasterVolume NOTIFY masterVolumeChanged)
     Q_PROPERTY(bool masterMuted READ masterMuted WRITE setMasterMuted NOTIFY masterMutedChanged)
+    // The master track (restMap G9): its id works with the effect calls (addTrackEffect,
+    // setEqBand, the mixing plugins...); its effects and EQ bands in the same form as the
+    // "effects" and "eqBands" roles.
+    Q_PROPERTY(int masterTrackId READ masterTrackId CONSTANT)
+    Q_PROPERTY(QVariantList masterEffects READ masterEffects NOTIFY masterChanged)
+    Q_PROPERTY(QVariantList masterEqBands READ masterEqBands NOTIFY masterChanged)
     // Row layout (restMap G6): a track's part, plus its volume lane when shown in its own lane.
     // Heights are set by the views; rowTops has count + 1 values (the last is the total height).
     Q_PROPERTY(double trackRowHeight READ trackRowHeight WRITE setTrackRowHeight NOTIFY layoutChanged)
@@ -202,6 +208,9 @@ public:
     double masterVolume() const { return m_state.masterVolume(); }
     Q_INVOKABLE bool setMasterVolume(double volume);
     Q_INVOKABLE void resetMasterVolume();
+    int masterTrackId() const { return Project::MasterTrackId; }
+    QVariantList masterEffects() const;
+    QVariantList masterEqBands() const;
     bool masterMuted() const { return m_state.masterMuted(); }
     Q_INVOKABLE bool setMasterMuted(bool muted);
     Q_INVOKABLE int addAudioClip(int trackId, const QString& poolId,
@@ -212,6 +221,10 @@ public:
     Q_INVOKABLE int splitClipAtBeat(int trackId, int clipId, double beat);
     Q_INVOKABLE bool editClips(const QVariantList& ids, const QString& operation, double deltaBeats = 0, int laneDelta = 0);
     Q_INVOKABLE bool canMergeClips(int trackId, int first, int second) const;
+    // Clip tools (restMap G14) on clip ids, one undo step: "reverse", "invertPolarity",
+    // "normalise" (peak to 0 dBFS). Audio clips only; can... is false with none among them.
+    Q_INVOKABLE bool canApplyClipTool(const QVariantList& ids) const;
+    Q_INVOKABLE bool applyClipTool(const QVariantList& ids, const QString& tool);
     Q_INVOKABLE bool canMergeSelectedClips(const QVariantList& ids) const;
     Q_INVOKABLE bool mergeSelectedClips(const QVariantList& ids);
     Q_INVOKABLE bool mergeClips(int trackId, int first, int second);
@@ -286,6 +299,7 @@ signals:
     void masterVolumeChanged();
     void masterMutedChanged();
     void layoutChanged();
+    void masterChanged();
 
 private:
     void notifyClipEdit(int trackId);

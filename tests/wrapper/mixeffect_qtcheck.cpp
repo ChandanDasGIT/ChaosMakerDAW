@@ -157,3 +157,40 @@ TEST(qtmixeffect, the_engine_follows_edits_meters_and_chain_imports)
     auto imported = controller.mixEffectProcessor(other, "compressor", true);
     CHECK(imported && imported->parameter("threshold")->get() == -30.0f);
 }
+
+TEST(qtmixeffect, the_master_track_has_effects_the_engine_runs_and_chains_carry)
+{
+    Storage storage;
+    EngineController controller(std::make_unique<SilentDevice>(), false);
+    TrackListWrapper tracks;
+    controller.attachProject(&tracks);
+    tracks.addVocalTrack();
+    const int master = tracks.masterTrackId();
+    int changed = 0;
+    QObject::connect(&tracks, &TrackListWrapper::masterChanged, [&] { ++changed; });
+    CHECK(tracks.masterEffects().isEmpty());
+    CHECK(tracks.addTrackEffect(master, "limiter") > 0);
+    CHECK(changed == 1);
+    CHECK(tracks.masterEffects().size() == 1 && tracks.masterEffects()[0].toMap()["type"].toString() == "limiter");
+    CHECK(tracks.count() == 1);                                   // still one row: the master is not one
+    auto limiter = controller.mixEffectProcessor(master, "limiter", true);
+    CHECK(limiter != nullptr);
+
+    MixEffectWrapper page;
+    page.setTrackModel(&tracks);
+    page.setTrackId(master);
+    page.setEffectType("limiter");
+    CHECK(page.setValue("ceiling", -4));
+    CHECK(limiter && limiter->parameter("ceiling")->get() == -4.0f);
+    CHECK(tracks.setEqBand(master, 0, 3.0));
+    CHECK(tracks.masterEqBands()[0].toDouble() == 3.0);
+
+    const QUrl file = QUrl::fromLocalFile(storage.dir.path() + "/master.chaosfx");
+    CHECK(controller.exportEffectChain(master, file).value("ok").toBool());
+    CHECK(tracks.removeTrackEffect(master, tracks.masterEffects()[0].toMap()["id"].toInt()));
+    CHECK(tracks.masterEffects().isEmpty());
+    CHECK(controller.importEffectChain(master, file).value("ok").toBool());
+    CHECK(tracks.masterEffects().size() == 1);
+    CHECK(tracks.mixEffect(master, "limiter")->values.at("ceiling") == -4.0f);
+    CHECK(!tracks.removeTrack(master));
+}

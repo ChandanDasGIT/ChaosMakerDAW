@@ -71,6 +71,7 @@ public:
             std::vector<std::string> effects; // effect types in processing order
         };
         std::vector<TrackInfo> tracks;
+        std::vector<std::string> masterEffects;   // the master track's effect types, in order (G9)
 
         static Context fromProject(const Project& project);
     };
@@ -81,6 +82,9 @@ public:
     using ChannelConnector = std::function<int(const std::string& source)>;
     using ErrorCallback = std::function<std::string()>;
 
+    // The processor that runs effect `type` for a track (the playback or the monitor instance);
+    // null when the track has none for it.
+    static std::shared_ptr<Processor> processorFor(const TrackEffects& effects, const std::string& type, bool playback);
     // A prepared monitor and playback instance of each mixing plugin in `types` that the track
     // does not have yet (UI thread); other types are ignored.
     static void ensureMixEffects(TrackEffects& effects, const std::vector<std::string>& types, double sampleRate, int maxFrames);

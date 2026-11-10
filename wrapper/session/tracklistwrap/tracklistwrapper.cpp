@@ -23,6 +23,7 @@
 
 
 namespace {
+QVariantList effectList(const Track& track);
 QVariantList noteList(const std::vector<MidiNote>& notes)
 {
     QVariantList list;
@@ -39,7 +40,8 @@ QVariantMap clipMap(const TrackList::ClipInfo& clip)
         {"startBeat", clip.startBeat}, {"lengthBeats", clip.lengthBeats},
         {"label", QString::fromStdString(clip.label)}, {"trackColour", QString::fromStdString(clip.colour)},
         {"effectsPrinted", clip.effectsPrinted}, {"gainDb", clip.gainDb},
-        {"isRecorded", clip.isRecorded}, {"notes", noteList(clip.notes)}};
+        {"isRecorded", clip.isRecorded}, {"notes", noteList(clip.notes)},
+        {"reversed", clip.reversed}, {"polarityInverted", clip.polarityInverted}};
 }
 QVariantList choices(const std::vector<TrackList::TrackChoice>& entries)
 {
@@ -80,6 +82,8 @@ TrackListWrapper::TrackListWrapper(QObject* parent)
     connect(this, &QAbstractItemModel::rowsRemoved, this, &TrackListWrapper::syncLayout);
     connect(this, &QAbstractItemModel::rowsMoved, this, &TrackListWrapper::syncLayout);
     connect(this, &QAbstractItemModel::modelReset, this, &TrackListWrapper::syncLayout);
+    // A new or opened project has its own master effects (G9).
+    connect(this, &QAbstractItemModel::modelReset, this, &TrackListWrapper::masterChanged);
 }
 
 void TrackListWrapper::syncLayout()
@@ -299,19 +303,8 @@ QVariant TrackListWrapper::data(const QModelIndex& index, int role) const
         for (const auto& clip : m_state.clips()) if (clip.trackId == track.id) result.append(clipMap(clip));
         return result;
     }
-    case EffectsRole: {
-        QVariantList result;
-        for (const auto& slot : track.effects) {
-            const auto* effect = effectchain::find(slot.type);
-            result.append(QVariantMap{
-                {QStringLiteral("id"), slot.id},
-                {QStringLiteral("type"), QString::fromStdString(slot.type)},
-                {QStringLiteral("title"), effect ? QString::fromUtf8(effect->title.data(), qsizetype(effect->title.size())) : QString()},
-                {QStringLiteral("subtitle"), effect ? QString::fromUtf8(effect->subtitle.data(), qsizetype(effect->subtitle.size())) : QString()},
-                {QStringLiteral("removable"), effectchain::canRemove(slot.type)}});
-        }
-        return result;
-    }
+    case EffectsRole:
+        return effectList(track);
     case EnvelopeShownRole:
         return track.volumeEnvelope.shown();
     case EnvelopeOverClipsRole:
@@ -331,6 +324,33 @@ QVariant TrackListWrapper::data(const QModelIndex& index, int role) const
     default:
         return {};
     }
+}
+
+namespace {
+// A track's insert effects for QML: [{id, type, title, subtitle, removable}] in chain order.
+QVariantList effectList(const Track& track)
+{
+    QVariantList result;
+    for (const auto& slot : track.effects) {
+        const auto* effect = effectchain::find(slot.type);
+        result.append(QVariantMap{
+            {QStringLiteral("id"), slot.id},
+            {QStringLiteral("type"), QString::fromStdString(slot.type)},
+            {QStringLiteral("title"), effect ? QString::fromUtf8(effect->title.data(), qsizetype(effect->title.size())) : QString()},
+            {QStringLiteral("subtitle"), effect ? QString::fromUtf8(effect->subtitle.data(), qsizetype(effect->subtitle.size())) : QString()},
+            {QStringLiteral("removable"), effectchain::canRemove(slot.type)}});
+    }
+    return result;
+}
+}
+
+QVariantList TrackListWrapper::masterEffects() const { return effectList(m_project.master()); }
+
+QVariantList TrackListWrapper::masterEqBands() const
+{
+    QVariantList bands;
+    for (float gain : m_project.master().eqGainDb) bands.push_back(gain);
+    return bands;
 }
 
 QHash<int, QByteArray> TrackListWrapper::roleNames() const
@@ -374,7 +394,7 @@ QVariantList TrackListWrapper::clipWaveform(int trackId, int clipId, int bins, d
 {
     QVariantList result;
     const auto* clip = m_state.findClip(trackId, clipId);
-    const auto audio = clip ? m_state.audioFor(clip->poolId) : nullptr;
+    const auto audio = clip ? m_state.clipAudio(*clip) : nullptr;   // reversed clips: their reversed copy
     if (clip && audio) for (const auto& peak : ::clipWaveform(*clip, *audio, m_project.tempo().sampleRate(), bins, from, to))
         result.append(QVariant(QVariantList{peak[0], peak[1]}));
     return result;
@@ -555,6 +575,11 @@ int TrackListWrapper::trackIdAt(int row) const { return m_state.trackIdAt(row); 
 
 bool TrackListWrapper::notifyTrackChanged(int id, int role, TrackList::Change change)
 {
+    if (change.changed && id == Project::MasterTrackId) {   // the master has no row (G9)
+        emit masterChanged();
+        emit projectChanged();
+        return change.accepted;
+    }
     if (change.changed) {
         const auto idx = index(rowForTrackId(id)); emit dataChanged(idx, idx, {role});
         if (role == SoloRole || role == MutedRole) emit cleanMonitorGainChanged(cleanMonitorGain());
@@ -858,6 +883,32 @@ bool TrackListWrapper::editClips(const QVariantList& values, const QString& oper
     return change.accepted;
 }
 
+namespace {
+std::optional<TrackList::ClipTool> clipTool(const QString& name)
+{
+    if (name == QLatin1String("reverse")) return TrackList::ClipTool::Reverse;
+    if (name == QLatin1String("invertPolarity")) return TrackList::ClipTool::InvertPolarity;
+    if (name == QLatin1String("normalise")) return TrackList::ClipTool::Normalise;
+    return std::nullopt;
+}
+}
+
+bool TrackListWrapper::canApplyClipTool(const QVariantList& values) const
+{
+    const auto ids = clipIds(values);
+    return ids && m_state.canApplyClipTool(*ids);
+}
+
+bool TrackListWrapper::applyClipTool(const QVariantList& values, const QString& tool)
+{
+    const auto ids = clipIds(values);
+    const auto which = clipTool(tool);
+    if (!ids || !which) return false;
+    const auto change = m_state.applyClipTool(*ids, *which);
+    if (change.changed) notifyClipEdit(-1);
+    return change.accepted;
+}
+
 bool TrackListWrapper::canMergeClips(int id, int first, int second) const { return m_state.canMergeClips(id, first, second); }
 
 bool TrackListWrapper::canMergeSelectedClips(const QVariantList& values) const
@@ -1015,6 +1066,7 @@ bool TrackListWrapper::applyEqBands(int trackId, const std::array<float,10>& ban
     auto* track = m_project.findTrack(trackId);
     if (!track) { setEqPresetError(QStringLiteral("Track is unavailable.")); return false; }
     for (int i=0;i<10;++i) m_project.setTrackEqBand(trackId,i,bands[i]);
+    if (trackId == Project::MasterTrackId) { emit masterChanged(); emit projectChanged(); setEqPresetError({}); return true; }
     const auto changed = index(rowForTrackId(trackId));
     emit dataChanged(changed,changed,{EqBandsRole});
     if (track->hasLiveInput() && track->monitorEnabled) emit cleanMonitorEqChanged();

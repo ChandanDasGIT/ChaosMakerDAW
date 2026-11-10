@@ -97,6 +97,7 @@ private:
     void renderTracks(const AudioIO& io, const EngineSnapshot& snapshot, int frames) noexcept;
     RecordingGroup* m_recordingGroup = nullptr;
     void fillEnvelopeGain(const TrackRender& track, int count) noexcept;
+    void applyMasterEffects(const AudioIO& io, const EngineSnapshot& snapshot, int offset, int count) noexcept;
     void mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot, int frames, TrackMeters* liveMeters) noexcept;
     void populateTrackMidi(const TrackRender& track, std::int64_t position, int count, bool loopWrapped, bool includeLiveMidi = true, const MidiBuffer* hwMidi = nullptr, bool routeHwMidi = false) noexcept;
     static bool trackReceivesHwMidi(const TrackRender& track, const EngineSnapshot* snapshot) noexcept;

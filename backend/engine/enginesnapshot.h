@@ -59,7 +59,10 @@ struct EngineSnapshot {
     std::shared_ptr<TrackMeters> monitorMeters;
     Processor* inputStage = nullptr;                    // optional per-track trim and EQ
     std::vector<TrackRender> tracks;
-    std::vector<Processor*> masterChain;
+    std::vector<Processor*> masterChain;                // the old live guitar monitor chain
+    // The master track's effects (restMap G9): run on the summed mix of all tracks, before the
+    // master fader and before the metronome click is added.
+    std::vector<Processor*> masterEffects;
     float masterGain = 1.0f;
     bool masterMuted = false;
     TempoMap tempo;
