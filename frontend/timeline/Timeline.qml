@@ -77,6 +77,21 @@ Item {
     function duplicateSelection() { editor.duplicateSelectedClips() }
     function deleteSelection() { root.trackModel.editClips(root.selectedClipIds, "delete", 0) }
     function selectAllClips() { editor.selectAllClips() }
+    // Clip effects (restMap R2). With a time selection, the clip of `trackId` under it is split
+    // at the selection's edges and the piece inside gets its effect window.
+    readonly property bool hasTimeSelection: rangeEndBeat > rangeStartBeat
+    readonly property bool menuCanEffectsOnSelection: editActionsAvailable && !recording && hasTimeSelection && selectedTrackId >= 0
+    function effectsOnSelection(trackId) {
+        if (!root.trackModel || !root.hasTimeSelection) return
+        const clip = root.trackModel.splitForRangeEffects(trackId >= 0 ? trackId : root.selectedTrackId,
+                                                          root.rangeStartBeat, root.rangeEndBeat)
+        if (clip >= 0) root.openClipEffects(clip)
+    }
+    function openClipEffects(clipId) {
+        if (!root.trackModel || !root.trackModel.canHaveClipEffects(clipId)) return
+        clipEffectsWindow.clipId = clipId
+        clipEffectsWindow.open()
+    }
 
     Shortcut {
         sequence: "Delete"
@@ -272,6 +287,21 @@ Item {
             onTriggered: root.trackModel.mergeSelectedClips(root.selectedClipIds)
         }
         ThemedMenuSeparator {}
+        // Clip effects (restMap R2).
+        ThemedMenuItem {
+            objectName: "clipEffectsAction"
+            text: "Clip effects…"
+            enabled: !!root.trackModel && !root.recording && root.trackModel.canHaveClipEffects(clipContextMenu.targetClipId)
+            onTriggered: root.openClipEffects(clipContextMenu.targetClipId)
+        }
+        ThemedMenuItem {
+            objectName: "effectsOnSelectionAction"
+            text: "Effects on selection…"
+            enabled: !!root.trackModel && !root.recording && root.hasTimeSelection
+                     && root.trackModel.canHaveClipEffects(clipContextMenu.targetClipId)
+            onTriggered: root.effectsOnSelection(clipContextMenu.targetTrackId)
+        }
+        ThemedMenuSeparator {}
         // Clip tools (restMap G14), on every selected audio clip; one undo step each.
         ThemedMenuItem {
             objectName: "clipReverseAction"
@@ -301,6 +331,24 @@ Item {
                     root.trackModel.editClips(root.selectedClipIds, "delete", 0)
             }
         }
+    }
+
+    // A clip's own effects (restMap R2): the same window as a track's, for the clip's effects id.
+    TrackEffectsPanel {
+        id: clipEffectsWindow
+        objectName: "clipEffectsPanel"
+        property int clipId: -1
+        readonly property var info: clipId >= 0 && root.trackModel
+                                    ? (root.trackModel.clips, root.trackModel.clipEffectsInfo(clipId)) : ({})
+        onInfoChanged: if (visible && info.effectsId === undefined) close()   // the clip went away
+        trackModel: root.trackModel
+        trackId: info.effectsId ?? -1
+        trackName: (info.name ?? "") + " (clip)"
+        trackType: "Clip"
+        eqBands: info.eqBands ?? []
+        effects: info.effects ?? []
+        hasLiveInput: false
+        recordDry: false
     }
 
     // The volume envelope's right-click menu (restMap G6).
@@ -515,6 +563,7 @@ Item {
                 required property var notes
                 required property bool reversed
                 required property bool polarityInverted
+                required property bool hasEffects
                 objectName: "clipBlock" + clipId
                 readonly property var preview: editor.previews[String(clipId)] ?? ({})
                 x: (preview.startBeat ?? startBeat) * root.beatWidth + 4
@@ -533,6 +582,26 @@ Item {
                           + (clipItem.polarityInverted ? " · Ø" : ""); color: Theme.timeline.clipLabel; font.pixelSize: 11
                     elide: Text.ElideRight
                     width: Math.max(0, parent.width - 20)
+                }
+                // Clip effects badge (restMap R2): click it to open them.
+                Rectangle {
+                    objectName: "clipEffectsBadge" + clipItem.clipId
+                    visible: clipItem.hasEffects
+                    anchors.right: parent.right; anchors.rightMargin: 12
+                    anchors.top: parent.top; anchors.topMargin: 6
+                    width: 24; height: 15; radius: 3
+                    color: Theme.accentBg
+                    border.color: Theme.accent
+                    z: 2
+                    Text { anchors.centerIn: parent; text: "FX"; color: Theme.accent; font.pixelSize: 9; font.bold: true }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.openClipEffects(clipItem.clipId)
+                        ToolTip.visible: containsMouse; ToolTip.delay: 450
+                        ToolTip.text: "This clip has its own effects: click to open them"
+                        hoverEnabled: true
+                    }
                 }
                 Canvas {
                     id: waveform

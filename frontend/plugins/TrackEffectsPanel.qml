@@ -101,12 +101,14 @@ Window {
                 Item { Layout.fillWidth: true }                        // keeps the controls together on the right
                 PanelButton {
                     objectName: "exportChainButton"
+                    visible: root.trackType !== "Clip"   // clip chains do not travel as .chaosfx yet
                     text: "Export chain…"
                     tooltip: "Save this track's effects, in order and with every setting, to a .chaosfx file"
                     onClicked: exportChainDialog.open()
                 }
                 PanelButton {
                     objectName: "importChainButton"
+                    visible: root.trackType !== "Clip"
                     text: "Import chain…"
                     enabled: !EngineController.takeBusy
                     tooltip: "Replace this track's effects with the ones in a .chaosfx file"

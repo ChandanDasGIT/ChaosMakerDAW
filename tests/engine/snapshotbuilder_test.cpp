@@ -708,3 +708,31 @@ TEST(snapshotbuilder, the_master_tracks_effects_run_on_the_mix_in_order)
           && snapshot->masterEffects[1] == master.playbackMixEffects.at("limiter").get());
     CHECK(snapshot->tracks.size() == 1);   // the master is not a track of the mix
 }
+
+TEST(snapshotbuilder, a_clips_effects_become_its_chain)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    auto& track = project.addTrack(TrackKind::Audio, "Vox");
+    AudioClip clip;
+    clip.poolId = "a";
+    clip.length = 4800;
+    const int id = project.addAudioClip(track.id, clip);
+    AudioClip plain = clip;
+    plain.start = 9600;
+    project.addAudioClip(track.id, plain);
+    CHECK(project.setTrackEffects(Project::clipEffectsId(id), {"compressor", "chaoseq"}));
+    SnapshotBuilder::TrackEffects clipFx;
+    clipFx.chaosEq = std::make_shared<ChaosEq>();
+    clipFx.playbackChaosEq = std::make_shared<ChaosEq>();
+    SnapshotBuilder::ensureMixEffects(clipFx, {"compressor", "chaoseq"}, 48000.0, 256);
+    auto audio = makeDummyAudio(48000);
+    auto snapshot = SnapshotBuilder::buildPlaybackSnapshot(project,
+        [&](const std::string&) -> std::shared_ptr<const AudioData> { return audio; },
+        [&](int fxId) -> const SnapshotBuilder::TrackEffects* { return fxId == Project::clipEffectsId(id) ? &clipFx : nullptr; }, false);
+    const auto& clips = snapshot->tracks[0].clips;
+    CHECK(clips.size() == 2);
+    CHECK(clips.size() == 2 && clips[0].chain.size() == 2 && clips[1].chain.empty());
+    CHECK(clips.size() == 2 && clips[0].chain[0] == clipFx.playbackMixEffects.at("compressor").get()
+          && clips[0].chain[1] == clipFx.playbackChaosEq.get());
+}

@@ -19,6 +19,9 @@ struct ClipRender {
     std::int64_t fadeOut = 0;
     float gain = 1.0f;
     bool effectsPrinted = true;
+    // Clip effects (restMap R2), in order; empty for a plain clip. They run on this clip's audio
+    // only, before the track's effects; their tails stop at the clip's end.
+    std::vector<Processor*> chain{};
 };
 
 struct NoteRender {

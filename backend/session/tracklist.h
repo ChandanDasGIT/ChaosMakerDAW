@@ -30,6 +30,7 @@ public:
         std::vector<MidiNote> notes; // clip-relative beats (0 = clip start); may lie outside the clip
         bool reversed = false;
         bool polarityInverted = false;
+        EffectState fx;   // clip effects (restMap R2)
     };
     struct ClipboardClip {
         std::string poolId;
@@ -42,6 +43,7 @@ public:
         bool effectsPrinted = true;
         bool reversed = false;
         bool polarityInverted = false;
+        EffectState fx;   // clip effects (restMap R2)
         int trackOffset = 0;
         std::vector<MidiNote> notes; // origin-relative, as stored in AudioClip
     };
@@ -69,6 +71,14 @@ public:
     // clips among them are left alone. Reverse and InvertPolarity flip their flag (again: back);
     // Normalise sets the clip gain so its loudest sample reaches 0 dBFS (like Reaper).
     enum class ClipTool { Reverse, InvertPolarity, Normalise };
+    // Effects on a time range (restMap R2): the audio clip on the track that the range covers
+    // most is split at the range's edges (where they fall inside it), as one undo step; the id
+    // of the piece inside the range, whose effects id is Project::clipEffectsId(id). -1 when no
+    // audio clip is under the range, while recording, or for a bad range.
+    int splitForRangeEffects(int trackId, double startBeat, double endBeat);
+    // Whether a clip can have clip effects: an audio clip (a pattern clip's sound is the
+    // track's instrument), not while recording.
+    bool canHaveClipEffects(int clipId) const;
     bool canApplyClipTool(const std::vector<int>& ids) const;
     Change applyClipTool(const std::vector<int>& ids, ClipTool tool);
     std::shared_ptr<const AudioData> audioFor(const std::string& path) const;

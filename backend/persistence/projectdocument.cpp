@@ -1,6 +1,7 @@
 #include "projectdocument.h"
 #include "chaoseqjson.h"
 #include "mixfxjson.h"
+#include "effectstatejson.h"
 #include "drumkitjson.h"
 #include "electrodrumsjson.h"
 #include "pianojson.h"
@@ -63,6 +64,7 @@ std::string ProjectDocument::serialize(const Project& project,
             clipObj["effectsPrinted"] = clip.effectsPrinted;
             if (clip.reversed) clipObj["reversed"] = true;                   // restMap G14
             if (clip.polarityInverted) clipObj["polarityInverted"] = true;
+            if (clip.fx.hasEffects()) clipObj["effects"] = effectstatejson::toJson(clip.fx);   // restMap R2
             if (!clip.notes.empty()) {
                 // Stored clip-relative (0 = clip start) so notes stay on the clip even if the
                 // project is reopened at another sample rate.
@@ -127,21 +129,7 @@ std::string ProjectDocument::serialize(const Project& project,
     projectJson["sampleRate"] = tempo.sampleRate();
     projectJson["masterVolume"] = project.masterVolume();
     projectJson["masterMuted"] = project.masterMuted();
-    {   // The master track's effects (restMap G9); written only when it has some settings.
-        const auto& master = project.master();
-        json masterJson = json::object();
-        json list = json::array();
-        for (const auto& slot : master.effects) list.push_back(slot.type);
-        masterJson["effects"] = std::move(list);
-        json eq = json::array();
-        for (float g : master.eqGainDb) eq.push_back(g);
-        masterJson["eq"] = std::move(eq);
-        masterJson["chaosEq"] = chaoseqjson::toJson(master.chaosEq);
-        json mix = json::object();
-        for (const auto& [type, settings] : master.mixEffects) mix[type] = mixfxjson::toJson(settings);
-        masterJson["mixEffects"] = std::move(mix);
-        projectJson["master"] = std::move(masterJson);
-    }
+    projectJson["master"] = effectstatejson::toJson(project.master());   // restMap G9
     projectJson["tracks"] = tracksJson;
 
     doc["project"] = projectJson;
@@ -242,41 +230,9 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
     candidate.setMasterMuted(projectJson.value("masterMuted", false));
     // The master track's effects (restMap G9); projects saved before have none.
     if (projectJson.contains("master")) {
-        const auto& m = projectJson["master"];
-        const auto bad = [&error](const char* what) { error = what; return false; };
-        if (!m.is_object()) return bad("Invalid master effects.");
-        const int masterId = Project::MasterTrackId;
-        if (m.contains("effects")) {
-            std::vector<std::string> types;
-            if (!m["effects"].is_array()) return bad("Invalid master effects.");
-            for (const auto& e : m["effects"]) {
-                if (!e.is_string()) return bad("Invalid master effects.");
-                types.push_back(e.get<std::string>());
-            }
-            if (!candidate.setTrackEffects(masterId, types)) return bad("Invalid master effects.");
-        }
-        if (m.contains("eq")) {
-            const auto& eq = m["eq"];
-            if (!eq.is_array() || eq.size() != 10) return bad("Invalid master EQ.");
-            for (int i = 0; i < 10; ++i) {
-                if (!eq[i].is_number()) return bad("Invalid master EQ.");
-                const double gain = eq[i].get<double>();
-                if (!std::isfinite(gain) || gain < -12.0 || gain > 12.0) return bad("Invalid master EQ.");
-                candidate.master().eqGainDb[std::size_t(i)] = static_cast<float>(gain);
-            }
-        }
-        if (m.contains("chaosEq")) {
-            chaoseq::Settings chaos;
-            if (!chaoseqjson::fromJson(m["chaosEq"], chaos, error)) return false;
-            candidate.setTrackChaosEq(masterId, chaos);
-        }
-        if (m.contains("mixEffects")) {
-            if (!m["mixEffects"].is_object()) return bad("Invalid master effects.");
-            for (const auto& [type, settingsJson] : m["mixEffects"].items()) {
-                mixfx::Settings settings;
-                if (!mixfxjson::fromJson(type, settingsJson, settings, error)) return false;
-                candidate.setTrackMixEffect(masterId, type, settings);
-            }
+        if (!effectstatejson::apply(projectJson["master"], candidate, Project::MasterTrackId, error)) {
+            error = "Invalid master effects: " + error;
+            return false;
         }
     }
 
@@ -531,8 +487,14 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
                 }
             }
 
-            if (candidate.addAudioClip(track.id, std::move(clip)) < 0) {
+            const int clipId = candidate.addAudioClip(track.id, std::move(clip));
+            if (clipId < 0) {
                 error = "Invalid clip.";
+                return false;
+            }
+            // Clip effects (restMap R2); optional.
+            if (c.contains("effects") && !effectstatejson::apply(c["effects"], candidate, Project::clipEffectsId(clipId), error)) {
+                error = "Invalid clip effects: " + error;
                 return false;
             }
         }

@@ -224,6 +224,15 @@ public:
     // Clip tools (restMap G14) on clip ids, one undo step: "reverse", "invertPolarity",
     // "normalise" (peak to 0 dBFS). Audio clips only; can... is false with none among them.
     Q_INVOKABLE bool canApplyClipTool(const QVariantList& ids) const;
+    // Clip effects (restMap R2). A clip's effects id works with the effect calls (addTrackEffect,
+    // setEqBand, the mixing plugins...). clipEffectsInfo: {effectsId, trackId, name, effects,
+    // eqBands}, empty for a pattern clip or none; it changes with clipsChanged.
+    Q_INVOKABLE int clipEffectsId(int clipId) const;
+    Q_INVOKABLE bool canHaveClipEffects(int clipId) const;
+    Q_INVOKABLE QVariantMap clipEffectsInfo(int clipId) const;
+    // Splits the track's audio clip under the range at its edges (one undo step); the piece
+    // inside, or -1.
+    Q_INVOKABLE int splitForRangeEffects(int trackId, double startBeat, double endBeat);
     Q_INVOKABLE bool applyClipTool(const QVariantList& ids, const QString& tool);
     Q_INVOKABLE bool canMergeSelectedClips(const QVariantList& ids) const;
     Q_INVOKABLE bool mergeSelectedClips(const QVariantList& ids);

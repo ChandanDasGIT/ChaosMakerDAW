@@ -15,9 +15,9 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 
 NEXT UP (2026-11-10), the user's order:
   1. G6 volume envelope committed (0597318); G6b curve shapes committed (758f523).
-  2. R1, G7b, T1 committed (b85b32f). G9 master effects, G17 tap tempo, G14 clip tools DONE
-     2026-11-11, NOT COMMITTED (the user is testing). Open from the user: effects on a time
-     range (Reaper-style); plan it with G15. Then G8 (fades) and the rest of G8-G17.
+  2. G9, G17, G14 committed (33ef5cc). R2 clip effects (effects on a time range) DONE
+     2026-11-11, NOT COMMITTED (the user is testing). Next: G8 fades, then G10, G15, G16,
+     G11, G13, G12. Later option: "render clip effects into the audio" (Reaper's apply FX).
   3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
      reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
      inside this group is to be confirmed with the user.
@@ -236,6 +236,35 @@ Done items stay further down as the record.
         removing_reordering_and_undoing_tracks_keeps_the_track_list_free_of_qml_warnings; the
         snap tests turn the selection magnet on; click() scrolls lists so the target is in view.
         Full transport_ui 155/155 offscreen; app log empty (empty profile and a session copy).
+[x] R2  Effects on a time range: clip effects, Reaper's take FX (the user, 2026-11-11, chose this
+        over rendering into the selection). DONE 2026-11-11 (uncommitted).
+        - "Effects on selection..." (clip menu, Edit menu): the audio clip of the track that the
+          time selection covers most is split at the selection's edges (one undo step) and the
+          piece inside gets its effect window; "Clip effects..." opens any audio clip's. The FX
+          badge on a clip opens them too. EQ, Chaos EQ and the eight mixing plugins; live; clip
+          effects run before the track's, their tails stop at the clip's end. Pattern clips:
+          none (their sound is the track's instrument). Export / import chain: tracks only.
+        - plugins/effectstate: EffectState (chain, EQ, Chaos EQ, mixing plugin settings);
+          Track derives from it, AudioClip::fx is one. Project::effects(id) for a track, the
+          master or a clip: Project::clipEffectsId(clipId) = ClipEffectsBase (1e9) + clip id,
+          clipOfEffects, effectOwnerType ("Clip"); the effect calls take any of them. Undo of
+          clip edits keeps the current clip effects (Project::restoreClips); split, copy /
+          paste and duplicate carry a copy; TrackList::splitForRangeEffects (joinLastClipEdits).
+        - persistence/effectstatejson (the master's and a clip's "effects" in the project).
+        - Engine: ClipRender::chain; AudioEngine::mixClipWithEffects renders an effected clip's
+          block through its chain, resets on play / seek / loop. EngineController makes clip
+          processors in syncTrackEffects (only clips with effects); SnapshotBuilder::
+          applyEffectState syncs settings for tracks, the master and clips.
+        - TrackListWrapper clipEffectsId / canHaveClipEffects / clipEffectsInfo /
+          splitForRangeEffects, clip "hasEffects"; Timeline.qml clipEffectsPanel window,
+          clipEffectsBadge, effectsOnSelection(); TrackEffectsPanel hides export / import for
+          "Clip". No automatic fades at the cuts: G8.
+        Tests: backendtests clipeffects, projectdocument clip_effects..., snapshotbuilder
+        a_clips_effects_become_its_chain, audioengine_midi a_clips_effects_change_only...;
+        wrappertests qtmixeffect a_clips_effects_get_processors...; transport_ui
+        effects_on_a_selection_split_the_clip_and_open_its_own_effects. Full suites: backend 600,
+        wrapper 20/20 (ctest), transport_ui 159/159 offscreen; app log empty (empty profile and
+        a session copy).
 -- From the Reaper comparison (the user picked these, 2026-11-10; none planned yet)
 [ ] G8  Clip fades and crossfades. AudioClip already has fadeIn / fadeOut (samples) but no
         wrapper action or UI sets them. Wanted: Reaper-style fade handles in a clip's top

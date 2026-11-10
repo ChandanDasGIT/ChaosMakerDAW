@@ -15,6 +15,7 @@
 #include <QJsonDocument>
 
 #include <QVariant>
+#include <filesystem>
 #include <QPointF>
 #include <QStringList>
 #include <algorithm>
@@ -23,7 +24,7 @@
 
 
 namespace {
-QVariantList effectList(const Track& track);
+QVariantList effectList(const EffectState& track);
 QVariantList noteList(const std::vector<MidiNote>& notes)
 {
     QVariantList list;
@@ -41,7 +42,8 @@ QVariantMap clipMap(const TrackList::ClipInfo& clip)
         {"label", QString::fromStdString(clip.label)}, {"trackColour", QString::fromStdString(clip.colour)},
         {"effectsPrinted", clip.effectsPrinted}, {"gainDb", clip.gainDb},
         {"isRecorded", clip.isRecorded}, {"notes", noteList(clip.notes)},
-        {"reversed", clip.reversed}, {"polarityInverted", clip.polarityInverted}};
+        {"reversed", clip.reversed}, {"polarityInverted", clip.polarityInverted},
+        {"hasEffects", clip.fx.hasEffects()}};
 }
 QVariantList choices(const std::vector<TrackList::TrackChoice>& entries)
 {
@@ -327,8 +329,9 @@ QVariant TrackListWrapper::data(const QModelIndex& index, int role) const
 }
 
 namespace {
-// A track's insert effects for QML: [{id, type, title, subtitle, removable}] in chain order.
-QVariantList effectList(const Track& track)
+// A track's (or the master's, or a clip's) insert effects for QML: [{id, type, title,
+// subtitle, removable}] in chain order.
+QVariantList effectList(const EffectState& track)
 {
     QVariantList result;
     for (const auto& slot : track.effects) {
@@ -580,6 +583,10 @@ bool TrackListWrapper::notifyTrackChanged(int id, int role, TrackList::Change ch
         emit projectChanged();
         return change.accepted;
     }
+    if (change.changed && Project::isClipEffectsId(id)) {    // a clip's effects (R2): its data
+        notifyClipEdit(-1);
+        return change.accepted;
+    }
     if (change.changed) {
         const auto idx = index(rowForTrackId(id)); emit dataChanged(idx, idx, {role});
         if (role == SoloRole || role == MutedRole) emit cleanMonitorGainChanged(cleanMonitorGain());
@@ -635,7 +642,7 @@ QVariantList TrackListWrapper::cleanMonitorEqBands() const
 
 const chaoseq::Settings* TrackListWrapper::chaosEq(int trackId) const
 {
-    const auto* track = m_project.findTrack(trackId);
+    const auto* track = m_project.effects(trackId);   // a track, the master or a clip
     return track ? &track->chaosEq : nullptr;
 }
 
@@ -774,7 +781,7 @@ bool TrackListWrapper::moveTrackEffect(int trackId, int effectId, int toIndex)
 QVariantList TrackListWrapper::addableEffects(int trackId) const
 {
     QVariantList result;
-    const auto* track = m_project.findTrack(trackId);
+    const auto* track = m_project.effects(trackId);   // a track, the master or a clip
     if (!track || m_state.trackLocked(trackId)) return result;
     const auto text = [](std::string_view s) { return QString::fromUtf8(s.data(), qsizetype(s.size())); };
     for (const auto type : effectchain::addableEffects(track->effects)) {
@@ -891,6 +898,30 @@ std::optional<TrackList::ClipTool> clipTool(const QString& name)
     if (name == QLatin1String("normalise")) return TrackList::ClipTool::Normalise;
     return std::nullopt;
 }
+}
+
+int TrackListWrapper::clipEffectsId(int clipId) const { return Project::clipEffectsId(clipId); }
+
+bool TrackListWrapper::canHaveClipEffects(int clipId) const { return m_state.canHaveClipEffects(clipId); }
+
+QVariantMap TrackListWrapper::clipEffectsInfo(int clipId) const
+{
+    int trackId = -1;
+    const auto* clip = m_project.clipOfEffects(Project::clipEffectsId(clipId), &trackId);
+    if (!clip || !m_state.canHaveClipEffects(clipId)) return {};
+    QVariantList bands;
+    for (float gain : clip->fx.eqGainDb) bands.push_back(gain);
+    return {{QStringLiteral("effectsId"), Project::clipEffectsId(clipId)}, {QStringLiteral("trackId"), trackId},
+            {QStringLiteral("name"), QString::fromStdString(clip->poolId.empty() ? std::string("Audio clip")
+                                         : std::filesystem::path(clip->poolId).filename().string())},
+            {QStringLiteral("effects"), effectList(clip->fx)}, {QStringLiteral("eqBands"), bands}};
+}
+
+int TrackListWrapper::splitForRangeEffects(int trackId, double startBeat, double endBeat)
+{
+    const int clip = m_state.splitForRangeEffects(trackId, startBeat, endBeat);
+    if (clip >= 0) notifyClipEdit(trackId);
+    return clip;
 }
 
 bool TrackListWrapper::canApplyClipTool(const QVariantList& values) const
@@ -1063,10 +1094,11 @@ QStringList TrackListWrapper::eqPresetNames() const {
     return names;
 }
 bool TrackListWrapper::applyEqBands(int trackId, const std::array<float,10>& bands) {
-    auto* track = m_project.findTrack(trackId);
-    if (!track) { setEqPresetError(QStringLiteral("Track is unavailable.")); return false; }
+    if (!m_project.effects(trackId)) { setEqPresetError(QStringLiteral("Track is unavailable.")); return false; }
     for (int i=0;i<10;++i) m_project.setTrackEqBand(trackId,i,bands[i]);
     if (trackId == Project::MasterTrackId) { emit masterChanged(); emit projectChanged(); setEqPresetError({}); return true; }
+    if (Project::isClipEffectsId(trackId)) { notifyClipEdit(-1); setEqPresetError({}); return true; }
+    auto* track = m_project.findTrack(trackId);
     const auto changed = index(rowForTrackId(trackId));
     emit dataChanged(changed,changed,{EqBandsRole});
     if (track->hasLiveInput() && track->monitorEnabled) emit cleanMonitorEqChanged();
@@ -1078,7 +1110,7 @@ bool TrackListWrapper::applyEqPreset(int trackId, int preset) {
     return applyEqBands(trackId, *gains);
 }
 bool TrackListWrapper::saveEqPreset(int trackId, const QUrl& url) {
-    const auto* track = m_project.findTrack(trackId);
+    const auto* track = m_project.effects(trackId);   // a track, the master or a clip
     if (!track || !url.isLocalFile()) { setEqPresetError(QStringLiteral("Choose a local file for an existing track.")); return false; }
     std::string error;
     if (!EqPresetStore::saveToFile(url.toLocalFile().toStdString(), track->eqGainDb, &error)) {

@@ -240,7 +240,8 @@ bool EngineController::effectsBusy() const
 
 QObject* EngineController::trackEffects(int trackId)
 {
-    if (!m_project || !m_project->project().findTrack(trackId)) return nullptr;
+    // A track, the master (G9) or a clip's effects (R2).
+    if (!m_project || !m_project->project().effects(trackId)) return nullptr;
     const auto existing=m_trackEffects.find(trackId);
     if(existing!=m_trackEffects.end())return existing->second.model;
     bindTrackEffects(trackId,new GuitarSuiteModel(this));
@@ -328,12 +329,22 @@ void EngineController::syncTrackEffects()
         for (const auto& slot : master.effects) types.push_back(slot.type);
         SnapshotBuilder::ensureMixEffects(m_trackEffects[master.id], types, rate, frames);
     }
+    // Clip effects (restMap R2): processors only for clips that have effects.
+    for (const auto& track : m_project->project().tracks())
+        for (const auto& clip : track->audioClips) {
+            if (!clip.fx.hasEffects()) continue;
+            const int id = Project::clipEffectsId(clip.id);
+            trackEffects(id);
+            std::vector<std::string> types;
+            for (const auto& slot : clip.fx.effects) types.push_back(slot.type);
+            SnapshotBuilder::ensureMixEffects(m_trackEffects[id], types, rate, frames);
+        }
     SnapshotBuilder::syncTrackEq(m_project->project(), [this](int id) {
         auto it = m_trackEffects.find(id);
         return it != m_trackEffects.end() ? &it->second : nullptr;
     });
     for (auto it = m_trackEffects.begin(); it != m_trackEffects.end();) {
-        if (!m_project->project().findTrack(it->first)) {
+        if (!m_project->project().effects(it->first)) {   // gone: a track, or a clip with effects
             if (it->second.model) m_removedTrackEffects[it->first] = it->second.model->sessionDataStd();
             delete it->second.model;
             it = m_trackEffects.erase(it);
