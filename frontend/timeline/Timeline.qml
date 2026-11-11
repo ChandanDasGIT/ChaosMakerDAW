@@ -10,6 +10,10 @@ Item {
     property alias snapMode: editor.snapMode // Backend-owned bars/beats/subdivision/off choice.
     // The magnets for the playhead and the time selection (Preferences > Timeline; off by default).
     property alias snapPlayhead: editor.snapPlayhead
+    // Ripple editing (restMap G15): the app setting, bound in by the window. The toggles ask
+    // for a change with rippleEdited; the window saves it.
+    property alias ripple: editor.ripple
+    signal rippleEdited(bool on)
     property alias snapSelection: editor.snapSelection
     TimelineWrapper {
         id: editor
@@ -42,6 +46,9 @@ Item {
     readonly property bool editingText: keyboardFocusItem instanceof TextInput || keyboardFocusItem instanceof TextEdit
     readonly property bool clipKeyboardActive: activeFocus && visible && enabled && !editingText && editor.keyboardAllowed
     readonly property bool canEditClipSelection: clipKeyboardActive && editor.canEditSelection
+    // Delete: the selected clips, or with none selected the time selection (restMap G15).
+    readonly property bool canDeleteSelection: clipKeyboardActive && editor.canDelete
+    readonly property bool rangeMode: editor.rangeMode
     readonly property bool canCopy: clipKeyboardActive && editor.canCopy
     readonly property bool canCut: clipKeyboardActive && editor.canCut
     readonly property bool canPaste: clipKeyboardActive && editor.canPaste
@@ -71,14 +78,14 @@ Item {
     readonly property bool menuCanCopy: editActionsAvailable && editor.canCopy
     readonly property bool menuCanPaste: editActionsAvailable && editor.canPaste
     readonly property bool menuCanDuplicate: editActionsAvailable && editor.canDuplicate
-    readonly property bool menuCanDelete: editActionsAvailable && editor.canEditSelection
+    readonly property bool menuCanDelete: editActionsAvailable && editor.canDelete
     readonly property bool menuCanSelectAll: editActionsAvailable && editor.keyboardAllowed
     function cutSelection() { editor.cutSelectedClips() }
     function copySelection() { editor.copySelectedClips() }
     // Paste at the playhead, on the selected track.
     function pasteAtPlayhead() { editor.pasteClips(root.transport.positionBeats, editor.selectedTrackId) }
     function duplicateSelection() { editor.duplicateSelectedClips() }
-    function deleteSelection() { root.trackModel.editClips(root.selectedClipIds, "delete", 0) }
+    function deleteSelection() { editor.deleteSelection() }
     function selectAllClips() { editor.selectAllClips() }
     // Clip effects (restMap R2). With a time selection, the clip of `trackId` under it is split
     // at the selection's edges and the piece inside gets its effect window.
@@ -98,7 +105,7 @@ Item {
 
     Shortcut {
         sequence: "Delete"
-        enabled: root.canEditClipSelection
+        enabled: root.canDeleteSelection
         autoRepeat: false
         onActivated: root.deleteSelection()
     }

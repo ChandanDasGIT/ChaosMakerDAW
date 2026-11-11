@@ -249,9 +249,15 @@ public:
     bool hasClipboard() const { return m_state.hasClipboard(); }
     int clipboardClipCount() const { return m_state.clipboardClipCount(); }
     Q_INVOKABLE bool copyClips(const QVariantList& ids);
-    Q_INVOKABLE QVariantList cutClips(const QVariantList& ids);
-    Q_INVOKABLE QVariantList pasteClips(int targetTrackId, double targetBeat);
-    Q_INVOKABLE QVariantList duplicateClips(const QVariantList& ids, double beatOffset = 0.0);
+    // ripple (restMap G15): close the gaps deletes leave / make room for pastes and duplicates.
+    Q_INVOKABLE QVariantList cutClips(const QVariantList& ids, bool ripple = false);
+    Q_INVOKABLE bool deleteClips(const QVariantList& ids, bool ripple = false);
+    Q_INVOKABLE QVariantList pasteClips(int targetTrackId, double targetBeat, bool ripple = false);
+    Q_INVOKABLE QVariantList duplicateClips(const QVariantList& ids, double beatOffset = 0.0, bool ripple = false);
+    // Time selection edits (restMap G15) on every track, clips and volume-envelope points.
+    Q_INVOKABLE bool copyRange(double startBeat, double endBeat);
+    Q_INVOKABLE bool cutRange(double startBeat, double endBeat, bool ripple);
+    Q_INVOKABLE bool deleteRange(double startBeat, double endBeat, bool ripple);
     Q_INVOKABLE void setTempo(double bpm, int numerator, int denominator);
 
     // Volume envelope (restMap G6), in project beats. Points, moves and bypass are undoable (one
@@ -317,6 +323,7 @@ signals:
     void masterChanged();
 
 private:
+    void notifyContentEdit();   // clips and envelopes on any track (G15)
     void notifyClipEdit(int trackId);
     // Clip gain only: refresh the track's clip data, engine and history, but not the clip list,
     // so the timeline does not rebuild every clip block while a gain fader moves.

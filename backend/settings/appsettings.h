@@ -24,6 +24,7 @@ public:
     static constexpr const char* KeyPianoRollDockHeight = "ui/pianoRollDockHeight";
     static constexpr const char* KeySnapPlayhead = "timeline/snapPlayhead";
     static constexpr const char* KeySnapSelection = "timeline/snapSelection";
+    static constexpr const char* KeyRippleEditing = "timeline/ripple";   // restMap G15
 
     // Main window layout (pixels). Setters clamp into these ranges; non-finite values are ignored.
     struct SizeLimits { double min, max, fallback; };
@@ -81,6 +82,10 @@ public:
     void setSnapPlayhead(bool on) noexcept { m_snapPlayhead = on; }
     bool snapSelection() const noexcept { return m_snapSelection; }
     void setSnapSelection(bool on) noexcept { m_snapSelection = on; }
+    // Ripple editing (restMap G15, off by default): deletes close their gap, pastes and
+    // duplicates make room.
+    bool rippleEditing() const noexcept { return m_rippleEditing; }
+    void setRippleEditing(bool on) noexcept { m_rippleEditing = on; }
 
     // Defaults and validation
     void resetToDefaults() noexcept;
@@ -112,5 +117,6 @@ private:
     int m_autoSaveIntervalSeconds = 60;
     bool m_snapPlayhead = false;
     bool m_snapSelection = false;
+    bool m_rippleEditing = false;
     mutable std::string m_lastError;
 };

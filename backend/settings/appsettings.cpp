@@ -120,6 +120,7 @@ void AppSettings::resetToDefaults() noexcept {
     m_autoSaveIntervalSeconds = 60;
     m_snapPlayhead = false;
     m_snapSelection = false;
+    m_rippleEditing = false;
     m_lastError.clear();
 }
 
@@ -150,6 +151,8 @@ void AppSettings::importValue(std::string_view key, std::string_view value) {
         m_snapPlayhead = parseBool(value, false);
     } else if (key == KeySnapSelection) {
         m_snapSelection = parseBool(value, false);
+    } else if (key == KeyRippleEditing) {
+        m_rippleEditing = parseBool(value, false);
     } else if (key == KeyAutoSaveEnabled) {
         m_autoSaveEnabled = parseBool(value, true);
     } else if (key == KeyAutoSaveInterval) {
@@ -184,6 +187,7 @@ std::string AppSettings::exportValue(std::string_view key) const {
     }
     if (key == KeySnapPlayhead) return m_snapPlayhead ? "true" : "false";
     if (key == KeySnapSelection) return m_snapSelection ? "true" : "false";
+    if (key == KeyRippleEditing) return m_rippleEditing ? "true" : "false";
     if (key == KeyAutoSaveInterval) {
         return std::to_string(m_autoSaveIntervalSeconds);
     }
@@ -204,6 +208,7 @@ std::string AppSettings::serialize() const {
     ss << KeyAutoSaveInterval << "=" << m_autoSaveIntervalSeconds << "\n";
     ss << KeySnapPlayhead << "=" << (m_snapPlayhead ? "true" : "false") << "\n";
     ss << KeySnapSelection << "=" << (m_snapSelection ? "true" : "false") << "\n";
+    ss << KeyRippleEditing << "=" << (m_rippleEditing ? "true" : "false") << "\n";
     return ss.str();
 }
 

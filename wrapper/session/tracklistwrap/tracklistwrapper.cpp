@@ -1013,15 +1013,15 @@ bool TrackListWrapper::copyClips(const QVariantList& ids)
     return ok;
 }
 
-QVariantList TrackListWrapper::cutClips(const QVariantList& ids)
+QVariantList TrackListWrapper::cutClips(const QVariantList& ids, bool ripple)
 {
     std::vector<int> intIds;
     intIds.reserve(ids.size());
     for (const auto& id : ids) intIds.push_back(id.toInt());
-    const auto cut = m_state.cutClips(intIds);
+    const auto cut = m_state.cutClips(intIds, ripple);
     if (!cut.empty()) {
         emit clipboardChanged();
-        notifyClipEdit(-1);
+        if (ripple) notifyContentEdit(); else notifyClipEdit(-1);
     }
     QVariantList result;
     result.reserve(cut.size());
@@ -1029,11 +1029,12 @@ QVariantList TrackListWrapper::cutClips(const QVariantList& ids)
     return result;
 }
 
-QVariantList TrackListWrapper::pasteClips(int targetTrackId, double targetBeat)
+QVariantList TrackListWrapper::pasteClips(int targetTrackId, double targetBeat, bool ripple)
 {
-    const auto pasted = m_state.pasteClips(targetTrackId, targetBeat);
+    const bool content = ripple || !m_state.clipboardEnvelopes().empty();
+    const auto pasted = m_state.pasteClips(targetTrackId, targetBeat, ripple);
     if (!pasted.empty()) {
-        notifyClipEdit(targetTrackId);
+        if (content) notifyContentEdit(); else notifyClipEdit(targetTrackId);
     }
     QVariantList result;
     result.reserve(pasted.size());
@@ -1041,14 +1042,14 @@ QVariantList TrackListWrapper::pasteClips(int targetTrackId, double targetBeat)
     return result;
 }
 
-QVariantList TrackListWrapper::duplicateClips(const QVariantList& ids, double beatOffset)
+QVariantList TrackListWrapper::duplicateClips(const QVariantList& ids, double beatOffset, bool ripple)
 {
     std::vector<int> intIds;
     intIds.reserve(ids.size());
     for (const auto& id : ids) intIds.push_back(id.toInt());
-    const auto duplicated = m_state.duplicateClips(intIds, beatOffset);
+    const auto duplicated = m_state.duplicateClips(intIds, beatOffset, ripple);
     if (!duplicated.empty()) {
-        notifyClipEdit(-1);
+        if (ripple) notifyContentEdit(); else notifyClipEdit(-1);
     }
     QVariantList result;
     result.reserve(duplicated.size());
@@ -1056,6 +1057,37 @@ QVariantList TrackListWrapper::duplicateClips(const QVariantList& ids, double be
     return result;
 }
 
+bool TrackListWrapper::deleteClips(const QVariantList& values, bool ripple)
+{
+    const auto ids = clipIds(values);
+    if (!ids) return false;
+    const auto change = m_state.deleteClips(*ids, ripple);
+    if (change.changed) { if (ripple) notifyContentEdit(); else notifyClipEdit(-1); }
+    return change.accepted;
+}
+bool TrackListWrapper::copyRange(double startBeat, double endBeat)
+{
+    const bool ok = m_state.copyRange(startBeat, endBeat);
+    if (ok) emit clipboardChanged();
+    return ok;
+}
+bool TrackListWrapper::cutRange(double startBeat, double endBeat, bool ripple)
+{
+    const auto change = m_state.cutRange(startBeat, endBeat, ripple);
+    if (change.accepted) emit clipboardChanged();
+    if (change.changed) notifyContentEdit();
+    return change.accepted;
+}
+bool TrackListWrapper::deleteRange(double startBeat, double endBeat, bool ripple)
+{
+    const auto change = m_state.deleteRange(startBeat, endBeat, ripple);
+    if (change.changed) notifyContentEdit();
+    return change.accepted;
+}
+void TrackListWrapper::notifyContentEdit() {
+    notifyClipEdit(-1);
+    if (count() > 0) emit dataChanged(index(0), index(count() - 1), {EnvelopePointsRole});
+}
 void TrackListWrapper::notifyClipEdit(int trackId) {
     const int row = rowForTrackId(trackId);
     if (count()>0) emit dataChanged(index(row<0 ? 0 : row), index(row<0 ? count()-1 : row), {ClipsRole});

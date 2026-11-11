@@ -190,6 +190,13 @@ public:
     bool setEnvelopeOverClips(int trackId, bool overClips);
     struct ClipChange { int trackId; AudioClip clip; bool remove = false; int destinationTrackId = -1; };
     bool editClipGroup(const std::vector<ClipChange>& changes);
+    // Time selection edits (restMap G15): several tracks' clips and volume-envelope points
+    // (the points and bypass; the view state stays) replaced as one undo step. A new clip
+    // takes its id from takeClipId(). False, and no change, for an unknown or repeated track,
+    // a repeated clip id or a clip with bad bounds.
+    struct TrackContent { int trackId; std::vector<AudioClip> clips; automation::VolumeEnvelope envelope; };
+    bool replaceTrackContent(std::vector<TrackContent> contents);
+    int takeClipId() noexcept { return m_nextClipId++; }
     bool canUndo() const { return m_historyPosition > 0; }
     bool canRedo() const { return m_historyPosition < m_history.size(); }
     int undo();
@@ -229,6 +236,7 @@ private:
     struct ClipEdit {
         std::vector<TrackClipEdit> tracks;
         std::optional<EnvelopeEdit> envelope;
+        std::vector<EnvelopeEdit> envelopes;   // several tracks' points with their clips (G15)
         int gainClipId = -1;
         int fadeClipId = -1;      // a fade handle drag (G8), extended like gainClipId
         std::optional<Track> removedTrack;

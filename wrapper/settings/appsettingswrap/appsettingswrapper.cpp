@@ -26,7 +26,7 @@ void AppSettingsWrapper::loadFromPlatform()
     }
     for (const char* key : {AppSettings::KeyTrackListWidth, AppSettings::KeyMixerHeight, AppSettings::KeyPianoRollDockHeight,
                             AppSettings::KeyDefaultRecordMode, AppSettings::KeyChordZoneMapping,
-                            AppSettings::KeySnapPlayhead, AppSettings::KeySnapSelection}) {
+                            AppSettings::KeySnapPlayhead, AppSettings::KeySnapSelection, AppSettings::KeyRippleEditing}) {
         const QString name = QString::fromLatin1(key);
         if (qs.contains(name)) m_settings.importValue(key, qs.value(name).toString().toStdString());
     }
@@ -60,7 +60,7 @@ void AppSettingsWrapper::saveToPlatform()
     qs.setValue(QStringLiteral("autosave/enabled"), m_settings.autoSaveEnabled());
     qs.setValue(QStringLiteral("autosave/intervalSeconds"), m_settings.autoSaveIntervalSeconds());
     for (const char* key : {AppSettings::KeyTrackListWidth, AppSettings::KeyMixerHeight, AppSettings::KeyPianoRollDockHeight,
-                            AppSettings::KeyDefaultRecordMode, AppSettings::KeySnapPlayhead, AppSettings::KeySnapSelection})
+                            AppSettings::KeyDefaultRecordMode, AppSettings::KeySnapPlayhead, AppSettings::KeySnapSelection, AppSettings::KeyRippleEditing})
         qs.setValue(QString::fromLatin1(key), QString::fromStdString(m_settings.exportValue(key)));
     qs.sync();
 }
@@ -132,6 +132,15 @@ void AppSettingsWrapper::setSnapPlayhead(bool on)
     saveValue(QString::fromLatin1(AppSettings::KeySnapPlayhead), QString::fromStdString(m_settings.exportValue(AppSettings::KeySnapPlayhead)));
     emit timelineSnapChanged();
     emit preferenceSaved(QString::fromLatin1(AppSettings::KeySnapPlayhead));
+}
+
+void AppSettingsWrapper::setRippleEditing(bool on)
+{
+    if (m_settings.rippleEditing() == on) return;
+    m_settings.setRippleEditing(on);
+    saveValue(QString::fromLatin1(AppSettings::KeyRippleEditing), QString::fromStdString(m_settings.exportValue(AppSettings::KeyRippleEditing)));
+    emit timelineSnapChanged();
+    emit preferenceSaved(QString::fromLatin1(AppSettings::KeyRippleEditing));
 }
 
 void AppSettingsWrapper::setSnapSelection(bool on)

@@ -217,13 +217,28 @@ public:
     std::vector<EnvelopeCurveSample> envelopeCurve(int trackId, double fromBeat, double toBeat, int steps) const;
     bool removeAudioClip(int trackId, int clipId);
     bool copyClips(const std::vector<int>& ids);
-    std::vector<int> cutClips(const std::vector<int>& ids);
-    std::vector<int> pasteClips(int targetTrackId, double targetBeat);
-    std::vector<int> duplicateClips(const std::vector<int>& ids, double beatOffset = 0.0);
-    bool hasClipboard() const { return !m_clipboard.empty(); }
+    // ripple (restMap G15, "ripple all tracks" for ranges and paste, the clip's own track for
+    // clip deletes): close the gap a delete leaves, or make room for what is pasted or duplicated.
+    std::vector<int> cutClips(const std::vector<int>& ids, bool ripple = false);
+    Change deleteClips(const std::vector<int>& ids, bool ripple = false);
+    std::vector<int> pasteClips(int targetTrackId, double targetBeat, bool ripple = false);
+    std::vector<int> duplicateClips(const std::vector<int>& ids, double beatOffset = 0.0, bool ripple = false);
+    // Time selection edits (restMap G15), on every track, each one undo step. Clips that cross
+    // an edge are split there and only the part inside is taken; volume-envelope points inside
+    // go too, and a point at each edge keeps the line outside the range where it was. Copy
+    // takes the parts inside (the document stays) with the envelope line, the gap before the
+    // first clip included. ripple: everything after the range moves left by its length.
+    bool copyRange(double startBeat, double endBeat);
+    Change deleteRange(double startBeat, double endBeat, bool ripple);
+    Change cutRange(double startBeat, double endBeat, bool ripple);
+    bool hasClipboard() const { return !m_clipboard.empty() || !m_clipboardEnvelopes.empty(); }
     int clipboardClipCount() const { return static_cast<int>(m_clipboard.size()); }
     const std::vector<ClipboardClip>& clipboard() const { return m_clipboard; }
-    void clearClipboard() { m_clipboard.clear(); }
+    // A copied range's envelope lines: points as beats from the range start, per track.
+    struct ClipboardEnvelope { int trackOffset = 0; std::vector<std::pair<double, automation::EnvelopePoint>> points; };
+    const std::vector<ClipboardEnvelope>& clipboardEnvelopes() const { return m_clipboardEnvelopes; }
+    double clipboardLengthBeats() const { return m_clipboardLengthBeats; }
+    void clearClipboard() { m_clipboard.clear(); m_clipboardEnvelopes.clear(); m_clipboardLengthBeats = 0.0; }
     bool canUndo() const { return !editsLocked() && m_project.canUndo(); }
     bool canRedo() const { return !editsLocked() && m_project.canRedo(); }
     bool undo();
@@ -242,6 +257,20 @@ private:
     // After a track is removed: if it was selected, select the track that took its row.
     void selectNeighbourOfRemoved(int id, int removedRow);
     double offsetBeats(const AudioClip& clip) const;
+    // Time selection helpers (restMap G15), in project samples.
+    double sourceRatio(const AudioClip& clip) const;   // file frames per project sample
+    // The part of a clip in [from, to): offset, fades (kept only on the clip's own edges) and
+    // pattern notes (those starting in it) follow; the id stays.
+    AudioClip clipPiece(const AudioClip& clip, std::int64_t from, std::int64_t to) const;
+    std::vector<AudioClip> clipsWithoutSpan(const Track& track, std::int64_t from, std::int64_t to, bool ripple);
+    std::vector<AudioClip> clipsWithSpace(const std::vector<AudioClip>& clips, std::int64_t at, std::int64_t length);
+    static automation::VolumeEnvelope envelopeWithoutSpan(const automation::VolumeEnvelope& envelope, std::int64_t from, std::int64_t to, bool ripple);
+    static automation::VolumeEnvelope envelopeWithSpace(const automation::VolumeEnvelope& envelope, std::int64_t at, std::int64_t length);
+    static automation::VolumeEnvelope envelopeWithPasted(const automation::VolumeEnvelope& envelope, std::int64_t at, std::int64_t length,
+                                                         const std::vector<automation::EnvelopePoint>& pasted);
+    static bool sameClips(const std::vector<AudioClip>& a, const std::vector<AudioClip>& b);
+    Change applyContent(std::vector<Project::TrackContent> contents);
+    std::vector<int> pasteWithContent(int targetRow, double targetBeat, bool ripple);
     Project m_project;
     AudioMap m_audio;
     // Reversed copies of audio files (G14), by pool id. Shared, so copying a TrackList keeps
@@ -256,6 +285,8 @@ private:
     std::optional<bool> m_newTrackRecordDry;
     int startTrack(Track& track); // applies new-track defaults, returns the id
     std::vector<ClipboardClip> m_clipboard;
+    std::vector<ClipboardEnvelope> m_clipboardEnvelopes;
+    double m_clipboardLengthBeats = 0.0;   // the copied span (a range's length, or the clips')
     int m_selectedTrackId = -1;
     int m_selectedClipId = -1;
     int m_nextAudioNumber = 1, m_nextVocalNumber = 1, m_nextInstrumentNumber = 1, m_nextClipNumber = 1;

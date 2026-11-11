@@ -111,6 +111,16 @@ ToolButton {
             onTriggered: root.runOnTimeline(() => root.timeline.deleteSelection())
         }
 
+        ThemedMenuItem {
+            objectName: "editRippleItem"
+            text: "Ripple editing"
+            checkable: true
+            checked: root.hasTimeline && root.timeline.ripple
+            enabled: root.hasTimeline
+            onTriggered: root.timeline.rippleEdited(!root.timeline.ripple)
+            Binding on checked { value: root.hasTimeline && root.timeline.ripple }
+        }
+
         ThemedMenuSeparator {}
 
         ThemedMenuItem {

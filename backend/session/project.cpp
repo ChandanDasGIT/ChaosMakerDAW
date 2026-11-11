@@ -496,7 +496,7 @@ bool Project::joinLastClipEdits()
     auto& first = m_history[m_history.size() - 2];
     auto& last = m_history.back();
     const auto plain = [](const ClipEdit& e) {
-        return e.tracks.size() == 1 && !e.envelope && !e.removedTrack && e.gainClipId < 0 && e.fadeClipId < 0;
+        return e.tracks.size() == 1 && !e.envelope && e.envelopes.empty() && !e.removedTrack && e.gainClipId < 0 && e.fadeClipId < 0;
     };
     if (!plain(first) || !plain(last) || first.tracks.front().trackId != last.tracks.front().trackId) return false;
     first.tracks.front().after = std::move(last.tracks.front().after);
@@ -668,6 +668,42 @@ bool Project::editClipGroup(const std::vector<ClipChange>& changes) {
     return true;
 }
 
+bool Project::replaceTrackContent(std::vector<TrackContent> contents) {
+    if (contents.empty()) return false;
+    std::vector<int> trackIds, clipIds;
+    for (const auto& content : contents) {
+        if (!findTrack(content.trackId) || std::find(trackIds.begin(), trackIds.end(), content.trackId) != trackIds.end()) return false;
+        trackIds.push_back(content.trackId);
+        for (const auto& clip : content.clips) {
+            if (clip.id <= 0 || std::find(clipIds.begin(), clipIds.end(), clip.id) != clipIds.end()
+                || clip.start < 0 || clip.length <= 0 || clip.sourceOffset < 0 || clip.start > INT64_MAX - clip.length) return false;
+            clipIds.push_back(clip.id);
+        }
+    }
+    // A clip id may not also live on a track this step leaves alone.
+    for (const auto& track : m_tracks) {
+        if (std::find(trackIds.begin(), trackIds.end(), track->id) != trackIds.end()) continue;
+        for (const auto& clip : track->audioClips)
+            if (std::find(clipIds.begin(), clipIds.end(), clip.id) != clipIds.end()) return false;
+    }
+    ClipEdit edit;
+    for (auto& content : contents) {
+        auto* track = findTrack(content.trackId);
+        edit.tracks.push_back({content.trackId, track->audioClips, content.clips});
+        automation::VolumeEnvelope after = track->volumeEnvelope;
+        after.restoreContent(content.envelope);
+        edit.envelopes.push_back({content.trackId, track->volumeEnvelope, after});
+    }
+    m_history.erase(m_history.begin() + static_cast<std::ptrdiff_t>(m_historyPosition), m_history.end());
+    m_history.push_back(std::move(edit));
+    if (m_history.size() > 100) m_history.erase(m_history.begin());
+    m_historyPosition = m_history.size();
+    for (const auto& envelope : m_history.back().envelopes)
+        findTrack(envelope.trackId)->volumeEnvelope.restoreContent(envelope.after);
+    for (const auto& state : m_history.back().tracks) findTrack(state.trackId)->audioClips = state.after;
+    return true;
+}
+
 void Project::rememberClipEdit(int trackId, std::vector<AudioClip> before)
 {
     ClipEdit edit;
@@ -815,7 +851,10 @@ int Project::undo()
         if (auto* track = findTrack(edit.envelope->trackId)) track->volumeEnvelope.restoreContent(edit.envelope->before);
         return edit.envelope->trackId;
     }
+    for (const auto& envelope : edit.envelopes)
+        if (auto* track = findTrack(envelope.trackId)) track->volumeEnvelope.restoreContent(envelope.before);
     for (const auto& track:edit.tracks) restoreClips(track.trackId, track.before);
+    if (edit.tracks.empty()) return edit.envelopes.empty() ? -1 : edit.envelopes.front().trackId;
     return edit.tracks.front().trackId;
 }
 
@@ -840,7 +879,10 @@ int Project::redo()
         if (auto* track = findTrack(edit.envelope->trackId)) track->volumeEnvelope.restoreContent(edit.envelope->after);
         return edit.envelope->trackId;
     }
+    for (const auto& envelope : edit.envelopes)
+        if (auto* track = findTrack(envelope.trackId)) track->volumeEnvelope.restoreContent(envelope.after);
     for (const auto& track:edit.tracks) restoreClips(track.trackId, track.after);
+    if (edit.tracks.empty()) return edit.envelopes.empty() ? -1 : edit.envelopes.front().trackId;
     return edit.tracks.front().trackId;
 }
 

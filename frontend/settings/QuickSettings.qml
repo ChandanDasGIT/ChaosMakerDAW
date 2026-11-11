@@ -9,10 +9,12 @@ Item {
 
     property var transport: EngineController
     property int snapMode: 1
+    property bool ripple: false            // restMap G15: ripple editing, owned by the app settings
     readonly property var focusedItem: Window.window ? Window.window.activeFocusItem : null
     readonly property bool editingText: focusedItem instanceof TextInput || focusedItem instanceof TextEdit
 
     signal snapModeEdited(int value)
+    signal rippleEdited(bool on)
     signal transportAction(string action)
 
     implicitWidth: quickSettingsButton.implicitWidth
@@ -146,6 +148,17 @@ Item {
                     currentIndex: root.snapMode
                     onActivated: index => root.snapModeEdited(index)
                     Accessible.name: "Snap grid"
+                }
+                ToggleChip {
+                    objectName: "rippleToggle"
+                    active: root.ripple
+                    idleBg: Theme.transport.button; idleBorder: Theme.textStrong; cornerRadius: 5   // white outline: easy to spot
+                    Layout.preferredWidth: 58; Layout.preferredHeight: 29
+                    text: "RIPPLE"; textSize: 9
+                    onClicked: root.rippleEdited(!active)
+                    tooltip: active ? "Ripple on: deleting closes the gap, pasting and duplicating make room (all tracks)"
+                                    : "Ripple off: deleting leaves a gap, pasting goes over what is there"
+                    Accessible.name: "Ripple editing"
                 }
             }
         }

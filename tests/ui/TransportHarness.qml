@@ -8,6 +8,8 @@ Window {
     TransportBar {
         snapMode: testTimeline.snapMode
         onSnapModeEdited: value => testTimeline.snapMode = value
+        ripple: testTimeline.ripple
+        onRippleEdited: on => testTimeline.rippleEdited(on)
         transport: harness.transport
         objectName: "transport"
         width: parent.width
@@ -58,6 +60,7 @@ Window {
         x: 0; y: 100; width: 1000; height: 500
         laneCount: trackModel ? trackModel.count : 0
         visible: false
+        onRippleEdited: on => ripple = on   // the app saves it in its settings (Main.qml)
     }
     // Like the app's docked piano roll: always present in the window, hidden by default.
     PianoRollView {

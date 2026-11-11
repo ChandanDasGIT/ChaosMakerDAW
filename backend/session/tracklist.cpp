@@ -843,8 +843,9 @@ bool TrackList::copyClips(const std::vector<int>& ids)
         }
     }
     if (candidates.empty()) return false;
-    m_clipboard.clear();
+    clearClipboard();
     m_clipboard.reserve(candidates.size());
+    for (const auto& c : candidates) m_clipboardLengthBeats = std::max(m_clipboardLengthBeats, c.startBeat + c.lengthBeats - minStart);
     for (const auto& c : candidates) {
         ClipboardClip item;
         item.poolId = c.clip.poolId;
@@ -865,23 +866,24 @@ bool TrackList::copyClips(const std::vector<int>& ids)
     return !m_clipboard.empty();
 }
 
-std::vector<int> TrackList::cutClips(const std::vector<int>& ids)
+std::vector<int> TrackList::cutClips(const std::vector<int>& ids, bool ripple)
 {
     if (editsLocked() || ids.empty()) return {};
     if (!copyClips(ids)) return {};
-    if (!editClips(ids, "delete", 0)) {
-        m_clipboard.clear();
+    if (!deleteClips(ids, ripple)) {
+        clearClipboard();
         return {};
     }
     return ids;
 }
 
-std::vector<int> TrackList::pasteClips(int targetTrackId, double targetBeat)
+std::vector<int> TrackList::pasteClips(int targetTrackId, double targetBeat, bool ripple)
 {
-    if (m_clipboard.empty() || editsLocked() || count() == 0) return {};
+    if (!hasClipboard() || editsLocked() || count() == 0) return {};
     if (!std::isfinite(targetBeat) || targetBeat < 0.0) targetBeat = 0.0;
     int targetRow = indexOfTrack(targetTrackId);
     if (targetRow < 0) targetRow = 0;
+    if (ripple || !m_clipboardEnvelopes.empty()) return pasteWithContent(targetRow, targetBeat, ripple);
 
     std::vector<std::pair<int, AudioClip>> toAdd;
     toAdd.reserve(m_clipboard.size());
@@ -914,7 +916,7 @@ std::vector<int> TrackList::pasteClips(int targetTrackId, double targetBeat)
     return m_project.addAudioClips(toAdd);
 }
 
-std::vector<int> TrackList::duplicateClips(const std::vector<int>& ids, double beatOffset)
+std::vector<int> TrackList::duplicateClips(const std::vector<int>& ids, double beatOffset, bool ripple)
 {
     if (editsLocked() || ids.empty() || count() == 0) return {};
     struct FoundClip {
@@ -960,7 +962,25 @@ std::vector<int> TrackList::duplicateClips(const std::vector<int>& ids, double b
         toAdd.emplace_back(f.trackId, std::move(clip));
     }
     if (toAdd.empty()) return {};
-    return m_project.addAudioClips(toAdd);
+    if (!ripple) return m_project.addAudioClips(toAdd);
+    // Ripple (G15): everything from the end of the selection on, on every track, moves right
+    // to make room for the copies, in the same undo step.
+    const auto at = sampleAtBeat(m_project.tempo(), maxEnd);
+    const auto until = sampleAtBeat(m_project.tempo(), minStart + offset + (maxEnd - minStart));
+    if (!at || !until || *until <= *at) return m_project.addAudioClips(toAdd);
+    std::vector<Project::TrackContent> contents;
+    std::vector<int> added;
+    for (const auto& track : m_project.tracks()) {
+        Project::TrackContent content{track->id, clipsWithSpace(track->audioClips, *at, *until - *at),
+                                      envelopeWithSpace(track->volumeEnvelope, *at, *until - *at)};
+        for (auto& [trackId, clip] : toAdd) if (trackId == track->id) {
+            clip.id = m_project.takeClipId();
+            added.push_back(clip.id);
+            content.clips.push_back(clip);
+        }
+        contents.push_back(std::move(content));
+    }
+    return applyContent(std::move(contents)).changed ? added : std::vector<int>{};
 }
 
 int TrackList::addEnvelopePoint(int trackId, std::int64_t position, double level)
@@ -1171,4 +1191,347 @@ bool TrackList::attachMidiTake(int trackId, std::int64_t start, std::int64_t len
     clip.length = length;
     clip.notes = std::move(notes);
     return m_project.addAudioClip(trackId, std::move(clip)) >= 0;
+}
+
+// ---- Time selection edits and ripple (restMap G15) ----------------------------------------
+
+namespace {
+using automation::EnvelopePoint;
+using automation::VolumeEnvelope;
+// The level at `at` lies between two points (so removing what is around it would move the line).
+bool pointsAround(const VolumeEnvelope& envelope, std::int64_t at)
+{
+    const auto& points = envelope.points();
+    return !points.empty() && points.front().position < at && points.back().position > at;
+}
+bool pointAt(const std::vector<EnvelopePoint>& points, std::int64_t at)
+{
+    return std::any_of(points.begin(), points.end(), [at](const auto& p) { return p.position == at; });
+}
+// The shape of the segment that runs through `at` (the last point before it).
+automation::CurveShape shapeThrough(const VolumeEnvelope& envelope, std::int64_t at)
+{
+    auto shape = automation::CurveShape::Linear;
+    for (const auto& p : envelope.points()) if (p.position < at) shape = p.shape;
+    return shape;
+}
+VolumeEnvelope withPoints(const VolumeEnvelope& envelope, std::vector<EnvelopePoint> points)
+{
+    std::sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.position < b.position; });
+    points.erase(std::unique(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.position == b.position; }), points.end());
+    VolumeEnvelope result = envelope;
+    if (!result.setPoints(std::move(points))) return envelope;
+    return result;
+}
+}
+
+double TrackList::sourceRatio(const AudioClip& clip) const
+{
+    const auto audio = isPatternClip(clip) ? nullptr : audioFor(clip.poolId);
+    return audio ? audio->sampleRate / m_project.tempo().sampleRate() : 1.0;
+}
+
+AudioClip TrackList::clipPiece(const AudioClip& clip, std::int64_t from, std::int64_t to) const
+{
+    AudioClip piece = clip;
+    const std::int64_t end = clip.start + clip.length;
+    from = std::max(from, clip.start);
+    to = std::min(to, end);
+    piece.start = from;
+    piece.length = to - from;
+    piece.sourceOffset = clip.sourceOffset + std::llround(double(from - clip.start) * sourceRatio(clip));
+    piece.fadeIn = from == clip.start ? std::min(clip.fadeIn, piece.length) : 0;
+    piece.fadeOut = to == end ? std::min(clip.fadeOut, piece.length - piece.fadeIn) : 0;
+    if (!clip.notes.empty()) {
+        // Notes are origin-relative (like a split): keep those that start inside the piece;
+        // ones before the clip's own start stay with the piece at its start.
+        const double first = offsetBeats(piece);
+        const double last = first + double(piece.length) * m_project.tempo().bpm() / (60.0 * m_project.tempo().sampleRate());
+        const bool keepsStart = from == clip.start, keepsEnd = to == end;
+        piece.notes.clear();
+        for (const auto& n : clip.notes)
+            if ((n.startBeat >= first || keepsStart) && (n.startBeat < last || keepsEnd)) piece.notes.push_back(n);
+    }
+    return piece;
+}
+
+std::vector<AudioClip> TrackList::clipsWithoutSpan(const Track& track, std::int64_t from, std::int64_t to, bool ripple)
+{
+    const std::int64_t gap = ripple ? to - from : 0;
+    std::vector<AudioClip> result;
+    for (const auto& clip : track.audioClips) {
+        const std::int64_t end = clip.start + clip.length;
+        if (end <= from) { result.push_back(clip); continue; }
+        if (clip.start >= to) { auto moved = clip; moved.start -= gap; result.push_back(moved); continue; }
+        if (clip.start < from) result.push_back(clipPiece(clip, clip.start, from));
+        if (end > to) {
+            auto right = clipPiece(clip, to, end);
+            if (clip.start < from) right.id = m_project.takeClipId();   // the clip went on both sides
+            right.start -= gap;
+            result.push_back(right);
+        }
+    }
+    return result;
+}
+
+std::vector<AudioClip> TrackList::clipsWithSpace(const std::vector<AudioClip>& clips, std::int64_t at, std::int64_t length)
+{
+    std::vector<AudioClip> result;
+    for (const auto& clip : clips) {
+        const std::int64_t end = clip.start + clip.length;
+        if (end <= at) { result.push_back(clip); continue; }
+        if (clip.start >= at) { auto moved = clip; moved.start += length; result.push_back(moved); continue; }
+        result.push_back(clipPiece(clip, clip.start, at));   // split where the space goes in
+        auto right = clipPiece(clip, at, end);
+        right.id = m_project.takeClipId();
+        right.start += length;
+        result.push_back(right);
+    }
+    return result;
+}
+
+VolumeEnvelope TrackList::envelopeWithoutSpan(const VolumeEnvelope& envelope, std::int64_t from, std::int64_t to, bool ripple)
+{
+    const auto& points = envelope.points();
+    if (points.empty()) return envelope;
+    std::vector<EnvelopePoint> kept;
+    if (!ripple) {
+        for (const auto& p : points) if (p.position <= from || p.position >= to) kept.push_back(p);
+        if (pointsAround(envelope, from) && !pointAt(points, from))
+            kept.push_back({from, envelope.levelAt(from), shapeThrough(envelope, from)});
+        if (pointsAround(envelope, to) && !pointAt(points, to))
+            kept.push_back({to, envelope.levelAt(to), shapeThrough(envelope, to)});
+        return withPoints(envelope, std::move(kept));
+    }
+    // Ripple: what was at `to` lands on `from`, so the line before the range ends one sample
+    // earlier.
+    const std::int64_t gap = to - from;
+    for (const auto& p : points) {
+        if (p.position < from) kept.push_back(p);
+        else if (p.position >= to) kept.push_back({p.position - gap, p.level, p.shape});
+    }
+    const bool before = points.front().position < from && points.back().position >= from;
+    if (before && from > 0 && !pointAt(points, from - 1))
+        kept.push_back({from - 1, envelope.levelAt(from - 1), shapeThrough(envelope, from - 1)});
+    if (pointsAround(envelope, to) && !pointAt(points, to))
+        kept.push_back({from, envelope.levelAt(to), shapeThrough(envelope, to)});
+    return withPoints(envelope, std::move(kept));
+}
+
+VolumeEnvelope TrackList::envelopeWithSpace(const VolumeEnvelope& envelope, std::int64_t at, std::int64_t length)
+{
+    const auto& points = envelope.points();
+    if (points.empty() || points.back().position < at) return envelope;
+    std::vector<EnvelopePoint> moved;
+    for (const auto& p : points) moved.push_back(p.position < at ? p : EnvelopePoint{p.position + length, p.level, p.shape});
+    if (points.front().position < at) {
+        // Flat across the new space: the level at `at` on both sides of it.
+        const double level = envelope.levelAt(at);
+        moved.push_back({at, level, automation::CurveShape::Linear});
+        if (!pointAt(points, at)) moved.push_back({at + length, level, shapeThrough(envelope, at)});
+    }
+    return withPoints(envelope, std::move(moved));
+}
+
+VolumeEnvelope TrackList::envelopeWithPasted(const VolumeEnvelope& envelope, std::int64_t at, std::int64_t length,
+                                             const std::vector<EnvelopePoint>& pasted)
+{
+    if (pasted.empty()) return envelope;
+    const auto& points = envelope.points();
+    const std::int64_t end = at + length;
+    std::vector<EnvelopePoint> result;
+    for (const auto& p : points) if (p.position < at || p.position > end) result.push_back(p);
+    // The line just outside keeps its shape; the pasted line starts and ends on its own levels.
+    if (!points.empty() && points.front().position < at - 1 && !pointAt(points, at - 1))
+        result.push_back({at - 1, envelope.levelAt(at - 1), shapeThrough(envelope, at - 1)});
+    if (!points.empty() && points.back().position > end + 1 && !pointAt(points, end + 1))
+        result.push_back({end + 1, envelope.levelAt(end + 1), shapeThrough(envelope, end + 1)});
+    for (const auto& p : pasted) {
+        std::erase_if(result, [&](const auto& q) { return q.position == p.position; });
+        result.push_back(p);
+    }
+    return withPoints(envelope, std::move(result));
+}
+
+bool TrackList::sameClips(const std::vector<AudioClip>& a, const std::vector<AudioClip>& b)
+{
+    return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](const AudioClip& x, const AudioClip& y) {
+        return x.id == y.id && x.start == y.start && x.length == y.length && x.sourceOffset == y.sourceOffset
+            && x.fadeIn == y.fadeIn && x.fadeOut == y.fadeOut && x.notes.size() == y.notes.size();
+    });
+}
+
+TrackList::Change TrackList::applyContent(std::vector<Project::TrackContent> contents)
+{
+    std::erase_if(contents, [&](const Project::TrackContent& content) {
+        const auto* track = m_project.findTrack(content.trackId);
+        return !track || (sameClips(track->audioClips, content.clips) && track->volumeEnvelope.sameContent(content.envelope));
+    });
+    if (contents.empty()) return {true, false};
+    const bool ok = m_project.replaceTrackContent(std::move(contents));
+    return {ok, ok};
+}
+
+bool TrackList::copyRange(double startBeat, double endBeat)
+{
+    const auto from = sampleAtBeat(m_project.tempo(), startBeat);
+    const auto to = sampleAtBeat(m_project.tempo(), endBeat);
+    if (!from || !to || *to <= *from) return false;
+    std::vector<ClipboardClip> clips;
+    std::vector<ClipboardEnvelope> envelopes;
+    int topRow = std::numeric_limits<int>::max();
+    std::vector<int> clipRows, envelopeRows;
+    const auto& tempo = m_project.tempo();
+    for (int row = 0; row < count(); ++row) {
+        const auto& track = *m_project.tracks()[row];
+        for (const auto& clip : track.audioClips) {
+            if (clip.start + clip.length <= *from || clip.start >= *to) continue;
+            const auto piece = clipPiece(clip, *from, *to);
+            ClipboardClip item;
+            item.poolId = piece.poolId;
+            item.beatOffset = tempo.beatAt(piece.start) - startBeat;
+            item.lengthBeats = tempo.beatAt(piece.start + piece.length) - tempo.beatAt(piece.start);
+            item.sourceOffset = piece.sourceOffset;
+            item.fadeIn = piece.fadeIn;
+            item.fadeOut = piece.fadeOut;
+            item.gainDb = piece.gainDb;
+            item.effectsPrinted = piece.effectsPrinted;
+            item.reversed = piece.reversed;
+            item.polarityInverted = piece.polarityInverted;
+            item.fx = piece.fx;
+            item.notes = piece.notes;
+            clips.push_back(std::move(item));
+            clipRows.push_back(row);
+            topRow = std::min(topRow, row);
+        }
+        const auto& envelope = track.volumeEnvelope;
+        if (envelope.points().empty()) continue;
+        ClipboardEnvelope line;
+        const auto add = [&](std::int64_t at, double level, automation::CurveShape shape) {
+            line.points.push_back({tempo.beatAt(at) - startBeat, EnvelopePoint{0, level, shape}});
+        };
+        if (!pointAt(envelope.points(), *from)) add(*from, envelope.levelAt(*from), shapeThrough(envelope, *from));
+        for (const auto& p : envelope.points()) if (p.position >= *from && p.position <= *to) add(p.position, p.level, p.shape);
+        if (!pointAt(envelope.points(), *to)) add(*to, envelope.levelAt(*to), automation::CurveShape::Linear);
+        envelopes.push_back(std::move(line));
+        envelopeRows.push_back(row);
+        topRow = std::min(topRow, row);
+    }
+    if (clips.empty() && envelopes.empty()) return false;
+    for (std::size_t i = 0; i < clips.size(); ++i) clips[i].trackOffset = clipRows[i] - topRow;
+    for (std::size_t i = 0; i < envelopes.size(); ++i) envelopes[i].trackOffset = envelopeRows[i] - topRow;
+    m_clipboard = std::move(clips);
+    m_clipboardEnvelopes = std::move(envelopes);
+    m_clipboardLengthBeats = endBeat - startBeat;
+    return true;
+}
+
+TrackList::Change TrackList::deleteRange(double startBeat, double endBeat, bool ripple)
+{
+    if (editsLocked()) return {};
+    const auto from = sampleAtBeat(m_project.tempo(), startBeat);
+    const auto to = sampleAtBeat(m_project.tempo(), endBeat);
+    if (!from || !to || *to <= *from) return {};
+    std::vector<Project::TrackContent> contents;
+    for (const auto& track : m_project.tracks())
+        contents.push_back({track->id, clipsWithoutSpan(*track, *from, *to, ripple),
+                            envelopeWithoutSpan(track->volumeEnvelope, *from, *to, ripple)});
+    return applyContent(std::move(contents));
+}
+
+TrackList::Change TrackList::cutRange(double startBeat, double endBeat, bool ripple)
+{
+    if (editsLocked() || !std::isfinite(startBeat) || !std::isfinite(endBeat) || endBeat <= startBeat) return {};
+    const auto clipboard = m_clipboard;
+    const auto envelopes = m_clipboardEnvelopes;
+    const double length = m_clipboardLengthBeats;
+    const bool copied = copyRange(startBeat, endBeat);
+    const auto change = deleteRange(startBeat, endBeat, ripple);
+    if (!change.accepted && copied) {   // nothing was cut: the clipboard stays as it was
+        m_clipboard = clipboard; m_clipboardEnvelopes = envelopes; m_clipboardLengthBeats = length;
+    }
+    return change;
+}
+
+TrackList::Change TrackList::deleteClips(const std::vector<int>& ids, bool ripple)
+{
+    if (!ripple) return editClips(ids, "delete", 0);
+    if (editsLocked() || ids.empty()) return {};
+    // Per track: the deleted clips go, and each span they covered closes up (later clips and
+    // envelope points on that track move left), the latest span first.
+    std::vector<Project::TrackContent> contents;
+    bool any = false;
+    for (const auto& track : m_project.tracks()) {
+        std::vector<std::pair<std::int64_t, std::int64_t>> spans;
+        Track working = *track;
+        std::erase_if(working.audioClips, [&](const AudioClip& clip) {
+            if (std::find(ids.begin(), ids.end(), clip.id) == ids.end()) return false;
+            spans.push_back({clip.start, clip.start + clip.length});
+            return true;
+        });
+        if (spans.empty()) continue;
+        any = true;
+        std::sort(spans.begin(), spans.end());
+        std::vector<std::pair<std::int64_t, std::int64_t>> merged;
+        for (const auto& span : spans) {
+            if (!merged.empty() && span.first <= merged.back().second) merged.back().second = std::max(merged.back().second, span.second);
+            else merged.push_back(span);
+        }
+        automation::VolumeEnvelope envelope = track->volumeEnvelope;
+        for (auto it = merged.rbegin(); it != merged.rend(); ++it) {
+            const auto [from, to] = *it;
+            for (auto& clip : working.audioClips) if (clip.start >= to) clip.start -= to - from;
+            envelope = envelopeWithoutSpan(envelope, from, to, true);
+        }
+        contents.push_back({track->id, std::move(working.audioClips), std::move(envelope)});
+    }
+    if (!any) return {};
+    return applyContent(std::move(contents));
+}
+
+std::vector<int> TrackList::pasteWithContent(int targetRow, double targetBeat, bool ripple)
+{
+    const auto& tempo = m_project.tempo();
+    const auto at = sampleAtBeat(tempo, targetBeat);
+    const auto until = sampleAtBeat(tempo, targetBeat + std::max(0.0, m_clipboardLengthBeats));
+    if (!at || !until) return {};
+    const std::int64_t space = ripple ? *until - *at : 0;
+    std::vector<Project::TrackContent> contents;
+    for (const auto& track : m_project.tracks())
+        contents.push_back({track->id, space > 0 ? clipsWithSpace(track->audioClips, *at, space) : track->audioClips,
+                            space > 0 ? envelopeWithSpace(track->volumeEnvelope, *at, space) : track->volumeEnvelope});
+    std::vector<int> added;
+    for (const auto& item : m_clipboard) {
+        const int row = std::clamp(targetRow + item.trackOffset, 0, count() - 1);
+        const auto start = sampleAtBeat(tempo, targetBeat + item.beatOffset);
+        const auto end = sampleAtBeat(tempo, targetBeat + item.beatOffset + item.lengthBeats);
+        if (!start || !end || *end <= *start) continue;
+        AudioClip clip;
+        clip.id = m_project.takeClipId();
+        clip.poolId = item.poolId;
+        clip.start = *start;
+        clip.length = *end - *start;
+        clip.sourceOffset = item.sourceOffset;
+        clip.fadeIn = item.fadeIn;
+        clip.fadeOut = item.fadeOut;
+        clip.gainDb = item.gainDb;
+        clip.effectsPrinted = item.effectsPrinted;
+        clip.reversed = item.reversed;
+        clip.polarityInverted = item.polarityInverted;
+        clip.fx = item.fx;
+        clip.notes = item.notes;
+        contents[std::size_t(row)].clips.push_back(std::move(clip));
+        added.push_back(contents[std::size_t(row)].clips.back().id);
+    }
+    for (const auto& line : m_clipboardEnvelopes) {
+        const int row = targetRow + line.trackOffset;
+        if (row < 0 || row >= count()) continue;   // a line never lands on another track's envelope
+        std::vector<automation::EnvelopePoint> points;
+        for (const auto& [beat, point] : line.points)
+            if (const auto position = sampleAtBeat(tempo, targetBeat + beat)) points.push_back({*position, point.level, point.shape});
+        auto& envelope = contents[std::size_t(row)].envelope;
+        envelope = envelopeWithPasted(envelope, *at, *until - *at, points);
+    }
+    const auto change = applyContent(std::move(contents));
+    return change.changed ? added : std::vector<int>{};
 }

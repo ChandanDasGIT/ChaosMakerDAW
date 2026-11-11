@@ -57,8 +57,18 @@ public:
     bool canSplitSelection() const;
     bool canCopySelection() const;
     bool canCutSelection() const;
+    bool canDeleteSelection() const;   // selected clips, or the time selection (G15)
     bool canPaste() const;
     bool canDuplicateSelection() const;
+    // restMap G15. Cut / copy / delete work on the selected clips; with none selected and a
+    // time selection, on everything inside it on every track (clips and envelope points).
+    bool hasTimeRange() const { return m_range.end > m_range.start; }
+    bool rangeMode() const { return m_selectedIds.empty() && hasTimeRange(); }
+    // Ripple editing (the user's toggle, off by default): deletes close their gap, pastes and
+    // duplicates make room.
+    void setRipple(bool on) { m_ripple = on; }
+    bool ripple() const { return m_ripple; }
+    bool deleteSelection();
     const std::vector<int>& selectedIds() const { return m_selectedIds; }
     int selectedClipId() const { return m_selectedClipId; }
     int selectedTrackId() const;
@@ -103,7 +113,7 @@ private:
     int m_snapMode = 1, m_numerator = 4, m_denominator = 4;
     double m_bpm = 120;
     bool m_busy = false, m_loading = false, m_recording = false;
-    bool m_snapPlayhead = false, m_snapSelection = false;
+    bool m_snapPlayhead = false, m_snapSelection = false, m_ripple = false;
     std::vector<int> m_selectedIds;
     int m_selectedClipId = -1, m_selectedTrackId = -1;
     std::string m_operation;

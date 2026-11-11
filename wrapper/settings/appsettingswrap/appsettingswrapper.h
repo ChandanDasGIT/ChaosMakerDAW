@@ -23,6 +23,8 @@ class AppSettingsWrapper : public QObject {
     // The timeline's magnets for the playhead and the time selection (off by default).
     Q_PROPERTY(bool snapPlayhead READ snapPlayhead WRITE setSnapPlayhead NOTIFY timelineSnapChanged)
     Q_PROPERTY(bool snapSelection READ snapSelection WRITE setSnapSelection NOTIFY timelineSnapChanged)
+    // restMap G15: the timeline's ripple editing toggle.
+    Q_PROPERTY(bool rippleEditing READ rippleEditing WRITE setRippleEditing NOTIFY timelineSnapChanged)
     // Main window layout, kept between sessions. The window sets these once a splitter drag ends.
     Q_PROPERTY(double trackListWidth READ trackListWidth WRITE setTrackListWidth NOTIFY layoutSizesChanged)
     Q_PROPERTY(double mixerHeight READ mixerHeight WRITE setMixerHeight NOTIFY layoutSizesChanged)
@@ -59,6 +61,8 @@ public:
     void setSnapPlayhead(bool on);
     bool snapSelection() const noexcept { return m_settings.snapSelection(); }
     void setSnapSelection(bool on);
+    bool rippleEditing() const noexcept { return m_settings.rippleEditing(); }
+    void setRippleEditing(bool on);
 
     double trackListWidth() const noexcept { return m_settings.trackListWidth(); }
     void setTrackListWidth(double width);
