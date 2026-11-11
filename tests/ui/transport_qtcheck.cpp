@@ -2840,7 +2840,11 @@ private slots:
         QTest::keyClick(window,Qt::Key_Escape); QCOMPARE(selected().size(),0);
         QCOMPARE(timeline->property("selectedClipId").toInt(),-1);
         QCOMPARE(timeline->property("rangeStartBeat").toDouble(),1.0); QCOMPARE(timeline->property("rangeEndBeat").toDouble(),4.0);
-        QTest::keyClick(window,Qt::Key_Delete); QCOMPARE(tracks.clips().size(),3);
+        // No clip selected and a time selection (beats 1..4): Delete takes what is inside it
+        // (restMap G15): the first clip (beats 2..4) goes, the others stay.
+        QTest::keyClick(window,Qt::Key_Delete); QCOMPARE(tracks.clips().size(),2);
+        QVERIFY(tracks.project().findTrack(a)->audioClips.empty());
+        QVERIFY(tracks.undo()); QCOMPARE(tracks.clips().size(),3);
     }
     void clip_keyboard_operations_preserve_text_and_reject_negative_group_positions() {
         TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
@@ -3147,6 +3151,58 @@ private slots:
         QVERIFY(!field->isEnabled());
         controller->setRecordingLatencyCompensation(true); QTRY_VERIFY(box->property("checked").toBool());
         QVERIFY(field->isEnabled());
+    }
+    void a_time_selection_is_deleted_with_the_key_and_ripple_toggles_from_the_chip_and_menu() {
+        // restMap G15. Track 1: a clip over beats 0..8; track 2: a clip at beats 5..7.
+        QTest::failOnWarning(QRegularExpression("^(?!This plugin does not support raise\\(\\)).*"));
+        auto device=std::make_unique<MultiInputUiDevice>();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller.attachProject(&tracks);
+        const int first=tracks.addAudioTrack(), second=tracks.addAudioTrack();
+        tracks.addClipAtBeat(first,0,8); const int later=tracks.addClipAtBeat(second,5,2);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] {
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+            timeline->setProperty("transport",QVariant::fromValue(EngineController::instance()));
+            window->setProperty("transport",QVariant::fromValue(EngineController::instance()));
+            timeline->setProperty("snapSelection",false); timeline->setProperty("ripple",false);
+        });
+        timeline->setProperty("snapSelection",true);
+        timeline->setProperty("transport",QVariant::fromValue(&controller));
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        window->setProperty("transport",QVariant::fromValue(&controller)); QTest::qWait(30);
+        const auto startOf=[&](int clip) {
+            for(const auto& c:tracks.clips()) if(c.toMap()["clipId"].toInt()==clip) return c.toMap()["startBeat"].toDouble();
+            return -1.0;
+        };
+        // Drag beats 1..4 on the empty part of track 1's lane (below its clip), then Delete.
+        const QPoint from=timeline->mapToScene(QPointF(65,300)).toPoint(), to=timeline->mapToScene(QPointF(175,300)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,from);
+        QTest::mouseMove(window,to); QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,to);
+        QCOMPARE(timeline->property("rangeStartBeat").toDouble(),1.0);
+        QCOMPARE(timeline->property("rangeEndBeat").toDouble(),4.0);
+        QTRY_VERIFY(timeline->property("rangeMode").toBool());
+        QTest::keyClick(window,Qt::Key_Delete);
+        QTRY_COMPARE(tracks.project().findTrack(first)->audioClips.size(),std::size_t(2));   // split around the range
+        QCOMPARE(startOf(later),5.0);                                                          // gap left
+        QVERIFY(tracks.undo()); QCOMPARE(tracks.project().findTrack(first)->audioClips.size(),std::size_t(1));
+        // Ripple on from the RIPPLE chip in the quick settings.
+        auto* quick=visualItem(window->contentItem(),"quickSettingsButton"); QVERIFY(quick); click(quick);
+        QQuickItem* chip=nullptr; QTRY_VERIFY((chip=visualItem(window->contentItem(),"rippleToggle")) && chip->isVisible());
+        QVERIFY(!chip->property("active").toBool());
+        QCOMPARE(chip->property("idleBorder").value<QColor>(),QColor("#ffffff"));   // a white outline, easy to spot
+        click(chip); QTRY_VERIFY(timeline->property("ripple").toBool()); QVERIFY(chip->property("active").toBool());
+        QTest::keyClick(window,Qt::Key_Escape);
+        QMetaObject::invokeMethod(timeline,"forceActiveFocus"); QCoreApplication::processEvents();
+        QTest::keyClick(window,Qt::Key_Delete);
+        QTRY_COMPARE(startOf(later),2.0);                                                      // closed up 3 beats
+        QVERIFY(tracks.undo()); QCOMPARE(startOf(later),5.0);
+        // And off again from the Edit menu.
+        auto* edit=visualItem(window->contentItem(),"editMenuButton"); QVERIFY(edit); click(edit);
+        QQuickItem* item=nullptr; QTRY_VERIFY((item=visualItem(window->contentItem(),"editRippleItem")) && item->isVisible());
+        QVERIFY(item->property("checked").toBool());
+        click(item); QTRY_VERIFY(!timeline->property("ripple").toBool());
+        controller.shutdownSession();
     }
     void normal_drag_selects_grid_range_and_repeat_stays_inside_it() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();

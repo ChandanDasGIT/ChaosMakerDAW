@@ -187,6 +187,8 @@ Window {
                 importJob: topBar.importJob
                 snapPlayhead: window.layoutSettings.snapPlayhead
                 snapSelection: window.layoutSettings.snapSelection
+                ripple: window.layoutSettings.rippleEditing
+                onRippleEdited: on => window.layoutSettings.rippleEditing = on
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 onOpenPianoRollRequested: (trackId, clipId, label, lengthBeats) => {
@@ -199,6 +201,8 @@ Window {
             trackModel: window.projectTracks
             snapMode: timeline.snapMode
             onSnapModeEdited: value => timeline.snapMode = value
+            ripple: timeline.ripple
+            onRippleEdited: on => timeline.rippleEdited(on)
             Layout.fillWidth: true
             timeSignature: timeline.timeSignature
             timeSignatureDenominator: timeline.timeSignatureDenominator

@@ -16,7 +16,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 NEXT UP (2026-11-10), the user's order:
   1. G6 volume envelope committed (0597318); G6b curve shapes committed (758f523).
   2. G9, G17, G14 committed (33ef5cc). R2 clip effects committed (e3b3d42).
-     Then import / export (item 6, done first at the user's request). G8 fades committed. G10 latency committed. Next: G15, G16,
+     Then import / export (item 6, done first at the user's request). G8 fades committed. G10 latency committed. G15 time selection + ripple committed. Next: G16,
      G11, G13, G12. Later option: "render clip effects into the audio" (Reaper's apply FX).
   3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
      reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
@@ -36,6 +36,33 @@ NEXT UP (2026-11-10), the user's order:
      wrapper/files/fileswrap (Files singleton). Tests: qtfiles; transport_ui import, export chooser, FX
      chain import through the chooser.
   7. U6 guitar FX panel UI, at the very end.
+
+  Open items ranked easiest -> hardest to build (2026-11-11; for reference, the order above
+  still decides what comes next):
+     1. C3b  Acoustic kit high-pass filters: a 2-pole HPF beside the sampler's low-pass (small
+             DSP); the user decides first whether the kit should sound different.
+     2. C3c  Acoustic kit cymbals (keys 73 / 75; try the electro kit's synthesised voices) and
+             the sample cache that never shrinks; mostly listening and tuning.
+     3. G16  Custom shortcuts + undo history list: the list is easy (undo stack exists);
+             rebinding means going through every QML shortcut.
+     4. G18  Live pitch monitor: reuses the guitar tuner's pitch detection; the work is the
+             scrolling graph UI.
+     5. G13  Noise reduction: noise profile + spectral subtraction / gating (FFT overlap-add,
+             avoid musical noise); moderate DSP, self-contained.
+     6. C11  Synth instrument: oscillators, filter, envelopes, LFO, presets, own track type;
+             big but self-contained (instrument / track-type patterns exist).
+     7. C6   Other instruments (strings, acoustic guitar, bass): depends on CC0 samples or
+             building string models.
+     8. G11  Punch in / out + loop takes / comping: recording, clip model, saving, undo and a
+             new takes UI.
+     9. G12  Tempo / meter changes in a song: a tempo map; touches the ruler, grid, metronome,
+             piano roll, Chords, grooves and saving.
+    10. G20  Drum pattern analyzer: onsets, tempo, kick / snare / hat; songs need a hand-written
+             harmonic / percussive separation.
+    11. G21  Chord / BPM analyzer: chromagram, chord templates, Viterbi, key; builds on G20.
+    12. G19  Guitar tone analyzer: searching GuitarSuite settings against a reference; only good
+             on an isolated guitar.
+     Not ranked: U6 (size depends on what the user wants; ask first), B1-B9 (checks by the user).
 Start here when the user says "let's continue". Plans first, one step at a time.
 
 OPEN — everything not finished, in the order the user wants it done (import and export last).
@@ -361,8 +388,43 @@ Done items stay further down as the record.
           canApplyClipTool / applyClipTool("reverse" | "invertPolarity" | "normalise").
         Tests: tracklist clip_tools..., projectdocument clip_tool_flags..., wrappertests
         qtclipediting a_reversed_clip_plays..., transport_ui clip_menu_reverses...
-[ ] G15 Time selection (Reaper's drag on empty timeline): mark a range, then cut / copy / delete
-        everything in it across all tracks. Today editing works on selected clips.
+[x] G15 Time selection edits and ripple editing. DONE 2026-11-11 (uncommitted). The user: complete,
+        volume envelopes too, and both "leave a gap" and "close the gap" as a toggle.
+        - Which: Ctrl+X / Ctrl+C / Delete (and the Edit menu) work on the selected clips; with
+          none selected and a time selection (drag on the empty timeline), on everything inside
+          it on every track. Timeline::rangeMode / canDeleteSelection / deleteSelection.
+        - TrackList copyRange / deleteRange / cutRange (one undo step): a clip crossing an edge
+          is split there (clipPiece: offset in the file's rate, fades only on the clip's own
+          edges, pattern notes that start inside), the part inside taken; envelope points
+          inside go and a point at each edge keeps the line outside where it was
+          (envelopeWithoutSpan). Copy keeps the gap before the first clip and the envelope line
+          (ClipboardEnvelope, beats from the range start; edge levels included); paste puts the
+          line back on the same relative tracks (never clamped onto another track's line),
+          replacing the points in its span (envelopeWithPasted).
+        - Ripple (toggle, off by default; AppSettings KeyRippleEditing "timeline/ripple"):
+          range delete / cut close the gap on every track (clips and points move left); paste
+          and duplicate make room on every track (clipsWithSpace splits a clip at the insert
+          point; envelopeWithSpace keeps the line flat across the new space); deleting / cutting
+          selected clips closes each clip's span on its own track (Reaper's per-track ripple).
+        - Project::replaceTrackContent / takeClipId: several tracks' clips and envelope points
+          as one undo step (ClipEdit::envelopes); undo / redo restore both.
+        - Wrapper: TrackListWrapper copyRange / cutRange / deleteRange / deleteClips, ripple on
+          cutClips / pasteClips / duplicateClips, notifyContentEdit (clips + envelope roles);
+          TimelineWrapper canDelete / rangeMode / ripple / deleteSelection; pasted clips are
+          selected on their own tracks. AppSettingsWrapper rippleEditing.
+        - UI: RIPPLE chip under SNAP GRID in the quick settings (rippleToggle); "Ripple editing"
+          check in the Edit menu (editRippleItem); Timeline.ripple / rippleEdited, saved by
+          Main.qml. Delete shortcut / menu use the range when no clip is selected.
+        Tests: backendtests tracklist deleting_a_time_range..., a_ripple_range_delete...,
+        copying_a_range..., ripple_paste_duplicate_and_clip_delete...; timeline_clipboard
+        with_no_clip_selected...; appsettings ripple_editing...; wrappertests qtclipediting
+        range_edits_refresh...; transporttests a_time_selection_is_deleted...
+        clip_keyboard_operations_across_tracks updated: Delete with no clip selected and a time
+        selection now removes what is inside it. Affected groups run: tracklist 26,
+        timeline_clipboard 3, timeline 5, clip_clipboard 3, clipeffects 2, clipnotes 6,
+        projectactions 7, appsettings 8, projectdocument 16, qtclipediting 16, 70 timeline /
+        clip / edit / menu UI tests (91 cases) offscreen; app log empty (empty profile and a
+        session copy).
 [ ] G16 Customisable keyboard shortcuts, and an undo history list to click back through.
 [x] G17 Tap tempo. DONE 2026-11-11 (uncommitted). A TAP chip beside the BPM box and Shift+T
         (plain T plays a note with the typing keyboard on). backend/tempo/taptempo: the average

@@ -13,6 +13,7 @@ Rectangle {
     property int timeSignatureDenominator: 4
     property real bpm: 120
     property int snapMode: 1
+    property bool ripple: false
     property bool playing: false
     property bool recording: false
     property bool repeating: false
@@ -22,6 +23,7 @@ Rectangle {
     signal denominatorEdited(int value)
     signal bpmEdited(real value)
     signal snapModeEdited(int value)
+    signal rippleEdited(bool on)
     signal transportAction(string action)
     height: 72
     color: Theme.transport.bar
@@ -138,6 +140,8 @@ Rectangle {
                 transport: root.transport
                 snapMode: root.snapMode
                 onSnapModeEdited: value => root.snapModeEdited(value)
+                ripple: root.ripple
+                onRippleEdited: on => root.rippleEdited(on)
                 onTransportAction: action => root.transportAction(action)
             }
         }

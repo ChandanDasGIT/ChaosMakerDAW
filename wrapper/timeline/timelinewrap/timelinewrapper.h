@@ -37,6 +37,11 @@ class TimelineWrapper : public QObject {
     Q_PROPERTY(bool canCopy READ canCopy NOTIFY stateChanged)
     Q_PROPERTY(bool canCut READ canCut NOTIFY stateChanged)
     Q_PROPERTY(bool canPaste READ canPaste NOTIFY stateChanged)
+    // restMap G15: with no clip selected and a time selection, cut / copy / delete take what is
+    // inside it on every track; ripple closes gaps / makes room.
+    Q_PROPERTY(bool canDelete READ canDelete NOTIFY stateChanged)
+    Q_PROPERTY(bool rangeMode READ rangeMode NOTIFY stateChanged)
+    Q_PROPERTY(bool ripple READ ripple WRITE setRipple NOTIFY stateChanged)
     Q_PROPERTY(bool canDuplicate READ canDuplicate NOTIFY stateChanged)
     Q_PROPERTY(QString editOperation READ editOperation NOTIFY stateChanged)
     Q_PROPERTY(double editDelta READ editDelta NOTIFY stateChanged)
@@ -88,6 +93,10 @@ public:
     bool canCopy() const { return m_timeline.canCopySelection(); }
     bool canCut() const { return m_timeline.canCutSelection(); }
     bool canPaste() const { return m_timeline.canPaste(); }
+    bool canDelete() const { return m_timeline.canDeleteSelection(); }
+    bool rangeMode() const { return m_timeline.rangeMode(); }
+    bool ripple() const { return m_timeline.ripple(); }
+    void setRipple(bool on) { if (on != ripple()) { m_timeline.setRipple(on); emit stateChanged(); } }
     bool canDuplicate() const { return m_timeline.canDuplicateSelection(); }
     QString editOperation() const { return QString::fromStdString(m_timeline.editOperation()); }
     double editDelta() const { return m_timeline.editDelta(); }
@@ -124,6 +133,7 @@ public:
     }
     Q_INVOKABLE bool copySelectedClips();
     Q_INVOKABLE QVariantList cutSelectedClips();
+    Q_INVOKABLE bool deleteSelection();
     Q_INVOKABLE QVariantList pasteClips(double targetBeat = -1, int targetTrackId = -1);
     Q_INVOKABLE QVariantList duplicateSelectedClips(double beatOffset = 0.0);
     Q_INVOKABLE void beginEdit(const QString& op) { m_timeline.beginEdit(op.toStdString()); emit stateChanged(); }

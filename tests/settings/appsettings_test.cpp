@@ -207,3 +207,20 @@ TEST(appsettings, the_timeline_magnets_are_off_by_default_and_round_trip)
     copy.resetToDefaults();
     CHECK(!copy.snapPlayhead() && !copy.snapSelection());
 }
+
+TEST(appsettings, ripple_editing_is_off_by_default_and_round_trips)
+{
+    // restMap G15.
+    AppSettings settings;
+    CHECK(!settings.rippleEditing());
+    CHECK(settings.exportValue(AppSettings::KeyRippleEditing) == "false");
+    settings.setRippleEditing(true);
+    AppSettings copy;
+    CHECK(copy.deserialize(settings.serialize()));
+    CHECK(copy.rippleEditing());
+    copy.importValue(AppSettings::KeyRippleEditing, "nonsense");
+    CHECK(!copy.rippleEditing());
+    copy.setRippleEditing(true);
+    copy.resetToDefaults();
+    CHECK(!copy.rippleEditing());
+}

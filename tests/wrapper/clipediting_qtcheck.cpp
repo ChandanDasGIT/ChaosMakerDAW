@@ -361,3 +361,33 @@ TEST(qtclipediting, clip_fades_reach_qml_with_the_crossfade_and_are_one_undo_ste
     const int pattern=tracks.addClipAtBeat(tracks.addVocalTrack(),0,4);
     CHECK(!tracks.setClipFade(tracks.project().tracks().back()->id,pattern,false,1.0));
 }
+
+TEST(qtclipediting, range_edits_refresh_clips_and_envelopes_and_ripple_reaches_paste) {
+    // restMap G15. One track: a clip over beats 0..4 and a volume line; another clip at 6..7.
+    TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+    const int clip=tracks.addClipAtBeat(track,0,4); const int later=tracks.addClipAtBeat(track,6,1);
+    CHECK(clip>0 && later>0);
+    CHECK(tracks.addEnvelopePoint(track,0,0.5)>=0); CHECK(tracks.addEnvelopePoint(track,4,1.0)>=0);
+    int envelopeChanges=0, clipsChanged=0, clipboardChanged=0;
+    QObject::connect(&tracks,&QAbstractItemModel::dataChanged,[&](const QModelIndex&,const QModelIndex&,const QList<int>& roles) {
+        if(roles.contains(TrackListWrapper::EnvelopePointsRole)) ++envelopeChanges;
+    });
+    QObject::connect(&tracks,&TrackListWrapper::clipsChanged,[&]{ ++clipsChanged; });
+    QObject::connect(&tracks,&TrackListWrapper::clipboardChanged,[&]{ ++clipboardChanged; });
+    const auto startOf=[&](int id) {
+        for(const auto& c:tracks.clips()) if(c.toMap()["clipId"].toInt()==id) return c.toMap()["startBeat"].toDouble();
+        return -1.0;
+    };
+    CHECK(tracks.copyRange(1,2)); CHECK(clipboardChanged==1); CHECK(clipsChanged==0);
+    CHECK(tracks.deleteRange(1,2,true));
+    CHECK(clipsChanged==1 && envelopeChanges>=1);
+    CHECK(std::abs(startOf(later)-5.0)<1e-9);                       // rippled one beat left
+    CHECK(tracks.undo()); CHECK(std::abs(startOf(later)-6.0)<1e-9);
+    CHECK(tracks.cutRange(1,2,false)); CHECK(clipboardChanged==2);
+    CHECK(std::abs(startOf(later)-6.0)<1e-9);                       // gap mode
+    CHECK(tracks.undo());
+    // A ripple paste of the copied range at beat 5 makes a beat of room.
+    const auto pasted=tracks.pasteClips(track,5,true);
+    CHECK(pasted.size()==1); CHECK(std::abs(startOf(later)-7.0)<1e-9);
+    CHECK(tracks.deleteClips({later},true)); CHECK(startOf(later)<0);
+}

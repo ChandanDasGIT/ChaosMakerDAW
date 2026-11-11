@@ -80,11 +80,16 @@ bool Timeline::canSplitSelection() const
 }
 bool Timeline::canCopySelection() const
 {
-    return keyboardAllowed() && !m_recording && !m_busy && !m_selectedIds.empty();
+    return keyboardAllowed() && !m_recording && !m_busy && (!m_selectedIds.empty() || hasTimeRange());
+}
+bool Timeline::canDeleteSelection() const
+{
+    if (rangeMode()) return keyboardAllowed() && !m_recording && !m_busy && !m_tracks->editsLocked();
+    return canEditSelection();
 }
 bool Timeline::canCutSelection() const
 {
-    return canCopySelection() && canEditSelection();
+    return canCopySelection() && canDeleteSelection();
 }
 bool Timeline::canPaste() const
 {
@@ -97,12 +102,22 @@ bool Timeline::canDuplicateSelection() const
 bool Timeline::copySelectedClips()
 {
     if (!canCopySelection()) return false;
+    if (rangeMode()) return m_tracks->copyRange(m_range.start, m_range.end);
     return m_tracks->copyClips(m_selectedIds);
+}
+bool Timeline::deleteSelection()
+{
+    if (!canDeleteSelection()) return false;
+    if (rangeMode()) return m_tracks->deleteRange(m_range.start, m_range.end, m_ripple).accepted;
+    const bool ok = m_tracks->deleteClips(m_selectedIds, m_ripple).accepted;
+    if (ok) { deselect(); sync(); }
+    return ok;
 }
 std::vector<int> Timeline::cutSelectedClips()
 {
     if (!canCutSelection()) return {};
-    const auto cut = m_tracks->cutClips(m_selectedIds);
+    if (rangeMode()) { m_tracks->cutRange(m_range.start, m_range.end, m_ripple); return {}; }
+    const auto cut = m_tracks->cutClips(m_selectedIds, m_ripple);
     if (!cut.empty()) {
         deselect();
         sync();
@@ -116,7 +131,7 @@ std::vector<int> Timeline::pasteClips(double targetBeat, int targetTrackId)
         targetTrackId = m_selectedTrackId >= 0 ? m_selectedTrackId : (m_tracks->count() > 0 ? m_tracks->trackIdAt(0) : -1);
     }
     if (targetBeat < 0.0) targetBeat = 0.0;
-    const auto pasted = m_tracks->pasteClips(targetTrackId, targetBeat);
+    const auto pasted = m_tracks->pasteClips(targetTrackId, targetBeat, m_ripple);
     if (!pasted.empty()) {
         m_selectedIds = pasted;
         m_selectedClipId = pasted.front();
@@ -128,7 +143,7 @@ std::vector<int> Timeline::pasteClips(double targetBeat, int targetTrackId)
 std::vector<int> Timeline::duplicateSelectedClips(double beatOffset)
 {
     if (!canDuplicateSelection()) return {};
-    const auto duplicated = m_tracks->duplicateClips(m_selectedIds, beatOffset);
+    const auto duplicated = m_tracks->duplicateClips(m_selectedIds, beatOffset, m_ripple);
     if (!duplicated.empty()) {
         m_selectedIds = duplicated;
         m_selectedClipId = duplicated.front();

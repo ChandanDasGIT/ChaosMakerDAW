@@ -53,7 +53,8 @@ void TimelineWrapper::commitGroupEdit() { apply(m_timeline.commitEdit()); }
 bool TimelineWrapper::copySelectedClips()
 {
     if (!canCopy() || !m_tracks) return false;
-    const bool ok = m_tracks->copyClips(selectedClipIds());
+    const bool ok = rangeMode() ? m_tracks->copyRange(m_timeline.savedRangeStart(), m_timeline.savedRangeEnd())
+                                : m_tracks->copyClips(selectedClipIds());
     emit stateChanged();
     return ok;
 }
@@ -61,7 +62,12 @@ bool TimelineWrapper::copySelectedClips()
 QVariantList TimelineWrapper::cutSelectedClips()
 {
     if (!canCut() || !m_tracks) return {};
-    const auto cut = m_tracks->cutClips(selectedClipIds());
+    if (rangeMode()) {
+        m_tracks->cutRange(m_timeline.savedRangeStart(), m_timeline.savedRangeEnd(), ripple());
+        emit stateChanged();
+        return {};
+    }
+    const auto cut = m_tracks->cutClips(selectedClipIds(), ripple());
     if (!cut.isEmpty()) {
         m_timeline.deselect();
         m_timeline.sync();
@@ -77,10 +83,14 @@ QVariantList TimelineWrapper::pasteClips(double targetBeat, int targetTrackId)
         targetTrackId = m_timeline.selectedTrackId() >= 0 ? m_timeline.selectedTrackId() : (m_tracks->count() > 0 ? m_tracks->trackIdAt(0) : -1);
     }
     if (targetBeat < 0.0) targetBeat = 0.0;
-    const auto pasted = m_tracks->pasteClips(targetTrackId, targetBeat);
+    const auto pasted = m_tracks->pasteClips(targetTrackId, targetBeat, ripple());
     if (!pasted.isEmpty()) {
+        // Pasted clips may land on several tracks: select each on its own track.
         for (int i = 0; i < pasted.size(); ++i) {
-            m_timeline.selectClip(targetTrackId, pasted[i].toInt(), false, i > 0);
+            const int clip = pasted[i].toInt();
+            int track = targetTrackId;
+            for (const auto& info : m_tracks->domain().clips()) if (info.clipId == clip) { track = info.trackId; break; }
+            m_timeline.selectClip(track, clip, false, i > 0);
         }
         if (m_tracks) m_tracks->setSelectedClipId(m_timeline.selectedClipId());
         emit stateChanged();
@@ -91,7 +101,7 @@ QVariantList TimelineWrapper::pasteClips(double targetBeat, int targetTrackId)
 QVariantList TimelineWrapper::duplicateSelectedClips(double beatOffset)
 {
     if (!canDuplicate() || !m_tracks) return {};
-    const auto dup = m_tracks->duplicateClips(selectedClipIds(), beatOffset);
+    const auto dup = m_tracks->duplicateClips(selectedClipIds(), beatOffset, ripple());
     if (!dup.isEmpty()) {
         const int selTrack = m_timeline.selectedTrackId() >= 0 ? m_timeline.selectedTrackId() : (m_tracks->count() > 0 ? m_tracks->trackIdAt(0) : -1);
         for (int i = 0; i < dup.size(); ++i) {
@@ -101,6 +111,15 @@ QVariantList TimelineWrapper::duplicateSelectedClips(double beatOffset)
         emit stateChanged();
     }
     return dup;
+}
+bool TimelineWrapper::deleteSelection()
+{
+    if (!canDelete() || !m_tracks) return false;
+    const bool ok = rangeMode() ? m_tracks->deleteRange(m_timeline.savedRangeStart(), m_timeline.savedRangeEnd(), ripple())
+                                : m_tracks->deleteClips(selectedClipIds(), ripple());
+    if (ok && !rangeMode()) { m_timeline.deselect(); m_timeline.sync(); }
+    emit stateChanged();
+    return ok;
 }
 void TimelineWrapper::nudgeClips(int direction) { apply(m_timeline.nudge(direction)); }
 void TimelineWrapper::createClipAt(double beat, int lane)

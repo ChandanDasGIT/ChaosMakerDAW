@@ -686,3 +686,171 @@ TEST(tracklist, a_take_compensated_to_before_zero_is_trimmed_at_the_front)
     const auto& small = tracks.project().findTrack(track)->audioClips.back();
     CHECK(small.start == 0 && small.sourceOffset == 0 && small.length == 100);
 }
+
+namespace {
+// restMap G15 fixture, 120 BPM at 48 kHz (a beat is 24000 samples). Track A (audio):
+//   X 0..4 beats, Z 1.5..2.5, W 2.5..5, and a volume line from level 0.5 at 0 to 1.0 at beat 4.
+// Track B (instrument): a pattern clip 0..4 beats with notes at 0.5, 1.5 and 3.5.
+struct RangeProject {
+    TrackList tracks;
+    int a = 0, b = 0, x = 0, z = 0, w = 0, pattern = 0;
+    automation::VolumeEnvelope original;
+    RangeProject() {
+        tracks.setSampleRate(48000);
+        a = tracks.addAudioTrack();
+        tracks.audio()["take.wav"] = rampAudio(480000);
+        x = tracks.addAudioClip(a, "take.wav", 0, 96000, 0);
+        z = tracks.addAudioClip(a, "take.wav", 36000, 24000, 0);
+        w = tracks.addAudioClip(a, "take.wav", 60000, 60000, 0);
+        CHECK(tracks.addEnvelopePoint(a, 0, 0.5) == 0);
+        CHECK(tracks.addEnvelopePoint(a, 96000, 1.0) == 1);
+        original = tracks.project().findTrack(a)->volumeEnvelope;
+        b = tracks.addInstrumentTrackOfType("Harmonium");
+        pattern = tracks.addClipAtBeat(b, 0, 4);
+        std::vector<MidiNote> notes;
+        for (double beat : {0.5, 1.5, 3.5}) notes.push_back(MidiNote{int(beat * 2), 60, beat, 0.25, 100, false});
+        CHECK(tracks.setClipNotes(b, pattern, notes).changed);
+    }
+    const AudioClip* clipAt(int track, std::int64_t start) const {
+        for (const auto& c : tracks.project().findTrack(track)->audioClips) if (c.start == start) return &c;
+        return nullptr;
+    }
+    const automation::VolumeEnvelope& envelope() const { return tracks.project().findTrack(a)->volumeEnvelope; }
+};
+}
+
+TEST(tracklist, deleting_a_time_range_splits_clips_keeps_the_line_outside_and_is_one_undo_step)
+{
+    RangeProject p;
+    const auto historyBefore = p.tracks.canUndo();
+    CHECK(historyBefore);
+    CHECK(p.tracks.deleteRange(1.0, 3.0, false).changed);   // samples 24000..72000
+    const auto& clips = p.tracks.project().findTrack(p.a)->audioClips;
+    CHECK(clips.size() == 3);                               // X left, X right, W's end; Z is gone
+    CHECK(!p.tracks.findClip(p.a, p.z));
+    CHECK(p.tracks.findClip(p.a, p.x)->start == 0 && p.tracks.findClip(p.a, p.x)->length == 24000);
+    const auto* xRight = p.clipAt(p.a, 72000);
+    CHECK(xRight && xRight->id != p.x && xRight->id != p.w);
+    CHECK(xRight->length == 24000 && xRight->sourceOffset == 72000);
+    CHECK(p.tracks.findClip(p.a, p.w)->start == 72000 && p.tracks.findClip(p.a, p.w)->length == 48000);
+    CHECK(p.tracks.findClip(p.a, p.w)->sourceOffset == 12000);
+    // The line outside the range is unchanged; edge points hold it.
+    for (std::int64_t at : {0LL, 10000LL, 24000LL, 72000LL, 80000LL, 96000LL, 200000LL})
+        CHECK_NEAR(p.envelope().levelAt(at), p.original.levelAt(at), 1e-9);
+    CHECK(p.envelope().points().size() == 4);
+    // Pattern notes: the one inside goes; the right piece keeps its later note in time.
+    CHECK(p.tracks.clipNotes(p.b, p.pattern).size() == 1);
+    const auto* patternRight = p.clipAt(p.b, 72000);
+    CHECK(patternRight);
+    const auto rightNotes = p.tracks.clipNotes(p.b, patternRight->id);
+    CHECK(rightNotes.size() == 1 && std::abs(rightNotes[0].startBeat - 0.5) < 1e-9);   // beat 3.5
+    // One undo puts back both tracks and the line.
+    CHECK(p.tracks.undo());
+    CHECK(p.tracks.project().findTrack(p.a)->audioClips.size() == 3 && p.tracks.findClip(p.a, p.z));
+    CHECK(p.tracks.findClip(p.a, p.x)->length == 96000);
+    CHECK(p.envelope().sameContent(p.original));
+    CHECK(p.tracks.project().findTrack(p.b)->audioClips.size() == 1 && p.tracks.clipNotes(p.b, p.pattern).size() == 3);
+    CHECK(p.tracks.redo());
+    CHECK(p.envelope().points().size() == 4);
+    // An empty range far out changes nothing.
+    CHECK(!p.tracks.deleteRange(40.0, 41.0, false).changed);
+    CHECK(!p.tracks.deleteRange(2.0, 2.0, false).accepted);
+}
+
+TEST(tracklist, a_ripple_range_delete_closes_the_gap_on_every_track)
+{
+    RangeProject p;
+    CHECK(p.tracks.deleteRange(1.0, 3.0, true).changed);
+    const auto* xRight = p.clipAt(p.a, 24000);
+    CHECK(xRight && xRight->id != p.x && xRight->id != p.w && xRight->sourceOffset == 72000);
+    CHECK(p.tracks.findClip(p.a, p.w)->start == 24000 && p.tracks.findClip(p.a, p.w)->sourceOffset == 12000);
+    // The line: unchanged before the range; after it, what was at t is now at t - 48000.
+    CHECK_NEAR(p.envelope().levelAt(10000), p.original.levelAt(10000), 1e-9);
+    CHECK_NEAR(p.envelope().levelAt(32000), p.original.levelAt(80000), 1e-9);
+    CHECK_NEAR(p.envelope().levelAt(48000), 1.0, 1e-9);
+    // The pattern's right piece moved left with its note.
+    const auto* patternRight = p.clipAt(p.b, 24000);
+    CHECK(patternRight && p.tracks.clipNotes(p.b, patternRight->id).size() == 1);
+    CHECK(p.tracks.undo());
+    CHECK(p.envelope().sameContent(p.original) && p.tracks.findClip(p.a, p.w)->start == 60000);
+}
+
+TEST(tracklist, copying_a_range_takes_clip_parts_and_the_line_and_pastes_them_together)
+{
+    RangeProject p;
+    CHECK(p.tracks.copyRange(1.0, 3.0));
+    CHECK(p.tracks.project().findTrack(p.a)->audioClips.size() == 3);   // the document stays
+    CHECK(p.tracks.clipboard().size() == 4);                           // X, Z, W's start, pattern
+    CHECK(p.tracks.clipboardEnvelopes().size() == 1);
+    CHECK_NEAR(p.tracks.clipboardLengthBeats(), 2.0, 1e-12);
+    const auto aClips = p.tracks.project().findTrack(p.a)->audioClips.size();
+    const auto pasted = p.tracks.pasteClips(p.a, 8.0);                 // samples 192000..240000
+    CHECK(pasted.size() == 4);
+    CHECK(p.tracks.project().findTrack(p.a)->audioClips.size() == aClips + 3);
+    const auto* xCopy = p.clipAt(p.a, 192000);
+    CHECK(xCopy && xCopy->length == 48000 && xCopy->sourceOffset == 24000);
+    const auto* wCopy = p.clipAt(p.a, 192000 + 36000);
+    CHECK(wCopy && wCopy->length == 12000 && wCopy->sourceOffset == 0);
+    CHECK(p.clipAt(p.b, 192000));                                      // onto the track below
+    // The pasted line has the copied levels; the line before it is unchanged.
+    CHECK_NEAR(p.envelope().levelAt(192000), p.original.levelAt(24000), 1e-9);
+    CHECK_NEAR(p.envelope().levelAt(216000), p.original.levelAt(48000), 1e-9);
+    CHECK_NEAR(p.envelope().levelAt(240000), p.original.levelAt(72000), 1e-9);
+    CHECK_NEAR(p.envelope().levelAt(50000), p.original.levelAt(50000), 1e-9);
+    CHECK(p.tracks.undo());                                            // one step
+    CHECK(p.tracks.project().findTrack(p.a)->audioClips.size() == aClips);
+    CHECK(p.envelope().sameContent(p.original));
+    // Cut = copy + delete, one undo step; the clipboard keeps the cut.
+    CHECK(p.tracks.cutRange(1.0, 3.0, false).changed);
+    CHECK(p.tracks.clipboard().size() == 4 && !p.tracks.findClip(p.a, p.z));
+    CHECK(p.tracks.undo() && p.tracks.findClip(p.a, p.z));
+}
+
+TEST(tracklist, ripple_paste_duplicate_and_clip_delete_make_and_close_room)
+{
+    TrackList tracks;
+    tracks.setSampleRate(48000);
+    const int a = tracks.addAudioTrack(), b = tracks.addAudioTrack();
+    tracks.audio()["take.wav"] = rampAudio(480000);
+    const int q = tracks.addAudioClip(a, "take.wav", 0, 24000, 0);        // beat 0..1
+    const int later = tracks.addAudioClip(a, "take.wav", 96000, 48000, 0); // beat 4..6
+    const int across = tracks.addAudioClip(b, "take.wav", 72000, 48000, 0); // beat 3..5 on B
+    CHECK(tracks.addEnvelopePoint(a, 0, 0.4) == 0);
+    CHECK(tracks.addEnvelopePoint(a, 120000, 0.9) == 1);                 // beat 5
+    const auto levelBefore = tracks.project().findTrack(a)->volumeEnvelope.levelAt(96000);
+
+    // Paste a 1-beat clip at beat 4 with ripple: everything from beat 4 on moves right a beat.
+    CHECK(tracks.copyClips({q}));
+    const auto pasted = tracks.pasteClips(a, 4.0, true);
+    CHECK(pasted.size() == 1 && tracks.findClip(a, pasted[0])->start == 96000);
+    CHECK(tracks.findClip(a, later)->start == 120000);
+    CHECK(tracks.findClip(b, across)->start == 72000 && tracks.findClip(b, across)->length == 24000);   // split at beat 4
+    const auto& bClips = tracks.project().findTrack(b)->audioClips;
+    CHECK(bClips.size() == 2);
+    const auto& bRight = bClips[0].id == across ? bClips[1] : bClips[0];
+    CHECK(bRight.start == 120000 && bRight.length == 24000 && bRight.sourceOffset == 24000);
+    const auto& line = tracks.project().findTrack(a)->volumeEnvelope;
+    CHECK(line.points().back().position == 144000);                      // beat 5 -> 6
+    CHECK_NEAR(line.levelAt(96000), levelBefore, 1e-9);                  // flat across the new space
+    CHECK_NEAR(line.levelAt(120000), levelBefore, 1e-9);
+    CHECK(tracks.undo());
+    CHECK(tracks.findClip(a, later)->start == 96000 && tracks.project().findTrack(b)->audioClips.size() == 1);
+
+    // Delete a clip with ripple: later clips and points on its track close up; B stays.
+    CHECK(tracks.deleteClips({q}, true).changed);
+    CHECK(!tracks.findClip(a, q) && tracks.findClip(a, later)->start == 72000);
+    CHECK(tracks.project().findTrack(a)->volumeEnvelope.points().back().position == 96000);
+    CHECK(tracks.findClip(b, across)->start == 72000);
+    CHECK(tracks.undo() && tracks.findClip(a, q));
+    // Without ripple nothing else moves.
+    CHECK(tracks.deleteClips({q}, false).changed && tracks.findClip(a, later)->start == 96000);
+    CHECK(tracks.undo());
+
+    // Duplicate with ripple: the copy goes right after, later clips make room.
+    const auto copies = tracks.duplicateClips({q}, 0.0, true);
+    CHECK(copies.size() == 1 && tracks.findClip(a, copies[0])->start == 24000);
+    CHECK(tracks.findClip(a, later)->start == 120000);
+    CHECK(tracks.undo() && tracks.findClip(a, later)->start == 96000 && !tracks.findClip(a, copies[0]));
+    // Cut with ripple: clipboard and the closed gap.
+    CHECK(tracks.cutClips({q}, true).size() == 1 && tracks.findClip(a, later)->start == 72000);
+}
