@@ -24,7 +24,9 @@ NEXT UP (2026-11-10), the user's order:
   4. C6 other instruments (strings first was suggested; not chosen yet), C11 synth.
   5. G18-G21 (live pitch monitor, guitar tone analyzer, drum pattern analyzer, chord / BPM
      analyzer; G20 and G21 share their analysis foundation).
-  6. Import and export (E, F2): DONE 2026-11-11, committed. Bug found in testing: imported audio does not go through the track FX (being fixed).
+  6. Import and export (E, F2): DONE 2026-11-11, committed (18aee6d). Fixed after: imported clips were
+     marked "effects printed", so the track FX skipped them; they are dry now (not committed yet).
+     NEXT after this: a better file browsing dialog, copying the one the user made for ProjectMusicPlayer.
   7. U6 guitar FX panel UI, at the very end.
 Start here when the user says "let's continue". Plans first, one step at a time.
 
