@@ -539,3 +539,36 @@ TEST(projectdocument, clip_effects_round_trip_and_are_optional)
     CHECK(ProjectDocument::deserialize(text.dump(), loaded, error, 48000.0));
     CHECK(!loaded.project.tracks()[0]->audioClips[0].fx.hasEffects());
 }
+
+TEST(projectdocument, clip_fades_round_trip_are_optional_and_validated)
+{
+    // restMap G8.
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    auto& track = project.addTrack(TrackKind::Audio, "Vox");
+    AudioClip clip;
+    clip.poolId = "take";
+    clip.length = 1000;
+    clip.fadeIn = 200;
+    clip.fadeOut = 300;
+    CHECK(project.addAudioClip(track.id, clip) > 0);
+    TrackList::MediaPaths paths;
+    paths.insert("take");
+    const std::string json = ProjectDocument::serialize(project, paths, {""});
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(json, loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->audioClips[0].fadeIn == 200);
+    CHECK(loaded.project.tracks()[0]->audioClips[0].fadeOut == 300);
+    CHECK(ProjectDocument::deserialize(json, loaded, error, 96000.0));         // rescaled like the clip
+    CHECK(loaded.project.tracks()[0]->audioClips[0].fadeIn == 400);
+    auto text = nlohmann::json::parse(json);
+    auto& c = text["project"]["tracks"][0]["clips"][0];
+    c.erase("fadeIn"); c.erase("fadeOut");                                      // saved before G8
+    CHECK(ProjectDocument::deserialize(text.dump(), loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->audioClips[0].fadeIn == 0 && loaded.project.tracks()[0]->audioClips[0].fadeOut == 0);
+    c["fadeIn"] = "5000";                                                       // longer than the clip
+    CHECK(!ProjectDocument::deserialize(text.dump(), loaded, error, 48000.0));
+    c["fadeIn"] = 20;                                                           // not a string
+    CHECK(!ProjectDocument::deserialize(text.dump(), loaded, error, 48000.0));
+}

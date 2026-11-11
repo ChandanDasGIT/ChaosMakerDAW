@@ -567,6 +567,13 @@ Item {
                 required property bool reversed
                 required property bool polarityInverted
                 required property bool hasEffects
+                required property real fadeInBeats
+                required property real fadeOutBeats
+                // Fade handle drags (restMap G8): the dragged length in beats, -1 when not dragging.
+                property real dragFadeIn: -1
+                property real dragFadeOut: -1
+                readonly property real shownFadeIn: dragFadeIn >= 0 ? dragFadeIn : fadeInBeats
+                readonly property real shownFadeOut: dragFadeOut >= 0 ? dragFadeOut : fadeOutBeats
                 objectName: "clipBlock" + clipId
                 readonly property var preview: editor.previews[String(clipId)] ?? ({})
                 x: (preview.startBeat ?? startBeat) * root.beatWidth + 4
@@ -636,6 +643,46 @@ Item {
                             ctx.lineTo(px, height * (0.5 - Math.max(-1, peaks[i][0]) * 0.48) + 1)
                         }
                         ctx.stroke()
+                    }
+                }
+                // Fades (restMap G8): the part a fade turns down is shaded above its curve.
+                Repeater {
+                    model: clipItem.isRecorded ? [false, true] : []
+                    delegate: Canvas {
+                        id: fadeCurve
+                        required property bool modelData
+                        readonly property bool atEnd: modelData
+                        objectName: (atEnd ? "clipFadeOutCurve" : "clipFadeInCurve") + clipItem.clipId
+                        readonly property real beats: atEnd ? clipItem.shownFadeOut : clipItem.shownFadeIn
+                        width: Math.min(clipItem.width, Math.max(0, beats * root.beatWidth))
+                        height: clipItem.height
+                        x: atEnd ? clipItem.width - width : 0
+                        visible: width >= 1
+                        onPaint: {
+                            const ctx = getContext("2d")
+                            ctx.clearRect(0, 0, width, height)
+                            const steps = Math.max(2, Math.ceil(width / 3))
+                            const yAt = i => {
+                                const t = i / steps
+                                return height * (1 - Math.sin(Math.PI / 2 * (atEnd ? 1 - t : t)))
+                            }
+                            ctx.beginPath()
+                            ctx.moveTo(0, 0)
+                            for (let i = 0; i <= steps; ++i) ctx.lineTo(i * width / steps, yAt(i))
+                            ctx.lineTo(width, 0)
+                            ctx.closePath()
+                            ctx.fillStyle = Qt.rgba(0, 0, 0, 0.35)
+                            ctx.fill()
+                            ctx.beginPath()
+                            for (let i = 0; i <= steps; ++i) {
+                                if (i === 0) ctx.moveTo(0, yAt(0)); else ctx.lineTo(i * width / steps, yAt(i))
+                            }
+                            ctx.strokeStyle = Theme.timeline.waveform
+                            ctx.lineWidth = 1
+                            ctx.stroke()
+                        }
+                        onWidthChanged: requestPaint()
+                        onHeightChanged: requestPaint()
                     }
                 }
                 // Reaper-style outlines of the pattern's notes. Vertical scale fits the clip's own
@@ -786,6 +833,59 @@ Item {
                         onReleased: editor.commitGroupEdit()
                         onCanceled: { editor.cancelEdit() }
                         ToolTip.visible: containsMouse; ToolTip.text: "Drag to trim the start"
+                    }
+                }
+                // Fade handles (restMap G8) in the top corners, at the end of each fade: drag them
+                // sideways to set the fade. Audio clips only; one undo step per drag.
+                Repeater {
+                    model: clipItem.isRecorded ? [false, true] : []
+                    delegate: Rectangle {
+                        id: fadeHandle
+                        required property bool modelData
+                        readonly property bool atEnd: modelData
+                        readonly property real fadePixels: (atEnd ? clipItem.shownFadeOut : clipItem.shownFadeIn) * root.beatWidth
+                        width: 8; height: 8; radius: 2
+                        y: 0; z: 4
+                        x: atEnd ? Math.max(8, Math.min(clipItem.width - 16, clipItem.width - 16 - fadePixels))
+                                 : Math.max(8, Math.min(clipItem.width - 16, 8 + fadePixels))
+                        color: fadeArea.containsMouse || fadeArea.pressed ? Theme.accent : Theme.timeline.trimHandle
+                        MouseArea {
+                            id: fadeArea
+                            objectName: (fadeHandle.atEnd ? "clipFadeOutHandle" : "clipFadeInHandle") + clipItem.clipId
+                            anchors.fill: parent; anchors.margins: -3
+                            hoverEnabled: true; acceptedButtons: Qt.LeftButton
+                            cursorShape: Qt.SizeHorCursor
+                            property real pointerStart: 0
+                            property real original: 0
+                            property bool moved: false
+                            function dragged(mouse) {
+                                const delta = (mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStart) / root.beatWidth
+                                const other = fadeHandle.atEnd ? clipItem.fadeInBeats : clipItem.fadeOutBeats
+                                return Math.max(0, Math.min(clipItem.lengthBeats - other,
+                                                            original + (fadeHandle.atEnd ? -delta : delta)))
+                            }
+                            onPressed: mouse => {
+                                editor.selectClip(clipItem.trackId, clipItem.clipId, false, true)
+                                pointerStart = mapToItem(scroll.contentItem, mouse.x, mouse.y).x
+                                original = fadeHandle.atEnd ? clipItem.fadeOutBeats : clipItem.fadeInBeats
+                                moved = false
+                            }
+                            onPositionChanged: mouse => {
+                                if (!pressed || root.recording) return
+                                moved = true
+                                if (fadeHandle.atEnd) clipItem.dragFadeOut = dragged(mouse)
+                                else clipItem.dragFadeIn = dragged(mouse)
+                            }
+                            onReleased: mouse => {
+                                const beats = dragged(mouse)
+                                clipItem.dragFadeIn = -1; clipItem.dragFadeOut = -1
+                                if (moved && !root.recording && root.trackModel)
+                                    root.trackModel.setClipFade(clipItem.trackId, clipItem.clipId, fadeHandle.atEnd, beats)
+                            }
+                            onCanceled: { clipItem.dragFadeIn = -1; clipItem.dragFadeOut = -1 }
+                            ToolTip.visible: containsMouse && !pressed; ToolTip.delay: 450
+                            ToolTip.text: fadeHandle.atEnd ? "Drag to set the fade-out" : "Drag to set the fade-in"
+                        }
                     }
                 }
                 Rectangle {

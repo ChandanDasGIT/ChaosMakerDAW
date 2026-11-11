@@ -16,7 +16,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 NEXT UP (2026-11-10), the user's order:
   1. G6 volume envelope committed (0597318); G6b curve shapes committed (758f523).
   2. G9, G17, G14 committed (33ef5cc). R2 clip effects committed (e3b3d42).
-     Then import / export (item 6, done first at the user's request). Next: G8 fades, then G10, G15, G16,
+     Then import / export (item 6, done first at the user's request). G8 fades committed. Next: G10, G15, G16,
      G11, G13, G12. Later option: "render clip effects into the audio" (Reaper's apply FX).
   3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
      reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
@@ -276,10 +276,32 @@ Done items stay further down as the record.
         wrapper 20/20 (ctest), transport_ui 159/159 offscreen; app log empty (empty profile and
         a session copy).
 -- From the Reaper comparison (the user picked these, 2026-11-10; none planned yet)
-[ ] G8  Clip fades and crossfades. AudioClip already has fadeIn / fadeOut (samples) but no
-        wrapper action or UI sets them. Wanted: Reaper-style fade handles in a clip's top
-        corners (drag to set), automatic short crossfade where two clips overlap, undoable,
-        saved. Check whether the engine already applies fadeIn / fadeOut when planning.
+[x] G8  Clip fades and crossfades. DONE 2026-11-11 (committed). Before: AudioClip had fadeIn /
+        fadeOut (samples) but the engine ignored them, nothing saved or set them.
+        - Engine: ClipRender::fadeGainAt, equal-power (quarter sine); applied with the clip gain
+          in both mix paths and mixClipWithEffects (before the clip effects). Export too.
+        - Automatic crossfade, never stored: playedFades (session/project.h) over a track's audio
+          clips; where two partly overlap, the earlier fades out and the later fades in across
+          the overlap (a longer own fade stays); a clip inside another gets none; a clip's two
+          fades never exceed it (shared in proportion). SnapshotBuilder and TrackList::clips()
+          both use it, so what is drawn is what plays.
+        - Project::setClipFades (undoable, a drag can extend the step: fadeClipId);
+          TrackList::setClipFade(track, clip, fadeOut, beats) for audio clips, stops at the
+          other fade. Split: left keeps the fade-in, right the fade-out (they still merge).
+        - Saved as clip "fadeIn" / "fadeOut" (sample strings, only when > 0, rescaled with the
+          rate; older files: none; longer than the clip: rejected). Copy / paste carried them.
+        - Wrapper setClipFade; clips report "fadeInBeats" / "fadeOutBeats" (as played).
+        - Timeline.qml: a small handle in each audio clip's top corners at the fade's end
+          (clipFadeInHandle / clipFadeOutHandle); drag previews locally, commits on release (one
+          undo step; a click alone changes nothing). The faded part is shaded above its curve
+          (clipFadeInCurve / clipFadeOutCurve).
+        Tests: backendtests audioengine_midi clip_fades_follow..., snapshotbuilder
+        overlapping_audio_clips_crossfade..., tracklist clip_fades_are_undoable...,
+        projectdocument clip_fades_round_trip...; wrappertests qtclipediting
+        clip_fades_reach_qml...; transporttests timeline_fade_handles_set_audio_clip_fades...
+        Affected groups also run: tracklist 21, snapshotbuilder 18, projectdocument 16,
+        audioengine_midi 14, clip_clipboard 3, clipeffects 2, qtclipediting 15, 29 timeline /
+        clip UI tests offscreen; app log empty (empty profile and a session copy).
 [x] G9  Effects on the master track. DONE 2026-11-11 (uncommitted). The mixer's MASTER strip
         has an FX button (lit when the master has effects) opening the same FX window as a
         track's, "Master · Effects": EQ, Chaos EQ and the eight mixing plugins, export / import

@@ -66,6 +66,8 @@ std::string ProjectDocument::serialize(const Project& project,
             clipObj["offset"] = std::to_string(clip.sourceOffset);
             clipObj["gainDb"] = clip.gainDb;
             clipObj["effectsPrinted"] = clip.effectsPrinted;
+            if (clip.fadeIn > 0) clipObj["fadeIn"] = std::to_string(clip.fadeIn);      // restMap G8
+            if (clip.fadeOut > 0) clipObj["fadeOut"] = std::to_string(clip.fadeOut);
             if (clip.reversed) clipObj["reversed"] = true;                   // restMap G14
             if (clip.polarityInverted) clipObj["polarityInverted"] = true;
             if (clip.fx.hasEffects()) clipObj["effects"] = effectstatejson::toJson(clip.fx);   // restMap R2
@@ -426,6 +428,16 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             clip.sourceOffset = pattern ? std::llround(offset * rate / oldRate) : offset;
             clip.start = std::llround(start * rate / oldRate);
             clip.length = std::max<std::int64_t>(1, std::llround(length * rate / oldRate));
+            // Fades (restMap G8), project samples like start; optional, older files have none.
+            for (auto [key, into] : {std::pair{"fadeIn", &clip.fadeIn}, std::pair{"fadeOut", &clip.fadeOut}}) {
+                if (!c.contains(key)) continue;
+                std::int64_t value = -1;
+                try { if (c[key].is_string()) value = std::stoll(c[key].get<std::string>()); } catch (...) {}
+                if (value < 0 || value > length) { error = "Invalid clip fade."; return false; }
+                *into = std::llround(value * rate / oldRate);
+            }
+            clip.fadeIn = std::min(clip.fadeIn, clip.length);
+            clip.fadeOut = std::min(clip.fadeOut, clip.length - clip.fadeIn);
 
             std::string resolvedPath = pathStr;
             if (!baseDirectory.empty() && !pathStr.empty()) {

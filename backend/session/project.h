@@ -46,6 +46,14 @@ struct AudioClip {
     std::vector<MidiNote> notes;
 };
 
+// Clip fades as they play (restMap G8). FadeSpan is one clip on a track; playedFades turns a
+// track's spans' own fades into the played ones: where two clips partly overlap, the earlier
+// fades out and the later fades in across the overlap (at least; a longer own fade stays), so
+// the crossfade follows the clips and is never stored. A clip inside another gets none. Each
+// clip's two fades together never exceed its length.
+struct FadeSpan { std::int64_t start = 0, length = 0, fadeIn = 0, fadeOut = 0; };
+void playedFades(std::vector<FadeSpan>& clips);
+
 enum class TrackKind { Audio, Instrument };
 
 // A track's effect data (chain, EQ, Chaos EQ, mixing plugins) is its EffectState part.
@@ -160,6 +168,9 @@ public:
     // continueEdit: fold this change into the previous undo step when that step was a gain
     // edit of the same clip (one fader drag = one undo step). Otherwise a new step is added.
     bool setClipGain(int trackId, int clipId, float gainDb, bool continueEdit = false);
+    // A clip's own fades (restMap G8), in samples, each kept within the clip. continueEdit: part
+    // of an ongoing handle drag on the same clip, so the whole drag is one undo step.
+    bool setClipFades(int trackId, int clipId, std::int64_t fadeIn, std::int64_t fadeOut, bool continueEdit = false);
     // Replace a clip's pattern notes (origin-relative beats) as one undoable edit.
     bool setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes);
     // Volume envelope (restMap G6). Adding, moving and removing points and bypass are undoable;
@@ -219,6 +230,7 @@ private:
         std::vector<TrackClipEdit> tracks;
         std::optional<EnvelopeEdit> envelope;
         int gainClipId = -1;
+        int fadeClipId = -1;      // a fade handle drag (G8), extended like gainClipId
         std::optional<Track> removedTrack;
         std::size_t removedIndex = 0;
         // Tracks this step added (an import): their ids, and while undone their copies at

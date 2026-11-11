@@ -616,3 +616,54 @@ TEST(tracklist, clip_tools_reverse_flip_and_normalise_audio_clips_in_one_undo_st
     CHECK(tracks.applyClipTool({right}, Tool::InvertPolarity).changed);
     CHECK(!tracks.canMergeClips(track, clip, right));
 }
+
+TEST(tracklist, clip_fades_are_undoable_split_with_the_clip_and_report_the_crossfade)
+{
+    // restMap G8. 120 BPM at 48 kHz: a beat is 24000 samples.
+    TrackList tracks;
+    tracks.setSampleRate(48000);
+    const int track = tracks.addAudioTrack();
+    tracks.audio()["take.wav"] = rampAudio(96000);
+    const int a = tracks.addAudioClip(track, "take.wav", 0, 48000, 0);
+    const int b = tracks.addAudioClip(track, "take.wav", 36000, 48000, 0);   // overlaps a by half a beat
+    const int pattern = tracks.addClipAtBeat(tracks.addInstrumentTrackOfType("Harmonium"), 0, 4);
+    const auto info = [&](int id) {
+        for (const auto& c : tracks.clips()) if (c.clipId == id) return c;
+        return TrackList::ClipInfo{};
+    };
+    CHECK_NEAR(info(a).fadeOutBeats, 0.5, 1e-9);
+    CHECK_NEAR(info(b).fadeInBeats, 0.5, 1e-9);
+    CHECK_NEAR(info(a).fadeInBeats, 0.0, 1e-9);
+    CHECK_NEAR(info(pattern).fadeInBeats, 0.0, 1e-9);
+    CHECK(tracks.findClip(track, a)->fadeOut == 0);                         // the crossfade is not stored
+
+    CHECK(tracks.setClipFade(track, a, false, 1.0).changed);
+    CHECK(tracks.findClip(track, a)->fadeIn == 24000);
+    CHECK_NEAR(info(a).fadeInBeats, 1.0, 1e-9);
+    CHECK(!tracks.setClipFade(track, a, false, 1.0).changed);
+    CHECK(tracks.setClipFade(track, a, true, 9.0).changed);                // kept within the clip
+    CHECK(tracks.findClip(track, a)->fadeIn == 24000 && tracks.findClip(track, a)->fadeOut == 24000);
+    CHECK(!tracks.setClipFade(track, pattern, false, 1.0).accepted);        // audio clips only
+    CHECK(!tracks.setClipFade(track, a, false, std::numeric_limits<double>::quiet_NaN()).accepted);
+    CHECK(tracks.undo());
+    CHECK(tracks.findClip(track, a)->fadeOut == 0 && tracks.findClip(track, a)->fadeIn == 24000);
+    CHECK(tracks.undo());
+    CHECK(tracks.findClip(track, a)->fadeIn == 0);
+    CHECK(tracks.redo());
+    CHECK(tracks.findClip(track, a)->fadeIn == 24000);
+
+    // A drag is one undo step.
+    CHECK(tracks.setClipFade(track, b, true, 0.25).changed);
+    CHECK(tracks.setClipFade(track, b, true, 0.5, true).changed);
+    CHECK(tracks.findClip(track, b)->fadeOut == 12000);
+    CHECK(tracks.undo());
+    CHECK(tracks.findClip(track, b)->fadeOut == 0);
+
+    // Split: the left piece keeps the fade-in, the right one the fade-out; they still merge.
+    CHECK(tracks.setClipFade(track, a, true, 0.25).changed);
+    const int right = tracks.splitClipAtBeat(track, a, 1.5);
+    CHECK(right > 0);
+    CHECK(tracks.findClip(track, a)->fadeIn == 24000 && tracks.findClip(track, a)->fadeOut == 0);
+    CHECK(tracks.findClip(track, right)->fadeIn == 0 && tracks.findClip(track, right)->fadeOut == 6000);
+    CHECK(tracks.canMergeClips(track, a, right));
+}

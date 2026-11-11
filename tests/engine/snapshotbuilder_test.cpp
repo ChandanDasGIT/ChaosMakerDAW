@@ -736,3 +736,29 @@ TEST(snapshotbuilder, a_clips_effects_become_its_chain)
     CHECK(clips.size() == 2 && clips[0].chain[0] == clipFx.playbackMixEffects.at("compressor").get()
           && clips[0].chain[1] == clipFx.playbackChaosEq.get());
 }
+
+TEST(snapshotbuilder, overlapping_audio_clips_crossfade_and_own_fades_stay_within_the_clip)
+{
+    // restMap G8.
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    auto& track = project.addTrack(TrackKind::Audio, "Vox");
+    AudioClip a; a.poolId = "a"; a.start = 0; a.length = 48000; a.fadeIn = 1000;
+    AudioClip b; b.poolId = "b"; b.start = 36000; b.length = 48000; b.fadeOut = 2000;
+    AudioClip inside; inside.poolId = "c"; inside.start = 100000; inside.length = 1000;
+    AudioClip outer; outer.poolId = "d"; outer.start = 90000; outer.length = 20000;
+    for (const auto& clip : {a, b, inside, outer}) CHECK(project.addAudioClip(track.id, clip) > 0);
+    auto data = makeDummyAudio(96000);
+    const auto snapshot = SnapshotBuilder::buildPlaybackSnapshot(project,
+        [&](const std::string&) -> std::shared_ptr<const AudioData> { return data; }, nullptr, false);
+    const auto& clips = snapshot->tracks[0].clips;
+    CHECK(clips.size() == 4);
+    CHECK(clips[0].fadeIn == 1000 && clips[0].fadeOut == 12000);   // a: own fade-in, crossfade out
+    CHECK(clips[1].fadeIn == 12000 && clips[1].fadeOut == 2000);   // b: crossfade in, own fade-out
+    CHECK(clips[2].fadeIn == 0 && clips[2].fadeOut == 0);          // outer: a clip inside it changes nothing
+    CHECK(clips[3].fadeIn == 0 && clips[3].fadeOut == 0);          // inside: none either
+
+    std::vector<FadeSpan> tooLong{{0, 100, 300, 100}};               // 3 : 1 of a 100-sample clip
+    playedFades(tooLong);
+    CHECK(tooLong[0].fadeIn == 75 && tooLong[0].fadeOut == 25);
+}

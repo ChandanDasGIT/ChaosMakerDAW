@@ -479,6 +479,23 @@ std::vector<TrackList::ClipInfo> TrackList::clips() const
                 blank ? clipNotes(track.id, clip.id) : std::vector<MidiNote>{}, clip.reversed, clip.polarityInverted,
                 clip.fx});
         }
+        // Fades as played (restMap G8), over the track's audio clips.
+        std::vector<FadeSpan> spans;
+        std::vector<std::size_t> rows;
+        for (std::size_t i = 0; i < track.audioClips.size(); ++i) {
+            const auto& clip = track.audioClips[i];
+            if (isPatternClip(clip)) continue;
+            spans.push_back({clip.start, clip.length, clip.fadeIn, clip.fadeOut});
+            rows.push_back(result.size() - track.audioClips.size() + i);
+        }
+        playedFades(spans);
+        const auto& tempo = m_project.tempo();
+        for (std::size_t i = 0; i < spans.size(); ++i) {
+            auto& info = result[rows[i]];
+            const auto end = spans[i].start + spans[i].length;
+            info.fadeInBeats = tempo.beatAt(spans[i].start + spans[i].fadeIn) - info.startBeat;
+            info.fadeOutBeats = tempo.beatAt(end) - tempo.beatAt(end - spans[i].fadeOut);
+        }
     }
     return result;
 }
@@ -759,6 +776,33 @@ TrackList::Change TrackList::setClipGain(int trackId, int clipId, double gainDb,
     const float clamped = std::clamp(static_cast<float>(gainDb), -120.0f, 24.0f);
     if (clip->gainDb == clamped) return {true, false};
     const bool ok = m_project.setClipGain(trackId, clipId, clamped, continueEdit);
+    return {ok, ok};
+}
+
+TrackList::Change TrackList::setClipFade(int trackId, int clipId, bool fadeOut, double beats, bool continueEdit)
+{
+    if (editsLocked() || !std::isfinite(beats)) return {};
+    const auto* clip = findClip(trackId, clipId);
+    if (!clip || isPatternClip(*clip)) return {};
+    const auto& tempo = m_project.tempo();
+    const double length = std::max(0.0, beats);
+    std::int64_t samples = 0;
+    if (fadeOut) {
+        const auto end = clip->start + clip->length;
+        const auto from = sampleAtBeat(tempo, std::max(0.0, tempo.beatAt(end) - length));
+        if (!from) return {};
+        samples = end - *from;
+    } else {
+        const auto to = sampleAtBeat(tempo, tempo.beatAt(clip->start) + length);
+        if (!to) return {};
+        samples = *to - clip->start;
+    }
+    // A fade reaches at most the other one, which stays (as the timeline's handle stops there).
+    samples = std::clamp<std::int64_t>(samples, 0, clip->length - (fadeOut ? clip->fadeIn : clip->fadeOut));
+    const auto in = fadeOut ? clip->fadeIn : samples;
+    const auto out = fadeOut ? samples : clip->fadeOut;
+    if (in == clip->fadeIn && out == clip->fadeOut) return {true, false};
+    const bool ok = m_project.setClipFades(trackId, clipId, in, out, continueEdit);
     return {ok, ok};
 }
 

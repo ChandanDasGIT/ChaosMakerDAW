@@ -31,6 +31,9 @@ public:
         bool reversed = false;
         bool polarityInverted = false;
         EffectState fx;   // clip effects (restMap R2)
+        // Fades as played, in beats (restMap G8): the clip's own plus the automatic crossfade
+        // where audio clips overlap. Audio clips only; 0 for pattern clips.
+        double fadeInBeats = 0.0, fadeOutBeats = 0.0;
     };
     struct ClipboardClip {
         std::string poolId;
@@ -178,6 +181,9 @@ public:
     bool resizeClipAtBeat(int trackId, int clipId, double length);
     // continueEdit: part of an ongoing fader drag; see Project::setClipGain.
     Change setClipGain(int trackId, int clipId, double gainDb, bool continueEdit = false);
+    // A clip's own fade-in (fadeOut false) or fade-out, in beats from that edge (restMap G8).
+    // Audio clips only; undoable, a drag (continueEdit) is one step; it reaches at most the other fade.
+    Change setClipFade(int trackId, int clipId, bool fadeOut, double beats, bool continueEdit = false);
     // Pattern notes in clip-relative beats (0 = clip start). Only pattern (non-recorded) clips
     // hold notes. Notes outside the clip bounds are kept (hidden), so trims can be undone.
     std::vector<MidiNote> clipNotes(int trackId, int clipId) const;

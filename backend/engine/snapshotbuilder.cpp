@@ -285,6 +285,16 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
         std::stable_sort(render.clips.begin(), render.clips.end(), [](const ClipRender& a, const ClipRender& b) {
             return a.start < b.start;
         });
+        {   // Fades as played (restMap G8): own fades plus the crossfade where audio clips overlap.
+            std::vector<FadeSpan> spans;
+            spans.reserve(render.clips.size());
+            for (const auto& c : render.clips) spans.push_back({c.start, c.length, c.fadeIn, c.fadeOut});
+            playedFades(spans);
+            for (std::size_t i = 0; i < spans.size(); ++i) {
+                render.clips[i].fadeIn = spans[i].fadeIn;
+                render.clips[i].fadeOut = spans[i].fadeOut;
+            }
+        }
 
         std::stable_sort(render.notes.begin(), render.notes.end(), [](const NoteRender& a, const NoteRender& b) {
             return a.on < b.on;

@@ -829,3 +829,41 @@ TEST(audioengine_midi, a_clips_effects_change_only_that_clips_samples)
         engine.stop();
     }
 }
+
+TEST(audioengine_midi, clip_fades_follow_an_equal_power_curve_with_and_without_clip_effects)
+{
+    // restMap G8. A constant 0.5 clip, samples 0..512: fade-in 256, fade-out 128.
+    constexpr double quarter = 1.5707963267948966;
+    for (bool multi : {false, true})
+        for (bool effected : {false, true}) {
+            AudioEngine engine{nullptr};
+            engine.deviceChanged(48000.0, 512);
+            auto audio = constantAudio(48000);
+            auto halve = std::make_shared<Halve>();
+            auto snapshot = std::make_unique<EngineSnapshot>();
+            snapshot->multiMonitor = multi;
+            snapshot->tempo.set(120.0, 4, 4, 48000.0);
+            TrackRender track;
+            track.trackId = 1;
+            ClipRender clip{audio.get(), 0, 512, 0, 256, 128, 1.0f, true};
+            if (effected) clip.chain.push_back(halve.get());   // the fade comes before the clip effects
+            track.clips.push_back(clip);
+            snapshot->tracks.push_back(std::move(track));
+            snapshot->keepProcessors.push_back(halve);
+            snapshot->keepAudio.push_back(audio);
+            engine.publishPlayback(std::move(snapshot));
+            CHECK(engine.post({EngineCommand::Type::Play}));
+            float left[512]{}, right[512]{};
+            float* out[]{left, right};
+            AudioIO io{{nullptr, 0, 0}, {out, 2, 512}, nullptr, 512};
+            engine.renderBlock(io);
+            const float level = effected ? 0.25f : 0.5f;
+            CHECK_NEAR(left[0], 0.0f, 1e-6);
+            CHECK_NEAR(left[128], float(level * std::sin(quarter * 0.5)), 1e-5);
+            CHECK_NEAR(right[300], level, 1e-5);                                   // between the fades
+            CHECK_NEAR(left[448], float(level * std::sin(quarter * 64.0 / 128.0)), 1e-5);
+            CHECK(left[511] < 0.02f * level);
+            for (int i = 1; i < 256; ++i) CHECK(left[i] >= left[i - 1]);           // only rises
+            engine.stop();
+        }
+}
