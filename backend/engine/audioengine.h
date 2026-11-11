@@ -115,6 +115,11 @@ private:
     std::atomic<std::int64_t> m_reportedPosition{0}, m_recordingStart{0}, m_countInRemaining{0};
     std::atomic<bool> m_reportedPlaying{false}, m_reportedRecording{false};
     std::int64_t m_position = 0, m_loopStart = 0, m_loopEnd = 0;
+    // Frames recorded since the take started (after any count-in), restMap G11. A take is one
+    // continuous run even when the loop wraps the playhead: its MIDI is stamped on this clock
+    // (start + frames), like the audio file, and cut into loop passes afterwards.
+    std::int64_t m_recordedFrames = 0;
+    std::int64_t recordingClock() const noexcept { return m_recordingStart.load(std::memory_order_relaxed) + m_recordedFrames; }
     std::int64_t m_countInTarget = -1;
     bool m_playing = false, m_looping = false;
     bool m_metronomeEnabled = false;

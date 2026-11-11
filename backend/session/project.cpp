@@ -534,7 +534,7 @@ bool Project::canMergeAudioClips(int trackId, int first, int second, double sour
         && a->sourceOffset+std::llround(a->length*sourceRate/m_tempo.sampleRate())==b->sourceOffset
         && a->effectsPrinted==b->effectsPrinted && a->gainDb==b->gainDb
         && a->reversed==b->reversed && a->polarityInverted==b->polarityInverted
-        && a->fadeOut==0 && b->fadeIn==0;
+        && a->takes==b->takes && a->fadeOut==0 && b->fadeIn==0;
 }
 
 bool Project::mergeAudioClips(int trackId, int first, int second, double sourceRate) {

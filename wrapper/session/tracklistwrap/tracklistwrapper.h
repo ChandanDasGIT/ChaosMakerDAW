@@ -137,8 +137,11 @@ public:
     std::shared_ptr<const AudioData> audioFor(const std::string& path) const { return m_state.audioFor(path); }
     void adoptDocument(TrackListWrapper& candidate);
     std::unique_ptr<EngineSnapshot> playbackSnapshot() const;
-    bool attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool effectsPrinted = true);
-    bool attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes);
+    // shape: loop passes and the punch range (restMap G11; TrackList::TakeShape).
+    bool attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool effectsPrinted = true,
+                    const TrackList::TakeShape& shape = TrackList::TakeShape{});
+    bool attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes,
+                        const TrackList::TakeShape& shape = TrackList::TakeShape{});
     int recordingTrackId() const;
     const Project& project() const { return m_project; }
     void setSampleRate(double rate);
@@ -250,6 +253,10 @@ public:
     // clips at startBeat on new tracks (targetTrackId < 0) or on one track; one undo step.
     std::vector<int> importAudio(const std::vector<std::shared_ptr<const AudioData>>& files, double startBeat, int targetTrackId);
     Q_INVOKABLE bool applyClipTool(const QVariantList& ids, const QString& tool);
+    // Takes (restMap G11) on clip ids, one undo step: "set" plays take `index`, "next" moves on
+    // (skipping takes that cannot play there), "delete" removes the playing take, "crop" keeps
+    // only it. Clips report "takeCount" and "activeTake". True when something changed.
+    Q_INVOKABLE bool takeAction(const QVariantList& ids, const QString& action, int index = -1);
     Q_INVOKABLE bool canMergeSelectedClips(const QVariantList& ids) const;
     Q_INVOKABLE bool mergeSelectedClips(const QVariantList& ids);
     Q_INVOKABLE bool mergeClips(int trackId, int first, int second);

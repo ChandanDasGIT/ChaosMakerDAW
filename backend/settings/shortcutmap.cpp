@@ -67,11 +67,13 @@ const std::vector<ShortcutMap::Action>& ShortcutMap::actions()
         {"transport.record", "Record", "Transport", Context::Main, "R"},
         {"transport.goToStart", "Go to start", "Transport", Context::Main, "W"},
         {"transport.tapTempo", "Tap tempo", "Transport", Context::Main, "Shift+T"},
+        {"transport.punch", "Punch on / off", "Transport", Context::Main, ""},
 
         {"timeline.split", "Split clip at the playhead", "Timeline", Context::Main, "S"},
         {"timeline.nudgeLeft", "Nudge clips left", "Timeline", Context::Main, "Left"},
         {"timeline.nudgeRight", "Nudge clips right", "Timeline", Context::Main, "Right"},
         {"timeline.envelope", "Show / hide volume envelope", "Timeline", Context::Main, "V"},
+        {"timeline.nextTake", "Next take", "Timeline", Context::Main, "Ctrl+T"},
 
         {"view.mixer", "Show / hide mixer", "View", Context::Main, "M"},
 

@@ -2529,6 +2529,69 @@ private slots:
         auto* field=visualItem(window->contentItem(),"bpmField"); QVERIFY(field);
         QTRY_COMPARE(field->property("text").toString(),QString::number(controller->bpm()));
     }
+    void clip_takes_show_on_the_clip_the_menu_picks_one_and_punch_toggles() {
+        TrackListWrapper tracks; tracks.setSampleRate(48000);
+        const int track=tracks.addAudioTrack();
+        auto audio=std::make_shared<AudioData>(); audio->path="passes.wav"; audio->sampleRate=48000; audio->frames=3*48000;
+        audio->channels={std::vector<float>(3*48000,0.2f)}; audio->buildWaveform();
+        TrackList::TakeShape shape; shape.recordStart=0; shape.loopStart=0; shape.loopEnd=48000;   // 3 passes of 2 beats
+        QVERIFY(tracks.attachTake(track,0,audio,false,shape));
+        const int clip=tracks.project().findTrack(track)->audioClips.at(0).id;
+        const auto active=[&] { return cliptakes::active(*tracks.project().findTrack(track)->audioClips.data()); };
+        QCOMPARE(active(),2);
+        auto device=std::make_unique<MultiInputUiDevice>();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        controller.attachProject(&tracks);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        const auto restore=qScopeGuard([&] {
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+            timeline->setProperty("transport",QVariant::fromValue(EngineController::instance()));
+            window->setProperty("transport",QVariant::fromValue(EngineController::instance()));
+        });
+        timeline->setProperty("transport",QVariant::fromValue(&controller));
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        window->setProperty("transport",QVariant::fromValue(&controller)); QTest::qWait(30);
+        const auto label=[&] {
+            auto* block=visualItem(timeline,"clipBlock"+QString::number(clip));
+            for(auto* child:block->childItems()) if(child->property("text").isValid()) return child->property("text").toString();
+            return QString();
+        };
+        QTRY_VERIFY(label().contains("Take 3/3"));
+
+        // The clip menu's Takes submenu lists them, the playing one ticked; picking one plays it.
+        auto* block=visualItem(timeline,"clipBlock"+QString::number(clip)); QVERIFY(block);
+        click(block);
+        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,block->mapToScene(QPointF(30,30)).toPoint());
+        QTRY_VERIFY(visualItem(window->contentItem(),"clipReverseAction")->isVisible());
+        auto* takesMenu=window->findChild<QObject*>("clipTakesMenu"); QVERIFY(takesMenu);
+        QVERIFY(takesMenu->property("title").toString().contains("3 of 3"));
+        QTest::qWait(300);
+        QMetaObject::invokeMethod(takesMenu,"open");
+        QQuickItem* first=nullptr;
+        QTRY_VERIFY((first=visualItem(window->contentItem(),"clipTake_0")) && first->isVisible());
+        QVERIFY(visualItem(window->contentItem(),"clipTake_2")->property("checked").toBool());
+        QTest::qWait(100);
+        click(first);
+        QTRY_COMPARE(active(),0);
+        QTRY_VERIFY(label().contains("Take 1/3"));
+        QCOMPARE(tracks.project().historyLabels().back(),std::string("Switch take"));
+
+        // Ctrl+T: the next take of the selected clip.
+        QTRY_VERIFY(!takesMenu->property("visible").toBool());
+        QTest::qWait(300);   // the clip menu closes too
+        block=visualItem(timeline,"clipBlock"+QString::number(clip)); QVERIFY(block);   // rebuilt on refresh
+        click(block);
+        QTest::keyClick(window,Qt::Key_T,Qt::ControlModifier);
+        QTRY_COMPARE(active(),1);
+
+        // PUNCH on the transport toggles punch recording.
+        auto* punch=visualItem(window->contentItem(),"transport_punch"); QVERIFY(punch);
+        QVERIFY(!controller.punch());
+        click(punch); QTRY_VERIFY(controller.punch());
+        QTRY_VERIFY(punch->property("active").toBool());
+        click(punch); QTRY_VERIFY(!controller.punch());
+        controller.shutdownSession();
+    }
     void clip_menu_reverses_normalises_and_inverts_audio_clips() {
         TrackListWrapper tracks; tracks.setSampleRate(48000);
         const int audioTrack=tracks.addAudioTrack(), harmonium=tracks.addInstrumentTrackOfType("Harmonium");

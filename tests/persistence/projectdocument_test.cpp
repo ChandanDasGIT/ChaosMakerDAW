@@ -572,3 +572,44 @@ TEST(projectdocument, clip_fades_round_trip_are_optional_and_validated)
     c["fadeIn"] = 20;                                                           // not a string
     CHECK(!ProjectDocument::deserialize(text.dump(), loaded, error, 48000.0));
 }
+
+TEST(projectdocument, clip_takes_round_trip_rescale_with_the_rate_and_are_optional)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    auto& track = project.addTrack(TrackKind::Audio, "Vox");
+    AudioClip clip;
+    clip.poolId = "take1";
+    clip.length = 1000;
+    MidiNote note; note.id = 1; note.note = 60; note.startBeat = 0.5; note.lengthBeats = 1; note.velocity = 90;
+    cliptakes::set(clip, {ClipTake{}, ClipTake{"take2", true, 480.0, {}}, ClipTake{"take3", false, -96.0, {note}}}, 0);
+    CHECK(project.addAudioClip(track.id, clip) > 0);
+    TrackList::MediaPaths paths{"take1", "take2"};
+    const std::string json = ProjectDocument::serialize(project, paths, {""});
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(json, loaded, error, 48000.0));
+    const auto& back = loaded.project.tracks()[0]->audioClips[0];
+    CHECK(back.takes == clip.takes);
+    CHECK(back.takes.list[1].reversed && back.takes.list[2].notes.size() == 1 && back.takes.list[2].notes[0].startBeat == 0.5);
+    CHECK(loaded.mediaPaths.contains("take2") && !loaded.mediaPaths.contains("take3"));
+    CHECK(loaded.warning.find("take2") != std::string::npos);      // its file is missing here
+
+    // Another rate: leads are project samples, so they scale like clip starts.
+    CHECK(ProjectDocument::deserialize(json, loaded, error, 96000.0));
+    CHECK(loaded.project.tracks()[0]->audioClips[0].takes.list[1].lead == 960.0);
+
+    auto text = nlohmann::json::parse(json);
+    auto& c = text["project"]["tracks"][0]["clips"][0];
+    for (auto bad : {nlohmann::json{{"active", 1}, {"list", c["takes"]["list"]}},          // active entry not null
+                     nlohmann::json{{"active", 0}, {"list", nlohmann::json::array({nullptr})}},   // one take
+                     nlohmann::json{{"active", 0}, {"list", {nullptr, {{"path", "x"}}}}},         // no lead
+                     nlohmann::json("yes")}) {
+        auto broken = text;
+        broken["project"]["tracks"][0]["clips"][0]["takes"] = bad;
+        CHECK(!ProjectDocument::deserialize(broken.dump(), loaded, error, 48000.0));
+    }
+    c.erase("takes");                                              // saved before G11
+    CHECK(ProjectDocument::deserialize(text.dump(), loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->audioClips[0].takes.list.empty());
+}

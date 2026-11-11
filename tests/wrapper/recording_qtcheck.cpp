@@ -993,3 +993,62 @@ TEST(qtrecording, audio_takes_move_earlier_by_the_reported_round_trip_plus_the_e
     CHECK(clip.start==48000); CHECK(clip.sourceOffset==0);
     controller.shutdownSession();
 }
+
+TEST(qtrecording, loop_recording_makes_takes_and_punch_keeps_only_the_time_selection) {
+    Storage storage;
+    auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
+    EngineController controller(std::move(device),false); TrackListWrapper tracks;
+    controller.attachProject(&tracks); controller.setBpm(120);
+    const int vocal=tracks.addVocalTrack(); CHECK(setCaptureAndMonitor(tracks,vocal,true));
+    tick(); io->process();
+    for(int i=0;i<128;++i) io->input[i]=0.25f;
+    const auto finish=[&] {
+        controller.transportAction("stop"); io->process();
+        for(int i=0;i<200 && controller.takeBusy();++i) tick(10);
+        CHECK(!controller.takeBusy());
+    };
+    const auto clipAt=[&](double beat) {
+        for (const auto& value : tracks.clips()) {
+            const auto clip=value.toMap();
+            if (std::abs(clip["startBeat"].toDouble()-beat)<1e-6) return clip;
+        }
+        return QVariantMap{};
+    };
+
+    // Repeat over beats 0 .. 0.5 (12000 samples), recorded from 0 for 3.2 passes (restMap G11).
+    CHECK(controller.setRepeatRange(0,0.5)); controller.transportAction("repeat"); CHECK(controller.repeating());
+    controller.seekBeat(0); io->process();
+    controller.transportAction("record"); CHECK(controller.takeBusy());
+    for(int i=0;i<300;++i) io->process();
+    CHECK(controller.repeating() && controller.positionBeats()<=0.5);   // still looping
+    finish();
+    CHECK(tracks.clips().size()==1);
+    auto clip=clipAt(0);
+    CHECK(clip["takeCount"].toInt()==3 && clip["activeTake"].toInt()==2 && std::abs(clip["lengthBeats"].toDouble()-0.5)<1e-6);
+    const QVariantList ids{clip["clipId"]};
+    CHECK(tracks.takeAction(ids,"next"));
+    CHECK(clipAt(0)["activeTake"].toInt()==0);
+    CHECK(tracks.takeAction(ids,"set",1) && clipAt(0)["activeTake"].toInt()==1);
+    CHECK(!tracks.takeAction(ids,"set",1) && !tracks.takeAction(ids,"bogus"));
+
+    // PUNCH needs a time selection.
+    controller.transportAction("repeat"); CHECK(!controller.repeating());
+    CHECK(controller.setRepeatRange(0,0));
+    controller.transportAction("punch"); CHECK(controller.punch());
+    controller.seekBeat(0); io->process();
+    controller.transportAction("record");
+    CHECK(!controller.takeBusy() && controller.transportMessage().contains("PUNCH"));
+    // Punch over beats 0.25 .. 0.5, recorded from 0: the old part becomes the first takes.
+    CHECK(controller.setRepeatRange(0.25,0.5));
+    controller.transportAction("record"); CHECK(controller.takeBusy());
+    controller.transportAction("punch"); CHECK(controller.punch());   // not while a take runs
+    for(int i=0;i<120;++i) io->process();
+    finish();
+    CHECK(tracks.clips().size()==2);
+    CHECK(clipAt(0)["takeCount"].toInt()==3);                      // the left part keeps its takes
+    const auto punched=clipAt(0.25);
+    CHECK(punched["takeCount"].toInt()==4 && punched["activeTake"].toInt()==3);
+    CHECK(std::abs(punched["lengthBeats"].toDouble()-0.25)<1e-6);
+    CHECK(tracks.takeAction({punched["clipId"]},"crop") && clipAt(0.25)["takeCount"].toInt()==1);
+    controller.shutdownSession();
+}

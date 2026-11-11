@@ -10,6 +10,7 @@ RowLayout {
     property bool playing: root.transport ? root.transport.playing : false
     property bool recording: root.transport ? root.transport.recording : false
     property bool repeating: root.transport ? root.transport.repeating : false
+    property bool punching: root.transport ? !!root.transport.punch : false
     readonly property var focusedItem: Window.window ? Window.window.activeFocusItem : null
     readonly property bool editingText: focusedItem instanceof TextInput || focusedItem instanceof TextEdit
 
@@ -36,6 +37,15 @@ RowLayout {
         onActivated: playbackBridge.transportAction("record")
     }
 
+    // Punch on / off (restMap G11; no key by default), like the button below.
+    Shortcut {
+        sequence: Shortcuts.keys["transport.punch"]
+        context: Qt.WindowShortcut
+        enabled: root.visible && root.enabled && !root.editingText && !EngineController.projectLoading
+        autoRepeat: false
+        onActivated: playbackBridge.transportAction("punch")
+    }
+
     // Go to start (restMap G16; W by default), like the button below.
     Shortcut {
         sequence: Shortcuts.keys["transport.goToStart"]
@@ -53,7 +63,10 @@ RowLayout {
             {glyph: Icons.play, hintText: "Play" + (Shortcuts.texts["transport.playPause"] ? " (" + Shortcuts.texts["transport.playPause"] + ")" : ""), command: "play"},
             {glyph: Icons.pause, hintText: "Pause" + (Shortcuts.texts["transport.playPause"] ? " (" + Shortcuts.texts["transport.playPause"] + ")" : ""), command: "pause"},
             {glyph: Icons.stop, hintText: "Stop", command: "stop"},
-            {glyph: Icons.loop, hintText: "Toggle repeat", command: "repeat"}
+            {glyph: Icons.loop, hintText: "Toggle repeat", command: "repeat"},
+            {glyph: Icons.punch, hintText: "Punch in / out: record only inside the time selection"
+                                           + (Shortcuts.texts["transport.punch"] ? " (" + Shortcuts.texts["transport.punch"] + ")" : ""),
+             command: "punch"}
         ]
         delegate: ToolButton {
             id: transportButton
@@ -64,7 +77,8 @@ RowLayout {
             required property string command
             readonly property bool active: command === "record" ? root.recording || (root.transport && root.transport.countingIn)
                                          : command === "play" ? root.playing && !root.recording
-                                         : command === "repeat" ? root.repeating : false
+                                         : command === "repeat" ? root.repeating
+                                         : command === "punch" ? root.punching : false
             text: glyph
             Accessible.name: hintText
             Layout.preferredWidth: index < 2 ? 42 : 36

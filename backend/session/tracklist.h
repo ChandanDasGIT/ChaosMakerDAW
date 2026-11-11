@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 
 #include <optional>
 
@@ -34,6 +35,7 @@ public:
         // Fades as played, in beats (restMap G8): the clip's own plus the automatic crossfade
         // where audio clips overlap. Audio clips only; 0 for pattern clips.
         double fadeInBeats = 0.0, fadeOutBeats = 0.0;
+        int takeCount = 1, activeTake = 0;   // restMap G11
     };
     struct ClipboardClip {
         std::string poolId;
@@ -47,6 +49,7 @@ public:
         bool reversed = false;
         bool polarityInverted = false;
         EffectState fx;   // clip effects (restMap R2)
+        ClipTakes takes;  // the other takes (restMap G11)
         int trackOffset = 0;
         std::vector<MidiNote> notes; // origin-relative, as stored in AudioClip
     };
@@ -89,6 +92,15 @@ public:
     bool canHaveClipEffects(int clipId) const;
     bool canApplyClipTool(const std::vector<int>& ids) const;
     Change applyClipTool(const std::vector<int>& ids, ClipTool tool);
+    // Takes (restMap G11), each one undo step over the given clips; clips with one take are left
+    // alone. setActiveTake plays take `index` (where that take reaches the clip's start);
+    // nextTake moves each clip on to its next take (after the last: the first); deleteActiveTake
+    // removes the playing take (the next one plays); cropToActiveTake keeps only the playing
+    // one. Refused while recording; {true, false} when nothing changed.
+    Change setActiveTake(const std::vector<int>& ids, int index);
+    Change nextTake(const std::vector<int>& ids);
+    Change deleteActiveTake(const std::vector<int>& ids);
+    Change cropToActiveTake(const std::vector<int>& ids);
     std::shared_ptr<const AudioData> audioFor(const std::string& path) const;
     void replaceDocument(Project project, AudioMap audio, MediaPaths paths);
     void adoptDocument(TrackList&& candidate);
@@ -250,8 +262,30 @@ public:
     void setSampleRate(double rate);
     // start may be below 0 after latency compensation (restMap G10): the part before 0 is trimmed
     // off the front (the clip starts later in its file).
-    bool attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool printed);
-    bool attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes);
+    //
+    // How a recording lands (restMap G11), in project samples. recordStart: where the playhead
+    // was when recording began. Loop (loopEnd > loopStart): it ran over the repeat loop; every
+    // complete pass becomes a take of one clip spanning the loop, the last one playing (a pass
+    // started before the loop counts from the loop start); with no complete pass the half-pass
+    // is kept as it was recorded. Punch (punchTo > punchFrom): only what lies inside is kept;
+    // when the range sits inside one clip of the same kind, that clip is split there and its
+    // old part becomes the first take under the new one, otherwise what was there is replaced.
+    // Without either: the clip goes where it was recorded, as before. One undo step.
+    struct TakeShape {
+        std::int64_t recordStart = 0;
+        std::int64_t loopStart = 0, loopEnd = 0;
+        std::int64_t punchFrom = 0, punchTo = 0;
+        bool loops() const noexcept { return loopEnd > loopStart; }
+        bool punches() const noexcept { return punchTo > punchFrom; }
+    };
+    bool attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool printed,
+                    const TakeShape& shape);
+    bool attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool printed)
+    { return attachTake(trackId, start, std::move(audio), printed, TakeShape{}); }
+    bool attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes,
+                        const TakeShape& shape);
+    bool attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes)
+    { return attachMidiTake(trackId, start, length, std::move(notes), TakeShape{}); }
 
 private:
     // After a track is removed: if it was selected, select the track that took its row.
@@ -259,10 +293,18 @@ private:
     double offsetBeats(const AudioClip& clip) const;
     // Time selection helpers (restMap G15), in project samples.
     double sourceRatio(const AudioClip& clip) const;   // file frames per project sample
+    double takeRatio(const std::string& poolId, bool reversed) const;   // the same for a take
+    Change editTakes(const std::vector<int>& ids, const std::function<bool(AudioClip&)>& edit);
     // The part of a clip in [from, to): offset, fades (kept only on the clip's own edges) and
     // pattern notes (those starting in it) follow; the id stays.
     AudioClip clipPiece(const AudioClip& clip, std::int64_t from, std::int64_t to) const;
     std::vector<AudioClip> clipsWithoutSpan(const Track& track, std::int64_t from, std::int64_t to, bool ripple);
+    // Where a recording's takes go (restMap G11): the unwrapped start of each kept pass (the
+    // last plays), where they play and for how long. Empty passes: nothing to keep.
+    struct TakeLayout { std::vector<double> passFrom; double at = 0, length = 0; };
+    static TakeLayout takeLayout(double start, double length, const TakeShape& shape);
+    // Puts a recorded clip on the track as TakeShape describes for a punch (one undo step).
+    bool placeRecorded(int trackId, AudioClip clip, bool punch);
     std::vector<AudioClip> clipsWithSpace(const std::vector<AudioClip>& clips, std::int64_t at, std::int64_t length);
     static automation::VolumeEnvelope envelopeWithoutSpan(const automation::VolumeEnvelope& envelope, std::int64_t from, std::int64_t to, bool ripple);
     static automation::VolumeEnvelope envelopeWithSpace(const automation::VolumeEnvelope& envelope, std::int64_t at, std::int64_t length);
