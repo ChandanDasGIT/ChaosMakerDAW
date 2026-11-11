@@ -63,6 +63,31 @@ std::optional<std::int64_t> sampleAtBeat(const TempoMap& tempo, double beat)
 }
 
 namespace {
+// Names the undo step an action adds (restMap G16): when the action ends, by whichever return,
+// the step it added (if any) gets this name. Actions that call others (Cut calls Delete) name
+// the step last, so the outer name wins. Labels are string literals.
+class StepName {
+public:
+    StepName(Project& project, const char* label) : m_project(project), m_steps(project.stepCount()), m_label(label) {}
+    ~StepName() { if (m_project.stepCount() != m_steps) m_project.setLastStepLabel(m_label); }
+    StepName(const StepName&) = delete;
+    StepName& operator=(const StepName&) = delete;
+private:
+    Project& m_project;
+    std::uint64_t m_steps;
+    const char* m_label;
+};
+
+const char* clipEditLabel(const std::string& operation, bool one)
+{
+    if (operation == "move") return one ? "Move clip" : "Move clips";
+    if (operation == "delete") return one ? "Delete clip" : "Delete clips";
+    if (operation == "trimStart") return one ? "Trim clip" : "Trim clips";
+    return one ? "Resize clip" : "Resize clips";
+}
+} // namespace
+
+namespace {
 constexpr std::string_view reversedSuffix = "\x1freversed";
 }
 
@@ -149,6 +174,7 @@ bool TrackList::canApplyClipTool(const std::vector<int>& ids) const
 
 TrackList::Change TrackList::applyClipTool(const std::vector<int>& ids, ClipTool tool)
 {
+    const StepName step(m_project, tool == ClipTool::Reverse ? "Reverse" : tool == ClipTool::InvertPolarity ? "Invert polarity" : "Normalise");
     if (!canApplyClipTool(ids)) return {};
     std::vector<Project::ClipChange> changes;
     for (const auto& track : m_project.tracks()) {
@@ -590,6 +616,7 @@ int TrackList::addClipAtBeat(int trackId, double startBeat, double lengthBeats)
 
 int TrackList::addPatternClipAtBeat(int trackId, double startBeat, double lengthBeats, std::vector<MidiNote> notes)
 {
+    const StepName step(m_project, "Add pattern clip");
     if (editsLocked() || !m_project.findTrack(trackId)) return -1;
     if (!std::isfinite(startBeat) || !std::isfinite(lengthBeats) || startBeat < 0.0 || lengthBeats <= 0.0)
         return -1;
@@ -643,6 +670,7 @@ int TrackList::splitClipAtBeat(int trackId, int clipId, double beat) {
 }
 
 TrackList::Change TrackList::editClips(const std::vector<int>& ids, const std::string& operation, double deltaBeats, int laneDelta) {
+    const StepName step(m_project, clipEditLabel(operation, ids.size() == 1));
     if (!m_recordingTracks.empty() || ids.empty() || !std::isfinite(deltaBeats)
         || (operation!="move" && operation!="delete" && operation!="trimStart" && operation!="resize")) return {};
     const double samples=deltaBeats*60*m_project.tempo().sampleRate()/m_project.tempo().bpm();
@@ -714,6 +742,7 @@ bool TrackList::canMergeSelectedClips(const std::vector<int>& ids) const {
 }
 
 bool TrackList::mergeSelectedClips(const std::vector<int>& ids) {
+    const StepName step(m_project, "Merge clips");
     if (!canMergeSelectedClips(ids)) return false;
     std::vector<AudioClip> clips; int trackId=-1;
     for (const auto& track:m_project.tracks()) for (const auto& clip:track->audioClips)
@@ -781,6 +810,7 @@ TrackList::Change TrackList::setClipGain(int trackId, int clipId, double gainDb,
 
 TrackList::Change TrackList::setClipFade(int trackId, int clipId, bool fadeOut, double beats, bool continueEdit)
 {
+    const StepName step(m_project, fadeOut ? "Fade out" : "Fade in");
     if (editsLocked() || !std::isfinite(beats)) return {};
     const auto* clip = findClip(trackId, clipId);
     if (!clip || isPatternClip(*clip)) return {};
@@ -868,6 +898,7 @@ bool TrackList::copyClips(const std::vector<int>& ids)
 
 std::vector<int> TrackList::cutClips(const std::vector<int>& ids, bool ripple)
 {
+    const StepName step(m_project, "Cut");
     if (editsLocked() || ids.empty()) return {};
     if (!copyClips(ids)) return {};
     if (!deleteClips(ids, ripple)) {
@@ -879,6 +910,7 @@ std::vector<int> TrackList::cutClips(const std::vector<int>& ids, bool ripple)
 
 std::vector<int> TrackList::pasteClips(int targetTrackId, double targetBeat, bool ripple)
 {
+    const StepName step(m_project, "Paste");
     if (!hasClipboard() || editsLocked() || count() == 0) return {};
     if (!std::isfinite(targetBeat) || targetBeat < 0.0) targetBeat = 0.0;
     int targetRow = indexOfTrack(targetTrackId);
@@ -918,6 +950,7 @@ std::vector<int> TrackList::pasteClips(int targetTrackId, double targetBeat, boo
 
 std::vector<int> TrackList::duplicateClips(const std::vector<int>& ids, double beatOffset, bool ripple)
 {
+    const StepName step(m_project, "Duplicate");
     if (editsLocked() || ids.empty() || count() == 0) return {};
     struct FoundClip {
         int trackId;
@@ -1133,6 +1166,7 @@ void TrackList::setSampleRate(double rate)
 std::vector<int> TrackList::importAudio(const std::vector<std::shared_ptr<const AudioData>>& files, double startBeat,
                                         int targetTrackId, std::vector<int>* newTrackIds)
 {
+    const StepName step(m_project, "Import audio");
     std::vector<int> clips;
     const auto start = sampleAtBeat(m_project.tempo(), startBeat);
     if (editsLocked() || files.empty() || !start) return clips;
@@ -1164,6 +1198,7 @@ std::vector<int> TrackList::importAudio(const std::vector<std::shared_ptr<const 
 
 bool TrackList::attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool effectsPrinted)
 {
+    const StepName step(m_project, "Record");
     if (!audio || audio->frames <= 0 || !std::isfinite(audio->sampleRate) || audio->sampleRate <= 0
         || !m_project.findTrack(trackId)) return false;
     const double length = audio->frames * m_project.tempo().sampleRate() / audio->sampleRate;
@@ -1184,6 +1219,7 @@ bool TrackList::attachTake(int trackId, std::int64_t start, std::shared_ptr<cons
 
 bool TrackList::attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes)
 {
+    const StepName step(m_project, "Record MIDI");
     if (length <= 0 || !m_project.findTrack(trackId)) return false;
     AudioClip clip;
     clip.poolId = "Clip " + std::to_string(m_nextClipNumber++);
@@ -1428,6 +1464,7 @@ bool TrackList::copyRange(double startBeat, double endBeat)
 
 TrackList::Change TrackList::deleteRange(double startBeat, double endBeat, bool ripple)
 {
+    const StepName step(m_project, ripple ? "Ripple delete range" : "Delete range");
     if (editsLocked()) return {};
     const auto from = sampleAtBeat(m_project.tempo(), startBeat);
     const auto to = sampleAtBeat(m_project.tempo(), endBeat);
@@ -1441,6 +1478,7 @@ TrackList::Change TrackList::deleteRange(double startBeat, double endBeat, bool 
 
 TrackList::Change TrackList::cutRange(double startBeat, double endBeat, bool ripple)
 {
+    const StepName step(m_project, ripple ? "Ripple cut range" : "Cut range");
     if (editsLocked() || !std::isfinite(startBeat) || !std::isfinite(endBeat) || endBeat <= startBeat) return {};
     const auto clipboard = m_clipboard;
     const auto envelopes = m_clipboardEnvelopes;
@@ -1455,6 +1493,7 @@ TrackList::Change TrackList::cutRange(double startBeat, double endBeat, bool rip
 
 TrackList::Change TrackList::deleteClips(const std::vector<int>& ids, bool ripple)
 {
+    const StepName step(m_project, ripple ? (ids.size() == 1 ? "Ripple delete clip" : "Ripple delete clips") : (ids.size() == 1 ? "Delete clip" : "Delete clips"));
     if (!ripple) return editClips(ids, "delete", 0);
     if (editsLocked() || ids.empty()) return {};
     // Per track: the deleted clips go, and each span they covered closes up (later clips and

@@ -21,7 +21,7 @@ RowLayout {
     }
 
     Shortcut {
-        sequence: "Space"
+        sequence: Shortcuts.keys["transport.playPause"]
         context: Qt.WindowShortcut
         enabled: root.visible && root.enabled && !root.editingText && !EngineController.projectLoading
         autoRepeat: false
@@ -29,20 +29,29 @@ RowLayout {
     }
 
     Shortcut {
-        sequence: "R"
+        sequence: Shortcuts.keys["transport.record"]
         context: Qt.WindowShortcut
         enabled: root.visible && root.enabled && !root.editingText && !EngineController.projectLoading
         autoRepeat: false
         onActivated: playbackBridge.transportAction("record")
     }
 
+    // Go to start (restMap G16; W by default), like the button below.
+    Shortcut {
+        sequence: Shortcuts.keys["transport.goToStart"]
+        context: Qt.WindowShortcut
+        enabled: root.visible && root.enabled && !root.editingText && !EngineController.projectLoading
+        autoRepeat: false
+        onActivated: playbackBridge.transportAction("rewind")
+    }
+
     Repeater {
         model: [
-            {glyph: Icons.goToStart, hintText: "Go to start", command: "rewind"},
+            {glyph: Icons.goToStart, hintText: "Go to start" + (Shortcuts.texts["transport.goToStart"] ? " (" + Shortcuts.texts["transport.goToStart"] + ")" : ""), command: "rewind"},
             {glyph: Icons.skipForward, hintText: "Skip forward one bar", command: "forward"},
-            {glyph: Icons.record, hintText: "Start/stop recording (R)", command: "record"},
-            {glyph: Icons.play, hintText: "Play (Space)", command: "play"},
-            {glyph: Icons.pause, hintText: "Pause (Space)", command: "pause"},
+            {glyph: Icons.record, hintText: "Start/stop recording" + (Shortcuts.texts["transport.record"] ? " (" + Shortcuts.texts["transport.record"] + ")" : ""), command: "record"},
+            {glyph: Icons.play, hintText: "Play" + (Shortcuts.texts["transport.playPause"] ? " (" + Shortcuts.texts["transport.playPause"] + ")" : ""), command: "play"},
+            {glyph: Icons.pause, hintText: "Pause" + (Shortcuts.texts["transport.playPause"] ? " (" + Shortcuts.texts["transport.playPause"] + ")" : ""), command: "pause"},
             {glyph: Icons.stop, hintText: "Stop", command: "stop"},
             {glyph: Icons.loop, hintText: "Toggle repeat", command: "repeat"}
         ]

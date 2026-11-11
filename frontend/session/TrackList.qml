@@ -665,7 +665,7 @@ Rectangle {
         contentItem: Text {
             text: "Delete \u201c" + removeTrackDialog.trackName + "\u201d and its " + removeTrackDialog.clipCount
                   + (removeTrackDialog.clipCount === 1 ? " clip" : " clips")
-                  + "?\nYou can bring it back with Undo (Ctrl+Z)."
+                  + "?\nYou can bring it back with Undo" + (Shortcuts.texts["edit.undo"] ? " (" + Shortcuts.texts["edit.undo"] + ")" : "") + "."
             color: Theme.text
             wrapMode: Text.WordWrap
             padding: 16

@@ -16,7 +16,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 NEXT UP (2026-11-10), the user's order:
   1. G6 volume envelope committed (0597318); G6b curve shapes committed (758f523).
   2. G9, G17, G14 committed (33ef5cc). R2 clip effects committed (e3b3d42).
-     Then import / export (item 6, done first at the user's request). G8 fades committed. G10 latency committed. G15 time selection + ripple committed. Next: G16,
+     Then import / export (item 6, done first at the user's request). G8 fades committed. G10 latency committed. G15 time selection + ripple committed. G16 shortcuts + undo history DONE (uncommitted). Next:
      G11, G13, G12. Later option: "render clip effects into the audio" (Reaper's apply FX).
   3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
      reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
@@ -425,7 +425,39 @@ Done items stay further down as the record.
         projectactions 7, appsettings 8, projectdocument 16, qtclipediting 16, 70 timeline /
         clip / edit / menu UI tests (91 cases) offscreen; app log empty (empty profile and a
         session copy).
-[ ] G16 Customisable keyboard shortcuts, and an undo history list to click back through.
+[x] G16 Customisable keyboard shortcuts and an undo history list. DONE 2026-11-11 (uncommitted).
+        The user's choices: history as a popup from the Edit menu; every app-wide shortcut
+        rebindable (Escape, Return / Enter, Tab stay fixed; the typing keyboard claims its note keys
+        first while KEYS is on, so W / R / Q play notes then); the editor opened from a "Keyboard
+        Shortcuts" section in Preferences (Preferences does not scroll, so the list is its own
+        popup). New keys asked: W = go to start, Space = play / pause (was so; now rebindable).
+        - Undo names: Project ClipEdit::label (string literal), historyLabels(), historySize(),
+          stepCount() (grows forever; history capped at 100), setLastStepLabel(); every new step
+          goes through pushHistory. TrackList's StepName guard names an action's step on any
+          return (outer action wins: Cut, Paste, Duplicate, Ripple delete range, Record, ...).
+        - TrackListWrapper undoHistory / undoPosition (undoHistoryChanged only when the history
+          changes) and jumpToHistory(n) (repeats undo() / redo(), so rows refresh as before).
+        - frontend/window/UndoHistory.qml: "Start" + one row per step, current highlighted,
+          undone greyed, click jumps, stays open; Edit menu "Undo History…" and Ctrl+Alt+Z.
+        - backend/settings/shortcutmap: 28 actions (id, name, group, context Main / PianoRoll,
+          default), normalise() ("ctrl+shift+s" -> "Ctrl+Shift+S", Qt portable names: Del, Esc,
+          PgUp), conflicts within a context (the piano roll's Delete may share the key), set()
+          takes the key from the other action (left with none), reset / resetAll, changes() /
+          loadChanges() for saving.
+        - wrapper/settings/shortcutswrap: the `Shortcuts` singleton (keys, texts, actions,
+          actionCount, keyFromEvent, isAllowed, conflicts, set, reset, resetAll); saved in
+          QSettings "shortcuts/<id>" (changes only, "" = no key).
+        - Every Shortcut {} reads Shortcuts.keys[...]; menus and tooltips show Shortcuts.texts.
+          frontend/settings/ShortcutEditor.qml: by group, click a key and press the new one, a
+          used key asks (Assign / Cancel), "No key", Reset per row, Reset all; Esc cancels.
+        Tests: backendtests tracklist every_undo_step_has_a_name..., shortcutmap (4); wrappertests
+        qtclipediting the_undo_history_lists_steps..., qtshortcuts (2); transport_ui
+        undo_history_lists_the_steps..., w_goes_to_start_and_the_shortcut_editor_changes_keys.
+        65 keyboard / menu UI tests run offscreen: all pass except two that fail only after
+        ctrl_shift_s_opens_save_as (decimal_bpm_and_decimal_comma_commit_on_enter,
+        desk_faders_have_a_slot_ticks_and_a_metal_cap; both pass alone). That order dependence is
+        older than G16 (it fails with the old ProjectActions.qml too): open, not fixed.
+        App log empty (empty profile, and a profile with changed and cleared keys).
 [x] G17 Tap tempo. DONE 2026-11-11 (uncommitted). A TAP chip beside the BPM box and Shift+T
         (plain T plays a note with the typing keyboard on). backend/tempo/taptempo: the average
         of up to 8 intervals, a pause over 2 s starts a new count, a gap 25 % off the average is

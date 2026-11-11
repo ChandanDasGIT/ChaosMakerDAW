@@ -83,6 +83,10 @@ ToolButton {
         }
     }
 
+    ShortcutEditor {
+        id: shortcutEditor
+    }
+
     Popup {
         id: preferencesPopup
         objectName: "preferencesPopup"
@@ -373,6 +377,30 @@ ToolButton {
                         leftPadding: windowRadio.indicator.width + 6
                         verticalAlignment: Text.AlignVCenter
                     }
+                }
+            }
+
+            // Keyboard shortcuts (restMap G16): the editor opens over Preferences.
+            Text {
+                text: "Keyboard Shortcuts"
+                color: Theme.text
+                font.pixelSize: Theme.bodySize
+                font.bold: true
+            }
+
+            RowLayout {
+                spacing: 8
+                Text {
+                    Layout.fillWidth: true
+                    text: "Change the key of any action, or put them all back."
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.smallSize
+                    wrapMode: Text.WordWrap
+                }
+                PanelButton {
+                    objectName: "editShortcutsButton"
+                    text: "Edit shortcuts…"
+                    onClicked: shortcutEditor.open()
                 }
             }
         }

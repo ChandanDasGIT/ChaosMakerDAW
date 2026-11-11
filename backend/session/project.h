@@ -206,6 +206,16 @@ public:
     std::optional<TrackChange> undoRestoresTrack() const;
     std::optional<TrackChange> redoRemovesTrack() const;
     void clearHistory() { m_history.clear(); m_historyPosition = 0; }
+    // The undo history's step names, oldest first (restMap G16). historyMark() of them are
+    // done; the ones after it are undone. At most 100 steps are kept.
+    std::vector<std::string> historyLabels() const;
+    // How many steps were ever added: a counter that only grows (the history is capped, so its
+    // size cannot tell). A caller compares it before and after to see whether a step was added.
+    std::uint64_t stepCount() const noexcept { return m_stepCount; }
+    std::size_t historySize() const noexcept { return m_history.size(); }
+    // Renames the newest step while it is the current one, for an action made of several calls
+    // (e.g. "Paste"). The label is kept as a pointer: pass a string literal. False otherwise.
+    bool setLastStepLabel(const char* label) noexcept;
     // Several steps since `mark` (a history size taken before) become one step that added the
     // tracks `ids` (an import, restMap E2): undo removes them with their clips, redo puts them
     // back. False, and nothing changes, for no ids or a mark past the history.
@@ -245,14 +255,16 @@ private:
         // their rows so redo can put them back.
         std::vector<int> addedTrackIds;
         std::vector<std::pair<std::size_t, Track>> addedTracks;
+        const char* label = "Edit";   // the step's name in the undo history (G16)
     };
     void pushHistory(ClipEdit edit);
     std::size_t indexOfTrack(int id) const;
-    void rememberClipEdit(int trackId, std::vector<AudioClip> before);
+    void rememberClipEdit(int trackId, std::vector<AudioClip> before, const char* label);
     void restoreClips(int trackId, std::vector<AudioClip> clips);
-    void rememberEnvelopeEdit(int trackId, automation::VolumeEnvelope before, int movedPoint = -1);
+    void rememberEnvelopeEdit(int trackId, automation::VolumeEnvelope before, const char* label, int movedPoint = -1);
     std::vector<ClipEdit> m_history;
     std::size_t m_historyPosition = 0;
+    std::uint64_t m_stepCount = 0;
     std::vector<std::unique_ptr<Track>> m_tracks;
     Track m_master;
     TempoMap m_tempo;

@@ -62,18 +62,25 @@ Item {
         onAboutToHide: contentLayout.forceActiveFocus()
 
         Shortcut {
-            sequence: "Space"
+            sequence: Shortcuts.keys["transport.playPause"]
             context: Qt.WindowShortcut
             enabled: quickSettingsPopup.visible && !root.editingText && !EngineController.projectLoading
             autoRepeat: false
             onActivated: root.transportAction(root.transport.playing ? "pause" : "play")
         }
         Shortcut {
-            sequence: "R"
+            sequence: Shortcuts.keys["transport.record"]
             context: Qt.WindowShortcut
             enabled: quickSettingsPopup.visible && !root.editingText && !EngineController.projectLoading
             autoRepeat: false
             onActivated: root.transportAction("record")
+        }
+        Shortcut {
+            sequence: Shortcuts.keys["transport.goToStart"]
+            context: Qt.WindowShortcut
+            enabled: quickSettingsPopup.visible && !root.editingText && !EngineController.projectLoading
+            autoRepeat: false
+            onActivated: root.transportAction("rewind")
         }
 
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent

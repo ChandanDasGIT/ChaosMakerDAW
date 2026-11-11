@@ -81,17 +81,17 @@ Item {
     readonly property bool keyboardActive: visible && activeFocus
 
     Shortcut {
-        sequence: "Delete"
+        sequence: Shortcuts.keys["pianoroll.delete"]
         enabled: root.keyboardActive
         onActivated: pianoRollBackend.deleteSelected()
     }
     Shortcut {
-        sequence: "Backspace"
+        sequence: Shortcuts.keys["pianoroll.deleteAlt"]
         enabled: root.keyboardActive
         onActivated: pianoRollBackend.deleteSelected()
     }
     Shortcut {
-        sequence: "Ctrl+A"
+        sequence: Shortcuts.keys["pianoroll.selectAll"]
         enabled: root.keyboardActive
         onActivated: pianoRollBackend.selectAll()
     }
@@ -101,7 +101,7 @@ Item {
         onActivated: pianoRollBackend.clearSelection()
     }
     Shortcut {
-        sequence: "Q"
+        sequence: Shortcuts.keys["pianoroll.quantize"]
         enabled: root.keyboardActive
         onActivated: root.quantizeNotes()
     }
@@ -393,7 +393,7 @@ Item {
                     Accessible.role: Accessible.Button; Accessible.name: "Quantize"
                     MouseArea { id: qHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.quantizeNotes() }
                     ToolTip.visible: qHover.containsMouse
-                    ToolTip.text: "Quantize note starts to the Grid (Q) · selected notes, or all if none selected"
+                    ToolTip.text: "Quantize note starts to the Grid" + (Shortcuts.texts["pianoroll.quantize"] ? " (" + Shortcuts.texts["pianoroll.quantize"] + ")" : "") + " · selected notes, or all if none selected"
                 }
 
                 // Undo/redo use the project history (note edits are undoable steps there)
@@ -407,7 +407,7 @@ Item {
                     Text { anchors.centerIn: parent; text: Icons.undo; color: Theme.pianoRoll.text; font.pixelSize: 13 }
                     Accessible.role: Accessible.Button; Accessible.name: "Undo"
                     MouseArea { id: undoHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.trackModel.undo() }
-                    ToolTip.visible: undoHover.containsMouse; ToolTip.text: "Undo (Ctrl+Z)"
+                    ToolTip.visible: undoHover.containsMouse; ToolTip.text: "Undo" + (Shortcuts.texts["edit.undo"] ? " (" + Shortcuts.texts["edit.undo"] + ")" : "")
                 }
 
                 Rectangle {
@@ -420,7 +420,7 @@ Item {
                     Text { anchors.centerIn: parent; text: Icons.redo; color: Theme.pianoRoll.text; font.pixelSize: 13 }
                     Accessible.role: Accessible.Button; Accessible.name: "Redo"
                     MouseArea { id: redoHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.trackModel.redo() }
-                    ToolTip.visible: redoHover.containsMouse; ToolTip.text: "Redo (Ctrl+Shift+Z)"
+                    ToolTip.visible: redoHover.containsMouse; ToolTip.text: "Redo" + (Shortcuts.texts["edit.redo"] ? " (" + Shortcuts.texts["edit.redo"] + ")" : "")
                 }
 
                 Item { Layout.fillWidth: true }
@@ -1169,8 +1169,8 @@ Item {
                     Repeater {
                         model: [
                             { text: Icons.goToStart, tt: "Go to start", command: "rewind" },
-                            { text: Icons.play, tt: "Play (Space)", command: "play" },
-                            { text: Icons.pause, tt: "Pause (Space)", command: "pause" },
+                            { text: Icons.play, tt: "Play" + (Shortcuts.texts["transport.playPause"] ? " (" + Shortcuts.texts["transport.playPause"] + ")" : ""), command: "play" },
+                            { text: Icons.pause, tt: "Pause" + (Shortcuts.texts["transport.playPause"] ? " (" + Shortcuts.texts["transport.playPause"] + ")" : ""), command: "pause" },
                             { text: Icons.stop, tt: "Stop", command: "stop" },
                             { text: Icons.skipForward, tt: "Skip forward one bar", command: "forward" }
                         ]

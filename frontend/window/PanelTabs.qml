@@ -60,7 +60,7 @@ Rectangle {
             objectName: "mixerTab"
             text: "Mixer"
             shown: root.mixerShown
-            hint: root.mixerShown ? "Hide the mixer (M)" : "Show the mixer (M)"
+            hint: (root.mixerShown ? "Hide the mixer" : "Show the mixer") + (Shortcuts.texts["view.mixer"] ? " (" + Shortcuts.texts["view.mixer"] + ")" : "")
             Accessible.name: "Mixer panel"
             onClicked: root.toggleMixerRequested()
         }

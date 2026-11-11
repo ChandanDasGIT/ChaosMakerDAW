@@ -391,3 +391,38 @@ TEST(qtclipediting, range_edits_refresh_clips_and_envelopes_and_ripple_reaches_p
     CHECK(pasted.size()==1); CHECK(std::abs(startOf(later)-7.0)<1e-9);
     CHECK(tracks.deleteClips({later},true)); CHECK(startOf(later)<0);
 }
+
+TEST(qtclipediting, the_undo_history_lists_steps_and_jumps_back_and_forth_through_them) {
+    TrackListWrapper tracks;
+    const int a = tracks.addAudioTrack(), b = tracks.addVocalTrack();
+    int announced = 0, inserted = -1;
+    QObject::connect(&tracks, &TrackListWrapper::undoHistoryChanged, [&] { ++announced; });
+    QObject::connect(&tracks, &QAbstractItemModel::rowsInserted, [&](const QModelIndex&, int first, int) { inserted = first; });
+    const int clip = tracks.addClipAtBeat(a, 0, 4);
+    CHECK(tracks.moveClipAtBeat(a, clip, 2));
+    CHECK(tracks.removeTrack(b));
+    CHECK(tracks.undoHistory() == (QStringList{"Add clip", "Move clip", "Delete track"}));
+    CHECK(tracks.undoPosition() == 3 && announced >= 3);
+
+    // Back to before the move: the track comes back as its own row, the clip at its old place.
+    announced = 0;
+    CHECK(tracks.jumpToHistory(1));
+    CHECK(tracks.undoPosition() == 1 && announced >= 1 && inserted == 1 && tracks.count() == 2);
+    CHECK(tracks.project().findTrack(a)->audioClips[0].start == 0);
+    CHECK(tracks.undoHistory().size() == 3);                       // undone steps stay listed
+    // Forward again, all the way, and to the very start.
+    CHECK(tracks.jumpToHistory(3) && tracks.count() == 1 && tracks.project().findTrack(a)->audioClips[0].start == 48000);
+    CHECK(tracks.jumpToHistory(0) && tracks.project().findTrack(a)->audioClips.empty() && tracks.count() == 2);
+    CHECK(!tracks.jumpToHistory(4) && !tracks.jumpToHistory(-1) && tracks.undoPosition() == 0);
+
+    // A new step after jumping back drops the undone ones.
+    CHECK(tracks.jumpToHistory(1));
+    CHECK(tracks.setClipGain(a, clip, -6.0));
+    CHECK(tracks.undoHistory() == (QStringList{"Add clip", "Clip gain"}) && tracks.undoPosition() == 2);
+
+    // Not while recording.
+    tracks.lockRecordingTrack(a);
+    CHECK(!tracks.jumpToHistory(0) && tracks.undoPosition() == 2);
+    tracks.lockRecordingTrack(-1);
+    CHECK(tracks.jumpToHistory(0));
+}
