@@ -6,6 +6,9 @@
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
+#if defined(__GLIBC__)
+#include <malloc.h>
+#endif
 
 namespace drumkit {
 
@@ -111,6 +114,11 @@ void Library::request(std::weak_ptr<Sampler> target, const Settings& settings)
             return !job.target.owner_before(target) && !target.owner_before(job.target);
         };
         std::erase_if(m_jobs, same);
+        std::erase_if(m_targets, [](const auto& known) { return known.expired(); });
+        const auto known = [&target](const std::weak_ptr<Sampler>& other) {
+            return !other.owner_before(target) && !target.owner_before(other);
+        };
+        if (std::none_of(m_targets.begin(), m_targets.end(), known)) m_targets.push_back(target);
         m_jobs.push_back({std::move(target), settings});
     }
     m_wake.notify_all();
@@ -132,6 +140,48 @@ void Library::waitUntilIdle()
 {
     std::unique_lock lock(m_mutex);
     m_idle.wait(lock, [this] { return m_jobs.empty() && !m_busy; });
+}
+
+void Library::trimSoon()
+{
+    {
+        std::lock_guard lock(m_mutex);
+        m_trimRequested = true;
+    }
+    m_wake.notify_all();
+}
+
+int Library::trim()
+{
+    std::lock_guard build(m_buildMutex);
+    std::vector<std::weak_ptr<Sampler>> targets;
+    {
+        std::lock_guard lock(m_mutex);
+        std::erase_if(m_targets, [](const auto& known) { return known.expired(); });
+        targets = m_targets;
+    }
+    for (const auto& target : targets)
+        if (auto sampler = target.lock()) sampler->collectRetired();
+    int dropped = 0;
+    {
+        std::lock_guard cacheLock(m_cache->mutex);
+        // Only the cache holds a sample no zone uses (zones are built under m_buildMutex).
+        dropped = int(std::erase_if(m_cache->entries, [](const auto& entry) {
+            return entry.second.audio && entry.second.audio.use_count() == 1;
+        }));
+    }
+#if defined(__GLIBC__)
+    // glibc keeps freed memory for later; a room's samples are hundreds of MB: give them back.
+    if (dropped > 0) malloc_trim(0);
+#endif
+    return dropped;
+}
+
+int Library::cachedSamples() const
+{
+    std::lock_guard cacheLock(m_cache->mutex);
+    return int(std::count_if(m_cache->entries.begin(), m_cache->entries.end(),
+                             [](const auto& entry) { return bool(entry.second.audio); }));
 }
 
 bool Library::loadKit()
@@ -162,17 +212,33 @@ void Library::run()
         Job job;
         {
             std::unique_lock lock(m_mutex);
-            m_wake.wait(lock, [this] { return m_stop || !m_jobs.empty(); });
+            const auto woken = [this] { return m_stop || !m_jobs.empty() || m_trimRequested; };
+            const bool timedOut = m_trimTries > 0 ? !m_wake.wait_for(lock, TrimInterval, woken)
+                                                  : (m_wake.wait(lock, woken), false);
             if (m_stop) return;
+            if (m_trimRequested) {
+                m_trimRequested = false;
+                m_trimTries = TrimAttempts;
+                continue;
+            }
+            if (timedOut) {
+                --m_trimTries;
+                lock.unlock();
+                trim();
+                continue;
+            }
             job = std::move(m_jobs.front());
             m_jobs.pop_front();
             m_busy = true;
         }
         if ((m_loaded || loadKit()) && !job.target.expired()) {
-            auto zones = buildZones(m_kit, job.settings, m_cache);
-            if (auto sampler = job.target.lock()) {
-                sampler->stageZones(std::move(zones));
-                sampler->collectRetired();
+            {
+                std::lock_guard build(m_buildMutex);
+                auto zones = buildZones(m_kit, job.settings, m_cache);
+                if (auto sampler = job.target.lock()) {
+                    sampler->stageZones(std::move(zones));
+                    sampler->collectRetired();
+                }
             }
             std::lock_guard lock(m_mutex);
             m_state = State::Ready;
@@ -181,6 +247,7 @@ void Library::run()
         {
             std::lock_guard lock(m_mutex);
             m_busy = false;
+            m_trimTries = TrimAttempts;               // the old zones go once the audio thread lets go
         }
         m_idle.notify_all();
     }
