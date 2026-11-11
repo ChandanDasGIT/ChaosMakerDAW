@@ -183,6 +183,68 @@ ToolButton {
                         verticalAlignment: Text.AlignVCenter
                     }
                 }
+                // Latency compensation (restMap G10), owned by EngineController: audio takes are
+                // moved earlier by the round trip the device reports plus the extra offset.
+                CheckBox {
+                    id: latencyCompensationBox
+                    objectName: "latencyCompensationSetting"
+                    text: "Compensate recording latency"
+                    checked: EngineController.recordingLatencyCompensation
+                    onToggled: EngineController.recordingLatencyCompensation = checked
+                    Binding on checked { value: EngineController.recordingLatencyCompensation }
+                    contentItem: Text {
+                        text: latencyCompensationBox.text
+                        color: Theme.text
+                        font.pixelSize: Theme.bodySize
+                        leftPadding: latencyCompensationBox.indicator.width + 6
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+                RowLayout {
+                    spacing: 8
+                    enabled: EngineController.recordingLatencyCompensation
+                    opacity: enabled ? 1 : 0.45
+                    Text {
+                        text: "Extra offset (ms)"
+                        color: Theme.text
+                        font.pixelSize: Theme.bodySize
+                    }
+                    TextField {
+                        id: offsetField
+                        objectName: "recordingOffsetField"
+                        Layout.preferredWidth: 70
+                        selectByMouse: true
+                        color: Theme.text
+                        font.pixelSize: 12
+                        horizontalAlignment: TextInput.AlignHCenter
+                        inputMethodHints: Qt.ImhFormattedNumbersOnly
+                        validator: DoubleValidator { bottom: -100; top: 100; decimals: 2; notation: DoubleValidator.StandardNotation }
+                        text: String(EngineController.recordingExtraOffsetMs)
+                        background: Rectangle { color: Theme.field; border.color: offsetField.activeFocus ? Theme.accent : Theme.fieldBorder; radius: 3 }
+                        onEditingFinished: {
+                            const ms = Number(text.replace(",", "."))
+                            if (isFinite(ms)) EngineController.recordingExtraOffsetMs = ms
+                            text = String(EngineController.recordingExtraOffsetMs)
+                        }
+                        ToolTip.visible: hovered; ToolTip.delay: 450
+                        ToolTip.text: "-100 to 100 ms, added to what the device reports (measure it with tools/latencytest)"
+                    }
+                }
+                Text {
+                    id: reportedLatency
+                    objectName: "reportedLatencyText"
+                    property real ms: EngineController.reportedRoundTripMs()
+                    text: ms > 0 ? "The device reports " + ms.toFixed(1) + " ms round trip; takes move earlier by that plus the extra offset."
+                                 : "The device reports no round-trip latency right now; only the extra offset applies."
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.smallSize
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    Connections {
+                        target: preferencesPopup
+                        function onAboutToShow() { reportedLatency.ms = EngineController.reportedRoundTripMs() }
+                    }
+                }
             }
 
             Text {

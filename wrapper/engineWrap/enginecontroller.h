@@ -58,6 +58,9 @@ class EngineController : public AudioEngineWrapper {
     Q_PROPERTY(bool restoreSessionOnStartup READ restoreSessionOnStartup WRITE setRestoreSessionOnStartup NOTIFY restoreSessionOnStartupChanged)
     // Stop playback (metronome included) at the end of the arrangement; saved preference, default on.
     Q_PROPERTY(bool stopPlaybackAtEnd READ stopPlaybackAtEnd WRITE setStopPlaybackAtEnd NOTIFY stopPlaybackAtEndChanged)
+    // restMap G10: audio takes are moved earlier by the device's round trip plus the extra offset.
+    Q_PROPERTY(bool recordingLatencyCompensation READ recordingLatencyCompensation WRITE setRecordingLatencyCompensation NOTIFY recordingLatencyChanged)
+    Q_PROPERTY(double recordingExtraOffsetMs READ recordingExtraOffsetMs WRITE setRecordingExtraOffsetMs NOTIFY recordingLatencyChanged)
     Q_PROPERTY(QVariantMap monitorLevels READ monitorLevels NOTIFY monitorLevelsChanged)
     Q_PROPERTY(QVariantMap trackLevels READ trackLevels NOTIFY trackLevelsChanged)
     Q_PROPERTY(double bpm READ bpm WRITE setBpm NOTIFY bpmChanged)
@@ -147,6 +150,12 @@ public:
     void setRestoreSessionOnStartup(bool enabled);
     bool stopPlaybackAtEnd() const;
     void setStopPlaybackAtEnd(bool enabled);
+    bool recordingLatencyCompensation() const;
+    void setRecordingLatencyCompensation(bool enabled);
+    double recordingExtraOffsetMs() const;
+    void setRecordingExtraOffsetMs(double ms);
+    // The round trip the audio device reports now, in ms (0 when unknown or not running).
+    Q_INVOKABLE double reportedRoundTripMs() const;
     Q_INVOKABLE void attachProject(TrackListWrapper* model);
     Q_INVOKABLE void transportAction(const QString& action);
     Q_INVOKABLE void seekBeat(double beat);
@@ -229,6 +238,7 @@ signals:
     void exportFinished(bool ok, const QString& message);
     void restoreSessionOnStartupChanged();
     void stopPlaybackAtEndChanged();
+    void recordingLatencyChanged();
     void meterChanged();
     void monitorLevelsChanged();
     void trackLevelsChanged();

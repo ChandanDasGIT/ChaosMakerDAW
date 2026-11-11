@@ -1148,9 +1148,18 @@ bool TrackList::attachTake(int trackId, std::int64_t start, std::shared_ptr<cons
         || !m_project.findTrack(trackId)) return false;
     const double length = audio->frames * m_project.tempo().sampleRate() / audio->sampleRate;
     if (!std::isfinite(length) || length < 1 || length >= double(INT64_MAX/4)) return false;
+    std::int64_t frames = std::llround(length), offset = 0;
+    if (start < 0) {   // compensated to before the song's start: trim the front (G10)
+        const std::int64_t trim = start <= -frames ? frames : -start;
+        if (trim < frames) {
+            offset = std::llround(double(trim) * audio->sampleRate / m_project.tempo().sampleRate());
+            frames -= trim;
+        }   // a take shorter than the shift stays whole, at 0
+        start = 0;
+    }
     const auto& path = audio->path;
     m_audio[path] = audio; m_mediaPaths.insert(path);
-    return addAudioClip(trackId, path, start, std::llround(length), 0, effectsPrinted) >= 0;
+    return addAudioClip(trackId, path, start, frames, offset, effectsPrinted) >= 0;
 }
 
 bool TrackList::attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes)

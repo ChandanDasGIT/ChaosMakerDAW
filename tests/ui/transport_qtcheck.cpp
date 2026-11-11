@@ -3119,6 +3119,35 @@ private slots:
         auto* popup=window->findChild<QObject*>("preferencesPopup"); QVERIFY(popup);
         QTRY_VERIFY(!popup->property("visible").toBool());
     }
+    void preferences_set_recording_latency_compensation_and_the_extra_offset() {
+        // restMap G10: on by default; the offset field is clamped to -100..100 ms and saved.
+        auto* controller=EngineController::instance(); QVERIFY(controller);
+        const auto restore=qScopeGuard([&] {
+            controller->setRecordingLatencyCompensation(true); controller->setRecordingExtraOffsetMs(0);
+            QMetaObject::invokeMethod(window->findChild<QObject*>("preferencesPopup"),"close");
+        });
+        QVERIFY(controller->recordingLatencyCompensation());
+        auto* button=visualItem(window->contentItem(),"settingsButton"); QVERIFY(button); click(button);
+        auto* prefs=visualItem(window->contentItem(),"preferencesSetting"); QTRY_VERIFY(prefs && prefs->isVisible()); click(prefs);
+        QQuickItem* box=nullptr;
+        QTRY_VERIFY((box=visualItem(window->contentItem(),"latencyCompensationSetting")) && box->isVisible());
+        QVERIFY(box->property("checked").toBool());
+        auto* field=visualItem(window->contentItem(),"recordingOffsetField"); QVERIFY(field);
+        auto* reported=visualItem(window->contentItem(),"reportedLatencyText"); QVERIFY(reported);
+        QVERIFY(!reported->property("text").toString().isEmpty());
+        // Type an offset and press Enter.
+        click(field); QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
+        for(char c:{'3','.','5'}) QTest::keyClick(window,c); QTest::keyClick(window,Qt::Key_Return);
+        QTRY_COMPARE(controller->recordingExtraOffsetMs(),3.5);
+        QCOMPARE(QSettings().value("recording/extraOffsetMs").toDouble(),3.5);
+        QCOMPARE(field->property("text").toString(),QString("3.5"));
+        // Off: saved, and the offset row is greyed out.
+        click(box); QTRY_VERIFY(!controller->recordingLatencyCompensation());
+        QCOMPARE(QSettings().value("recording/latencyCompensation").toString(),QString("false"));
+        QVERIFY(!field->isEnabled());
+        controller->setRecordingLatencyCompensation(true); QTRY_VERIFY(box->property("checked").toBool());
+        QVERIFY(field->isEnabled());
+    }
     void normal_drag_selects_grid_range_and_repeat_stays_inside_it() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);

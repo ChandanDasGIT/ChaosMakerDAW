@@ -24,7 +24,8 @@ public:
     bool open(AudioCallback* c,int frames) override { callback=c; c->deviceChanged(48000,frames); return true; }
     void close() override { callback=nullptr; }
     double sampleRate() const override { return 48000; }
-    DeviceLatency latency() const override { return {128,128,128}; }
+    int roundTrip=0;   // restMap G10: the round trip this device reports
+    DeviceLatency latency() const override { return {128,128,128,roundTrip}; }
     bool setBufferSize(int) override { return true; }
     std::vector<std::string> inputNames() const override { return {"test:input","test:mic","test:pickup"}; }
     std::vector<std::string> outputNames() const override { return {"test:left","test:right"}; }
@@ -948,5 +949,47 @@ TEST(qtrecording, the_waveform_of_a_take_grows_while_it_records) {
     for(int i=0;i<100 && controller.takeBusy();++i) tick(10);
     CHECK(controller.recordingWaveform(vocal,4).isEmpty());          // the clip takes over
     CHECK(tracks.clips().size()==1);
+    controller.shutdownSession();
+}
+
+TEST(qtrecording, audio_takes_move_earlier_by_the_reported_round_trip_plus_the_extra_offset) {
+    // restMap G10. 48 kHz: the device reports 480 frames (10 ms), the extra offset is 2 ms (96).
+    Storage storage;
+    auto device=std::make_unique<OfflineDevice>(); auto* io=device.get(); io->roundTrip=480;
+    EngineController controller(std::move(device),false); TrackListWrapper tracks;
+    controller.attachProject(&tracks);
+    CHECK(controller.recordingLatencyCompensation());                 // on by default
+    CHECK(controller.recordingExtraOffsetMs()==0.0);
+    controller.setRecordingExtraOffsetMs(2.0);
+    controller.setRecordingExtraOffsetMs(500.0); CHECK(controller.recordingExtraOffsetMs()==100.0);   // clamped
+    controller.setRecordingExtraOffsetMs(2.0);
+    CHECK_NEAR(controller.reportedRoundTripMs(),10.0,1e-9);
+    const int vocal=tracks.addVocalTrack(); CHECK(setCaptureAndMonitor(tracks,vocal,true));
+    const auto take=[&](double beat) {
+        tick(); io->process();
+        controller.seekBeat(beat); io->process();
+        controller.transportAction("record"); CHECK(controller.takeBusy());
+        for(int i=0;i<8;++i) io->process();
+        controller.transportAction("stop"); io->process();
+        for(int i=0;i<100 && controller.takeBusy();++i) tick(10);
+        CHECK(!controller.takeBusy());
+        const auto& clips=tracks.project().findTrack(vocal)->audioClips;
+        CHECK(!clips.empty());
+        return clips.back();
+    };
+    // From beat 1 (24000 at 120 BPM): 576 frames earlier, nothing trimmed.
+    auto clip=take(1.0);
+    CHECK(clip.start==24000-576); CHECK(clip.sourceOffset==0);
+    // From the start: the first 576 frames would sit before 0, so they are trimmed off.
+    const auto whole=tracks.audioFor(clip.poolId)->frames;
+    clip=take(0.0);
+    CHECK(clip.start==0); CHECK(clip.sourceOffset==576);
+    CHECK(clip.length==tracks.audioFor(clip.poolId)->frames-576);
+    CHECK(whole>576);
+    // Off: placed where capture began.
+    controller.setRecordingLatencyCompensation(false);
+    CHECK(!controller.recordingLatencyCompensation());
+    clip=take(2.0);
+    CHECK(clip.start==48000); CHECK(clip.sourceOffset==0);
     controller.shutdownSession();
 }

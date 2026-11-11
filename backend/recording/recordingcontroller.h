@@ -6,6 +6,7 @@
 #include "engine/enginecommands.h"
 #include "transport/tempomap.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -39,6 +40,19 @@ public:
     double recordStartBeat() const noexcept { return m_recordStartBeat; }
     void setRecordStartBeat(double beat) noexcept { m_recordStartBeat = beat; }
     std::size_t takeCount() const noexcept { return m_takes.size() + m_midiTakes.size(); }
+    // Recording latency compensation (restMap G10), in project samples: audio takes are placed
+    // this much earlier (their start may go below 0; TrackList::attachTake trims that part).
+    // MIDI takes are not moved. Set before startRecording; it holds for that recording.
+    void setLatencyCompensation(std::int64_t samples) noexcept { m_compensation = std::max<std::int64_t>(0, samples); }
+    std::int64_t latencyCompensation() const noexcept { return m_compensation; }
+    // The shift for a recording: the device's reported round trip plus the user's extra offset
+    // (ms, -100..100, for what the report leaves out; tools/latencytest measures it), never
+    // below 0; 0 when compensation is off.
+    static std::int64_t compensationSamples(bool enabled, int roundTripFrames, double extraOffsetMs, double sampleRate) noexcept {
+        if (!enabled || !(sampleRate > 0)) return 0;
+        const double offset = std::isfinite(extraOffsetMs) ? std::clamp(extraOffsetMs, -100.0, 100.0) : 0.0;
+        return std::max<std::int64_t>(0, std::max(0, roundTripFrames) + std::llround(offset * sampleRate / 1000.0));
+    }
 
     // The waveform of the take being recorded on a track so far: `bins` (min, max) pairs; empty
     // when the track has no audio take running (UI thread).
@@ -116,5 +130,6 @@ private:
     TempoMap m_tempo;
     int m_recordTrack = -1;
     double m_recordStartBeat = 0.0;
+    std::int64_t m_compensation = 0;
     bool m_countInMessagePending = false;
 };

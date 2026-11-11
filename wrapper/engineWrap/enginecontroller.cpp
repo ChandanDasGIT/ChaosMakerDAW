@@ -881,6 +881,31 @@ void EngineController::setStopPlaybackAtEnd(bool enabled) {
     if (settings.status() != QSettings::NoError) setTransportMessage("Could not save the stop-at-end preference.");
     emit stopPlaybackAtEndChanged();
 }
+bool EngineController::recordingLatencyCompensation() const {
+    return QSettings().value(QString::fromLatin1(AppSettings::KeyRecordingLatencyCompensation), true).toBool();
+}
+void EngineController::setRecordingLatencyCompensation(bool enabled) {
+    if (enabled == recordingLatencyCompensation()) return;
+    QSettings settings; settings.setValue(QString::fromLatin1(AppSettings::KeyRecordingLatencyCompensation), enabled); settings.sync();
+    if (settings.status() != QSettings::NoError) setTransportMessage("Could not save the latency compensation preference.");
+    emit recordingLatencyChanged();
+}
+double EngineController::recordingExtraOffsetMs() const {
+    const double ms = QSettings().value(QString::fromLatin1(AppSettings::KeyRecordingExtraOffsetMs), 0.0).toDouble();
+    return std::isfinite(ms) ? std::clamp(ms, -100.0, 100.0) : 0.0;
+}
+void EngineController::setRecordingExtraOffsetMs(double ms) {
+    if (!std::isfinite(ms)) return;
+    ms = std::clamp(ms, -100.0, 100.0);
+    if (ms == recordingExtraOffsetMs()) return;
+    QSettings settings; settings.setValue(QString::fromLatin1(AppSettings::KeyRecordingExtraOffsetMs), ms); settings.sync();
+    if (settings.status() != QSettings::NoError) setTransportMessage("Could not save the recording offset.");
+    emit recordingLatencyChanged();
+}
+double EngineController::reportedRoundTripMs() const {
+    const double rate = m_engine ? m_engine->sampleRate() : 0.0;
+    return m_audioReady && rate > 0 ? m_engine->latency().roundTripFrames * 1000.0 / rate : 0.0;
+}
 void EngineController::setTransportMessage(const QString& message) {
     if (m_transportMessage == message) return;
     m_transportMessage = message; emit transportMessageChanged();
@@ -1215,6 +1240,9 @@ void EngineController::transportAction(const QString& action) {
     try {
         std::string msg;
         const double rate = m_engine->sampleRate() > 1000 ? m_engine->sampleRate() : 48000;
+        // restMap G10: fixed for this recording, from what the device reports right now.
+        m_recordingController.setLatencyCompensation(RecordingController::compensationSamples(
+            recordingLatencyCompensation(), m_engine->latency().roundTripFrames, recordingExtraOffsetMs(), rate));
         bool ok = m_recordingController.startRecording(
             m_project->project(),
             folder.toStdString(),

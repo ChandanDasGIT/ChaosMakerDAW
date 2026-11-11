@@ -228,3 +228,18 @@ TEST(recordingcontroller, start_recording_midi_take_lifecycle)
     CHECK_NEAR(receivedNotes[0].lengthBeats, 1.0, 1e-4);
     CHECK(receivedNotes[0].velocity == 100);
 }
+
+TEST(recordingcontroller, latency_compensation_is_the_round_trip_plus_the_extra_offset)
+{
+    // restMap G10.
+    CHECK(RecordingController::compensationSamples(true, 480, 0.0, 48000) == 480);
+    CHECK(RecordingController::compensationSamples(true, 480, 2.0, 48000) == 576);
+    CHECK(RecordingController::compensationSamples(true, 480, -5.0, 48000) == 240);
+    CHECK(RecordingController::compensationSamples(true, 100, -100.0, 48000) == 0);    // never below 0
+    CHECK(RecordingController::compensationSamples(true, 0, 500.0, 48000) == 4800);    // offset clamped to 100 ms
+    CHECK(RecordingController::compensationSamples(false, 480, 2.0, 48000) == 0);      // off
+    CHECK(RecordingController::compensationSamples(true, 480, 2.0, 0) == 0);
+    RecordingController controller;
+    controller.setLatencyCompensation(-5);
+    CHECK(controller.latencyCompensation() == 0);
+}

@@ -25,6 +25,9 @@ struct DeviceLatency {
     int captureFrames = 0;
     int playbackFrames = 0;
     int requestedBufferFrames = 0;
+    // restMap G10: what the device reports a sound takes out to the speakers and back in
+    // (playback + capture latency of the connected hardware), in frames; 0 when unknown.
+    int roundTripFrames = 0;
 };
 
 class AudioDevice {

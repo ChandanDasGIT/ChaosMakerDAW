@@ -16,7 +16,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 NEXT UP (2026-11-10), the user's order:
   1. G6 volume envelope committed (0597318); G6b curve shapes committed (758f523).
   2. G9, G17, G14 committed (33ef5cc). R2 clip effects committed (e3b3d42).
-     Then import / export (item 6, done first at the user's request). G8 fades committed. Next: G10, G15, G16,
+     Then import / export (item 6, done first at the user's request). G8 fades committed. G10 latency committed. Next: G15, G16,
      G11, G13, G12. Later option: "render clip effects into the audio" (Reaper's apply FX).
   3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
      reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
@@ -319,9 +319,29 @@ Done items stay further down as the record.
         Tests: tracklist the_master_track..., projectdocument the_master_tracks_effects...,
         snapshotbuilder the_master_tracks_effects_run..., audioengine_midi master_effects...,
         wrappertests qtmixeffect the_master_track..., transport_ui the_master_strip_opens...
-[ ] G10 Recording latency compensation. Recorded takes are not shifted by the interface's round
-        trip. tools/latencytest (F3) measures it; plan: use JACK's reported latency plus an
-        optional measured offset (a setting), applied when a take is placed.
+[x] G10 Recording latency compensation. DONE 2026-11-11 (committed). Audio takes only (the
+        user chose it; MIDI takes are not moved, like Reaper's default).
+        - DeviceLatency::roundTripFrames: JackAudioDevice asks JACK for the largest capture
+          latency over our input ports plus the largest playback latency over our outputs
+          (JACK hands the hardware's on to connected ports); read when asked, no callback.
+        - RecordingController::compensationSamples(enabled, roundTrip, extraOffsetMs, rate)
+          (offset clamped -100..100 ms, never below 0); setLatencyCompensation is fixed at
+          record start (EngineController). Audio takes attach at startSample - compensation.
+        - TrackList::attachTake takes a start below 0: the front is trimmed (sourceOffset, in
+          the file's rate); a take shorter than the shift stays whole at 0.
+        - Settings (EngineController, QSettings like stop-at-end): AppSettings
+          KeyRecordingLatencyCompensation (default on), KeyRecordingExtraOffsetMs (default 0);
+          EngineController recordingLatencyCompensation / recordingExtraOffsetMs /
+          reportedRoundTripMs().
+        - Preferences > Recording: "Compensate recording latency" check, "Extra offset (ms)"
+          field (greyed when off), a line with the round trip the device reports now.
+        Tests: backendtests tracklist a_take_compensated..., recordingcontroller
+        latency_compensation...; wrappertests qtrecording audio_takes_move_earlier...;
+        transporttests preferences_set_recording_latency_compensation... Affected groups also
+        run: recordingcontroller 8, tracklist 22, recording 16, multirecording 4, countin 3,
+        qtrecording 13, qtmultirecording 3, qtmidirecording 1; app log empty (empty profile and
+        a session copy). Not yet checked on the real interface: the Preferences line shows
+        what JACK reports.
 [ ] G11 Punch in / out and loop recording with takes (comping): record only inside a range;
         several passes over a loop kept as takes on one clip; pick the best parts.
 [ ] G12 Tempo and meter changes inside a song (the project has one BPM and one meter today;
