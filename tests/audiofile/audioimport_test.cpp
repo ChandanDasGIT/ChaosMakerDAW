@@ -131,6 +131,7 @@ TEST(audioimport, an_import_adds_tracks_or_clips_in_one_undo_step)
     CHECK(tracks.project().findTrack(added[0])->name == "drums" && tracks.project().findTrack(added[1])->name == "bass");
     const auto* clip = tracks.findClip(added[1], clips[1]);
     CHECK(clip && clip->start == 96000 && clip->length == 48000);   // beat 4 at 120 BPM; 1 s at either rate
+    CHECK(clip && !clip->effectsPrinted);                          // imported audio is dry: the track FX play on it
     CHECK(tracks.audioFor("/m/import-bass.wav") != nullptr);
     CHECK(tracks.undo());                                          // both tracks go at once
     CHECK(tracks.project().tracks().size() == 1 && tracks.project().tracks()[0]->id == existing);

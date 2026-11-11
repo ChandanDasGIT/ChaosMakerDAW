@@ -1087,7 +1087,7 @@ std::vector<int> TrackList::importAudio(const std::vector<std::shared_ptr<const 
         }
         m_audio[audio->path] = audio;
         m_mediaPaths.insert(audio->path);
-        const int clip = addAudioClip(track, audio->path, *start, std::llround(length), 0, true);
+        const int clip = addAudioClip(track, audio->path, *start, std::llround(length), 0, false);
         if (clip >= 0) clips.push_back(clip);
     }
     // One undo step: the new tracks go with their clips, or the clips on the one track go.
