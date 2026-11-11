@@ -43,7 +43,8 @@ QVariantMap clipMap(const TrackList::ClipInfo& clip)
         {"effectsPrinted", clip.effectsPrinted}, {"gainDb", clip.gainDb},
         {"isRecorded", clip.isRecorded}, {"notes", noteList(clip.notes)},
         {"reversed", clip.reversed}, {"polarityInverted", clip.polarityInverted},
-        {"hasEffects", clip.fx.hasEffects()}};
+        {"hasEffects", clip.fx.hasEffects()},
+        {"fadeInBeats", clip.fadeInBeats}, {"fadeOutBeats", clip.fadeOutBeats}};
 }
 QVariantList choices(const std::vector<TrackList::TrackChoice>& entries)
 {
@@ -488,6 +489,13 @@ bool TrackListWrapper::setClipGain(int trackId, int clipId, double gainDb, bool 
     if (change.changed) {
         notifyClipGainEdit(trackId);
     }
+    return change.accepted;
+}
+
+bool TrackListWrapper::setClipFade(int trackId, int clipId, bool fadeOut, double beats, bool continueEdit)
+{
+    const auto change = m_state.setClipFade(trackId, clipId, fadeOut, beats, continueEdit);
+    if (change.changed) notifyClipEdit(trackId);
     return change.accepted;
 }
 

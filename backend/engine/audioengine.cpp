@@ -604,11 +604,12 @@ void AudioEngine::mixClipWithEffects(const ClipRender& clip, int count, bool res
         const double source = clip.sourceOffset + double(m_position + i - clip.start) * clip.audio->sampleRate / m_sampleRate;
         if (source < 0 || source >= clip.audio->frames) continue;
         const auto at = static_cast<std::size_t>(source);
+        const float gain = clip.gain * clip.fadeGainAt(m_position + i);   // fades before clip effects (G8)
         for (int c = 0; c < 2; ++c) {
             const auto& data = clip.audio->channels[std::min<std::size_t>(c, clip.audio->channels.size() - 1)];
             if (at >= data.size()) continue;
             const float next = at + 1 < data.size() ? data[at + 1] : data[at];
-            buffer[c][i] = (data[at] + float(source - at) * (next - data[at])) * clip.gain;
+            buffer[c][i] = (data[at] + float(source - at) * (next - data[at])) * gain;
         }
     }
     if (reset) for (auto* processor : clip.chain) if (processor) processor->reset();
@@ -683,12 +684,13 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
                     const double source=clip.sourceOffset+double(position-clip.start)*clip.audio->sampleRate/m_sampleRate;
                     if(source<0 || source>=clip.audio->frames)continue;
                     const auto at=static_cast<std::size_t>(source);
+                    const float gain=clip.gain*clip.fadeGainAt(position);   // restMap G8
                     const int channelCount=2;
                     for(int c=0;c<channelCount;++c) {
                         const auto& data=clip.audio->channels[std::min<std::size_t>(c,clip.audio->channels.size()-1)];
                         if(at>=data.size())continue;
                         const float next=at+1<data.size()?data[at+1]:data[at];
-                        const float sample=(data[at]+float(source-at)*(next-data[at]))*clip.gain;
+                        const float sample=(data[at]+float(source-at)*(next-data[at]))*gain;
                         if(dry)channels[c][i]+=sample;
                         else m_printedAudio[c][i]+=sample;
                     }
@@ -852,11 +854,12 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
                     const double source=clip.sourceOffset+double(at-clip.start)*clip.audio->sampleRate/m_sampleRate;
                     if(source<0 || source>=clip.audio->frames)continue;
                     const auto sample=static_cast<std::size_t>(source);
+                    const float gain=clip.gain*clip.fadeGainAt(at);   // restMap G8
                     for(int c=0;c<2;++c) {
                         const auto& data=clip.audio->channels[std::min<std::size_t>(c,clip.audio->channels.size()-1)];
                         if(sample>=data.size())continue;
                         const float next=sample+1<data.size()?data[sample+1]:data[sample];
-                        const float value=(data[sample]+float(source-sample)*(next-data[sample]))*clip.gain;
+                        const float value=(data[sample]+float(source-sample)*(next-data[sample]))*gain;
                         if(!clip.effectsPrinted && !track.chain.empty())dry[c][i]+=value;
                         else m_printedAudio[c][i]+=value;
                     }

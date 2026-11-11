@@ -6,6 +6,8 @@
 #include "dsp/trackmeters.h"
 #include "automation/volumeenvelope.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -15,6 +17,8 @@ struct ClipRender {
     std::int64_t start = 0;                               // on the timeline
     std::int64_t length = 0;
     std::int64_t sourceOffset = 0;                        // into the file
+    // Fades (restMap G8), in samples, already including the automatic crossfade where clips
+    // overlap; fadeIn + fadeOut never exceeds length.
     std::int64_t fadeIn = 0;
     std::int64_t fadeOut = 0;
     float gain = 1.0f;
@@ -22,6 +26,19 @@ struct ClipRender {
     // Clip effects (restMap R2), in order; empty for a plain clip. They run on this clip's audio
     // only, before the track's effects; their tails stop at the clip's end.
     std::vector<Processor*> chain{};
+
+    // The fade gain at a sample position on the timeline: equal-power (quarter sine), so two
+    // clips crossfading over the same span keep an even loudness. 1 outside the fades.
+    float fadeGainAt(std::int64_t position) const noexcept {
+        const std::int64_t into = position - start;
+        double gain = 1.0;
+        if (fadeIn > 0 && into < fadeIn)
+            gain *= std::sin(1.5707963267948966 * std::clamp(double(into) / double(fadeIn), 0.0, 1.0));
+        const std::int64_t left = start + length - position;
+        if (fadeOut > 0 && left < fadeOut)
+            gain *= std::sin(1.5707963267948966 * std::clamp(double(left) / double(fadeOut), 0.0, 1.0));
+        return float(gain);
+    }
 };
 
 struct NoteRender {

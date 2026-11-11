@@ -109,6 +109,9 @@ public:
     // continueEdit: true for every step of a fader drag after the first (one undo step per drag).
     Q_INVOKABLE bool setClipGain(int trackId, int clipId, double gainDb, bool continueEdit = false);
     Q_INVOKABLE double clipGain(int trackId, int clipId) const;
+    // restMap G8: an audio clip's own fade-in (fadeOut false) or fade-out, in beats from that
+    // edge; undoable. Clips report their fades as played in "fadeInBeats" / "fadeOutBeats".
+    Q_INVOKABLE bool setClipFade(int trackId, int clipId, bool fadeOut, double beats, bool continueEdit = false);
     // Pattern notes of a clip in clip-relative beats: [{id, note, startBeat, lengthBeats, velocity}]
     Q_INVOKABLE QVariantList clipNotes(int trackId, int clipId) const;
     // C++ adapter used by PianoRollWrapper; one undoable edit, emits clip-edit signals on change.

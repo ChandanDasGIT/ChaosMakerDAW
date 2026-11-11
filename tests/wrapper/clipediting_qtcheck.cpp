@@ -336,3 +336,28 @@ TEST(qtclipediting, a_reversed_clip_plays_and_draws_backwards_and_an_inverted_on
     CHECK(std::abs(left[100]-(-4699.0f/4800.0f))<1e-4f);
     engine.stop();
 }
+
+TEST(qtclipediting, clip_fades_reach_qml_with_the_crossfade_and_are_one_undo_step) {
+    // restMap G8. Two takes of 2 beats overlapping by half a beat (120 BPM, 48 kHz).
+    TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+    auto audio=std::make_shared<AudioData>(); audio->path="take.wav"; audio->sampleRate=48000; audio->frames=48000;
+    audio->channels={std::vector<float>(48000,0.25f)};
+    CHECK(tracks.attachTake(track,0,audio)); CHECK(tracks.attachTake(track,36000,audio));
+    const auto& clips=tracks.project().findTrack(track)->audioClips;
+    CHECK(clips.size()==2);
+    const int a=clips[0].id, b=clips[1].id;
+    const auto role=[&](int id,const char* key) {
+        for(const auto& c:tracks.clips()) if(c.toMap().value("clipId").toInt()==id) return c.toMap().value(key).toDouble();
+        return -1.0;
+    };
+    CHECK_NEAR(role(a,"fadeOutBeats"),0.5,1e-9);
+    CHECK_NEAR(role(b,"fadeInBeats"),0.5,1e-9);
+    int clipsChanged=0; QObject::connect(&tracks,&TrackListWrapper::clipsChanged,[&]{ ++clipsChanged; });
+    CHECK(tracks.setClipFade(track,a,false,0.25));
+    CHECK(clipsChanged==1);                                   // the timeline redraws the fade
+    CHECK_NEAR(role(a,"fadeInBeats"),0.25,1e-9);
+    CHECK(tracks.canUndo() && tracks.undo());
+    CHECK_NEAR(role(a,"fadeInBeats"),0.0,1e-9);
+    const int pattern=tracks.addClipAtBeat(tracks.addVocalTrack(),0,4);
+    CHECK(!tracks.setClipFade(tracks.project().tracks().back()->id,pattern,false,1.0));
+}

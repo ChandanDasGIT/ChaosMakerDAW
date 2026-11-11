@@ -475,6 +475,8 @@ int Project::splitAudioClip(int trackId, int clipId, std::int64_t position, std:
     auto before = track->audioClips; AudioClip right=*clip;
     right.id=m_nextClipId++; right.start=position; right.length=clip->start+clip->length-position; right.sourceOffset=sourceOffset;
     clip->length=position-clip->start;
+    clip->fadeOut=0; right.fadeIn=0;   // the left piece keeps the fade-in, the right the fade-out (G8)
+    clip->fadeIn=std::min(clip->fadeIn,clip->length); right.fadeOut=std::min(right.fadeOut,right.length);
     if (!clip->notes.empty()) {
         // Notes are origin-relative, so the split point in note space is the right half's
         // offset. Notes starting before it stay left, the rest move right (no duplicates).
@@ -494,7 +496,7 @@ bool Project::joinLastClipEdits()
     auto& first = m_history[m_history.size() - 2];
     auto& last = m_history.back();
     const auto plain = [](const ClipEdit& e) {
-        return e.tracks.size() == 1 && !e.envelope && !e.removedTrack && e.gainClipId < 0;
+        return e.tracks.size() == 1 && !e.envelope && !e.removedTrack && e.gainClipId < 0 && e.fadeClipId < 0;
     };
     if (!plain(first) || !plain(last) || first.tracks.front().trackId != last.tracks.front().trackId) return false;
     first.tracks.front().after = std::move(last.tracks.front().after);
@@ -563,6 +565,57 @@ bool Project::setClipGain(int trackId, int clipId, float gainDb, bool continueEd
         m_history.back().gainClipId = clipId;
     }
     return true;
+}
+
+bool Project::setClipFades(int trackId, int clipId, std::int64_t fadeIn, std::int64_t fadeOut, bool continueEdit) {
+    auto* track = findTrack(trackId);
+    if (!track || fadeIn < 0 || fadeOut < 0) return false;
+    auto it = std::find_if(track->audioClips.begin(), track->audioClips.end(),
+                           [clipId](const auto& c) { return c.id == clipId; });
+    if (it == track->audioClips.end()) return false;
+    fadeIn = std::min(fadeIn, it->length);
+    fadeOut = std::min(fadeOut, it->length - fadeIn);
+    if (it->fadeIn == fadeIn && it->fadeOut == fadeOut) return true;
+    const bool extendLast = continueEdit && m_historyPosition > 0 && m_historyPosition == m_history.size()
+        && m_history.back().fadeClipId == clipId && m_history.back().tracks.size() == 1
+        && m_history.back().tracks.front().trackId == trackId;
+    auto before = track->audioClips;
+    it->fadeIn = fadeIn;
+    it->fadeOut = fadeOut;
+    if (extendLast) {
+        m_history.back().tracks.front().after = track->audioClips; // keep the original "before"
+    } else {
+        rememberClipEdit(trackId, std::move(before));
+        m_history.back().fadeClipId = clipId;
+    }
+    return true;
+}
+
+void playedFades(std::vector<FadeSpan>& clips) {
+    auto played = clips;
+    for (std::size_t i = 0; i < clips.size(); ++i)
+        for (std::size_t j = 0; j < clips.size(); ++j) {
+            if (i == j) continue;
+            const auto& a = clips[i];   // the earlier one
+            const auto& b = clips[j];
+            const std::int64_t aEnd = a.start + a.length, bEnd = b.start + b.length;
+            if (b.start < a.start || (b.start == a.start && j < i)) continue;
+            if (b.start >= aEnd || bEnd <= aEnd) continue;   // apart, or b inside a
+            const std::int64_t overlap = aEnd - b.start;
+            played[i].fadeOut = std::max(played[i].fadeOut, overlap);
+            played[j].fadeIn = std::max(played[j].fadeIn, overlap);
+        }
+    for (auto& f : played) {
+        f.length = std::max<std::int64_t>(f.length, 0);
+        f.fadeIn = std::max<std::int64_t>(f.fadeIn, 0);
+        f.fadeOut = std::max<std::int64_t>(f.fadeOut, 0);
+        if (f.fadeIn + f.fadeOut > f.length) {   // share the clip, keeping their proportion
+            const double scale = double(f.length) / double(f.fadeIn + f.fadeOut);
+            f.fadeIn = std::int64_t(double(f.fadeIn) * scale);
+            f.fadeOut = f.length - f.fadeIn;
+        }
+    }
+    clips = std::move(played);
 }
 
 bool Project::setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes) {

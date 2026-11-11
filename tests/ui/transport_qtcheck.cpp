@@ -3774,6 +3774,39 @@ private slots:
         QVERIFY(tracks.undo()); QVERIFY(tracks.undo()); QCOMPARE(tracks.project().findTrack(track)->audioClips[0].start,qint64(24000));
         timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
     }
+    void timeline_fade_handles_set_audio_clip_fades_in_one_undo_step() {
+        // restMap G8. A 4-beat take at beat 1; 48 px per beat in this view.
+        TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+        auto audio=std::make_shared<AudioData>(); audio->path="fade.wav"; audio->sampleRate=48000; audio->frames=96000;
+        audio->channels={std::vector<float>(96000,0.25f)};
+        QVERIFY(tracks.attachTake(track,24000,audio)); const int clip=tracks.project().findTrack(track)->audioClips[0].id;
+        const int pattern=tracks.addClipAtBeat(tracks.addInstrumentTrack(),0,4);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true); QCoreApplication::processEvents();
+        const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); });
+        QVERIFY(!visualItem(timeline,"clipFadeInHandle"+QString::number(pattern)));   // audio clips only
+        auto drag=[&](const QString& name,int delta) {
+            auto* handle=visualItem(timeline,name+QString::number(clip)); QVERIFY(handle);
+            const QPoint start=handle->mapToScene(QPointF(4,4)).toPoint();
+            QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start); QTest::mouseMove(window,start+QPoint(delta/2,0));
+            QTest::mouseMove(window,start+QPoint(delta,0));
+            QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,start+QPoint(delta,0)); QCoreApplication::processEvents();
+        };
+        drag("clipFadeInHandle",24);
+        QCOMPARE(tracks.project().findTrack(track)->audioClips[0].fadeIn,qint64(12000));
+        drag("clipFadeOutHandle",-12);
+        QCOMPARE(tracks.project().findTrack(track)->audioClips[0].fadeOut,qint64(6000));
+        QCOMPARE(tracks.project().findTrack(track)->audioClips[0].start,qint64(24000));   // nothing moved
+        auto* curve=visualItem(timeline,"clipFadeInCurve"+QString::number(clip)); QVERIFY(curve);
+        QVERIFY(curve->isVisible()); QVERIFY(std::abs(curve->width()-24.0)<0.5);
+        // A click without a drag changes nothing.
+        auto* handle=visualItem(timeline,"clipFadeInHandle"+QString::number(clip)); QVERIFY(handle);
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,handle->mapToScene(QPointF(4,4)).toPoint()); QCoreApplication::processEvents();
+        QCOMPARE(tracks.project().findTrack(track)->audioClips[0].fadeIn,qint64(12000));
+        QVERIFY(tracks.undo());
+        QCOMPARE(tracks.project().findTrack(track)->audioClips[0].fadeOut,qint64(0));
+        QCOMPARE(tracks.project().findTrack(track)->audioClips[0].fadeIn,qint64(12000));
+    }
     void monitor_buttons_are_independent_of_record_arm_and_capture() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
