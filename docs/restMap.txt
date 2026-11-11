@@ -25,8 +25,16 @@ NEXT UP (2026-11-10), the user's order:
   5. G18-G21 (live pitch monitor, guitar tone analyzer, drum pattern analyzer, chord / BPM
      analyzer; G20 and G21 share their analysis foundation).
   6. Import and export (E, F2): DONE 2026-11-11, committed (18aee6d). Fixed after: imported clips were
-     marked "effects printed", so the track FX skipped them; they are dry now (not committed yet).
-     NEXT after this: a better file browsing dialog, copying the one the user made for ProjectMusicPlayer.
+     marked "effects printed", so the track FX skipped them; they are dry now (a1a125f).
+     File chooser DONE 2026-11-11 (committed): frontend/dialogs/FilePicker.qml,
+     ported from ProjectMusicPlayer's FolderPicker (places Home / Music / Downloads / Project folder /
+     drives, clickable path bar, Hidden files, file types, Backspace up / Enter / Esc), in the app's
+     colours. FileDialog's API (fileMode OpenFile / OpenFiles / SaveFile, nameFilters, defaultSuffix,
+     currentFolder, selectedFile(s), accepted / rejected), so all 11 file dialogs swapped one for one:
+     import audio (Ctrl / Shift+click, "Import N files"), save / open project, export, FX chain, EQ
+     presets, GuitarSuite presets and cabinet IR. "Replace" when saving over a file. Paths come from
+     wrapper/files/fileswrap (Files singleton). Tests: qtfiles; transport_ui import, export chooser, FX
+     chain import through the chooser.
   7. U6 guitar FX panel UI, at the very end.
 Start here when the user says "let's continue". Plans first, one step at a time.
 

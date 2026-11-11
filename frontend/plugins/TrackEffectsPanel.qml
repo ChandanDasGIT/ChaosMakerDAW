@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Dialogs
 
 // A track's FX panel: its insert effects and its instrument's own page. A window of its own,
 // like the on-screen piano: it floats over the app, and the user moves it by its title bar
@@ -457,22 +456,20 @@ Window {
     }
 
     // ---- FX chain files (EngineController export / preview / import) ----
-    FileDialog {
+    FilePicker {
         id: exportChainDialog
         objectName: "exportChainDialog"
-        popupType: Popup.Item                                   // stays inside this window (plan 1.11)
         title: "Export FX chain"
-        fileMode: FileDialog.SaveFile
+        fileMode: FilePicker.SaveFile
         nameFilters: ["FX chains (*.chaosfx)"]
         defaultSuffix: "chaosfx"
         onAccepted: root.exportChain(selectedFile)
     }
-    FileDialog {
+    FilePicker {
         id: importChainDialog
         objectName: "importChainDialog"
-        popupType: Popup.Item
         title: "Import FX chain"
-        fileMode: FileDialog.OpenFile
+        fileMode: FilePicker.OpenFile
         nameFilters: ["FX chains (*.chaosfx)"]
         onAccepted: root.previewChain(selectedFile)
     }

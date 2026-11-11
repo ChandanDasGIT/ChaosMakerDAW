@@ -2,7 +2,6 @@ import QtCore
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Dialogs
 import ".."
 import "../common"
 
@@ -94,12 +93,12 @@ Popup {
         }
     }
 
-    FileDialog {
+    FilePicker {
         id: fileDialog
         objectName: "exportFileDialog"
-        popupType: Popup.Item
         title: "Export to"
-        fileMode: FileDialog.SaveFile
+        fileMode: FilePicker.SaveFile
+        acceptLabel: "Choose"
         currentFolder: root.folder()
         selectedFile: root.file
         nameFilters: root.format.ext === "mp3" ? ["MP3 audio (*.mp3)"] : ["WAV audio (*.wav)"]

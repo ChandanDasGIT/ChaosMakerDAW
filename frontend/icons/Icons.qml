@@ -36,4 +36,16 @@ QtObject {
     readonly property string quantize:    "\u21E5"       // ⇥ (shown as "⇥Q")
     readonly property string undo:        "\u21B6"       // ↶
     readonly property string redo:        "\u21B7"       // ↷
+
+    // ---- file chooser (frontend/dialogs/FilePicker.qml) ----
+    readonly property string folder:      "\uD83D\uDCC1" // folder (U+1F4C1)
+    readonly property string folderOpen:  "\uD83D\uDCC2" // open folder (U+1F4C2), the chooser's title
+    readonly property string file:        "\uD83D\uDCC4" // page (U+1F4C4), a file that is not audio
+    readonly property string audioFile:   "\u266B"       // ♫ an audio file
+    readonly property string folderUp:    "\u2191"       // ↑ up one folder
+    readonly property string home:        "\u2302"       // ⌂ home folder
+    readonly property string music:       "\u266A"       // ♪ Music folder
+    readonly property string download:    "\u2913"       // ⤓ Downloads folder
+    readonly property string project:     "\u25C8"       // ◈ the open project's folder
+    readonly property string drive:       "\uD83D\uDCBE" // disk (U+1F4BE), a mounted drive
 }

@@ -1240,6 +1240,24 @@ private slots:
         QTRY_VERIFY(message->property("visible").toBool() || panel->findChild<QObject*>("chainMessage")->property("visible").toBool());
         QVERIFY(!confirm->property("visible").toBool());
         QMetaObject::invokeMethod(panel->findChild<QObject*>("chainMessage")->findChild<QQuickItem*>("chainMessageOk"),"click");
+        QTRY_VERIFY(!panel->findChild<QObject*>("chainMessage")->property("visible").toBool());
+
+        // "Import chain..." opens the app's file chooser inside the FX window: only chains are
+        // listed, and a click on one asks as before.
+        auto* chooser=panel->findChild<QObject*>("importChainDialog"); QVERIFY(chooser);
+        chooser->setProperty("currentFolder",QUrl::fromLocalFile(QFileInfo(file).absolutePath()));
+        { QFile other(QFileInfo(file).absolutePath()+"/notes.txt"); QVERIFY(other.open(QIODevice::WriteOnly)); }
+        click(visualItem(window->contentItem(),"importChainButton"));
+        QTRY_VERIFY(chooser->property("visible").toBool());
+        auto* content=qvariant_cast<QQuickItem*>(chooser->property("contentItem")); QVERIFY(content);
+        QCOMPARE(static_cast<QWindow*>(content->window()),fxWindow());
+        QQuickItem* row=nullptr;
+        QTRY_VERIFY((row=visualItemIn(content,"filePickerRow_guitar.chaosfx")));
+        QVERIFY(!visualItemIn(content,"filePickerRow_notes.txt"));
+        click(row); QTRY_VERIFY(!chooser->property("visible").toBool());
+        QTRY_VERIFY(confirm->property("visible").toBool());
+        QMetaObject::invokeMethod(confirm->findChild<QQuickItem*>("chainImportOk"),"click");
+        QTRY_VERIFY(!confirm->property("visible").toBool());
     }
     void vocal_effects_offer_eq_and_recording_controls_without_guitarsuite() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
@@ -3376,32 +3394,62 @@ private slots:
         auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
         top->setProperty("trackModel",QVariant::fromValue(&tracks));
         const auto restore=qScopeGuard([&] { top->setProperty("trackModel",QVariant()); });
-        // The File menu item opens the file chooser.
+        // Two takes, a text file and a folder, all in a throwaway folder.
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        audiofile::writeWav((dir.path()+"/Bass.wav").toStdString(),{std::vector<float>(4800,0.2f)},48000,audiofile::WavFormat::Int16);
+        audiofile::writeWav((dir.path()+"/Drums.wav").toStdString(),{std::vector<float>(4800,0.1f)},48000,audiofile::WavFormat::Int16);
+        { QFile notes(dir.path()+"/notes.txt"); QVERIFY(notes.open(QIODevice::WriteOnly)); }
+        QVERIFY(QDir(dir.path()).mkdir("Takes"));
+        auto* job=window->findChild<QObject*>("importJob"); QVERIFY(job);
+        job->setProperty("mediaFolder",dir.path()+"/media");
+
+        // The File menu item opens the app's file chooser, in the folder it is given.
         auto* chooser=window->findChild<QObject*>("importAudioDialog"); QVERIFY(chooser);
+        chooser->setProperty("currentFolder",QUrl::fromLocalFile(dir.path()));
         auto* button=visualItem(window->contentItem(),"fileMenuButton"); QVERIFY(button);
         auto* menu=window->findChild<QObject*>("fileMenu"); QVERIFY(menu);
         click(button); QTRY_VERIFY(menu->property("visible").toBool());
         auto* item=visualItem(window->contentItem(),"fileImportItem"); QVERIFY(item); QVERIFY(item->isEnabled());
         click(item); QTRY_VERIFY(!menu->property("visible").toBool());
         QTRY_VERIFY(chooser->property("visible").toBool());
-        QMetaObject::invokeMethod(chooser,"reject"); QTRY_VERIFY(!chooser->property("visible").toBool());
+        auto* content=qvariant_cast<QQuickItem*>(chooser->property("contentItem")); QVERIFY(content);
+        const auto inChooser=[&](const QString& name) { return visualItemIn(content,name); };
+        QTRY_VERIFY(inChooser("filePickerRow_Bass.wav"));
+        QVERIFY(inChooser("filePickerRow_Drums.wav")); QVERIFY(inChooser("filePickerRow_Takes"));
+        QVERIFY(!inChooser("filePickerRow_notes.txt"));                       // not audio
+        auto* accept=inChooser("filePickerAccept"); QVERIFY(accept);
+        QVERIFY(!accept->isEnabled());                                        // nothing chosen yet
 
-        // An import (as the chooser or a drop starts it): the status popup reports it.
-        QTemporaryDir dir; QVERIFY(dir.isValid());
-        audiofile::writeWav((dir.path()+"/Bass.wav").toStdString(),{std::vector<float>(4800,0.2f)},48000,audiofile::WavFormat::Int16);
-        auto* job=window->findChild<QObject*>("importJob"); QVERIFY(job);
-        job->setProperty("mediaFolder",dir.path()+"/media");
-        bool started=false;
-        QVERIFY(QMetaObject::invokeMethod(job,"importFiles",Q_RETURN_ARG(bool,started),
-            Q_ARG(QVariantList,QVariantList{QUrl::fromLocalFile(dir.path()+"/Bass.wav")}),Q_ARG(double,0.0),Q_ARG(int,-1)));
-        QVERIFY(started);
+        // A click chooses one file, Ctrl+click adds another; the button takes both.
+        click(inChooser("filePickerRow_Bass.wav"));
+        QTRY_COMPARE(accept->property("text").toString(),QStringLiteral("Import"));
+        auto* drums=inChooser("filePickerRow_Drums.wav");
+        QTest::mouseClick(window,Qt::LeftButton,Qt::ControlModifier,drums->mapToScene(QPointF(drums->width()/2,drums->height()/2)).toPoint());
+        QTRY_COMPARE(accept->property("text").toString(),QStringLiteral("Import 2 files"));
+        click(accept); QTRY_VERIFY(!chooser->property("visible").toBool());
+        QCOMPARE(chooser->property("selectedFiles").toList().size(),2);
+
+        // The import runs: the status popup reports it, the takes become tracks.
         auto* popup=window->findChild<QObject*>("importStatusPopup"); QVERIFY(popup);
         QTRY_VERIFY(popup->property("visible").toBool());
         QTRY_VERIFY(!job->property("busy").toBool());
-        QTRY_COMPARE(tracks.count(),1);
-        QVERIFY(job->property("status").toString().contains("Imported 1"));
+        QTRY_COMPARE(tracks.count(),2);
+        QVERIFY(job->property("status").toString().contains("Imported 2"));
         auto* close=visualItem(window->contentItem(),"importStatusClose"); QVERIFY(close);
         click(close); QTRY_VERIFY(!popup->property("visible").toBool());
+
+        // Open again: a folder opens with a click, Up goes back; Cancel imports nothing.
+        QVERIFY(QMetaObject::invokeMethod(chooser,"open")); QTRY_VERIFY(chooser->property("visible").toBool());
+        QTRY_VERIFY(inChooser("filePickerRow_Takes"));
+        click(inChooser("filePickerRow_Takes"));
+        QTRY_VERIFY(!inChooser("filePickerRow_Bass.wav"));
+        QCOMPARE(chooser->property("folder").toUrl(),QUrl::fromLocalFile(dir.path()+"/Takes"));
+        click(inChooser("filePickerUp"));
+        QTRY_VERIFY(inChooser("filePickerRow_Bass.wav"));
+        click(inChooser("filePickerCancel")); QTRY_VERIFY(!chooser->property("visible").toBool());
+        QTest::qWait(50);
+        QCOMPARE(tracks.count(),2);
+        QVERIFY(!popup->property("visible").toBool());
     }
     void file_menu_export_opens_the_export_dialog() {
         QTest::failOnWarning(QRegularExpression("^(?!This plugin does not support raise\\(\\)).*"));
@@ -3445,6 +3493,44 @@ private slots:
         QVERIFY(!EngineController::instance() || !EngineController::instance()->exporting());
         auto* close=visualItem(window->contentItem(),"exportClose"); QVERIFY(close);
         click(close); QTRY_VERIFY(!dialog->property("visible").toBool());
+    }
+    void export_file_chooser_names_the_file_and_warns_before_replacing() {
+        QTest::failOnWarning(QRegularExpression("^(?!This plugin does not support raise\\(\\)).*"));
+        auto* dialog=window->findChild<QObject*>("exportDialog"); QVERIFY(dialog);
+        auto* picker=window->findChild<QObject*>("exportFileDialog"); QVERIFY(picker);
+        const auto restore=qScopeGuard([&] {
+            QMetaObject::invokeMethod(picker,"reject");
+            QTest::qWaitFor([&] { return !picker->property("visible").toBool(); });
+            QMetaObject::invokeMethod(dialog,"close");
+            dialog->setProperty("file",QUrl());
+        });
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        { QFile mix(dir.path()+"/Mix.wav"); QVERIFY(mix.open(QIODevice::WriteOnly)); }
+        QVERIFY(QMetaObject::invokeMethod(dialog,"open")); QTRY_VERIFY(dialog->property("visible").toBool());
+        dialog->setProperty("file",QUrl::fromLocalFile(dir.path()+"/Mix.wav"));
+        auto* choose=visualItem(window->contentItem(),"exportChooseFile"); QVERIFY(choose);
+        click(choose); QTRY_VERIFY(picker->property("visible").toBool());
+        auto* content=qvariant_cast<QQuickItem*>(picker->property("contentItem")); QVERIFY(content);
+        auto* name=visualItemIn(content,"filePickerName"); QVERIFY(name);
+        auto* accept=visualItemIn(content,"filePickerAccept"); QVERIFY(accept);
+        // It opens in the file's folder with its name; that file is there, so: Replace.
+        QCOMPARE(picker->property("folder").toUrl(),QUrl::fromLocalFile(dir.path()));
+        QCOMPARE(name->property("text").toString(),QStringLiteral("Mix.wav"));
+        QTRY_COMPARE(accept->property("text").toString(),QStringLiteral("Replace"));
+        QTRY_VERIFY(visualItemIn(content,"filePickerRow_Mix.wav"));
+        // A new name gets the format's extension.
+        name->setProperty("text",QStringLiteral("New mix"));
+        QTRY_COMPARE(accept->property("text").toString(),QStringLiteral("Choose"));
+        click(accept); QTRY_VERIFY(!picker->property("visible").toBool());
+        QCOMPARE(dialog->property("file").toUrl(),QUrl::fromLocalFile(dir.path()+"/New mix.wav"));
+        QVERIFY(!QFile::exists(dir.path()+"/New mix.wav"));                 // choosing writes nothing
+        // An empty name can't be chosen.
+        click(choose); QTRY_VERIFY(picker->property("visible").toBool());
+        name->setProperty("text",QString());
+        QTRY_VERIFY(!accept->isEnabled());
+        // Cancel closes it (before the export dialog, as only the top one takes Esc).
+        QVERIFY(QMetaObject::invokeMethod(picker,"reject"));
+        QTRY_VERIFY(!picker->property("visible").toBool());
     }
     void view_menu_ticks_follow_the_panels_and_requests_toggles() {
         auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
