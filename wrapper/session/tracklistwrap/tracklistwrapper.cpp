@@ -44,7 +44,8 @@ QVariantMap clipMap(const TrackList::ClipInfo& clip)
         {"isRecorded", clip.isRecorded}, {"notes", noteList(clip.notes)},
         {"reversed", clip.reversed}, {"polarityInverted", clip.polarityInverted},
         {"hasEffects", clip.fx.hasEffects()},
-        {"fadeInBeats", clip.fadeInBeats}, {"fadeOutBeats", clip.fadeOutBeats}};
+        {"fadeInBeats", clip.fadeInBeats}, {"fadeOutBeats", clip.fadeOutBeats},
+        {"takeCount", clip.takeCount}, {"activeTake", clip.activeTake}};   // restMap G11
 }
 QVariantList choices(const std::vector<TrackList::TrackChoice>& entries)
 {
@@ -957,6 +958,20 @@ bool TrackListWrapper::canApplyClipTool(const QVariantList& values) const
     return ids && m_state.canApplyClipTool(*ids);
 }
 
+bool TrackListWrapper::takeAction(const QVariantList& values, const QString& action, int index)
+{
+    const auto ids = clipIds(values);
+    if (!ids) return false;
+    TrackList::Change change;
+    if (action == "set") change = m_state.setActiveTake(*ids, index);
+    else if (action == "next") change = m_state.nextTake(*ids);
+    else if (action == "delete") change = m_state.deleteActiveTake(*ids);
+    else if (action == "crop") change = m_state.cropToActiveTake(*ids);
+    else return false;
+    if (change.changed) notifyClipEdit(-1);
+    return change.changed;
+}
+
 bool TrackListWrapper::applyClipTool(const QVariantList& values, const QString& tool)
 {
     const auto ids = clipIds(values);
@@ -1227,15 +1242,17 @@ void TrackListWrapper::setSampleRate(double rate) { m_state.setSampleRate(rate);
 
 int TrackListWrapper::recordingTrackId() const { return m_state.recordingTrackId(); }
 
-bool TrackListWrapper::attachTake(int id, std::int64_t start, std::shared_ptr<const AudioData> audio, bool printed)
+bool TrackListWrapper::attachTake(int id, std::int64_t start, std::shared_ptr<const AudioData> audio, bool printed,
+                                  const TrackList::TakeShape& shape)
 {
-    if (!m_state.attachTake(id, start, std::move(audio), printed)) return false;
+    if (!m_state.attachTake(id, start, std::move(audio), printed, shape)) return false;
     notifyClipEdit(id); return true;
 }
 
-bool TrackListWrapper::attachMidiTake(int id, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes)
+bool TrackListWrapper::attachMidiTake(int id, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes,
+                                      const TrackList::TakeShape& shape)
 {
-    if (!m_state.attachMidiTake(id, start, length, std::move(notes))) return false;
+    if (!m_state.attachMidiTake(id, start, length, std::move(notes), shape)) return false;
     notifyClipEdit(id); return true;
 }
 

@@ -38,8 +38,11 @@ MediaCollection collectMedia(const Project& project, const TrackList::MediaPaths
 
     std::set<std::string> files;   // each file once, in a stable order
     for (const auto& track : project.tracks())
-        for (const auto& clip : track->audioClips)
+        for (const auto& clip : track->audioClips) {
             if (!clip.poolId.empty() && media.contains(clip.poolId)) files.insert(clip.poolId);
+            for (const auto& take : clip.takes.list)   // the other takes travel too (restMap G11)
+                if (!take.poolId.empty() && media.contains(take.poolId)) files.insert(take.poolId);
+        }
 
     std::set<fs::path> taken;      // copies made in this save (two sources with one name)
     for (const auto& source : files) {

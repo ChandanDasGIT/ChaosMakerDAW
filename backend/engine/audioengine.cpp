@@ -257,7 +257,7 @@ void AudioEngine::processInput(const AudioIO& io) noexcept
         case EngineCommand::Type::StartRecording:
             if (command.recorder && !m_recorder) {
                 cancelRingOut();
-                m_recorder = command.recorder; m_recorder->begin(m_position);
+                m_recorder = command.recorder; m_recorder->begin(m_position); m_recordedFrames = 0;
                 m_recordingStart.store(m_position, std::memory_order_relaxed); m_playing = true;
             }
             break;
@@ -270,6 +270,7 @@ void AudioEngine::processInput(const AudioIO& io) noexcept
                     if (entry.midiRecorder) entry.midiRecorder->begin(m_position);
                 }
                 m_recordingStart.store(m_position,std::memory_order_relaxed);
+                m_recordedFrames=0;
                 if (command.a>0 && command.a<INT64_MAX/4) {
                     m_countInTarget=m_position; m_position-=command.a;
                 }
@@ -425,7 +426,7 @@ void AudioEngine::finishRecording() noexcept
         for(auto& entry:group->entries) {
             if(entry.active) {
                 if (entry.recorder) entry.recorder->releaseFromAudio();
-                if (entry.midiRecorder) entry.midiRecorder->finish(m_position);
+                if (entry.midiRecorder) entry.midiRecorder->finish(recordingClock());
                 entry.active=false;
             }
         }
@@ -653,13 +654,14 @@ void AudioEngine::mixPlayback(const AudioIO& io, const EngineSnapshot* snapshot,
             m_position=snapshot->playbackEnd; endPlayback();
         }
         bool blockLoopWrapped = false;
-        if (m_playing && m_looping && !m_recorder && m_position >= m_loopEnd) {
+        // Recording keeps looping (restMap G11): the take runs on; passes are cut afterwards.
+        if (m_playing && m_looping && m_position >= m_loopEnd) {
             m_position = m_loopStart;
             blockLoopWrapped = true;
         }
         int count = std::min(m_fxBlockFrames, frames-offset);
         if (bounded && m_playing) count=int(std::min<std::int64_t>(count,snapshot->playbackEnd-m_position));
-        if (m_playing && m_looping && !m_recorder) count = int(std::min<std::int64_t>(count,m_loopEnd-m_position));
+        if (m_playing && m_looping) count = int(std::min<std::int64_t>(count,m_loopEnd-m_position));
         for (int c=0;c<2;++c) {
             if (io.output.channelCount>0) std::copy_n(io.output.channel(std::min(c,io.output.channelCount-1))+offset,count,m_liveAudio[c].data());
             else std::fill_n(m_liveAudio[c].data(),count,0);
@@ -776,7 +778,7 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
             const auto track=std::find_if(snapshot.tracks.begin(),snapshot.tracks.end(),[&](const auto& t){return t.trackId==entry.trackId;});
             if(track==snapshot.tracks.end() || !track->armed) {
                 if (entry.recorder) entry.recorder->releaseFromAudio();
-                if (entry.midiRecorder) entry.midiRecorder->finish(m_position);
+                if (entry.midiRecorder) entry.midiRecorder->finish(recordingClock());
                 entry.active=false;
             } else {
                 active=true;
@@ -799,14 +801,15 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
             m_position=snapshot.playbackEnd; endPlayback();
         }
         bool blockLoopWrapped = false;
-        if(m_playing && m_looping && !m_recordingGroup && m_position>=m_loopEnd) {
+        // Recording keeps looping (restMap G11), except during the count-in.
+        if(m_playing && m_looping && m_countInTarget<0 && m_position>=m_loopEnd) {
             m_position=m_loopStart;
             blockLoopWrapped = true;
         }
         int count=std::min(m_fxBlockFrames,frames-offset);
         if (m_countInTarget>=0) count=int(std::min<std::int64_t>(count,m_countInTarget-m_position));
         if (bounded && m_playing) count=int(std::min<std::int64_t>(count,snapshot.playbackEnd-m_position));
-        if(m_playing && m_looping && !m_recordingGroup)count=int(std::min<std::int64_t>(count,m_loopEnd-m_position));
+        if(m_playing && m_looping && m_countInTarget<0)count=int(std::min<std::int64_t>(count,m_loopEnd-m_position));
         bool failed=false;
         for(const auto& track:snapshot.tracks) {
             RecordingGroup::Entry* recording=nullptr;
@@ -878,12 +881,12 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
             if(recording && recording->midiRecorder && m_countInTarget < 0 && offset == 0) {
                 if (routeHw && io.midiIn) {
                     for(const auto& ev : io.midiIn->events()) {
-                        recording->midiRecorder->capture(ev, m_position);
+                        recording->midiRecorder->capture(ev, recordingClock());
                     }
                 }
                 for(int i = 0; i < m_liveMidiCount; ++i) {
                     if (m_liveMidiBatch[i].trackId < 0 || m_liveMidiBatch[i].trackId == track.trackId) {
-                        recording->midiRecorder->capture(m_liveMidiBatch[i].event, m_position);
+                        recording->midiRecorder->capture(m_liveMidiBatch[i].event, recordingClock());
                     }
                 }
             }
@@ -928,6 +931,7 @@ void AudioEngine::renderTracks(const AudioIO& io, const EngineSnapshot& snapshot
         }
         applyMasterEffects(io, snapshot, offset, count);
         mixMetronome(io,offset,count,snapshot.tempo);
+        if(m_playing && m_recordingGroup && m_countInTarget<0) m_recordedFrames+=count;
         if(m_playing)m_position=std::min<std::int64_t>(INT64_MAX/2,m_position+count);
         if (m_countInTarget>=0 && m_position>=m_countInTarget) m_countInTarget=-1;
         if (bounded && m_playing && m_position==snapshot.playbackEnd) endPlayback();

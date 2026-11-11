@@ -46,20 +46,22 @@ std::string ProjectDocument::serialize(const Project& project,
             eqJson.push_back(v);
         }
         json clipsJson = json::array();
-        for (const auto& clip : track->audioClips) {
-            std::string clipPath = clip.poolId;
+        // A file as the project stores it: moved by a media collect, relative when inside.
+        const auto savedPath = [&](const std::string& poolId) {
+            std::string path = poolId;
             if (pathMap) {
-                if (const auto moved = pathMap->find(clip.poolId); moved != pathMap->end()) clipPath = moved->second;
+                if (const auto moved = pathMap->find(poolId); moved != pathMap->end()) path = moved->second;
             }
             if (!baseDirectory.empty()) {
                 std::error_code ec;
-                auto rel = std::filesystem::relative(clipPath, baseDirectory, ec);
-                if (!ec && !rel.empty() && !rel.string().starts_with("..")) {
-                    clipPath = rel.string();
-                }
+                auto rel = std::filesystem::relative(path, baseDirectory, ec);
+                if (!ec && !rel.empty() && !rel.string().starts_with("..")) path = rel.string();
             }
+            return path;
+        };
+        for (const auto& clip : track->audioClips) {
             json clipObj;
-            clipObj["path"] = clipPath;
+            clipObj["path"] = savedPath(clip.poolId);
             clipObj["hasAudio"] = mediaPaths.contains(clip.poolId);
             clipObj["start"] = std::to_string(clip.start);
             clipObj["length"] = std::to_string(clip.length);
@@ -71,6 +73,25 @@ std::string ProjectDocument::serialize(const Project& project,
             if (clip.reversed) clipObj["reversed"] = true;                   // restMap G14
             if (clip.polarityInverted) clipObj["polarityInverted"] = true;
             if (clip.fx.hasEffects()) clipObj["effects"] = effectstatejson::toJson(clip.fx);   // restMap R2
+            if (!clip.takes.list.empty()) {   // restMap G11: the other takes; null = the clip itself
+                json list = json::array();
+                for (std::size_t i = 0; i < clip.takes.list.size(); ++i) {
+                    if (int(i) == clip.takes.active) { list.push_back(nullptr); continue; }
+                    const auto& take = clip.takes.list[i];
+                    json takeObj{{"path", savedPath(take.poolId)}, {"hasAudio", mediaPaths.contains(take.poolId)},
+                                 {"lead", take.lead}};
+                    if (take.reversed) takeObj["reversed"] = true;
+                    if (!take.notes.empty()) {
+                        json notesJson = json::array();
+                        for (const auto& n : take.notes)
+                            notesJson.push_back({{"pitch", n.note}, {"start", n.startBeat},
+                                                 {"length", n.lengthBeats}, {"velocity", n.velocity}});
+                        takeObj["notes"] = std::move(notesJson);
+                    }
+                    list.push_back(std::move(takeObj));
+                }
+                clipObj["takes"] = {{"active", clip.takes.active}, {"list", std::move(list)}};
+            }
             if (!clip.notes.empty()) {
                 // Stored clip-relative (0 = clip start) so notes stay on the clip even if the
                 // project is reopened at another sample rate.
@@ -439,14 +460,25 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             clip.fadeIn = std::min(clip.fadeIn, clip.length);
             clip.fadeOut = std::min(clip.fadeOut, clip.length - clip.fadeIn);
 
-            std::string resolvedPath = pathStr;
-            if (!baseDirectory.empty() && !pathStr.empty()) {
-                std::error_code ec;
-                auto candidatePath = baseDirectory / pathStr;
-                if (std::filesystem::exists(candidatePath, ec)) {
-                    resolvedPath = candidatePath.string();
+            // A stored path: inside the project's folder when it is there.
+            const auto resolve = [&](const std::string& stored) {
+                if (!baseDirectory.empty() && !stored.empty()) {
+                    std::error_code ec;
+                    auto candidatePath = baseDirectory / stored;
+                    if (std::filesystem::exists(candidatePath, ec)) return candidatePath.string();
                 }
-            }
+                return stored;
+            };
+            const auto loadMedia = [&](const std::string& path) {
+                mediaPaths.insert(path);
+                if (audio.contains(path)) return;
+                try {
+                    audio[path] = loadTakeWav(path);
+                } catch (...) {
+                    missing.push_back(std::filesystem::path(path).filename().string());
+                }
+            };
+            const std::string resolvedPath = resolve(pathStr);
             clip.poolId = resolvedPath;
             clip.effectsPrinted = c.value("effectsPrinted", true);
             // Optional (restMap G14): older files play forwards and upright.
@@ -492,15 +524,62 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
                 }
             }
 
-            if (hasAudio) {
-                mediaPaths.insert(resolvedPath);
-                if (!audio.contains(resolvedPath)) {
-                    try {
-                        audio[resolvedPath] = loadTakeWav(resolvedPath);
-                    } catch (...) {
-                        missing.push_back(std::filesystem::path(resolvedPath).filename().string());
-                    }
+            if (hasAudio) loadMedia(resolvedPath);
+
+            if (c.contains("takes")) {   // restMap G11; optional, older projects have none
+                const auto& takesJson = c["takes"];
+                const bool shaped = takesJson.is_object() && takesJson.contains("active") && takesJson["active"].is_number_integer()
+                    && takesJson.contains("list") && takesJson["list"].is_array() && takesJson["list"].size() >= 2;
+                const int active = shaped ? takesJson["active"].get<int>() : -1;
+                if (!shaped || active < 0 || active >= int(takesJson["list"].size()) || !takesJson["list"][std::size_t(active)].is_null()) {
+                    error = "Invalid clip takes.";
+                    return false;
                 }
+                std::vector<ClipTake> takes;
+                for (const auto& tj : takesJson["list"]) {
+                    ClipTake take;
+                    if (!tj.is_null()) {
+                        if (!tj.is_object() || !tj.contains("path") || !tj["path"].is_string()
+                            || !tj.contains("lead") || !tj["lead"].is_number()
+                            || (tj.contains("reversed") && !tj["reversed"].is_boolean())
+                            || (tj.contains("hasAudio") && !tj["hasAudio"].is_boolean())
+                            || (tj.contains("notes") && !tj["notes"].is_array())) {
+                            error = "Invalid clip takes.";
+                            return false;
+                        }
+                        take.poolId = resolve(tj["path"].get<std::string>());
+                        take.lead = tj["lead"].get<double>() * rate / oldRate;
+                        take.reversed = tj.value("reversed", false);
+                        if (!std::isfinite(take.lead) || std::abs(take.lead) > double(INT64_MAX / 4)) {
+                            error = "Invalid clip takes.";
+                            return false;
+                        }
+                        if (tj.value("hasAudio", false)) loadMedia(take.poolId);
+                        int noteId = 1;
+                        for (const auto& nj : tj.value("notes", json::array())) {
+                            if (!nj.is_object() || !nj.contains("pitch") || !nj["pitch"].is_number_integer()
+                                || !nj.contains("start") || !nj["start"].is_number() || !nj.contains("length")
+                                || !nj["length"].is_number() || !nj.contains("velocity") || !nj["velocity"].is_number_integer()) {
+                                error = "Invalid clip takes.";
+                                return false;
+                            }
+                            MidiNote n;
+                            n.id = noteId++;
+                            n.note = nj["pitch"].get<int>();
+                            n.startBeat = nj["start"].get<double>();
+                            n.lengthBeats = nj["length"].get<double>();
+                            n.velocity = nj["velocity"].get<int>();
+                            if (n.note < 0 || n.note > 127 || n.velocity < 0 || n.velocity > 127
+                                || !std::isfinite(n.startBeat) || !std::isfinite(n.lengthBeats) || n.lengthBeats <= 0) {
+                                error = "Invalid clip takes.";
+                                return false;
+                            }
+                            take.notes.push_back(n);
+                        }
+                    }
+                    takes.push_back(std::move(take));
+                }
+                cliptakes::set(clip, std::move(takes), active);
             }
 
             const int clipId = candidate.addAudioClip(track.id, std::move(clip));

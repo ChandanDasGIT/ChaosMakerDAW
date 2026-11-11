@@ -242,6 +242,8 @@ Item {
         property real targetLength: 0
         property bool targetIsRecorded: false
         property string targetLabel: ""
+        property int targetTakeCount: 1
+        property int targetActiveTake: 0
 
         ThemedMenuItem {
             id: openPianoRollAction
@@ -310,6 +312,47 @@ Item {
             enabled: !!root.trackModel && !root.recording && root.hasTimeSelection
                      && root.trackModel.canHaveClipEffects(clipContextMenu.targetClipId)
             onTriggered: root.effectsOnSelection(clipContextMenu.targetTrackId)
+        }
+        ThemedMenuSeparator {}
+        // Takes (restMap G11): which one the selected clips play; one undo step each.
+        ThemedMenu {
+            id: takesMenu
+            objectName: "clipTakesMenu"
+            title: clipContextMenu.targetTakeCount > 1
+                   ? "Takes (" + (clipContextMenu.targetActiveTake + 1) + " of " + clipContextMenu.targetTakeCount + ")"
+                   : "Takes"
+            enabled: clipContextMenu.targetTakeCount > 1 && !!root.trackModel && !root.recording
+            width: 190
+            Instantiator {
+                model: clipContextMenu.targetTakeCount > 1 ? clipContextMenu.targetTakeCount : 0
+                delegate: ThemedMenuItem {
+                    required property int index
+                    objectName: "clipTake_" + index
+                    text: "Take " + (index + 1)
+                    checkable: true
+                    checked: index === clipContextMenu.targetActiveTake
+                    onTriggered: root.trackModel.takeAction(root.selectedClipIds, "set", index)
+                }
+                onObjectAdded: (index, object) => takesMenu.insertItem(index, object)
+                onObjectRemoved: (index, object) => takesMenu.removeItem(object)
+            }
+            ThemedMenuSeparator {}
+            ThemedMenuItem {
+                objectName: "clipNextTakeAction"
+                text: "Next take"
+                shortcutText: Shortcuts.texts["timeline.nextTake"]
+                onTriggered: root.trackModel.takeAction(root.selectedClipIds, "next")
+            }
+            ThemedMenuItem {
+                objectName: "clipDeleteTakeAction"
+                text: "Delete this take"
+                onTriggered: root.trackModel.takeAction(root.selectedClipIds, "delete")
+            }
+            ThemedMenuItem {
+                objectName: "clipCropTakesAction"
+                text: "Crop to this take"
+                onTriggered: root.trackModel.takeAction(root.selectedClipIds, "crop")
+            }
         }
         ThemedMenuSeparator {}
         // Clip tools (restMap G14), on every selected audio clip; one undo step each.
@@ -448,6 +491,13 @@ Item {
         autoRepeat: false
         onActivated: root.trackModel.toggleEnvelopeShown(root.trackModel.selectedTrackId)
     }
+    // Next take on the selected clips (restMap G11; Ctrl+T by default).
+    Shortcut {
+        sequence: Shortcuts.keys["timeline.nextTake"]
+        enabled: root.visible && !root.editingText && !!root.trackModel && !root.recording && root.selectedClipIds.length > 0
+        autoRepeat: false
+        onActivated: root.trackModel.takeAction(root.selectedClipIds, "next")
+    }
 
     Connections {
         target: root.transport
@@ -576,6 +626,8 @@ Item {
                 required property bool hasEffects
                 required property real fadeInBeats
                 required property real fadeOutBeats
+                required property int takeCount
+                required property int activeTake
                 // Fade handle drags (restMap G8): the dragged length in beats, -1 when not dragging.
                 property real dragFadeIn: -1
                 property real dragFadeOut: -1
@@ -596,7 +648,8 @@ Item {
                     anchors.left: parent.left; anchors.leftMargin: 10
                     anchors.top: parent.top; anchors.topMargin: 8
                     text: label + (clipItem.effectsPrinted ? "" : " · Dry") + (clipItem.reversed ? " · Reversed" : "")
-                          + (clipItem.polarityInverted ? " · Ø" : ""); color: Theme.timeline.clipLabel; font.pixelSize: 11
+                          + (clipItem.polarityInverted ? " · Ø" : "")
+                          + (clipItem.takeCount > 1 ? " · Take " + (clipItem.activeTake + 1) + "/" + clipItem.takeCount : ""); color: Theme.timeline.clipLabel; font.pixelSize: 11
                     elide: Text.ElideRight
                     width: Math.max(0, parent.width - 20)
                 }
@@ -805,6 +858,8 @@ Item {
                         clipContextMenu.targetLength = clipItem.lengthBeats
                         clipContextMenu.targetIsRecorded = clipItem.isRecorded
                         clipContextMenu.targetLabel = clipItem.label
+                        clipContextMenu.targetTakeCount = clipItem.takeCount
+                        clipContextMenu.targetActiveTake = clipItem.activeTake
                         const position = mapToItem(root, mouse.x, mouse.y)
                         clipContextMenu.popup(position.x, position.y)
                     }

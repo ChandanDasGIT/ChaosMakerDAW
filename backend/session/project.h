@@ -15,6 +15,7 @@
 #include "automation/volumeenvelope.h"
 #include "plugins/mixfx/mixfxspec.h"
 #include "plugins/effectstate.h"
+#include "session/cliptakes.h"
 
 #include <cstdint>
 #include <array>
@@ -44,6 +45,8 @@ struct AudioClip {
     // Pattern notes. startBeat is measured from the clip's content origin
     // (start - sourceOffset), so trims/splits keep notes fixed in time like audio.
     std::vector<MidiNote> notes;
+    // The other takes (restMap G11; session/cliptakes.h). The fields above are the active one.
+    ClipTakes takes;
 };
 
 // Clip fades as they play (restMap G8). FadeSpan is one clip on a track; playedFades turns a

@@ -187,8 +187,11 @@ TrackList::Change TrackList::applyClipTool(const std::vector<int>& ids, ClipTool
             const std::int64_t used = std::min<std::int64_t>(audio->frames - clip.sourceOffset, std::llround(double(clip.length) * ratio));
             if (tool == ClipTool::Reverse) {
                 // The same stretch of the file, counted from the other end of the reversed copy.
+                const double before = double(clip.sourceOffset) / ratio;
                 clip.sourceOffset = std::max<std::int64_t>(0, audio->frames - (clip.sourceOffset + used));
                 clip.reversed = !clip.reversed;
+                // Its origin moved (restMap G11): the other takes stay where they are.
+                cliptakes::activeOriginMoved(clip, before - double(clip.sourceOffset) / ratio);
             } else if (tool == ClipTool::InvertPolarity) {
                 clip.polarityInverted = !clip.polarityInverted;
             } else {
@@ -516,6 +519,11 @@ std::vector<TrackList::ClipInfo> TrackList::clips() const
         }
         playedFades(spans);
         const auto& tempo = m_project.tempo();
+        for (std::size_t i = 0; i < track.audioClips.size(); ++i) {   // takes (restMap G11)
+            auto& info = result[result.size() - track.audioClips.size() + i];
+            info.takeCount = cliptakes::count(track.audioClips[i]);
+            info.activeTake = cliptakes::active(track.audioClips[i]);
+        }
         for (std::size_t i = 0; i < spans.size(); ++i) {
             auto& info = result[rows[i]];
             const auto end = spans[i].start + spans[i].length;
@@ -718,7 +726,7 @@ bool TrackList::canMergeClips(int trackId, int first, int second) const {
         if (a->start>b->start)std::swap(a,b);
         return a->start+a->length==b->start && a->effectsPrinted==b->effectsPrinted && a->gainDb==b->gainDb
             && a->reversed==b->reversed && a->polarityInverted==b->polarityInverted
-            && a->fadeOut==0 && b->fadeIn==0;
+            && a->takes==b->takes && a->fadeOut==0 && b->fadeIn==0;
     }
     const auto audio=audioFor(a->poolId);
     return m_project.canMergeAudioClips(trackId,first,second,audio ? audio->sampleRate : m_project.tempo().sampleRate());
@@ -889,6 +897,7 @@ bool TrackList::copyClips(const std::vector<int>& ids)
         item.reversed = c.clip.reversed;
         item.polarityInverted = c.clip.polarityInverted;
         item.fx = c.clip.fx;
+        item.takes = c.clip.takes;
         item.trackOffset = c.row - minRow;
         item.notes = c.clip.notes;
         m_clipboard.push_back(std::move(item));
@@ -941,6 +950,7 @@ std::vector<int> TrackList::pasteClips(int targetTrackId, double targetBeat, boo
         clip.reversed = item.reversed;
         clip.polarityInverted = item.polarityInverted;
         clip.fx = item.fx;
+        clip.takes = item.takes;
         clip.notes = item.notes;
         toAdd.emplace_back(destTrackId, std::move(clip));
     }
@@ -1196,37 +1206,187 @@ std::vector<int> TrackList::importAudio(const std::vector<std::shared_ptr<const 
     return clips;
 }
 
-bool TrackList::attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool effectsPrinted)
+namespace {
+// Keeps the part of a recorded clip inside [from, to) (its takes stay lined up). False: none.
+bool cropRecorded(AudioClip& clip, std::int64_t from, std::int64_t to, double ratio)
 {
-    const StepName step(m_project, "Record");
+    const std::int64_t s = std::max(clip.start, from), e = std::min(clip.start + clip.length, to);
+    if (e <= s) return false;
+    clip.sourceOffset += std::llround(double(s - clip.start) * ratio);
+    clip.start = s;
+    clip.length = e - s;
+    return true;
+}
+constexpr std::size_t MaxLoopTakes = 100;
+} // namespace
+
+TrackList::TakeLayout TrackList::takeLayout(double start, double length, const TakeShape& shape)
+{
+    TakeLayout layout;
+    const double end = start + length;
+    if (!shape.loops()) {
+        layout.passFrom = {start};
+        layout.at = start;
+        layout.length = length;
+        return layout;
+    }
+    const double loopStart = double(shape.loopStart), loopEnd = double(shape.loopEnd), span = loopEnd - loopStart;
+    const double from = double(shape.recordStart);
+    // The engine wraps at the loop end; started at or past it, it wraps at once.
+    const double wrap = from < loopEnd ? loopEnd : from;
+    if (from <= loopStart && start <= loopStart && end >= loopEnd) layout.passFrom.push_back(loopStart);
+    if (end >= wrap + span) {
+        const auto passes = std::int64_t(std::floor((end - wrap) / span));
+        for (std::int64_t i = 0; i < passes; ++i) layout.passFrom.push_back(wrap + double(i) * span);
+    }
+    if (layout.passFrom.size() > MaxLoopTakes)
+        layout.passFrom.erase(layout.passFrom.begin(), layout.passFrom.end() - std::ptrdiff_t(MaxLoopTakes));
+    if (!layout.passFrom.empty()) {
+        layout.at = loopStart;
+        layout.length = span;
+        return layout;
+    }
+    // No complete pass: the half-pass is kept as it was recorded.
+    if (from < loopEnd && std::min(end, wrap) > start) {
+        layout.passFrom = {start};
+        layout.at = start;
+        layout.length = std::min(end, wrap) - start;
+    } else if (end > wrap) {
+        layout.passFrom = {wrap};
+        layout.at = loopStart;
+        layout.length = std::min(end - wrap, span);
+    }
+    return layout;
+}
+
+bool TrackList::placeRecorded(int trackId, AudioClip clip, bool punch)
+{
+    const auto* track = m_project.findTrack(trackId);
+    if (!track) return false;
+    if (!punch) return m_project.addAudioClip(trackId, std::move(clip)) >= 0;
+    const std::int64_t a = clip.start, b = clip.start + clip.length;
+    const AudioClip* under = nullptr;
+    int overlapping = 0;
+    for (const auto& c : track->audioClips)
+        if (c.start < b && c.start + c.length > a) { ++overlapping; under = &c; }
+    std::vector<AudioClip> clips;
+    clip.id = m_project.takeClipId();
+    if (overlapping == 1 && under->start <= a && under->start + under->length >= b
+        && isPatternClip(*under) == isPatternClip(clip)) {
+        // Punched inside one clip: its old part becomes the first take(s) under the new one.
+        const AudioClip old = *under;
+        for (const auto& c : track->audioClips) if (c.id != old.id) clips.push_back(c);
+        if (a > old.start) clips.push_back(clipPiece(old, old.start, a));            // keeps the id
+        if (b < old.start + old.length) {
+            auto right = clipPiece(old, b, old.start + old.length);
+            right.id = m_project.takeClipId();
+            clips.push_back(std::move(right));
+        }
+        const auto middle = clipPiece(old, a, b);
+        const double newOrigin = double(clip.start) - double(clip.sourceOffset) / sourceRatio(clip);
+        const double oldOrigin = double(middle.start) - double(middle.sourceOffset) / sourceRatio(middle);
+        std::vector<ClipTake> takes;
+        auto oldTakes = middle.takes.list;   // no takes: the clip itself is the only one
+        if (oldTakes.empty()) oldTakes.resize(1);
+        for (int i = 0; i < int(oldTakes.size()); ++i) {
+            ClipTake take = i == cliptakes::active(middle)
+                ? ClipTake{middle.poolId, middle.reversed, 0.0, middle.notes} : oldTakes[std::size_t(i)];
+            take.lead += oldOrigin - newOrigin;
+            takes.push_back(std::move(take));
+        }
+        const int active = int(takes.size()) + cliptakes::active(clip);
+        auto newTakes = clip.takes.list;
+        if (newTakes.empty()) newTakes.resize(1);
+        takes.insert(takes.end(), newTakes.begin(), newTakes.end());
+        cliptakes::set(clip, std::move(takes), active);
+    } else {
+        clips = clipsWithoutSpan(*track, a, b, false);   // what was there is replaced
+    }
+    clips.push_back(std::move(clip));
+    std::vector<Project::TrackContent> contents;
+    contents.push_back({trackId, std::move(clips), track->volumeEnvelope});
+    return applyContent(std::move(contents)).changed;
+}
+
+bool TrackList::attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool effectsPrinted,
+                           const TakeShape& shape)
+{
+    const StepName step(m_project, shape.punches() ? "Punch record" : "Record");
     if (!audio || audio->frames <= 0 || !std::isfinite(audio->sampleRate) || audio->sampleRate <= 0
         || !m_project.findTrack(trackId)) return false;
     const double length = audio->frames * m_project.tempo().sampleRate() / audio->sampleRate;
     if (!std::isfinite(length) || length < 1 || length >= double(INT64_MAX/4)) return false;
-    std::int64_t frames = std::llround(length), offset = 0;
-    if (start < 0) {   // compensated to before the song's start: trim the front (G10)
-        const std::int64_t trim = start <= -frames ? frames : -start;
-        if (trim < frames) {
-            offset = std::llround(double(trim) * audio->sampleRate / m_project.tempo().sampleRate());
-            frames -= trim;
-        }   // a take shorter than the shift stays whole, at 0
-        start = 0;
-    }
     const auto& path = audio->path;
+    if (!shape.loops() && !shape.punches()) {
+        std::int64_t frames = std::llround(length), offset = 0;
+        if (start < 0) {   // compensated to before the song's start: trim the front (G10)
+            const std::int64_t trim = start <= -frames ? frames : -start;
+            if (trim < frames) {
+                offset = std::llround(double(trim) * audio->sampleRate / m_project.tempo().sampleRate());
+                frames -= trim;
+            }   // a take shorter than the shift stays whole, at 0
+            start = 0;
+        }
+        m_audio[path] = audio; m_mediaPaths.insert(path);
+        return addAudioClip(trackId, path, start, frames, offset, effectsPrinted) >= 0;
+    }
     m_audio[path] = audio; m_mediaPaths.insert(path);
-    return addAudioClip(trackId, path, start, frames, offset, effectsPrinted) >= 0;
+    // Loop passes and / or the punch range (restMap G11). The file runs on through the wraps.
+    const auto layout = takeLayout(double(start), length, shape);
+    if (layout.passFrom.empty()) return true;                       // nothing inside: nothing kept
+    const double ratio = audio->sampleRate / m_project.tempo().sampleRate();
+    AudioClip clip;
+    clip.poolId = path;
+    clip.effectsPrinted = effectsPrinted;
+    clip.start = std::llround(layout.at);
+    clip.length = std::max<std::int64_t>(1, std::llround(layout.length));
+    clip.sourceOffset = std::llround((layout.passFrom.back() - double(start)) * ratio);
+    std::vector<ClipTake> takes;
+    for (const double from : layout.passFrom) takes.push_back(ClipTake{path, false, layout.passFrom.back() - from, {}});
+    cliptakes::set(clip, std::move(takes), int(layout.passFrom.size()) - 1);
+    const std::int64_t lo = shape.punches() ? std::max<std::int64_t>(0, shape.punchFrom) : 0;
+    const std::int64_t hi = shape.punches() ? shape.punchTo : INT64_MAX / 2;
+    if (!cropRecorded(clip, lo, hi, ratio)) return true;
+    return placeRecorded(trackId, std::move(clip), shape.punches());
 }
-
-bool TrackList::attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes)
+bool TrackList::attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes,
+                               const TakeShape& shape)
 {
-    const StepName step(m_project, "Record MIDI");
+    const StepName step(m_project, shape.punches() ? "Punch record MIDI" : "Record MIDI");
     if (length <= 0 || !m_project.findTrack(trackId)) return false;
     AudioClip clip;
     clip.poolId = "Clip " + std::to_string(m_nextClipNumber++);
-    clip.start = start;
-    clip.length = length;
-    clip.notes = std::move(notes);
-    return m_project.addAudioClip(trackId, std::move(clip)) >= 0;
+    if (!shape.loops() && !shape.punches()) {
+        clip.start = start;
+        clip.length = length;
+        clip.notes = std::move(notes);
+        return m_project.addAudioClip(trackId, std::move(clip)) >= 0;
+    }
+    // Loop passes and / or the punch range (restMap G11): each pass's notes, from its start.
+    const auto layout = takeLayout(double(start), double(length), shape);
+    if (layout.passFrom.empty()) return true;
+    const auto& tempo = m_project.tempo();
+    const double samplesPerBeat = 60.0 * tempo.sampleRate() / tempo.bpm();
+    std::vector<ClipTake> takes;
+    for (const double from : layout.passFrom) {
+        ClipTake take{clip.poolId, false, 0.0, {}};
+        for (const auto& n : notes) {
+            const double on = double(start) + n.startBeat * samplesPerBeat;
+            if (shape.loops() && (on < from || on >= from + layout.length)) continue;   // another pass
+            auto moved = n;
+            moved.startBeat = (on - from) / samplesPerBeat;
+            take.notes.push_back(moved);
+        }
+        takes.push_back(std::move(take));
+    }
+    clip.start = std::llround(layout.at);
+    clip.length = std::max<std::int64_t>(1, std::llround(layout.length));
+    clip.notes = takes.back().notes;
+    cliptakes::set(clip, std::move(takes), int(layout.passFrom.size()) - 1);
+    const std::int64_t lo = shape.punches() ? std::max<std::int64_t>(0, shape.punchFrom) : 0;
+    const std::int64_t hi = shape.punches() ? shape.punchTo : INT64_MAX / 2;
+    if (!cropRecorded(clip, lo, hi, 1.0)) return true;
+    return placeRecorded(trackId, std::move(clip), shape.punches());
 }
 
 // ---- Time selection edits and ripple (restMap G15) ----------------------------------------
@@ -1259,6 +1419,63 @@ VolumeEnvelope withPoints(const VolumeEnvelope& envelope, std::vector<EnvelopePo
     if (!result.setPoints(std::move(points))) return envelope;
     return result;
 }
+}
+
+double TrackList::takeRatio(const std::string& poolId, bool reversed) const
+{
+    if (poolId.starts_with("Clip ") && !m_mediaPaths.contains(poolId) && !m_audio.contains(poolId)) return 1.0;
+    const auto audio = audioFor(reversed ? reversedPoolId(poolId) : poolId);
+    return audio ? audio->sampleRate / m_project.tempo().sampleRate() : 1.0;
+}
+
+TrackList::Change TrackList::editTakes(const std::vector<int>& ids, const std::function<bool(AudioClip&)>& edit)
+{
+    if (editsLocked() || ids.empty()) return {};
+    std::vector<Project::ClipChange> changes;
+    for (const auto& track : m_project.tracks())
+        for (const auto& original : track->audioClips) {
+            if (original.takes.list.empty() || std::find(ids.begin(), ids.end(), original.id) == ids.end()) continue;
+            auto clip = original;
+            if (edit(clip)) changes.push_back({track->id, std::move(clip), false, track->id});
+        }
+    if (changes.empty()) return {true, false};
+    if (!m_project.editClipGroup(changes)) return {};
+    return {true, true};
+}
+
+TrackList::Change TrackList::setActiveTake(const std::vector<int>& ids, int index)
+{
+    const StepName step(m_project, "Switch take");
+    const auto ratioOf = [this](const std::string& pool, bool reversed) { return takeRatio(pool, reversed); };
+    return editTakes(ids, [&](AudioClip& clip) {
+        return index != cliptakes::active(clip) && cliptakes::activate(clip, index, ratioOf);
+    });
+}
+
+TrackList::Change TrackList::nextTake(const std::vector<int>& ids)
+{
+    const StepName step(m_project, "Switch take");
+    const auto ratioOf = [this](const std::string& pool, bool reversed) { return takeRatio(pool, reversed); };
+    return editTakes(ids, [&](AudioClip& clip) {
+        // The next one that can play here (a take that starts after the clip is skipped).
+        const int n = cliptakes::count(clip);
+        for (int k = 1; k < n; ++k)
+            if (cliptakes::activate(clip, (cliptakes::active(clip) + k) % n, ratioOf)) return true;
+        return false;
+    });
+}
+
+TrackList::Change TrackList::deleteActiveTake(const std::vector<int>& ids)
+{
+    const StepName step(m_project, "Delete take");
+    const auto ratioOf = [this](const std::string& pool, bool reversed) { return takeRatio(pool, reversed); };
+    return editTakes(ids, [&](AudioClip& clip) { return cliptakes::remove(clip, cliptakes::active(clip), ratioOf); });
+}
+
+TrackList::Change TrackList::cropToActiveTake(const std::vector<int>& ids)
+{
+    const StepName step(m_project, "Crop to active take");
+    return editTakes(ids, [](AudioClip& clip) { cliptakes::cropToActive(clip); return true; });
 }
 
 double TrackList::sourceRatio(const AudioClip& clip) const
@@ -1435,6 +1652,7 @@ bool TrackList::copyRange(double startBeat, double endBeat)
             item.reversed = piece.reversed;
             item.polarityInverted = piece.polarityInverted;
             item.fx = piece.fx;
+            item.takes = piece.takes;
             item.notes = piece.notes;
             clips.push_back(std::move(item));
             clipRows.push_back(row);
@@ -1558,6 +1776,7 @@ std::vector<int> TrackList::pasteWithContent(int targetRow, double targetBeat, b
         clip.reversed = item.reversed;
         clip.polarityInverted = item.polarityInverted;
         clip.fx = item.fx;
+        clip.takes = item.takes;
         clip.notes = item.notes;
         contents[std::size_t(row)].clips.push_back(std::move(clip));
         added.push_back(contents[std::size_t(row)].clips.back().id);

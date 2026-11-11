@@ -270,3 +270,50 @@ TEST(recording, the_live_waveform_follows_what_the_take_writes)
     take->wait();
     CHECK(take->audio()->frames==take->livePeaks().frames());
 }
+
+TEST(recording, a_take_keeps_running_while_the_loop_wraps_and_midi_is_stamped_on_the_take_clock) {
+    Fixture f;
+    MidiBuffer hwMidi;
+    f.io.midiIn = &hwMidi;
+    for (int i = 0; i < 128; ++i) f.input[i] = 0.25f;
+    auto take = std::make_unique<TakeRecorder>(f.path, 48000);
+    MidiTakeRecorder midiRec(42);
+    RecordingGroup group;
+    group.entries.push_back({42, 0, take.get(), &midiRec, true});
+    auto snapshot = std::make_unique<EngineSnapshot>();
+    snapshot->multiMonitor = true;
+    auto gain = std::make_shared<StereoGain>();                  // an instrument-like chain gets MIDI
+    TrackRender track;
+    track.trackId = 42;
+    track.armed = true;
+    track.chain.push_back(gain.get());
+    snapshot->tracks.push_back(track);
+    snapshot->keepProcessors.push_back(gain);
+    CHECK(f.engine.tryPublishPlayback(snapshot));
+
+    // A 100-sample loop from 100; recording starts at its start (restMap G11).
+    f.command(EngineCommand::Type::SetLoop, 100, 200);
+    f.command(EngineCommand::Type::Seek, 100);
+    EngineCommand recordCmd;
+    recordCmd.type = EngineCommand::Type::StartRecordingGroup;
+    recordCmd.group = &group;
+    CHECK(f.engine.post(recordCmd));
+    f.run();                                                     // 128 frames: wrapped once
+    CHECK(f.engine.position() == 128);                           // 100 -> 200 -> 100 + 28
+    hwMidi.add(MidiEvent{20, 0x90, 64, 100});                    // take clock 228 + 20
+    f.run();
+    hwMidi.clear();
+    hwMidi.add(MidiEvent{5, 0x80, 64, 0});                       // take clock 356 + 5
+    f.run();
+    hwMidi.clear();
+    CHECK(f.engine.position() == 184);                           // 100 + 384 frames, looped
+    CHECK(f.engine.recording());
+    f.command(EngineCommand::Type::StopRecording);
+    f.run();
+
+    CHECK(midiRec.isFinished() && midiRec.startSample() == 100 && midiRec.endSample() == 484);
+    CHECK(midiRec.notes().size() == 1 && midiRec.notes()[0].on == 248 && midiRec.notes()[0].off == 361);
+    take->wait();
+    CHECK(take->done() && take->error().empty());
+    CHECK(loadTakeWav(f.path)->frames == 384);                   // one continuous file
+}

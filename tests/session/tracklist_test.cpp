@@ -910,3 +910,203 @@ TEST(tracklist, every_undo_step_has_a_name_for_the_history_list)
     for (int i = 0; i < 120; ++i) CHECK(tracks.setClipGain(t, b, -double(i % 7) - 1.0).accepted);
     CHECK(project.historyLabels().size() == 100 && project.stepCount() > steps + 100);
 }
+
+namespace {
+// A track with one 2 s clip at 0 playing take A (48 kHz, 4 s); take B (24 kHz, 2 s) lies
+// under it from the same start.
+struct TakesProject {
+    TrackList tracks;
+    int track = -1, clip = -1;
+    std::shared_ptr<AudioData> a = std::make_shared<AudioData>(), b = std::make_shared<AudioData>();
+    TakesProject() {
+        track = tracks.addAudioTrack();
+        a->path = "takeA.wav"; a->sampleRate = 48000; a->frames = 192000; a->channels = {std::vector<float>(192000, 0.1f)};
+        b->path = "takeB.wav"; b->sampleRate = 24000; b->frames = 48000; b->channels = {std::vector<float>(48000, 0.2f)};
+        CHECK(tracks.attachTake(track, 0, a, false));
+        CHECK(tracks.attachTake(track, 0, b, false));                 // registers B's audio
+        const auto& clips = tracks.project().findTrack(track)->audioClips;
+        auto withTakes = clips[0];
+        withTakes.length = 96000;
+        cliptakes::set(withTakes, {ClipTake{}, ClipTake{"takeB.wav", false, 0.0, {}}}, 0);
+        CHECK(tracks.project().editClipGroup({{track, withTakes}, {track, clips[1], true}}));
+        clip = withTakes.id;
+    }
+    const AudioClip& at(int id) { return *tracks.findClip(track, id); }
+};
+}
+
+TEST(tracklist, a_clip_switches_between_takes_and_pieces_of_a_split_pick_their_own)
+{
+    TakesProject p;
+    auto& t = p.tracks;
+    const auto info = t.clips();
+    CHECK(info.size() == 1 && info[0].takeCount == 2 && info[0].activeTake == 0);
+
+    CHECK(t.nextTake({p.clip}).changed);
+    CHECK(p.at(p.clip).poolId == "takeB.wav" && p.at(p.clip).sourceOffset == 0 && t.clips()[0].activeTake == 1);
+    CHECK(t.project().historyLabels().back() == "Switch take");
+    CHECK(t.undo() && p.at(p.clip).poolId == "takeA.wav");
+    CHECK(t.redo() && p.at(p.clip).poolId == "takeB.wav");
+    CHECK(t.nextTake({p.clip}).changed && p.at(p.clip).poolId == "takeA.wav");   // wraps around
+
+    // Comping: split at 1 s; the right piece plays B from B's own 1 s (24000 frames at 24 kHz).
+    const int right = t.splitClipAtBeat(p.track, p.clip, 2.0);
+    CHECK(right > 0 && cliptakes::count(p.at(right)) == 2);
+    CHECK(t.setActiveTake({right}, 1).changed);
+    CHECK(p.at(right).poolId == "takeB.wav" && p.at(right).sourceOffset == 24000);
+    CHECK(p.at(p.clip).poolId == "takeA.wav");
+    CHECK(!t.canMergeClips(p.track, p.clip, right));                // different takes playing
+    CHECK(t.setActiveTake({right}, 0).changed && p.at(right).sourceOffset == 48000);
+    CHECK(t.canMergeClips(p.track, p.clip, right));
+    CHECK(!t.setActiveTake({right}, 0).changed);                   // already playing
+
+    // A moved clip keeps its takes lined up.
+    CHECK(t.moveClipAtBeat(p.track, right, 8.0));
+    CHECK(t.setActiveTake({right}, 1).changed && p.at(right).sourceOffset == 24000);
+    CHECK(t.setActiveTake({right}, 0).changed);
+
+    // Copy / paste carries the takes.
+    CHECK(t.copyClips({right}));
+    const auto pasted = t.pasteClips(p.track, 16.0, false);
+    CHECK(pasted.size() == 1 && p.at(pasted[0]).takes == p.at(right).takes);
+
+    // Reversing the playing take keeps the others where they are.
+    CHECK(t.applyClipTool({p.clip}, TrackList::ClipTool::Reverse).changed);
+    CHECK(p.at(p.clip).reversed && p.at(p.clip).sourceOffset == 144000);
+    CHECK(t.setActiveTake({p.clip}, 1).changed && p.at(p.clip).sourceOffset == 0 && !p.at(p.clip).reversed);
+    CHECK(t.setActiveTake({p.clip}, 0).changed && p.at(p.clip).reversed && p.at(p.clip).sourceOffset == 144000);
+}
+
+TEST(tracklist, takes_that_cannot_play_here_are_skipped_and_takes_can_be_deleted_or_cropped)
+{
+    TakesProject p;
+    auto& t = p.tracks;
+    // Take C starts 0.5 s after the clip: it cannot play from the clip's start.
+    auto clip = p.at(p.clip);
+    cliptakes::set(clip, {ClipTake{}, ClipTake{"takeA.wav", false, 24000.0, {}}, ClipTake{"takeB.wav", false, 0.0, {}}}, 0);
+    CHECK(t.project().editClipGroup({{p.track, clip}}));
+    CHECK(!t.setActiveTake({p.clip}, 1).changed && p.at(p.clip).sourceOffset == 0);
+    CHECK(t.nextTake({p.clip}).changed && p.at(p.clip).poolId == "takeB.wav");   // skips C
+
+    // Deleting the playing take: the next one that can play takes over (A, after wrapping).
+    CHECK(t.deleteActiveTake({p.clip}).changed);
+    CHECK(t.project().historyLabels().back() == "Delete take");
+    CHECK(cliptakes::count(p.at(p.clip)) == 2 && p.at(p.clip).poolId == "takeA.wav");
+    CHECK(t.cropToActiveTake({p.clip}).changed && p.at(p.clip).takes.list.empty());
+    CHECK(t.project().historyLabels().back() == "Crop to active take");
+    CHECK(t.undo() && cliptakes::count(p.at(p.clip)) == 2);
+    // A clip with one take: nothing to do.
+    CHECK(t.cropToActiveTake({p.clip}).changed);
+    CHECK(!t.nextTake({p.clip}).changed && t.nextTake({p.clip}).accepted);
+    // Refused while recording.
+    CHECK(t.undo());
+    t.lockRecordingTrack(p.track);
+    CHECK(!t.nextTake({p.clip}).accepted);
+    t.lockRecordingTrack(-1);
+    // Its only other take (C) cannot play here: nothing to switch to.
+    CHECK(t.nextTake({p.clip}).accepted && p.at(p.clip).poolId == "takeA.wav");
+}
+
+namespace {
+std::shared_ptr<AudioData> recording(const std::string& path, std::int64_t frames, float value = 0.3f)
+{
+    auto audio = std::make_shared<AudioData>();
+    audio->path = path; audio->sampleRate = 48000; audio->frames = frames;
+    audio->channels = {std::vector<float>(std::size_t(frames), value)};
+    return audio;
+}
+}
+
+TEST(tracklist, loop_recording_keeps_each_complete_pass_as_a_take_of_one_clip)
+{
+    // A 1 s loop from 1 s (48 kHz); recorded from its start for 3.5 passes.
+    TrackList tracks;
+    const int t = tracks.addAudioTrack();
+    TrackList::TakeShape shape;
+    shape.recordStart = 48000; shape.loopStart = 48000; shape.loopEnd = 96000;
+    CHECK(tracks.attachTake(t, 48000, recording("loop.wav", 168000), false, shape));
+    const auto& clips = tracks.project().findTrack(t)->audioClips;
+    CHECK(clips.size() == 1);
+    const auto clip = clips[0];
+    CHECK(clip.start == 48000 && clip.length == 48000 && clip.sourceOffset == 96000);   // the last pass plays
+    CHECK(cliptakes::count(clip) == 3 && cliptakes::active(clip) == 2);
+    CHECK(tracks.project().historyLabels().back() == "Record");
+    CHECK(tracks.setActiveTake({clip.id}, 0).changed && tracks.findClip(t, clip.id)->sourceOffset == 0);
+    CHECK(tracks.setActiveTake({clip.id}, 1).changed && tracks.findClip(t, clip.id)->sourceOffset == 48000);
+
+    // Started half a second before the loop, with 480 samples of latency compensation: the
+    // passes still line up with the loop (the file's first 24480 frames are pre-roll).
+    const int u = tracks.addAudioTrack();
+    shape.recordStart = 24000;
+    CHECK(tracks.attachTake(u, 24000 - 480, recording("preroll.wav", 24480 + 2 * 48000 + 1000), false, shape));
+    const auto pre = tracks.project().findTrack(u)->audioClips.at(0);
+    CHECK(pre.start == 48000 && cliptakes::count(pre) == 2 && pre.sourceOffset == 24480 + 48000);
+
+    // Stopped before the loop came round: the half-pass stays as recorded.
+    const int v = tracks.addAudioTrack();
+    shape.recordStart = 60000;
+    CHECK(tracks.attachTake(v, 60000, recording("half.wav", 20000), false, shape));
+    auto half = tracks.project().findTrack(v)->audioClips.at(0);
+    CHECK(half.start == 60000 && half.length == 20000 && half.takes.list.empty());
+    // Wrapped once but no complete pass after it: the part before the wrap is kept.
+    CHECK(tracks.attachTake(v, 60000, recording("half2.wav", 60000), false, shape));
+    half = tracks.project().findTrack(v)->audioClips.at(1);
+    CHECK(half.start == 60000 && half.length == 36000 && half.takes.list.empty());
+
+    // MIDI: each pass's notes, from the pass start.
+    const int m = tracks.addInstrumentTrack();
+    shape.recordStart = 48000;
+    MidiNote first{1, 60, 0.5, 0.25, 100, false}, second{2, 62, 2.25, 0.25, 100, false};   // 24000 / 108000 in
+    CHECK(tracks.attachMidiTake(m, 48000, 2 * 48000 + 10, {first, second}, shape));
+    const auto pattern = tracks.project().findTrack(m)->audioClips.at(0);
+    CHECK(pattern.start == 48000 && pattern.length == 48000 && cliptakes::count(pattern) == 2);
+    CHECK(pattern.notes.size() == 1 && pattern.notes[0].note == 62 && std::abs(pattern.notes[0].startBeat - 0.25) < 1e-9);
+    CHECK(pattern.takes.list[0].notes.size() == 1 && pattern.takes.list[0].notes[0].note == 60);
+}
+
+TEST(tracklist, punch_recording_keeps_the_range_and_the_old_part_becomes_the_first_take)
+{
+    TrackList tracks;
+    const int t = tracks.addAudioTrack();
+    CHECK(tracks.attachTake(t, 0, recording("old.wav", 192000, 0.1f), false));
+    const int old = tracks.project().findTrack(t)->audioClips[0].id;
+    TrackList::TakeShape shape;
+    shape.recordStart = 0; shape.punchFrom = 48000; shape.punchTo = 96000;
+    CHECK(tracks.attachTake(t, 0, recording("new.wav", 144000, 0.2f), false, shape));
+    CHECK(tracks.project().historyLabels().back() == "Punch record");
+    auto clips = tracks.project().findTrack(t)->audioClips;
+    std::sort(clips.begin(), clips.end(), [](const auto& a, const auto& b) { return a.start < b.start; });
+    CHECK(clips.size() == 3);
+    CHECK(clips[0].id == old && clips[0].start == 0 && clips[0].length == 48000 && clips[0].poolId == "old.wav");
+    CHECK(clips[2].start == 96000 && clips[2].length == 96000 && clips[2].sourceOffset == 96000 && clips[2].poolId == "old.wav");
+    const auto punched = clips[1];
+    CHECK(punched.start == 48000 && punched.length == 48000 && punched.poolId == "new.wav" && punched.sourceOffset == 48000);
+    CHECK(cliptakes::count(punched) == 2 && cliptakes::active(punched) == 1);
+    CHECK(tracks.setActiveTake({punched.id}, 0).changed);
+    CHECK(tracks.findClip(t, punched.id)->poolId == "old.wav" && tracks.findClip(t, punched.id)->sourceOffset == 48000);
+    // One undo step: the old clip whole again.
+    CHECK(tracks.undo() && tracks.undo());
+    CHECK(tracks.project().findTrack(t)->audioClips.size() == 1 && tracks.findClip(t, old)->length == 192000);
+
+    // Over a gap between two clips: what was in the range is replaced.
+    const int u = tracks.addAudioTrack();
+    CHECK(tracks.attachTake(u, 0, recording("a.wav", 60000), false));
+    CHECK(tracks.attachTake(u, 90000, recording("b.wav", 60000), false));
+    CHECK(tracks.attachTake(u, 0, recording("c.wav", 192000), false, shape));
+    clips = tracks.project().findTrack(u)->audioClips;
+    std::sort(clips.begin(), clips.end(), [](const auto& a, const auto& b) { return a.start < b.start; });
+    CHECK(clips.size() == 3 && clips[0].length == 48000 && clips[1].poolId == "c.wav" && clips[1].takes.list.empty());
+    CHECK(clips[2].start == 96000 && clips[2].poolId == "b.wav");
+
+    // Nothing recorded inside the range: nothing is added.
+    const auto before = tracks.project().findTrack(u)->audioClips.size();
+    CHECK(tracks.attachTake(u, 200000, recording("late.wav", 1000), false, shape));
+    CHECK(tracks.project().findTrack(u)->audioClips.size() == before);
+
+    // Punch and loop together: the passes, kept inside the range.
+    const int v = tracks.addAudioTrack();
+    shape.loopStart = 0; shape.loopEnd = 144000; shape.recordStart = 0;
+    CHECK(tracks.attachTake(v, 0, recording("both.wav", 2 * 144000), false, shape));
+    const auto both = tracks.project().findTrack(v)->audioClips.at(0);
+    CHECK(both.start == 48000 && both.length == 48000 && cliptakes::count(both) == 2 && both.sourceOffset == 144000 + 48000);
+}

@@ -17,6 +17,7 @@ QtObject {
     readonly property string pause:       "\u2161"       // Ⅱ
     readonly property string stop:        "\u25A0"       // ■
     readonly property string loop:        "\u27F3"       // ⟳
+    readonly property string punch:       "\u21E5\u2022\u21E4" // ⇥•⇤ punch in / out (restMap G11)
 
     // ---- menus and common buttons ----
     readonly property string menuArrow:   "\u25BE"       // ▾ opens a menu or list

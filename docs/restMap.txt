@@ -16,8 +16,8 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 NEXT UP (2026-11-10), the user's order:
   1. G6 volume envelope committed (0597318); G6b curve shapes committed (758f523).
   2. G9, G17, G14 committed (33ef5cc). R2 clip effects committed (e3b3d42).
-     Then import / export (item 6, done first at the user's request). G8 fades committed. G10 latency committed. G15 time selection + ripple committed. G16 shortcuts + undo history DONE (uncommitted). Next:
-     G11, G13, G12. Later option: "render clip effects into the audio" (Reaper's apply FX).
+     Then import / export (item 6, done first at the user's request). G8 fades committed. G10 latency committed. G15 time selection + ripple committed. G16 committed. G11 punch / loop takes DONE (uncommitted). Next:
+     G13, G12. Later option: "render clip effects into the audio" (Reaper's apply FX).
   3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
      reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
      inside this group is to be confirmed with the user.
@@ -369,8 +369,57 @@ Done items stay further down as the record.
         qtrecording 13, qtmultirecording 3, qtmidirecording 1; app log empty (empty profile and
         a session copy). Not yet checked on the real interface: the Preferences line shows
         what JACK reports.
-[ ] G11 Punch in / out and loop recording with takes (comping): record only inside a range;
+[x] G11 Punch in / out and loop recording with takes (comping). DONE 2026-11-11 (uncommitted).
+        Record only inside a range;
         several passes over a loop kept as takes on one clip; pick the best parts.
+        The user's choices (2026-11-11): comping = split the clip and pick each piece's take
+        (clip menu / Next take key; take lanes maybe later); punch range = the time selection
+        while PUNCH is on; punching over audio inside one clip keeps the old part as Take 1 and
+        the new recording as Take 2 (otherwise the old audio in the range is replaced; undo
+        restores); loop recording: only complete passes become takes (a half-pass is kept only
+        when it is the only one).
+        Design: a clip's own poolId / sourceOffset (or notes) ARE its active take, the other
+        takes are kept beside it, so playback, waveforms, fades and export need no change. Loop
+        recording writes one continuous file; at the end it is cut into passes (takes).
+        Steps: 1 takes model (backend/session/cliptakes, AudioClip takes, split / trim / merge /
+        clipboard keep takes, set / next / delete / crop take undoable, saved); 2 engine loops
+        while recording; 3 recording cuts passes into takes + punch trim; 4 wrapper; 5 UI (PUNCH
+        button, "Take 2/3" label, clip menu Takes, Next take shortcut).
+        Step 1 DONE: backend/session/cliptakes (ClipTake {poolId, reversed, lead, notes}; ClipTakes
+        {list, active} with the active entry an empty placeholder; activate / remove / cropToActive /
+        activeOriginMoved). AudioClip::takes; merges need equal takes; clipboard, split pieces and
+        Reverse keep them lined up. TrackList setActiveTake / nextTake (skips takes that start
+        after the clip) / deleteActiveTake / cropToActiveTake ("Switch take", "Delete take",
+        "Crop to active take"); ClipInfo takeCount / activeTake. Saved as "takes": {active, list
+        (null = the clip)}, leads rescaled with the rate; media collect copies take files.
+        Tests: tracklist a_clip_switches_between_takes..., takes_that_cannot_play_here...;
+        projectdocument clip_takes_round_trip....
+        Step 2 DONE: the engine keeps looping while recording (both paths; not during the count-in);
+        a take is one continuous file and its MIDI is stamped on the take clock (recordingClock() =
+        start + frames recorded), not the wrapped playhead. Test: recording
+        a_take_keeps_running_while_the_loop_wraps....
+        Step 3 DONE: TrackList::TakeShape {recordStart, loop, punch} on attachTake / attachMidiTake.
+        takeLayout: complete passes (a pass started before the loop counts from the loop start;
+        latency compensation lines up), at most the last 100; no complete pass: the half-pass as
+        recorded. Punch crops to the range; placeRecorded: inside one clip of the same kind the
+        clip is split and its old part's takes come first under the new one; otherwise the range
+        is replaced. Labels "Record" / "Punch record". Tests: tracklist
+        loop_recording_keeps_each_complete_pass..., punch_recording_keeps_the_range....
+        Step 4 DONE: EngineController punch (transportAction "punch", not while a take runs),
+        recording no longer turns repeat off; the shape is fixed at record time (loop = the
+        samples postRepeatLoop sends; punch = the time selection, which is the repeat range;
+        none: a message). TrackListWrapper clip roles takeCount / activeTake, takeAction(ids,
+        "set" | "next" | "delete" | "crop", index). Test: qtrecording
+        loop_recording_makes_takes_and_punch_keeps_only_the_time_selection.
+        Step 5 DONE: PUNCH button after repeat (Icons.punch); clip label " · Take 2/3"; clip menu
+        "Takes (2 of 3)" submenu (Take N ticked, Next take, Delete this take, Crop to this take)
+        on the selected clips; shortcuts timeline.nextTake (Ctrl+T) and transport.punch (no
+        key). Test: transport_ui clip_takes_show_on_the_clip_the_menu_picks_one_and_punch_toggles.
+        82 UI tests (keyboard, menus, recording, repeat, clips) run offscreen: all pass except
+        two that fail only after ctrl_shift_s_opens_save_as (decimal_bpm..., default_record_mode...;
+        the older order problem noted under G16). App log empty.
+        Not done: loop recording over existing audio layers on top, as any recording did before
+        (only punch turns old audio into takes); take lanes.
 [ ] G12 Tempo and meter changes inside a song (the project has one BPM and one meter today;
         TempoMap is a single tempo). Affects the ruler, grid, metronome, piano roll, Chords
         and drum grooves, and saving.

@@ -1181,14 +1181,24 @@ void EngineController::seekBeat(double beat) {
     if (samples > double(INT64_MAX / 4)) return;
     postTransport(int(EngineCommand::Type::Seek), std::llround(samples));
 }
+std::optional<std::pair<std::int64_t, std::int64_t>> EngineController::rangeSamples(double startBeat, double endBeat) const {
+    const double rate=m_engine->sampleRate()>1000 ? m_engine->sampleRate() : 48000;
+    const double a=startBeat*60*rate/m_bpm,b=endBeat*60*rate/m_bpm;
+    if (!std::isfinite(a) || !std::isfinite(b) || a<0 || b>=double(INT64_MAX/4) || std::llround(b)<=std::llround(a)) return std::nullopt;
+    return std::pair{std::llround(a),std::llround(b)};
+}
 bool EngineController::postRepeatLoop() {
     const double start=m_repeatEndBeat>m_repeatStartBeat ? m_repeatStartBeat : 0;
     const double end=m_repeatEndBeat>m_repeatStartBeat ? m_repeatEndBeat
         : (m_project ? std::max(m_project->contentEndBeats(),m_numerator*4.0/m_denominator) : 4);
-    const double rate=m_engine->sampleRate()>1000 ? m_engine->sampleRate() : 48000;
-    const double a=start*60*rate/m_bpm,b=end*60*rate/m_bpm;
-    if (!std::isfinite(a) || !std::isfinite(b) || b>=double(INT64_MAX/4) || std::llround(b)<=std::llround(a)) return false;
-    return postTransport(int(EngineCommand::Type::SetLoop),std::llround(a),std::llround(b));
+    const auto range=rangeSamples(start,end);
+    return range && postTransport(int(EngineCommand::Type::SetLoop),range->first,range->second);
+}
+// The loop the engine runs (the same samples postRepeatLoop sends) and the punch range.
+TrackList::TakeShape EngineController::recordingShape(std::int64_t recordStart) const {
+    auto shape=m_takeShape;
+    shape.recordStart=recordStart;
+    return shape;
 }
 
 bool EngineController::setRepeatRange(double startBeat, double endBeat) {
@@ -1211,6 +1221,11 @@ void EngineController::transportAction(const QString& action) {
     if (action == "play") { postTransport(int(Type::Play)); return; }
     if (action == "rewind") { seekBeat(0); return; }
     if (action == "forward") { seekBeat(positionBeats() + m_numerator * 4.0 / m_denominator); return; }
+    if (action == "punch") {   // restMap G11
+        if (takeBusy()) { setTransportMessage("Finish the take before changing punch."); return; }
+        m_punch = !m_punch; emit transportChanged();
+        return;
+    }
     if (action == "repeat") {
         if (takeBusy()) { setTransportMessage("Finish the take before changing repeat."); return; }
         if (m_repeating ? postTransport(int(Type::ClearLoop)) : postRepeatLoop()) {
@@ -1231,9 +1246,19 @@ void EngineController::transportAction(const QString& action) {
         setTransportMessage(QString::fromStdString(eligibilityError));
         return;
     }
-    if(m_repeating) {
-        if(!postTransport(int(Type::ClearLoop)))return;
-        m_repeating=false;
+    // restMap G11: recording keeps the loop running (each pass a take) and keeps only the time
+    // selection when PUNCH is on.
+    m_takeShape = {};
+    if (m_repeating) {
+        const double start=m_repeatEndBeat>m_repeatStartBeat ? m_repeatStartBeat : 0;
+        const double end=m_repeatEndBeat>m_repeatStartBeat ? m_repeatEndBeat
+            : (m_project ? std::max(m_project->contentEndBeats(),m_numerator*4.0/m_denominator) : 4);
+        if (const auto loop=rangeSamples(start,end)) { m_takeShape.loopStart=loop->first; m_takeShape.loopEnd=loop->second; }
+    }
+    if (m_punch) {
+        const auto range=m_repeatEndBeat>m_repeatStartBeat ? rangeSamples(m_repeatStartBeat,m_repeatEndBeat) : std::nullopt;
+        if (!range) { setTransportMessage("PUNCH records only inside the time selection: drag one over the part to re-record."); return; }
+        m_takeShape.punchFrom=range->first; m_takeShape.punchTo=range->second;
     }
     const QString folder=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+"/Recordings";
     if(!QDir().mkpath(folder)) { setTransportMessage("Cannot create recordings folder."); return; }
@@ -1298,10 +1323,11 @@ void EngineController::pollTransport() {
         m_engine->recordingStart(),
         m_project ? m_project->project().tempo() : TempoMap{},
         [this](int id, int64_t start, std::shared_ptr<const AudioData> audio, bool printed) {
-            if (m_project) m_project->attachTake(id, start, audio, printed);
+            if (m_project) m_project->attachTake(id, start, audio, printed,
+                recordingShape(start + m_recordingController.latencyCompensation()));
         },
         [this](int id, int64_t start, int64_t length, std::vector<MidiNote> notes) {
-            if (m_project) m_project->attachMidiTake(id, start, length, std::move(notes));
+            if (m_project) m_project->attachMidiTake(id, start, length, std::move(notes), recordingShape(start));
         });
     if (done) completeTake();
     emit transportChanged();
@@ -1310,10 +1336,11 @@ void EngineController::completeTake() {
     if(!takeBusy())return;
     auto result = m_recordingController.completeTake(
         [this](int id, int64_t start, std::shared_ptr<const AudioData> audio, bool printed) {
-            if (m_project) m_project->attachTake(id, start, audio, printed);
+            if (m_project) m_project->attachTake(id, start, audio, printed,
+                recordingShape(start + m_recordingController.latencyCompensation()));
         },
         [this](int id, int64_t start, int64_t length, std::vector<MidiNote> notes) {
-            if (m_project) m_project->attachMidiTake(id, start, length, std::move(notes));
+            if (m_project) m_project->attachMidiTake(id, start, length, std::move(notes), recordingShape(start));
         },
         [this]() {
             if (m_project) m_project->lockRecordingTrack(-1);
@@ -1438,10 +1465,11 @@ void EngineController::shutdownSession() {
     if(takeBusy()) {
         m_recordingController.shutdown(
             [this](int id, int64_t start, std::shared_ptr<const AudioData> audio, bool printed) {
-                if (m_project) m_project->attachTake(id, start, audio, printed);
+                if (m_project) m_project->attachTake(id, start, audio, printed,
+                recordingShape(start + m_recordingController.latencyCompensation()));
             },
             [this](int id, int64_t start, int64_t length, std::vector<MidiNote> notes) {
-                if (m_project) m_project->attachMidiTake(id, start, length, std::move(notes));
+                if (m_project) m_project->attachMidiTake(id, start, length, std::move(notes), recordingShape(start));
             },
             [this]() {
                 if (m_project) m_project->lockRecordingTrack(-1);
