@@ -59,6 +59,9 @@ Item {
     readonly property real rangeEndBeat: editor.rangeEndBeat
 
     signal openPianoRollRequested(int trackId, int clipId, string label, real lengthBeats)
+    // Audio files dropped here (restMap E2): onto the track under the drop, at the drop's beat;
+    // below the tracks, a new track per file. Needs the app's import job.
+    property var importJob: null
 
     // Clip edit actions, shared by the keyboard shortcuts below and the Edit menu.
     // The menu does not need keyboard focus on the timeline; the backend still decides
@@ -967,6 +970,21 @@ Item {
                 }
             }
           }
+        }
+        DropArea {
+            objectName: "timelineFileDrop"
+            x: 0; y: root.rulerHeight; width: root.contentWidth; height: scroll.contentHeight - root.rulerHeight; z: 5
+            keys: ["text/uri-list"]
+            enabled: !!root.importJob && !root.recording
+            onDropped: drop => {
+                const files = drop.urls.filter(url => root.importJob.isImportable(url))
+                if (files.length === 0) return
+                const row = root.rowAt(drop.y)
+                const onTrack = root.trackModel && row >= 0 && row < root.trackModel.count
+                root.importJob.importFiles(files, Math.max(0, drop.x / root.beatWidth),
+                                           onTrack ? root.trackModel.trackIdAt(row) : -1)
+                drop.acceptProposedAction()
+            }
         }
         Rectangle { objectName: "timelinePlayhead"; x: root.playhead; y: 0; width: 2; height: scroll.contentHeight; color: Theme.record; z: 4 }
 

@@ -22,7 +22,17 @@ Window {
         onTransportAction: action => transport.transportAction(action)
         onBpmEdited: value => EngineController.bpm = value
     }
-    TopBar { objectName: "testTopBar"; width: parent.width; timeline: testTimeline }
+    TopBar {
+        id: testTopBar
+        objectName: "testTopBar"; width: parent.width; timeline: testTimeline
+        onExportRequested: testExportDialog.open()
+    }
+    ExportDialog {
+        id: testExportDialog
+        hasTimeSelection: testTimeline.hasTimeSelection
+        selectionStartBeat: testTimeline.rangeStartBeat
+        selectionEndBeat: testTimeline.rangeEndBeat
+    }
     MixerPanel {
         objectName: "testMixer"
         x: 0; y: 650; width: parent.width; height: 166

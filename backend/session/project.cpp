@@ -705,6 +705,28 @@ void Project::rememberEnvelopeEdit(int trackId, automation::VolumeEnvelope befor
     pushHistory(std::move(edit));
 }
 
+bool Project::foldIntoAddedTracks(std::size_t mark, const std::vector<int>& ids)
+{
+    if (ids.empty() || mark > m_history.size() || m_historyPosition != m_history.size()) return false;
+    m_history.erase(m_history.begin() + std::ptrdiff_t(mark), m_history.end());
+    ClipEdit edit;
+    edit.addedTrackIds = ids;
+    m_history.push_back(std::move(edit));
+    if (m_history.size() > 100) m_history.erase(m_history.begin());
+    m_historyPosition = m_history.size();
+    return true;
+}
+
+bool Project::undoChangesTracks() const
+{
+    return canUndo() && !m_history[m_historyPosition - 1].addedTrackIds.empty();
+}
+
+bool Project::redoChangesTracks() const
+{
+    return canRedo() && !m_history[m_historyPosition].addedTrackIds.empty();
+}
+
 void Project::restoreClips(int trackId, std::vector<AudioClip> clips)
 {
     // Clip effect settings are not part of clip-edit undo (like a track's effects): a clip that
@@ -720,7 +742,17 @@ void Project::restoreClips(int trackId, std::vector<AudioClip> clips)
 int Project::undo()
 {
     if (!canUndo()) return -1;
-    const auto& edit = m_history[--m_historyPosition];
+    auto& edit = m_history[--m_historyPosition];
+    if (!edit.addedTrackIds.empty()) {   // an import: the tracks go, kept for redo
+        edit.addedTracks.clear();
+        for (int id : edit.addedTrackIds) {
+            const auto index = indexOfTrack(id);
+            if (index >= m_tracks.size()) continue;
+            edit.addedTracks.emplace_back(index, *m_tracks[index]);
+            m_tracks.erase(m_tracks.begin() + static_cast<std::ptrdiff_t>(index));
+        }
+        return edit.addedTrackIds.front();
+    }
     if (edit.removedTrack) {
         const auto index = std::min(edit.removedIndex, m_tracks.size());
         m_tracks.insert(m_tracks.begin() + static_cast<std::ptrdiff_t>(index), std::make_unique<Track>(*edit.removedTrack));
@@ -737,7 +769,15 @@ int Project::undo()
 int Project::redo()
 {
     if (!canRedo()) return -1;
-    const auto& edit = m_history[m_historyPosition++];
+    auto& edit = m_history[m_historyPosition++];
+    if (!edit.addedTrackIds.empty()) {   // the import again: back at their rows, in reverse
+        for (auto it = edit.addedTracks.rbegin(); it != edit.addedTracks.rend(); ++it) {
+            const auto index = std::min(it->first, m_tracks.size());
+            m_tracks.insert(m_tracks.begin() + static_cast<std::ptrdiff_t>(index), std::make_unique<Track>(it->second));
+        }
+        edit.addedTracks.clear();
+        return edit.addedTrackIds.front();
+    }
     if (edit.removedTrack) {
         const auto index = indexOfTrack(edit.removedTrack->id);
         if (index < m_tracks.size()) m_tracks.erase(m_tracks.begin() + static_cast<std::ptrdiff_t>(index));

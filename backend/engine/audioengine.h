@@ -76,6 +76,12 @@ public:
 
     // Offline rendering uses the same path as the real-time one.
     void renderBlock(const AudioIO& io) noexcept;
+    // Export (restMap F2): while suspended the device gets silence and the engine touches none of
+    // its processors, so an offline render can use them. suspend() waits (up to 300 ms) until the
+    // audio thread has seen it; with no device running it returns at once.
+    void suspend();
+    void resume() noexcept { m_suspended.store(false, std::memory_order_release); }
+    bool suspended() const noexcept { return m_suspended.load(std::memory_order_acquire); }
 
     // AudioCallback, audio thread
     void process(const AudioIO& io) noexcept override;
@@ -113,6 +119,8 @@ private:
     bool m_playing = false, m_looping = false;
     bool m_metronomeEnabled = false;
     bool m_stopAtEnd = true; // Stop playback at the end of the arrangement (user setting).
+    std::atomic<bool> m_suspended{false};
+    std::atomic<std::uint64_t> m_suspendedBlocks{0};
     static constexpr double RingOutSeconds = 2.0;
     std::int64_t m_ringOut = 0;                             // frames of ring-out left after the end
     bool m_endNoteOffs = false;                             // the next block sends the end's note-offs

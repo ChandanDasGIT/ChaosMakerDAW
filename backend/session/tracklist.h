@@ -76,6 +76,11 @@ public:
     // of the piece inside the range, whose effects id is Project::clipEffectsId(id). -1 when no
     // audio clip is under the range, while recording, or for a bad range.
     int splitForRangeEffects(int trackId, double startBeat, double endBeat);
+    // Import (restMap E2): each decoded file (its path set to where it is kept) as a clip at
+    // startBeat. targetTrackId < 0: a new Audio track per file, named after it; otherwise all on
+    // that track. One undo step either way. The ids of the clips added (empty: refused).
+    std::vector<int> importAudio(const std::vector<std::shared_ptr<const AudioData>>& files, double startBeat,
+                                 int targetTrackId = -1, std::vector<int>* newTrackIds = nullptr);
     // Whether a clip can have clip effects: an audio clip (a pattern clip's sound is the
     // track's instrument), not while recording.
     bool canHaveClipEffects(int clipId) const;

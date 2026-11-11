@@ -233,6 +233,9 @@ public:
     // Splits the track's audio clip under the range at its edges (one undo step); the piece
     // inside, or -1.
     Q_INVOKABLE int splitForRangeEffects(int trackId, double startBeat, double endBeat);
+    // Import (restMap E2), for ImportExportWrapper: decoded files kept where their paths say, as
+    // clips at startBeat on new tracks (targetTrackId < 0) or on one track; one undo step.
+    std::vector<int> importAudio(const std::vector<std::shared_ptr<const AudioData>>& files, double startBeat, int targetTrackId);
     Q_INVOKABLE bool applyClipTool(const QVariantList& ids, const QString& tool);
     Q_INVOKABLE bool canMergeSelectedClips(const QVariantList& ids) const;
     Q_INVOKABLE bool mergeSelectedClips(const QVariantList& ids);

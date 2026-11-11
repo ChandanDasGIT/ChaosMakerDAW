@@ -13,7 +13,9 @@ Rectangle {
     property bool pianoRollShown: false
     property bool pianoRollAvailable: false
     readonly property alias appSettings: appSettings
+    readonly property var importJob: projectActions.importJob   // import / export (E2, F2)
     signal closeRequested()
+    signal exportRequested()
     signal toggleMixerRequested()
     signal togglePianoRollRequested()
 
@@ -37,6 +39,7 @@ Rectangle {
             id: projectActions
             trackModel: root.trackModel
             onCloseRequested: root.closeRequested()
+            onExportRequested: root.exportRequested()
         }
 
         EditMenu {

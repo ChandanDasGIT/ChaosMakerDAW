@@ -32,7 +32,8 @@ public:
                                  const std::vector<std::string>& trackEffectsJson,
                                  std::string_view format = projectFormat,
                                  int version = currentVersion,
-                                 const std::filesystem::path& baseDirectory = {});
+                                 const std::filesystem::path& baseDirectory = {},
+                                 const std::unordered_map<std::string, std::string>* pathMap = nullptr);
 
     static bool deserialize(std::string_view jsonStr,
                             ProjectFileContent& outContent,
@@ -45,7 +46,9 @@ public:
                            const TrackList::MediaPaths& mediaPaths,
                            const std::vector<std::string>& trackEffectsJson,
                            std::string_view format = projectFormat,
-                           std::string* error = nullptr);
+                           std::string* error = nullptr,
+                           // Clip files to save under other paths (restMap E4: copies beside the project).
+                           const std::unordered_map<std::string, std::string>* pathMap = nullptr);
 
     static bool loadFromFile(const std::filesystem::path& filePath,
                              ProjectFileContent& outContent,

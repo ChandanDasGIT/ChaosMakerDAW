@@ -188,6 +188,16 @@ public:
     std::optional<TrackChange> undoRestoresTrack() const;
     std::optional<TrackChange> redoRemovesTrack() const;
     void clearHistory() { m_history.clear(); m_historyPosition = 0; }
+    // Several steps since `mark` (a history size taken before) become one step that added the
+    // tracks `ids` (an import, restMap E2): undo removes them with their clips, redo puts them
+    // back. False, and nothing changes, for no ids or a mark past the history.
+    // The current place in the history (a new step drops the undone ones after it).
+    std::size_t historyMark() const noexcept { return m_historyPosition; }
+    bool foldIntoAddedTracks(std::size_t mark, const std::vector<int>& ids);
+    // Whether the next undo / redo adds or removes several tracks at once (an import): views
+    // then reload the whole list.
+    bool undoChangesTracks() const;
+    bool redoChangesTracks() const;
 
     const std::vector<std::unique_ptr<Track>>& tracks() const { return m_tracks; }
     double contentEndBeats() const noexcept;
@@ -211,6 +221,10 @@ private:
         int gainClipId = -1;
         std::optional<Track> removedTrack;
         std::size_t removedIndex = 0;
+        // Tracks this step added (an import): their ids, and while undone their copies at
+        // their rows so redo can put them back.
+        std::vector<int> addedTrackIds;
+        std::vector<std::pair<std::size_t, Track>> addedTracks;
     };
     void pushHistory(ClipEdit edit);
     std::size_t indexOfTrack(int id) const;

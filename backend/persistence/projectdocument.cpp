@@ -32,7 +32,8 @@ std::string ProjectDocument::serialize(const Project& project,
                                        const std::vector<std::string>& trackEffectsJson,
                                        std::string_view format,
                                        int version,
-                                       const std::filesystem::path& baseDirectory)
+                                       const std::filesystem::path& baseDirectory,
+                                       const std::unordered_map<std::string, std::string>* pathMap)
 {
     json doc;
     doc["format"] = std::string(format);
@@ -47,6 +48,9 @@ std::string ProjectDocument::serialize(const Project& project,
         json clipsJson = json::array();
         for (const auto& clip : track->audioClips) {
             std::string clipPath = clip.poolId;
+            if (pathMap) {
+                if (const auto moved = pathMap->find(clip.poolId); moved != pathMap->end()) clipPath = moved->second;
+            }
             if (!baseDirectory.empty()) {
                 std::error_code ec;
                 auto rel = std::filesystem::relative(clipPath, baseDirectory, ec);
@@ -545,7 +549,8 @@ bool ProjectDocument::saveToFile(const std::filesystem::path& filePath,
                                  const TrackList::MediaPaths& mediaPaths,
                                  const std::vector<std::string>& trackEffectsJson,
                                  std::string_view format,
-                                 std::string* error)
+                                 std::string* error,
+                                 const std::unordered_map<std::string, std::string>* pathMap)
 {
     std::error_code ec;
     auto parentDir = filePath.parent_path();
@@ -557,7 +562,7 @@ bool ProjectDocument::saveToFile(const std::filesystem::path& filePath,
         }
     }
 
-    const std::string jsonStr = serialize(project, mediaPaths, trackEffectsJson, format, currentVersion, parentDir);
+    const std::string jsonStr = serialize(project, mediaPaths, trackEffectsJson, format, currentVersion, parentDir, pathMap);
 
     auto tmpPath = filePath;
     tmpPath += ".tmp." + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());

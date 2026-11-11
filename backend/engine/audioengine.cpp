@@ -1,4 +1,6 @@
 #include "audioengine.h"
+#include <chrono>
+#include <thread>
 
 #include <algorithm>
 #include <cmath>
@@ -178,8 +180,22 @@ void AudioEngine::renderBlock(const AudioIO& io) noexcept
     process(io);
 }
 
+void AudioEngine::suspend()
+{
+    const auto before = m_suspendedBlocks.load(std::memory_order_acquire);
+    m_suspended.store(true, std::memory_order_release);
+    // A callback already under way finishes first; the next one sees the flag.
+    for (int i = 0; i < 300 && m_suspendedBlocks.load(std::memory_order_acquire) == before; ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+}
+
 void AudioEngine::process(const AudioIO& io) noexcept
 {
+    if (m_suspended.load(std::memory_order_acquire)) {   // an export renders offline (F2)
+        for (int c = 0; c < io.output.channelCount; ++c) std::fill_n(io.output.channel(c), io.frames, 0.0f);
+        m_suspendedBlocks.fetch_add(1, std::memory_order_acq_rel);
+        return;
+    }
     // Typing-keyboard notes join the device's MIDI input for this block, after its events.
     MidiEvent typed;
     if (!m_keyboardMidi.pop(typed)) { processInput(io); return; }

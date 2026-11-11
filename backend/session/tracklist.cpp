@@ -1066,6 +1066,38 @@ void TrackList::setSampleRate(double rate)
     }
 }
 
+std::vector<int> TrackList::importAudio(const std::vector<std::shared_ptr<const AudioData>>& files, double startBeat,
+                                        int targetTrackId, std::vector<int>* newTrackIds)
+{
+    std::vector<int> clips;
+    const auto start = sampleAtBeat(m_project.tempo(), startBeat);
+    if (editsLocked() || files.empty() || !start) return clips;
+    if (targetTrackId >= 0 && indexOfTrack(targetTrackId) < 0) return clips;
+    const auto mark = m_project.historyMark();
+    std::vector<int> tracks;
+    for (const auto& audio : files) {
+        if (!audio || audio->frames <= 0 || !std::isfinite(audio->sampleRate) || audio->sampleRate <= 0) continue;
+        const double length = double(audio->frames) * m_project.tempo().sampleRate() / audio->sampleRate;
+        if (!std::isfinite(length) || length < 1 || length >= double(INT64_MAX / 4)) continue;
+        int track = targetTrackId;
+        if (track < 0) {
+            const std::string name = std::filesystem::path(audio->path).stem().string();
+            track = startTrack(m_project.addTrack(TrackKind::Audio, name.rfind("import-", 0) == 0 ? name.substr(7) : name, "Audio"));
+            tracks.push_back(track);
+        }
+        m_audio[audio->path] = audio;
+        m_mediaPaths.insert(audio->path);
+        const int clip = addAudioClip(track, audio->path, *start, std::llround(length), 0, true);
+        if (clip >= 0) clips.push_back(clip);
+    }
+    // One undo step: the new tracks go with their clips, or the clips on the one track go.
+    if (!tracks.empty()) m_project.foldIntoAddedTracks(mark, tracks);
+    else while (m_project.historyMark() > mark + 1 && m_project.joinLastClipEdits()) {}
+    if (newTrackIds) *newTrackIds = tracks;
+    if (m_selectedTrackId < 0 && !tracks.empty()) m_selectedTrackId = tracks.front();
+    return clips;
+}
+
 bool TrackList::attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool effectsPrinted)
 {
     if (!audio || audio->frames <= 0 || !std::isfinite(audio->sampleRate) || audio->sampleRate <= 0

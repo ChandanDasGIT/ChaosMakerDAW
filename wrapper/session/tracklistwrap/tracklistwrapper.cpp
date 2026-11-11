@@ -917,6 +917,22 @@ QVariantMap TrackListWrapper::clipEffectsInfo(int clipId) const
             {QStringLiteral("effects"), effectList(clip->fx)}, {QStringLiteral("eqBands"), bands}};
 }
 
+std::vector<int> TrackListWrapper::importAudio(const std::vector<std::shared_ptr<const AudioData>>& files, double startBeat, int targetTrackId)
+{
+    if (targetTrackId >= 0) {
+        const auto clips = m_state.importAudio(files, startBeat, targetTrackId);
+        if (!clips.empty()) notifyClipEdit(targetTrackId);
+        return clips;
+    }
+    // Several new rows at once: views reload the list.
+    beginResetModel();
+    const auto clips = m_state.importAudio(files, startBeat, -1);
+    endResetModel();
+    notifyTrackCountChanged();
+    notifyClipEdit(-1);
+    return clips;
+}
+
 int TrackListWrapper::splitForRangeEffects(int trackId, double startBeat, double endBeat)
 {
     const int clip = m_state.splitForRangeEffects(trackId, startBeat, endBeat);
@@ -1046,6 +1062,12 @@ void TrackListWrapper::notifyClipGainEdit(int trackId) {
 }
 bool TrackListWrapper::undo()
 {
+    // Undoing an import takes several rows away at once: views reload the list.
+    if (m_project.undoChangesTracks()) {
+        beginResetModel(); const bool ok = m_state.undo(); endResetModel();
+        notifyTrackCountChanged(); notifyClipEdit(-1);
+        return ok;
+    }
     // Undoing a track removal puts a row back: announce it so views add just that row.
     if (const auto restore = m_state.undoRestoresTrack()) {
         const int row = static_cast<int>(restore->index);
@@ -1062,6 +1084,11 @@ bool TrackListWrapper::undo()
 }
 bool TrackListWrapper::redo()
 {
+    if (m_project.redoChangesTracks()) {
+        beginResetModel(); const bool ok = m_state.redo(); endResetModel();
+        notifyTrackCountChanged(); notifyClipEdit(-1);
+        return ok;
+    }
     if (const auto removal = m_state.redoRemovesTrack()) {
         const int row = static_cast<int>(removal->index);
         beginRemoveRows({}, row, row);
