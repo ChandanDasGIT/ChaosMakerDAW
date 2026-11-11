@@ -101,3 +101,44 @@ TEST(songrender, normalise_sets_the_peak_and_leaves_silence)
     songrender::normalise(quiet, 0.0f);
     CHECK(quiet[0][0] == 0.0f);
 }
+
+// Delay compensation (restMap G13): a track or clip through noise reduction (2048 samples of
+// delay; nothing learned, so it only delays) exports exactly like one without it.
+TEST(songrender, effects_with_a_delay_are_compensated_so_the_export_stays_in_time)
+{
+    const auto render = [](bool trackFx, bool clipFx) {
+        Project project;
+        project.tempo().set(120.0, 4, 4, 48000.0);
+        auto& track = project.addTrack(TrackKind::Audio, "Vox");
+        AudioClip clip;
+        clip.start = 6000;
+        clip.length = 5000;
+        clip.poolId = "a";
+        clip.effectsPrinted = false;
+        const int id = project.addAudioClip(track.id, clip);
+        if (trackFx) CHECK(project.setTrackEffects(track.id, {"denoise"}));
+        if (clipFx) CHECK(project.setTrackEffects(Project::clipEffectsId(id), {"denoise"}));
+        std::unordered_map<int, SnapshotBuilder::TrackEffects> effects;
+        if (trackFx) SnapshotBuilder::ensureMixEffects(effects[track.id], {"denoise"}, 48000.0, 512);
+        if (clipFx) SnapshotBuilder::ensureMixEffects(effects[Project::clipEffectsId(id)], {"denoise"}, 48000.0, 512);
+        auto audio = constant(5000, 0.5f, -0.5f);
+        songrender::Options o;
+        o.sampleRate = 48000;
+        o.length = 12000;
+        o.tail = 6000;
+        return songrender::render(SnapshotBuilder::buildPlaybackSnapshot(project,
+            [audio](const std::string& p) { return p == "a" ? audio : nullptr; },
+            [&](int fxId) -> const SnapshotBuilder::TrackEffects* {
+                const auto it = effects.find(fxId);
+                return it == effects.end() ? nullptr : &it->second;
+            }, true), o);
+    };
+    const auto plain = render(false, false);
+    CHECK(std::abs(plain[0][7000]) > 0.2f);
+    for (const auto& [trackFx, clipFx] : {std::pair{true, false}, std::pair{false, true}, std::pair{true, true}}) {
+        const auto out = render(trackFx, clipFx);
+        double worst = 0.0;
+        for (std::size_t i = 0; i < plain[0].size(); ++i) worst = std::max(worst, double(std::abs(out[0][i] - plain[0][i])));
+        CHECK(worst < 1e-3);   // the clip end included: the clip effect's delayed tail is heard
+    }
+}

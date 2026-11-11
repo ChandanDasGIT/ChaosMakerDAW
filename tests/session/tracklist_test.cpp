@@ -1,6 +1,9 @@
 #include "testkit.h"
 #include "session/tracklist.h"
+#include "plugins/denoise/denoise.h"
 
+#include <cmath>
+#include <cstdint>
 #include <limits>
 
 TEST(tracklist, catalog_creation_and_unicode_name_colour_rules_preserve_identity_and_history)
@@ -1109,4 +1112,44 @@ TEST(tracklist, punch_recording_keeps_the_range_and_the_old_part_becomes_the_fir
     CHECK(tracks.attachTake(v, 0, recording("both.wav", 2 * 144000), false, shape));
     const auto both = tracks.project().findTrack(v)->audioClips.at(0);
     CHECK(both.start == 48000 && both.length == 48000 && cliptakes::count(both) == 2 && both.sourceOffset == 144000 + 48000);
+}
+
+TEST(tracklist, noise_reduction_learns_the_noise_from_the_time_selection)
+{
+    TrackList tracks;
+    const int t = tracks.addAudioTrack();
+    // 1 s of hiss, then 1 s of a loud tone (48 kHz; 120 BPM: 2 beats a second).
+    auto audio = std::make_shared<AudioData>();
+    audio->path = "vocal.wav"; audio->sampleRate = 48000; audio->frames = 96000;
+    audio->channels = {std::vector<float>(96000)};
+    std::uint32_t seed = 7;
+    for (int i = 0; i < 96000; ++i) {
+        seed = seed * 1664525u + 1013904223u;
+        audio->channels[0][std::size_t(i)] = i < 48000 ? 0.02f * (float(seed >> 8) / float(1u << 24) * 2.0f - 1.0f)
+                                                       : 0.5f * float(std::sin(0.13 * i));
+    }
+    CHECK(tracks.attachTake(t, 0, audio, false));
+    const int clip = tracks.project().findTrack(t)->audioClips[0].id;
+
+    CHECK(tracks.learnNoise(t, 1.0, 1.0) == "Drag a time selection over a part with only noise first.");
+    CHECK(tracks.learnNoise(t, 10.0, 12.0) == "There is no recorded audio in the time selection.");
+    CHECK(tracks.learnNoise(t, 0.0, 0.01).find("too short") != std::string::npos);
+    CHECK(tracks.learnNoise(-5, 0.0, 1.0) == "There is no track or clip for this noise reduction.");
+    CHECK(tracks.mixEffect(t, mixfx::Denoise)->profile.empty());
+
+    // The first half second: the hiss alone, as recorded.
+    CHECK(tracks.learnNoise(t, 0.0, 1.0).empty());
+    const auto profile = tracks.mixEffect(t, mixfx::Denoise)->profile;
+    const auto expected = Denoise::learnProfile(std::vector<float>(audio->channels[0].begin(), audio->channels[0].begin() + 24000));
+    CHECK(profile.size() == expected.size());
+    for (std::size_t k = 0; k < profile.size() && k < expected.size(); ++k) CHECK_NEAR(profile[k], expected[k], 1e-5);
+    CHECK(tracks.ownerAudio(t, 0, 10).size() == 10 && tracks.ownerAudio(t, 200000, 200010).empty());
+
+    // A clip's own noise reduction learns from that clip only (clip gain counts).
+    CHECK(tracks.setClipGain(t, clip, -6.0).changed);
+    const int fx = Project::clipEffectsId(clip);
+    CHECK(tracks.learnNoise(fx, 0.0, 1.0).empty());
+    const auto quieter = tracks.mixEffect(fx, mixfx::Denoise)->profile;
+    CHECK(quieter.size() == profile.size());
+    CHECK(std::abs(20.0 * std::log10(quieter[200] / profile[200]) + 6.0) < 0.1);
 }

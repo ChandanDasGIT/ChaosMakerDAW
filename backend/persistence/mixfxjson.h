@@ -9,6 +9,7 @@
 
 // A mixing plugin's settings in a project file or an FX chain file (restMap G7):
 //   {"bypassed": false, "values": {"threshold": -18, "ratio": 4, ...}}
+// Noise reduction adds "profile": [one level per bin] once it has learned the noise (G13).
 namespace mixfxjson {
 nlohmann::json toJson(const mixfx::Settings& settings);
 // False, with a message and no change, when the JSON is not settings of this type: not an

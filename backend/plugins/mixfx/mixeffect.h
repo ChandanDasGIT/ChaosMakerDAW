@@ -32,6 +32,8 @@ protected:
     double sampleRate() const noexcept { return m_sampleRate; }
     void publishReductionDb(float db) noexcept { m_reductionDb.store(db, std::memory_order_relaxed); }
 
+    // Settings beyond the controls (the noise profile, restMap G13). Any thread; default none.
+    virtual void applyExtra(const mixfx::Settings&) noexcept {}
     virtual void prepareEffect(double sampleRate, int maxFrames) = 0;
     virtual void resetEffect() noexcept = 0;
     // Processes the block in place (up to 2 channels), bypass aside.
@@ -42,6 +44,10 @@ private:
     std::vector<Parameter*> m_controls;
     Parameter* m_bypass = nullptr;
     std::vector<float> m_dry[2];
+    // An effect with a delay (latencySamples) delays its dry signal too, so bypassing it keeps
+    // the track where the engine's delay compensation expects it (restMap G13).
+    std::vector<float> m_delayLine[2];
+    std::size_t m_delayPos = 0;
     double m_sampleRate = 48000.0;
     float m_wet = 1.0f;          // 1 on, 0 bypassed, in between while crossfading
     float m_wetStep = 0.001f;

@@ -597,11 +597,12 @@ void AudioEngine::mixClipWithEffects(const ClipRender& clip, int count, bool res
 {
     if (!clip.audio || clip.audio->channels.empty()) return;
     const int first = int(std::clamp<std::int64_t>(clip.start - m_position, 0, count));
-    const int last = int(std::clamp<std::int64_t>(clip.start + clip.length - m_position, 0, count));
+    const int audioLast = int(std::clamp<std::int64_t>(clip.start + clip.length - m_position, 0, count));
+    const int last = int(std::clamp<std::int64_t>(clip.start + clip.length + clip.tail - m_position, 0, count));
     if (last <= first) return;
     float* buffer[]{m_clipAudio[0].data(), m_clipAudio[1].data()};
     std::fill_n(buffer[0], count, 0.0f); std::fill_n(buffer[1], count, 0.0f);
-    for (int i = first; i < last; ++i) {
+    for (int i = first; i < audioLast; ++i) {
         const double source = clip.sourceOffset + double(m_position + i - clip.start) * clip.audio->sampleRate / m_sampleRate;
         if (source < 0 || source >= clip.audio->frames) continue;
         const auto at = static_cast<std::size_t>(source);

@@ -4,6 +4,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 // The mixing plugins any track can add (restMap G7: compressor, de-esser, reverb, Chaos Verb).
 // Each one is described here once: its controls, their ranges and defaults, and the card each
@@ -18,6 +19,10 @@ inline constexpr std::string_view Delay = "delay";
 inline constexpr std::string_view Limiter = "limiter";
 inline constexpr std::string_view Saturation = "saturation";
 inline constexpr std::string_view Gate = "gate";
+// Noise reduction (restMap G13): learns the noise from a time selection, then turns it down.
+inline constexpr std::string_view Denoise = "denoise";
+// Its learned noise: one level per frequency bin of a 2048-point FFT (DenoiseBins values).
+inline constexpr int DenoiseBins = 1025;
 
 enum class ControlKind {
     Slider,   // a value between min and max
@@ -52,6 +57,8 @@ const Control* findControl(const Spec& spec, std::string_view id);
 struct Settings {
     bool bypassed = false;
     std::map<std::string, float, std::less<>> values;
+    // Noise reduction only (restMap G13): the learned noise level per bin; empty = none yet.
+    std::vector<float> profile;
     bool operator==(const Settings&) const = default;
 };
 
@@ -59,7 +66,7 @@ struct Settings {
 Settings defaults(std::string_view type);
 // The settings made valid for the type: unknown ids dropped, missing ones at their default,
 // nonfinite values at their default, values clamped, choices and switches rounded to a whole
-// index.
+// index. A noise profile is kept only for noise reduction, with DenoiseBins finite levels >= 0.
 Settings sanitize(std::string_view type, const Settings& settings);
 // A control's value from settings (its default when missing; 0 for an unknown control).
 float value(const Spec& spec, const Settings& settings, std::string_view id);

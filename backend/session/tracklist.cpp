@@ -1,4 +1,5 @@
 #include "tracklist.h"
+#include "plugins/denoise/denoise.h"
 #include "dsp/panlaw.h"
 #include "mixer/mixerpanel.h"
 #include "instruments/instrumentcatalog.h"
@@ -415,6 +416,59 @@ TrackList::Change TrackList::setMixEffect(int id, std::string_view type, const m
     if (!before) return {};
     if (!m_project.setTrackMixEffect(id, type, settings)) return {};
     return {true, *before != *mixEffect(id, type)};
+}
+
+std::vector<float> TrackList::ownerAudio(int effectsId, std::int64_t from, std::int64_t to) const
+{
+    std::vector<float> mono;
+    const double rate = m_project.tempo().sampleRate();
+    if (to <= from || from < 0 || double(to - from) > rate * 600.0) return mono;   // at most 10 minutes
+    std::vector<const AudioClip*> clips;
+    if (const auto* clip = m_project.clipOfEffects(effectsId)) clips.push_back(clip);
+    else if (const auto* track = m_project.findTrack(effectsId))
+        for (const auto& clip : track->audioClips) clips.push_back(&clip);
+    mono.assign(std::size_t(to - from), 0.0f);
+    bool any = false;
+    for (const auto* clip : clips) {
+        if (isPatternClip(*clip)) continue;
+        const auto audio = clipAudio(*clip);
+        if (!audio || audio->channels.empty()) continue;
+        const double ratio = audio->sampleRate / rate;
+        const float gain = float(std::pow(10.0, double(clip->gainDb) / 20.0));
+        const std::int64_t s = std::max(from, clip->start), e = std::min(to, clip->start + clip->length);
+        for (std::int64_t p = s; p < e; ++p) {
+            const double source = double(clip->sourceOffset) + double(p - clip->start) * ratio;
+            const auto at = std::size_t(source);
+            if (source < 0.0 || at >= std::size_t(audio->frames)) continue;
+            float sum = 0.0f;
+            for (const auto& channel : audio->channels) {
+                if (at >= channel.size()) continue;
+                const float next = at + 1 < channel.size() ? channel[at + 1] : channel[at];
+                sum += channel[at] + float(source - double(at)) * (next - channel[at]);
+            }
+            mono[std::size_t(p - from)] += sum / float(audio->channels.size()) * gain;
+            any = true;
+        }
+    }
+    if (!any) mono.clear();
+    return mono;
+}
+
+std::string TrackList::learnNoise(int effectsId, double startBeat, double endBeat)
+{
+    if (!std::isfinite(startBeat) || !std::isfinite(endBeat) || endBeat <= startBeat)
+        return "Drag a time selection over a part with only noise first.";
+    auto settings = mixEffect(effectsId, mixfx::Denoise);
+    if (!settings) return "There is no track or clip for this noise reduction.";
+    const auto from = sampleAtBeat(m_project.tempo(), startBeat), to = sampleAtBeat(m_project.tempo(), endBeat);
+    if (!from || !to) return "Drag a time selection over a part with only noise first.";
+    const auto audio = ownerAudio(effectsId, *from, *to);
+    if (audio.empty()) return "There is no recorded audio in the time selection.";
+    auto profile = Denoise::learnProfile(audio);
+    if (profile.empty()) return "The time selection is too short: select at least a twentieth of a second.";
+    settings->profile = std::move(profile);
+    if (!setMixEffect(effectsId, mixfx::Denoise, *settings).accepted) return "The noise could not be kept.";
+    return {};
 }
 TrackList::Change TrackList::setHarmonium(int id, const harmonium::Settings& settings)
 {

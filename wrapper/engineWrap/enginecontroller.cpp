@@ -1211,6 +1211,7 @@ bool EngineController::setRepeatRange(double startBeat, double endBeat) {
     if (m_repeating && !postRepeatLoop()) {
         m_repeatStartBeat=oldStart; m_repeatEndBeat=oldEnd; return false;
     }
+    emit transportChanged();
     return true;
 }
 

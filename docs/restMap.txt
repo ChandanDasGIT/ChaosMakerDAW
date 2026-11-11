@@ -16,8 +16,8 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 NEXT UP (2026-11-10), the user's order:
   1. G6 volume envelope committed (0597318); G6b curve shapes committed (758f523).
   2. G9, G17, G14 committed (33ef5cc). R2 clip effects committed (e3b3d42).
-     Then import / export (item 6, done first at the user's request). G8 fades committed. G10 latency committed. G15 time selection + ripple committed. G16 committed. G11 punch / loop takes DONE (uncommitted). Next:
-     G13, G12. Later option: "render clip effects into the audio" (Reaper's apply FX).
+     Then import / export (item 6, done first at the user's request). G8 fades committed. G10 latency committed. G15 time selection + ripple committed. G16 committed. G11 committed. G13 noise reduction DONE (uncommitted). Next:
+     G12. Later option: "render clip effects into the audio" (Reaper's apply FX).
   3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
      reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
      inside this group is to be confirmed with the user.
@@ -423,8 +423,40 @@ Done items stay further down as the record.
 [ ] G12 Tempo and meter changes inside a song (the project has one BPM and one meter today;
         TempoMap is a single tempo). Affects the ruler, grid, metronome, piano roll, Chords
         and drum grooves, and saving.
-[ ] G13 Noise reduction (mostly vocals): learn the noise from a silent part (room, hiss, hum),
+[x] G13 Noise reduction. DONE 2026-11-11 (uncommitted). Learn the noise from a silent part (room, hiss, hum),
         then remove it from the take. Hand-written spectral subtraction / gating.
+        The user's choices (2026-11-11): an FX plugin ("Noise Reduction", mix-effect type
+        "denoise", on tracks and clips); its own page with a spectrum (learned noise under the
+        live sound); learn from a time selection only (no learn toggle); the engine compensates
+        the effect's delay on playback / export (also the limiter's and amps' small delays).
+        Steps: 1 DSP + profile saved with the settings; 2 engine delay compensation; 3 learn from
+        selection; 4 wrapper page model; 5 NoiseReductionEditor.qml.
+        1 backend/plugins/denoise (Denoise : MixEffect): 2048-point frames, hop 512, sqrt-Hann in
+          and out; gain per bin 1 - k * noise / level (k = Sensitivity), held for Smoothing,
+          averaged over 5 bins, never under the Reduction floor; both channels share one gain;
+          "Hear removed noise"; latency 2048 always (unlearned it only delays). The profile
+          (1025 levels) lives in mixfx::Settings::profile (sanitized, saved by mixfxjson, so
+          projects and FX chain files keep it) and reaches the audio thread through a triple
+          buffer (MixEffect::applyExtra). MixEffect now delays its dry signal by the effect's
+          latency, so a bypassed limiter / saturation / noise reduction stays where the
+          compensation expects it. Catalog entry "Noise Reduction".
+        2 Delay compensation in SnapshotBuilder: a clip's start moves earlier by its clip effects'
+          latency plus the track chain's (unless printed); ClipRender::tail lets clip effects
+          play their delayed end. Live input and MIDI notes are not moved; the first ~43 ms after
+          Play on such a track is silent (the effect fills up).
+        3 TrackList::ownerAudio / learnNoise (track or clip effects id, as recorded, clip gain
+          applied; messages for no selection / no audio / too short).
+        4 DenoiseWrapper: 160 display frequencies, profile / input / output curves (measured
+          the same way: Denoise::learnProfile + curveDb), learn / forget, message.
+          EngineController timeSelectionStartBeat / EndBeat (the repeat range).
+        5 frontend/plugins/denoise/NoiseReductionEditor.qml: spectrum (learned noise filled, in /
+          out lines), Learn from selection / Forget / status, the four controls; the FX window
+          opens it for "denoise".
+        Tests: denoise (4), songrender effects_with_a_delay..., snapshotbuilder clips_are_read_early...,
+        tracklist noise_reduction_learns..., qtdenoise (2), transport_ui
+        noise_reduction_has_its_own_page...; effectchain / picker lists include denoise.
+        99 UI tests: all pass but the two that fail only after ctrl_shift_s_opens_save_as. App
+        log empty. Not yet heard on real recordings.
 [x] G14 Clip tools. DONE 2026-11-11 (uncommitted). The clip menu: Reverse, Normalise (peak to
         0 dBFS, like Reaper; the user chose it), Invert polarity (clip only; the user chose no
         track Ø). On every selected audio clip, one undo step; pattern clips: greyed out.

@@ -26,6 +26,11 @@ struct ClipRender {
     // Clip effects (restMap R2), in order; empty for a plain clip. They run on this clip's audio
     // only, before the track's effects; their tails stop at the clip's end.
     std::vector<Processor*> chain{};
+    // Delay compensation (restMap G13): the clip's effects' delay. The snapshot moves start
+    // earlier by everything the clip goes through (its effects, and the track's when it plays
+    // through them), so it is heard in time; its effects run on this long after its end so
+    // their delayed output is not cut off.
+    std::int64_t tail = 0;
 
     // The fade gain at a sample position on the timeline: equal-power (quarter sine), so two
     // clips crossfading over the same span keep an even loudness. 1 outside the fades.

@@ -7,6 +7,7 @@
 #include "plugins/limiter/limiter.h"
 #include "plugins/saturation/saturation.h"
 #include "plugins/gate/gate.h"
+#include "plugins/denoise/denoise.h"
 
 namespace mixfx {
 
@@ -22,6 +23,7 @@ std::shared_ptr<MixEffect> create(std::string_view type)
     if (type == Limiter) return std::make_shared<::Limiter>();
     if (type == Saturation) return std::make_shared<::Saturation>();
     if (type == Gate) return std::make_shared<::Gate>();
+    if (type == Denoise) return std::make_shared<::Denoise>();
     return nullptr;
 }
 

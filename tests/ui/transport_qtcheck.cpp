@@ -1231,7 +1231,7 @@ private slots:
         QVERIFY(visualItem(window->contentItem(),"addEffectButton")->isEnabled());            // Chaos EQ is still offered
         addEffectFromPicker("chaoseq");
         QVERIFY(visualItem(window->contentItem(),"addEffectButton")->isEnabled());            // the mixing plugins (G7)
-        for(const char* mix:{"compressor","deesser","reverb","chaosverb","delay","limiter","saturation","gate"}) addEffectFromPicker(mix);
+        for(const char* mix:{"compressor","deesser","reverb","chaosverb","delay","limiter","saturation","gate","denoise"}) addEffectFromPicker(mix);
         QVERIFY(!visualItem(window->contentItem(),"addEffectButton")->isEnabled());           // nothing left to add
         {   // a long chain scrolls: Add FX stays inside the window
             auto* add=visualItem(window->contentItem(),"addEffectButton");
@@ -1239,7 +1239,7 @@ private slots:
             auto* chainScroll=visualItem(window->contentItem(),"effectChainScroll"); QVERIFY(chainScroll);
             QVERIFY(chainScroll->property("contentHeight").toDouble()>=chainScroll->height());
         }
-        for(const char* mix:{"compressor","deesser","reverb","chaosverb","delay","limiter","saturation","gate"}) {                    // back to the guitar's chain
+        for(const char* mix:{"compressor","deesser","reverb","chaosverb","delay","limiter","saturation","gate","denoise"}) {                    // back to the guitar's chain
             click(visualItem(window->contentItem(),QString("removeEffect_")+mix)); QTRY_VERIFY(!row(mix));
         }
         click(visualItem(window->contentItem(),"removeEffect_chaoseq"));
@@ -2482,6 +2482,59 @@ private slots:
     }
     void chaosverb_page_shows_its_cards_and_edits_the_track() {
         checkMixEffectPage("chaosverb",{"Character","Space","Movement","Tone"},"decay","mode",false);
+    }
+    void noise_reduction_has_its_own_page_and_learns_from_the_time_selection() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int vocal=tracks.addVocalTrack();
+        auto audio=std::make_shared<AudioData>(); audio->path="noisy-vocal.wav"; audio->sampleRate=48000; audio->frames=96000;
+        audio->channels={std::vector<float>(96000)};
+        std::uint32_t seed=11;
+        for(int i=0;i<96000;++i) {
+            seed=seed*1664525u+1013904223u;
+            audio->channels[0][std::size_t(i)]=i<48000 ? 0.02f*(float(seed>>8)/float(1u<<24)*2.0f-1.0f) : 0.5f*float(std::sin(0.13*i));
+        }
+        audio->buildWaveform();
+        QVERIFY(tracks.attachTake(vocal,0,audio,false));
+        QVERIFY(tracks.addTrackEffect(vocal,"denoise")>0);
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        QObject* panel=nullptr;
+        const auto restore=qScopeGuard([&] {
+            controller->setRepeatRange(0,0);
+            if(panel) QMetaObject::invokeMethod(panel,"close");
+            list->setVisible(false); list->setProperty("trackModel",QVariant());
+        });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QCoreApplication::processEvents();
+        auto* fxButton=visualItem(window->contentItem(),"trackFxButton"+QString::number(vocal)); QVERIFY(fxButton);
+        click(fxButton);
+        panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(vocal)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        auto* row=visualItem(window->contentItem(),"selectEffect_denoise"); QVERIFY(row); click(row);
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("denoise"));
+        // Its own page with a spectrum, not the shared slider page.
+        QQuickItem* page=nullptr;
+        QTRY_VERIFY((page=visualItem(window->contentItem(),"trackNoiseReduction")) && page->isVisible());
+        QVERIFY(!visualItem(window->contentItem(),"trackMixEffect")->isVisible());
+        QVERIFY(visualItem(page,"denoiseSpectrum") && visualItem(page,"denoise.reduction"));
+        auto* status=visualItem(page,"denoiseStatus"); QVERIFY(status);
+        QVERIFY(status->property("text").toString().contains("Select a part with only noise"));
+        // Learn needs a time selection.
+        auto* learn=visualItem(page,"denoiseLearn"); QVERIFY(learn);
+        QVERIFY(!learn->isEnabled());
+        QVERIFY(controller->setRepeatRange(0,1.5));
+        QTRY_VERIFY(learn->isEnabled());
+        click(learn);
+        QTRY_VERIFY(status->property("text").toString().contains("Noise learned"));
+        QCOMPARE(tracks.mixEffect(vocal,mixfx::Denoise)->profile.size(),std::size_t(mixfx::DenoiseBins));
+        auto* forget=visualItem(page,"denoiseForget"); QVERIFY(forget); QTRY_VERIFY(forget->isVisible());
+        QTRY_VERIFY(controller->mixEffectProcessor(vocal,"denoise",true));
+        // A selection with nothing recorded: the page says why.
+        QVERIFY(controller->setRepeatRange(40,42));
+        QTRY_VERIFY(learn->isEnabled()); click(learn);
+        QTRY_VERIFY(status->property("text").toString().contains("no recorded audio"));
+        click(forget);
+        QTRY_VERIFY(tracks.mixEffect(vocal,mixfx::Denoise)->profile.empty());
     }
     void the_master_strip_opens_the_master_effects_and_a_limiter_goes_on_the_mix() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
