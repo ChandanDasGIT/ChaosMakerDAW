@@ -233,6 +233,8 @@ public:
     std::optional<Project::TrackChange> redoRemovesTrack() const { return canRedo() ? m_project.redoRemovesTrack() : std::nullopt; }
     bool setTempo(double bpm, int numerator, int denominator);
     void setSampleRate(double rate);
+    // start may be below 0 after latency compensation (restMap G10): the part before 0 is trimmed
+    // off the front (the clip starts later in its file).
     bool attachTake(int trackId, std::int64_t start, std::shared_ptr<const AudioData> audio, bool printed);
     bool attachMidiTake(int trackId, std::int64_t start, std::int64_t length, std::vector<MidiNote> notes);
 

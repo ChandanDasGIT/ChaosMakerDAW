@@ -191,7 +191,7 @@ bool RecordingController::poll(
         if (take->released() && take->done() && !m_attachedTakes.contains(id)) {
             const auto audio = take->audio();
             if (audio && audio->frames > 0 && attachCallback) {
-                attachCallback(id, take->startSample, audio, take->source() == TakeRecorder::Source::PostFx);
+                attachCallback(id, take->startSample - m_compensation, audio, take->source() == TakeRecorder::Source::PostFx);
             }
             m_attachedTakes.insert(id);
         }
@@ -252,7 +252,7 @@ RecordingController::FinalizeResult RecordingController::completeTake(
         if (audio && audio->frames > 0) {
             if (!m_attachedTakes.contains(id)) {
                 if (attachCallback) {
-                    attachCallback(id, take->startSample, audio, take->source() == TakeRecorder::Source::PostFx);
+                    attachCallback(id, take->startSample - m_compensation, audio, take->source() == TakeRecorder::Source::PostFx);
                 }
                 m_attachedTakes.insert(id);
             }

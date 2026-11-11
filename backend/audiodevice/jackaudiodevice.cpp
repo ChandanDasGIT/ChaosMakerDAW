@@ -88,7 +88,20 @@ double JackAudioDevice::sampleRate() const
 DeviceLatency JackAudioDevice::latency() const
 {
     const int bufferFrames = m_bufferFrames.load(std::memory_order_acquire);
-    return {bufferFrames, bufferFrames, m_requestedBufferFrames};
+    // JACK hands the hardware's latency on to the ports connected to it: the largest capture
+    // latency over our inputs plus the largest playback latency over our outputs (G10).
+    const auto largest = [](const auto& ports, jack_latency_callback_mode_t mode) {
+        jack_nframes_t most = 0;
+        for (auto* port : ports) {
+            if (!port) continue;
+            jack_latency_range_t range{0, 0};
+            jack_port_get_latency_range(port, mode, &range);
+            most = std::max(most, range.max);
+        }
+        return most;
+    };
+    const auto roundTrip = m_client ? largest(m_inputs, JackCaptureLatency) + largest(m_outputs, JackPlaybackLatency) : 0;
+    return {bufferFrames, bufferFrames, m_requestedBufferFrames, int(std::min<jack_nframes_t>(roundTrip, 1u << 20))};
 }
 
 bool JackAudioDevice::setBufferSize(int frames)

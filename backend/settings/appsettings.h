@@ -9,6 +9,10 @@ public:
     static constexpr const char* KeyRestoreSessionOnStartup = "session/restoreOnStartup";
     // Owned by EngineController like the key above: stop playback at the arrangement end (default on).
     static constexpr const char* KeyStopPlaybackAtEnd = "playback/stopAtEnd";
+    // Owned by EngineController too (restMap G10): recording latency compensation (default on)
+    // and the extra offset in ms added to the device's reported round trip (default 0).
+    static constexpr const char* KeyRecordingLatencyCompensation = "recording/latencyCompensation";
+    static constexpr const char* KeyRecordingExtraOffsetMs = "recording/extraOffsetMs";
     static constexpr const char* KeyDefaultProjectDir = "paths/defaultProjectDirectory";
     static constexpr const char* KeyAutoSaveEnabled = "autosave/enabled";
     static constexpr const char* KeyAutoSaveInterval = "autosave/intervalSeconds";

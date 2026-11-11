@@ -667,3 +667,22 @@ TEST(tracklist, clip_fades_are_undoable_split_with_the_clip_and_report_the_cross
     CHECK(tracks.findClip(track, right)->fadeIn == 0 && tracks.findClip(track, right)->fadeOut == 6000);
     CHECK(tracks.canMergeClips(track, a, right));
 }
+
+TEST(tracklist, a_take_compensated_to_before_zero_is_trimmed_at_the_front)
+{
+    // restMap G10. A 24 kHz take in a 48 kHz project: 1000 project samples are 500 file frames.
+    TrackList tracks;
+    tracks.setSampleRate(48000);
+    const int track = tracks.addAudioTrack();
+    auto audio = std::make_shared<AudioData>(); audio->path = "late.wav"; audio->sampleRate = 24000; audio->frames = 24000;
+    audio->channels = {std::vector<float>(24000, 0.2f)};
+    CHECK(tracks.attachTake(track, -1000, audio, false));
+    const auto& clip = tracks.project().findTrack(track)->audioClips.back();
+    CHECK(clip.start == 0 && clip.sourceOffset == 500 && clip.length == 48000 - 1000);
+    // A take shorter than the shift stays whole, at 0.
+    auto tiny = std::make_shared<AudioData>(); tiny->path = "tiny.wav"; tiny->sampleRate = 48000; tiny->frames = 100;
+    tiny->channels = {std::vector<float>(100, 0.2f)};
+    CHECK(tracks.attachTake(track, -500, tiny, false));
+    const auto& small = tracks.project().findTrack(track)->audioClips.back();
+    CHECK(small.start == 0 && small.sourceOffset == 0 && small.length == 100);
+}
