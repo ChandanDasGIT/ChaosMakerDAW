@@ -295,3 +295,50 @@ TEST(drumkit, the_kit_counts_its_hits_per_key_for_the_picture)
     CHECK(drums.hits(66).count == 1 && drums.hits(66).velocity == 37);
     CHECK(drums.hits(-1).count == 0 && drums.hits(128).count == 0);
 }
+
+TEST(drumkit, samples_no_track_plays_are_dropped_from_the_cache)
+{
+    FakeKit kit("trim");
+    auto library = std::make_shared<drumkit::Library>(kit.folder.string());
+    {
+        DrumKit drums(library);
+        drums.prepare(48000.0, 256);
+        drumkit::Settings s;
+        s.room = drumkit::Room::Full;
+        drums.setSettings(s);
+        library->waitUntilIdle();
+        play(drums, {});
+        play(drums, {});
+        library->trim();
+        CHECK(library->cachedSamples() == 9);                     // the front mic's kick too
+
+        s.room = drumkit::Room::Close;
+        drums.setSettings(s);
+        library->waitUntilIdle();
+        CHECK(library->cachedSamples() == 9);                     // the old zones still play
+        play(drums, {});                                          // the audio thread takes the new set
+        play(drums, {});                                          // and retires the old one
+        library->trim();
+        CHECK(library->cachedSamples() == 8);                     // the front mic's kick is gone
+        std::vector<float> out;
+        play(drums, {60}, &out);
+        CHECK(out[10] > 0.1f);                                    // the close kick still plays
+
+        DrumKit second(library);                                  // another track keeps what it uses
+        second.prepare(48000.0, 256);
+        second.setSettings(s);
+        library->waitUntilIdle();
+        play(second, {});
+        play(second, {});
+        library->trim();
+        CHECK(library->cachedSamples() == 8);
+
+        s.room = drumkit::Room::Front;                            // choosing it again reads it again
+        drums.setSettings(s);
+        library->waitUntilIdle();
+        CHECK(library->cachedSamples() == 9);
+        play(drums, {});
+    }
+    library->trim();                                              // no Drums track left
+    CHECK(library->cachedSamples() == 0);
+}

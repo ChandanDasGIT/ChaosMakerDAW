@@ -3,6 +3,7 @@
 #include "instruments/sampler/samplezone.h"
 #include "instruments/sfz/sfzloader.h"
 
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <memory>
@@ -19,6 +20,11 @@ class Sampler;
 // folder next to the program (up to three folders up: build/appChaosMaker finds the
 // project's sample-kits). Loading and every rebuild for new settings run on one background
 // thread; finished zones go to the track's sampler with Sampler::stageZones().
+//
+// Samples no track plays any more (another room, a removed Drums track) are dropped from the
+// cache: the old zones are freed only once the audio thread lets go of them, so after every
+// rebuild, and after trimSoon(), the worker tries trim() every TrimInterval, TrimAttempts times.
+// Choosing a room again reads its samples from disk again.
 namespace drumkit {
 
 constexpr const char* KitFolderName = "AccousticDrums/Gogodze_Phu_vol_II";
@@ -58,6 +64,16 @@ public:
     std::string kitFolder() const { return m_folder; }
     void waitUntilIdle();                 // tests: every request handled
 
+    // Frees the zone sets the tracks' samplers retired, then drops the cached samples no zone
+    // uses. Returns how many samples were dropped. Any thread; waits for a build in progress.
+    int trim();
+    // Has the worker trim() again for a while (a track's kit is going away).
+    void trimSoon();
+    int cachedSamples() const;            // samples held in memory now
+
+    static constexpr std::chrono::milliseconds TrimInterval{500};
+    static constexpr int TrimAttempts = 20;
+
 private:
     struct Job {
         std::weak_ptr<Sampler> target;
@@ -70,6 +86,10 @@ private:
     mutable std::mutex m_mutex;
     std::condition_variable m_wake, m_idle;
     std::deque<Job> m_jobs;
+    std::vector<std::weak_ptr<Sampler>> m_targets;   // every sampler asked for, for trim()
+    int m_trimTries = 0;
+    bool m_trimRequested = false;
+    std::mutex m_buildMutex;              // a build or a trim, not both
     bool m_busy = false, m_stop = false;
     State m_state = State::Idle;
     std::string m_message;

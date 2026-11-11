@@ -1,0 +1,77 @@
+ChaosMaker — Later Gator (will do later)
+========================================
+Created 2026-11-12. Everything the user chose to do LATER, moved here out of docs/restMap.txt.
+Nothing here is scheduled. When the user picks an item up, move it back to restMap.txt's
+NEXT UP list. Same rules as restMap.txt (AGENTS.md, 3-tier split, from-scratch rule).
+
+Status legend:  [L] will do later (the user's choice)   [?] needs the user (a check or a decision)
+
+
+FEATURES
+--------
+[L] G12 Tempo and meter changes inside a song (postponed by the user 2026-11-12: one BPM and
+        one meter per song is enough for now). Today the project has one BPM and one meter
+        (TempoMap is a single tempo). Clips are placed in samples, MIDI notes in beats from
+        their clip's origin. The user's choices, if it is picked up: instant tempo jumps first
+        (ramps later); audio clips stay in time, MIDI notes follow the beats. Still open: where
+        changes are edited (a lane under the ruler, markers on the ruler, or a table in the
+        Tempo / Meter editors). Affects the ruler, grid, metronome, count-in, repeat loop,
+        piano roll, Chords, drum grooves, the snapshot builder and saving.
+[L] L1  Render clip effects into the audio (like Reaper's "apply FX"): a clip's effects
+        printed into a new take.
+[L] L2  Envelope extras (after G6 / G6b): pan and FX parameter envelopes, lane height resizing.
+[L] L3  Take lanes (after G11), and loop recording over existing audio turning that audio into
+        takes (today only punch does; plain loop recording layers on top).
+[L] L4  Export extras (after F2): FLAC export, stems, block switching in the MP3 encoder.
+[L] L5  Keep piano samples as 16-bit to halve their memory (after C5).
+[L] L6  Cabinet IRs in the project's media folder (left over from E4): GuitarSuite saves an
+        absolute irPath and project loads don't pass the project folder as its base, so the
+        IR is not copied into "<project name> Media" like clip files are.
+[L] H1  (was A4) Chaos EQ extras the user chose "not now": dynamic EQ, linear phase.
+[L] H2  (was A5) The 10-band EQ page's look: the user said they would redo it themselves
+        (plan 3.10).
+[L] H3  (was part of C2) tools/sfzcheck: a command-line report for an SFZ file (missing samples,
+        what the loader cannot play yet, layers per key, duplicate regions), on top of
+        sfz::loadSfz's report. Build it if we ever write our own SFZ map.
+
+
+INSTRUMENTS
+-----------
+[L] C3b The acoustic kit's map puts 2-pole HIGH-pass filters (30-200 Hz, cutoff_oncc110) on
+        its mic regions; the sampler only has the low-pass (C5 step 2), so they are not played
+        (reported "fil_type=hpf_2p"). Adding them would change how the kit sounds: the user
+        decides (found 2026-11-08).
+[L] C8  Credits: the user's rule (2026-11-07): no third-party credit or attribution of any
+        kind in the GitHub repo. So no courtesy credits, no "Third-party sounds" README
+        section. The first choices need none (Gogodze Phu Vol II is CC0, Splendid is public
+        domain). Only if a CC-BY library is used (the Accurate-Salamander fallback) is a
+        credit legally required; then ask the user where it goes before adding anything.
+        Ready-made text for that case:
+          Accurate-Salamander Grand Piano. Original recordings: Salamander Grand Piano by
+          Alexander Holm (Yamaha C5). Remaster: Accurate-Salamander by Chisato Yamauchi.
+          Licence: CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/).
+          Changes: converted and mapped for ChaosMaker.
+
+
+CHECKS IN THE REAL APP (the user)
+---------------------------------
+[?] B1  Clip gain drag, then Ctrl+Z.
+[?] B2  Delete a track that has a pedalboard, then Ctrl+Z (pedalboard comes back).
+[?] B3  Piano roll in 3/4 and 6/8.
+[?] B4  Buffer size change with JACK.
+[?] B5  Pedal cards and tuner look unchanged (now also: amp "Channel" dial shows Clean /
+        Crunch / High Gain; cabinet "Cab" dial shows None / 1x12 Open / 2x12 / 4x12 Closed).
+[?] B6  Custom track colour, then typing still works.
+[?] B7  Listen to Chaos EQ on real audio (solo, auto gain, stereo placement, analyzer).
+[?] B8  Built-in cabinet models in the app (renders in local-reference/renders/cab-*.wav).
+[?] B9  Listen to the harmonium (C7) in the app: Harmonium track, FX → Harmonium; play it with
+        MON on from the digital piano (IN → MIDI device) and from KEYS. 2026-11-08: the user
+        liked harmonium-western-full-voxhumana.wav; the first Indian renders were "trash"
+        (buzzy); the rebuilt reed (renders harmonium-v2-*.wav) is "much better". Note what to
+        change next (see C7 tuning step 2).
+
+
+DOCS (the user)
+---------------
+[?] F4  EducationPurpose/architecture.txt: the user updates it at the end of the project
+        (do not edit it).

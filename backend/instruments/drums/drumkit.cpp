@@ -9,7 +9,10 @@ DrumKit::DrumKit(std::shared_ptr<drumkit::Library> library)
     if (m_library) m_library->request(m_sampler, m_settings);
 }
 
-DrumKit::~DrumKit() = default;
+DrumKit::~DrumKit()
+{
+    if (m_library) m_library->trimSoon();                  // this track's samples may go
+}
 
 void DrumKit::prepare(double sampleRate, int maxFrames)
 {

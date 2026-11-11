@@ -13,56 +13,24 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
                 [L] will do later (the user's choice; section H)   [-] dropped (the user)
 
 
-NEXT UP (2026-11-10), the user's order:
-  1. G6 volume envelope committed (0597318); G6b curve shapes committed (758f523).
-  2. G9, G17, G14 committed (33ef5cc). R2 clip effects committed (e3b3d42).
-     Then import / export (item 6, done first at the user's request). G8 fades committed. G10 latency committed. G15 time selection + ripple committed. G16 committed. G11 committed. G13 noise reduction DONE (uncommitted). Next:
-     G12. Later option: "render clip effects into the audio" (Reaper's apply FX).
-  3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
-     reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
-     inside this group is to be confirmed with the user.
-  4. C6 other instruments (strings first was suggested; not chosen yet), C11 synth.
-  5. G18-G21 (live pitch monitor, guitar tone analyzer, drum pattern analyzer, chord / BPM
-     analyzer; G20 and G21 share their analysis foundation).
-  6. Import and export (E, F2): DONE 2026-11-11, committed (18aee6d). Fixed after: imported clips were
-     marked "effects printed", so the track FX skipped them; they are dry now (a1a125f).
-     File chooser DONE 2026-11-11 (committed): frontend/dialogs/FilePicker.qml,
-     ported from ProjectMusicPlayer's FolderPicker (places Home / Music / Downloads / Project folder /
-     drives, clickable path bar, Hidden files, file types, Backspace up / Enter / Esc), in the app's
-     colours. FileDialog's API (fileMode OpenFile / OpenFiles / SaveFile, nameFilters, defaultSuffix,
-     currentFolder, selectedFile(s), accepted / rejected), so all 11 file dialogs swapped one for one:
-     import audio (Ctrl / Shift+click, "Import N files"), save / open project, export, FX chain, EQ
-     presets, GuitarSuite presets and cabinet IR. "Replace" when saving over a file. Paths come from
-     wrapper/files/fileswrap (Files singleton). Tests: qtfiles; transport_ui import, export chooser, FX
-     chain import through the chooser.
-  7. U6 guitar FX panel UI, at the very end.
+NEXT UP (2026-11-12), the user's order, easiest first:
+  1. C3c  Acoustic kit cymbals CANCELLED by the user (2026-11-12). Sample cache clean-up DONE
+          (uncommitted). Left: per-drum polyphony / live MIDI CC, by ear (the user).
+  2. G18  Live pitch monitor (vocals): reuses the guitar tuner's pitch detection; the work is
+          the scrolling graph UI.
+  3. C11  Synth instrument: oscillators, filter, envelopes, LFO, presets, own track type.
+  4. C6   Other instruments (strings, acoustic guitar, bass): CC0 samples or string models.
+  5. G20  Drum pattern analyzer: onsets, tempo, kick / snare / hat; songs need a hand-written
+          harmonic / percussive separation.
+  6. G21  Chord / BPM analyzer: chromagram, chord templates, Viterbi, key; builds on G20.
+  7. G19  Guitar tone analyzer: searching GuitarSuite settings against a reference; only good
+          on an isolated guitar.
+  8. U6   Guitar FX panel UI, at the very end (ask the user what they want first).
+  Everything the user chose to do later (G12 tempo / meter changes, C3b, C8, B1-B9 checks, F4,
+  H1-H3 and the smaller "later" ideas L1-L6) is in docs/laterGator.txt.
+  Done and committed up to 2026-11-12: G1-G11, G13-G17, R2, import / export, file chooser
+  (last commit bb27814, G13 noise reduction).
 
-  Open items ranked easiest -> hardest to build (2026-11-11; for reference, the order above
-  still decides what comes next):
-     1. C3b  Acoustic kit high-pass filters: a 2-pole HPF beside the sampler's low-pass (small
-             DSP); the user decides first whether the kit should sound different.
-     2. C3c  Acoustic kit cymbals (keys 73 / 75; try the electro kit's synthesised voices) and
-             the sample cache that never shrinks; mostly listening and tuning.
-     3. G16  Custom shortcuts + undo history list: the list is easy (undo stack exists);
-             rebinding means going through every QML shortcut.
-     4. G18  Live pitch monitor: reuses the guitar tuner's pitch detection; the work is the
-             scrolling graph UI.
-     5. G13  Noise reduction: noise profile + spectral subtraction / gating (FFT overlap-add,
-             avoid musical noise); moderate DSP, self-contained.
-     6. C11  Synth instrument: oscillators, filter, envelopes, LFO, presets, own track type;
-             big but self-contained (instrument / track-type patterns exist).
-     7. C6   Other instruments (strings, acoustic guitar, bass): depends on CC0 samples or
-             building string models.
-     8. G11  Punch in / out + loop takes / comping: recording, clip model, saving, undo and a
-             new takes UI.
-     9. G12  Tempo / meter changes in a song: a tempo map; touches the ruler, grid, metronome,
-             piano roll, Chords, grooves and saving.
-    10. G20  Drum pattern analyzer: onsets, tempo, kick / snare / hat; songs need a hand-written
-             harmonic / percussive separation.
-    11. G21  Chord / BPM analyzer: chromagram, chord templates, Viterbi, key; builds on G20.
-    12. G19  Guitar tone analyzer: searching GuitarSuite settings against a reference; only good
-             on an isolated guitar.
-     Not ranked: U6 (size depends on what the user wants; ask first), B1-B9 (checks by the user).
 Start here when the user says "let's continue". Plans first, one step at a time.
 
 OPEN — everything not finished, in the order the user wants it done (import and export last).
@@ -420,10 +388,9 @@ Done items stay further down as the record.
         the older order problem noted under G16). App log empty.
         Not done: loop recording over existing audio layers on top, as any recording did before
         (only punch turns old audio into takes); take lanes.
-[ ] G12 Tempo and meter changes inside a song (the project has one BPM and one meter today;
-        TempoMap is a single tempo). Affects the ruler, grid, metronome, piano roll, Chords
-        and drum grooves, and saving.
-[x] G13 Noise reduction. DONE 2026-11-11 (uncommitted). Learn the noise from a silent part (room, hiss, hum),
+[L] G12 Tempo and meter changes inside a song: postponed by the user 2026-11-12, see
+        docs/laterGator.txt.
+[x] G13 Noise reduction. DONE 2026-11-11 (committed bb27814). Learn the noise from a silent part (room, hiss, hum),
         then remove it from the take. Hand-written spectral subtraction / gating.
         The user's choices (2026-11-11): an FX plugin ("Noise Reduction", mix-effect type
         "denoise", on tracks and clips); its own page with a spectrum (learned noise under the
@@ -572,50 +539,28 @@ Done items stay further down as the record.
         Good on clear pop / rock / folk chords; weaker on jazz chords, inversions, heavy
         distortion. G20 and G21 share one analysis foundation (FFT, onsets, tempo, separation).
 
--- Checks in the real app, need the user (was section B)
-[?] B1  Clip gain drag, then Ctrl+Z.
-[?] B2  Delete a track that has a pedalboard, then Ctrl+Z (pedalboard comes back).
-[?] B3  Piano roll in 3/4 and 6/8.
-[?] B4  Buffer size change with JACK.
-[?] B5  Pedal cards and tuner look unchanged (now also: amp "Channel" dial shows Clean /
-        Crunch / High Gain; cabinet "Cab" dial shows None / 1x12 Open / 2x12 / 4x12 Closed).
-[?] B6  Custom track colour, then typing still works.
-[?] B7  Listen to Chaos EQ on real audio (solo, auto gain, stereo placement, analyzer).
-[?] B8  Built-in cabinet models in the app (renders in local-reference/renders/cab-*.wav).
-[?] B9  Listen to the harmonium (C7) in the app: Harmonium track, FX → Harmonium; play it with
-        MON on from the digital piano (IN → MIDI device) and from KEYS. 2026-11-08: the user
-        liked harmonium-western-full-voxhumana.wav; the first Indian renders were "trash"
-        (buzzy); the rebuilt reed (renders harmonium-v2-*.wav) is "much better". Note what to
-        change next (see C7 tuning step 2).
+-- Checks in the real app (B1-B9): moved to docs/laterGator.txt (2026-11-12).
 
 -- Instruments (was section C)
-[ ] C3b The acoustic kit's map puts 2-pole HIGH-pass filters (30-200 Hz, cutoff_oncc110) on
-        its mic regions; the sampler only has the low-pass (C5 step 2), so they are not played
-        (reported "fil_type=hpf_2p"). Adding them would change how the kit sounds: the user
-        decides (found 2026-11-08).
+[L] C3b Acoustic kit high-pass mic filters: moved to docs/laterGator.txt (2026-11-12).
 [ ] C3c Left over from C3 (found 2026-11-08 when C3 was closed):
-        - Cymbals for the acoustic kit (keys 73 crash, 75 ride are still free in drummap.h).
-          The electronic kit (90fc463) already has synthesised crash and ride voices in
-          backend/instruments/electrodrums/electrovoices; check whether they can be reused
-          before writing new ones. Renders for the user first.
+        - [-] Cymbals for the acoustic kit: CANCELLED by the user (2026-11-12). Built (the
+          electro kit's Studio crash / ride on keys 73 / 75) and rolled back unused: the
+          Electronic Drums kit already has cymbals, which is enough. Keys 73 / 75 stay free.
         - Judge by ear first: per-drum polyphony, live MIDI CC (hardware hi-hat pedal, mic mix
           knob). The high-pass mic filters are C3b.
-        - The sample cache never shrinks (Full room keeps all mics, ~730 MB, until the app
-          closes).
+        - [x] The sample cache never shrinks: DONE 2026-11-12 (uncommitted). drumkit::Library
+          remembers every sampler it built for; after each rebuild and when a DrumKit goes
+          away (trimSoon) its worker runs trim() every 0.5 s, 20 times: collectRetired() on
+          each sampler, then drops cache entries only the cache holds, then malloc_trim (glibc).
+          Real kit: Close 972 samples / 434 MB, Full 1701 / 738 MB, back to Close 972 / 419 MB.
+          Choosing a room again reads it from disk again. Test: backendtests drumkit
+          samples_no_track_plays_are_dropped_from_the_cache.
 [ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
         model), mapped in instrumentfactory.cpp.
 [ ] C11 A synth instrument (the user, 2026-11-10): a hand-written subtractive synth (oscillators,
         filter, envelopes, LFO, presets) as its own track type. Not planned yet.
-[ ] C8  Credits: the user's rule (2026-11-07): no third-party credit or attribution of any
-        kind in the GitHub repo. So no courtesy credits, no "Third-party sounds" README
-        section. The first choices need none (Gogodze Phu Vol II is CC0, Splendid is public
-        domain). Only if a CC-BY library is used (the Accurate-Salamander fallback) is a
-        credit legally required; then ask the user where it goes before adding anything.
-        Ready-made text for that case:
-          Accurate-Salamander Grand Piano. Original recordings: Salamander Grand Piano by
-          Alexander Holm (Yamaha C5). Remaster: Accurate-Salamander by Chisato Yamauchi.
-          Licence: CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/).
-          Changes: converted and mapped for ChaosMaker.
+[L] C8  Credits: moved to docs/laterGator.txt (2026-11-12).
 
 -- Piano roll (was section D)
 [x] D5  DONE 2026-11-10 (not committed yet): a pattern clip's sourceOffset is in project
@@ -643,8 +588,7 @@ Done items stay further down as the record.
         The maths: backend/dsp/latencymeasure (a Hann-windowed 1-8 kHz chirp, cross-
         correlation, polarity, "not found" for weak or unclear peaks).
         Test: backendtests latencymeasure. The user runs the measurement on their interface.
-[?] F4  EducationPurpose/architecture.txt: the user updates it at the end of the project
-        (do not edit it).
+[?] F4  The user's architecture.txt update: moved to docs/laterGator.txt (2026-11-12).
 
 -- LAST: audio import (was section E), then export
 Target: WAV, MP3 and FLAC import through a file picker, editable clips, reliable reopen.
@@ -1363,12 +1307,7 @@ impulse at the file start; measure IRs with an unwindowed FFT instead).
 
 H. WILL DO LATER (the user's choice)
 -------------------------------------
-[L] H1  (was A4) Chaos EQ extras the user chose "not now": dynamic EQ, linear phase.
-[L] H2  (was A5) The 10-band EQ page's look: the user said they would redo it themselves
-        (plan 3.10).
-[L] H3  (was part of C2) tools/sfzcheck: a command-line report for an SFZ file (missing samples,
-        what the loader cannot play yet, layers per key, duplicate regions), on top of
-        sfz::loadSfz's report. Build it if we ever write our own SFZ map.
+H1-H3 moved to docs/laterGator.txt (2026-11-12).
 
 DECIDED NOT TO DO
 [x] Playing the harmonium from the piano's audio cable (pitch detection): the user chose MIDI
