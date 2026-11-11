@@ -7,7 +7,7 @@
 #include <string>
 
 // Reads a whole WAV file: RIFF PCM 8/16/24/32-bit or IEEE float 32/64-bit, also in the
-// extensible header, mono or stereo, any sample rate from 1 kHz to 384 kHz. The first loop of
+// extensible header, 1 to 8 channels, any sample rate from 1 kHz to 384 kHz. The first loop of
 // a `smpl` chunk comes with it. Runs off the audio thread; throws std::runtime_error with a
 // message a user can read.
 //

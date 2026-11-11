@@ -41,6 +41,9 @@ class EngineController : public AudioEngineWrapper {
     Q_PROPERTY(bool countingIn READ countingIn NOTIFY transportChanged)
     Q_PROPERTY(int countInBeatsRemaining READ countInBeatsRemaining NOTIFY transportChanged)
     Q_PROPERTY(bool takeBusy READ takeBusy NOTIFY transportChanged)
+    // Export (restMap F2): while it runs, live audio is silent and paused.
+    Q_PROPERTY(bool exporting READ exporting NOTIFY exportChanged)
+    Q_PROPERTY(double exportProgress READ exportProgress NOTIFY exportChanged)
     Q_PROPERTY(double positionBeats READ positionBeats NOTIFY transportChanged)
     Q_PROPERTY(double positionSeconds READ positionSeconds NOTIFY transportChanged)
     Q_PROPERTY(double recordingStartBeats READ recordingStartBeats NOTIFY transportChanged)
@@ -110,6 +113,18 @@ public:
     bool countingIn() const;
     int countInBeatsRemaining() const;
     bool takeBusy() const { return m_recordingController.isBusy(); }
+    bool exporting() const { return m_exporting; }
+    double exportProgress() const { return m_exportProgress; }
+    // Renders startBeat..endBeat (endBeat <= startBeat: the whole song, from its start to the end
+    // of its last clip) plus tailSeconds into `file` on a worker thread; exportFinished follows.
+    // format: "wav16" (dithered), "wav24", "wav32f" or "mp3" (mp3Kbps 128..320). normalise: 0 off,
+    // else the peak in dBFS (e.g. -1, 0) as normalisePeakDb with normalise true. False (with
+    // exportFinished not sent) while recording, exporting or for an empty song / bad range.
+    Q_INVOKABLE bool startExport(const QUrl& file, double startBeat, double endBeat, const QString& format,
+                                 int mp3Kbps, double tailSeconds, bool normalise, double normalisePeakDb);
+    Q_INVOKABLE void cancelExport();
+    // The song's length in beats (to the end of its last clip); 0 when empty.
+    Q_INVOKABLE double songEndBeats() const;
     QVariantList recordingTracks() const;
     // The waveform recorded so far on a track, [[min, max], ...] in `bins` columns covering
     // from..to (0..1 of what is recorded), for the timeline's recording box (live, like
@@ -210,6 +225,8 @@ signals:
     void projectLoadingChanged();
     void transportChanged();
     void transportMessageChanged();
+    void exportChanged();
+    void exportFinished(bool ok, const QString& message);
     void restoreSessionOnStartupChanged();
     void stopPlaybackAtEndChanged();
     void meterChanged();
@@ -231,6 +248,10 @@ signals:
     void midiInputPortsChanged();
 
 private:
+    bool m_exporting = false;
+    double m_exportProgress = 0.0;
+    std::shared_ptr<std::atomic<bool>> m_exportCancel;
+
     void setProjectDirty(bool dirty);
     QJsonObject projectDocument();
     void finishProjectLoad();

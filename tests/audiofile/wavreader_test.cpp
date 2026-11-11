@@ -165,7 +165,8 @@ TEST(wavreader, bad_files_are_refused_with_the_file_name)
     CHECK(throws(riff({{"data", pcm16({1})}})));                      // no format
     CHECK(throws(riff({{"fmt ", fmtBody(1, 1, 48000, 16)}})));        // no data
     CHECK(throws(riff({{"fmt ", fmtBody(2, 1, 48000, 16)}, {"data", pcm16({1})}})));   // ADPCM
-    CHECK(throws(riff({{"fmt ", fmtBody(1, 3, 48000, 16)}, {"data", pcm16({1, 2, 3})}})));
+    CHECK(!throws(riff({{"fmt ", fmtBody(1, 3, 48000, 16)}, {"data", pcm16({1, 2, 3})}})));   // up to 8 channels
+    CHECK(throws(riff({{"fmt ", fmtBody(1, 9, 48000, 16)}, {"data", pcm16({1, 2, 3, 4, 5, 6, 7, 8, 9})}})));
     CHECK(throws(riff({{"fmt ", fmtBody(1, 1, 48000, 12)}, {"data", pcm16({1})}})));
     CHECK(throws(riff({{"fmt ", fmtBody(1, 1, 500, 16)}, {"data", pcm16({1})}})));
     Bytes nan;

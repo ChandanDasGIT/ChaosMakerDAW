@@ -89,7 +89,8 @@ WavFile decodeWav(std::span<const std::uint8_t> bytes, const std::string& path)
     if (format != 1 && format != 3) fail(path, "only PCM and float WAV can be read (format " + std::to_string(format) + ").");
     if (isFloat ? (bits != 32 && bits != 64) : (bits != 8 && bits != 16 && bits != 24 && bits != 32))
         fail(path, std::to_string(bits) + "-bit " + (isFloat ? "float" : "PCM") + " WAV is not supported.");
-    if (channels != 1 && channels != 2) fail(path, std::to_string(channels) + " channels: only mono and stereo are supported.");
+    // Up to 8 channels (surround stems); the sampler uses the first two, an import mixes down.
+    if (channels < 1 || channels > 8) fail(path, std::to_string(channels) + " channels: 1 to 8 are supported.");
     if (rate < 1000 || rate > 384000) fail(path, "sample rate " + std::to_string(rate) + " Hz is out of range.");
     if (align != channels * (bits / 8)) fail(path, "the block size does not match the format.");
 

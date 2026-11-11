@@ -45,12 +45,15 @@ public:
         const std::vector<std::string>& trackEffects,
         std::string* error = nullptr);
 
+    // Copies the clips' files from outside the project's folder beside it first (restMap E4);
+    // `warning` (if given) names files that could not be copied (saved as they were).
     bool saveProjectFile(
         const std::string& targetPath,
         const Project& project,
         const TrackList::MediaPaths& mediaPaths,
         const std::vector<std::string>& trackEffects,
-        std::string* error = nullptr);
+        std::string* error = nullptr,
+        std::string* warning = nullptr);
 
     // Load candidate preparation
     bool prepareLoadCandidate(

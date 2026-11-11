@@ -11,6 +11,9 @@ RowLayout {
 
     property var trackModel: null
     signal closeRequested()
+    // Import and export (restMap E2, F2): one job object for the File menu and file drops.
+    readonly property alias importJob: importJob
+    signal exportRequested()
 
     function requestAction(action) {
         if (action === "New" || action === "Open" || action === "Close") {
@@ -19,6 +22,81 @@ RowLayout {
             actionsBridge.requestSave(EngineController.projectFile.toString().length > 0)
         } else if (action === "Save As") {
             actionsBridge.requestSaveAs()
+        }
+    }
+
+    ImportExportWrapper {
+        id: importJob
+        objectName: "importJob"
+        trackModel: root.trackModel ?? null
+        onFinished: importStatus.open()
+        onBusyChanged: if (busy) importStatus.open()
+    }
+
+    FileDialog {
+        // Inside the main window, like the other file dialogs (keyboard focus comes back).
+        popupType: Popup.Item
+        id: importDialog
+        objectName: "importAudioDialog"
+        title: "Import audio"
+        fileMode: FileDialog.OpenFiles
+        nameFilters: ["Audio files (*.wav *.WAV *.flac *.FLAC *.mp3 *.MP3)", "All files (*)"]
+        onAccepted: importJob.importFiles(selectedFiles, EngineController.positionBeats, -1)
+    }
+
+    // What an import is doing, and what went wrong with which file.
+    Popup {
+        id: importStatus
+        objectName: "importStatusPopup"
+        parent: Overlay.overlay
+        x: Math.round((parent.width - width) / 2)
+        y: 56
+        width: 420
+        padding: 12
+        closePolicy: Popup.CloseOnEscape
+        background: Rectangle { color: Theme.panelBg; border.color: Theme.divider; radius: 8 }
+        contentItem: ColumnLayout {
+            spacing: 8
+            Text {
+                objectName: "importStatusText"
+                Layout.fillWidth: true
+                text: importJob.status
+                color: Theme.text
+                font.pixelSize: Theme.bodySize
+                wrapMode: Text.WordWrap
+            }
+            ProgressBar {
+                Layout.fillWidth: true
+                visible: importJob.busy
+                value: importJob.progress
+            }
+            Repeater {
+                model: importJob.busy ? [] : importJob.problems
+                delegate: Text {
+                    required property string modelData
+                    Layout.fillWidth: true
+                    text: "• " + modelData
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.smallSize
+                    wrapMode: Text.WordWrap
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                PanelButton {
+                    objectName: "importCancelButton"
+                    visible: importJob.busy
+                    text: "Cancel"
+                    onClicked: importJob.cancel()
+                }
+                PanelButton {
+                    objectName: "importStatusClose"
+                    visible: !importJob.busy
+                    text: "Close"
+                    onClicked: importStatus.close()
+                }
+            }
         }
     }
 
@@ -48,6 +126,17 @@ RowLayout {
         sequences: [StandardKey.Save]
         enabled: !EngineController.takeBusy && !EngineController.projectLoading
         onActivated: actionsBridge.requestSave(EngineController.projectFile.toString().length > 0)
+    }
+
+    Shortcut {
+        sequence: "Ctrl+I"
+        enabled: !EngineController.takeBusy && !EngineController.projectLoading && !importJob.busy
+        onActivated: importDialog.open()
+    }
+    Shortcut {
+        sequence: "Ctrl+E"
+        enabled: !EngineController.takeBusy && !EngineController.projectLoading
+        onActivated: root.exportRequested()
     }
 
     // Literal sequence so it always matches the "Ctrl+Shift+S" shown in the File menu
@@ -228,6 +317,24 @@ RowLayout {
                 shortcutText: "Ctrl+Shift+S"
                 enabled: !EngineController.takeBusy && !EngineController.projectLoading
                 onTriggered: actionsBridge.requestSaveAs()
+            }
+
+            ThemedMenuSeparator {}
+
+            ThemedMenuItem {
+                objectName: "fileImportItem"
+                text: "Import audio..."
+                shortcutText: "Ctrl+I"
+                enabled: !EngineController.takeBusy && !EngineController.projectLoading && !importJob.busy
+                onTriggered: importDialog.open()
+            }
+
+            ThemedMenuItem {
+                objectName: "fileExportItem"
+                text: "Export..."
+                shortcutText: "Ctrl+E"
+                enabled: !EngineController.takeBusy && !EngineController.projectLoading
+                onTriggered: root.exportRequested()
             }
         }
     }

@@ -1,4 +1,9 @@
 #include "enginecontroller.h"
+#include <filesystem>
+#include <QThreadPool>
+#include "audiofile/mp3writer.h"
+#include "audiofile/wavwriter.h"
+#include "render/songrender.h"
 #include "engine/enginestatus.h"
 
 #include "core/version.h"
@@ -1017,6 +1022,108 @@ void EngineController::refreshProject() {
     publishPlayback();
     if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
 }
+double EngineController::songEndBeats() const
+{
+    if (!m_project) return 0.0;
+    double end = 0.0;
+    for (const auto& track : m_project->project().tracks())
+        for (const auto& clip : track->audioClips)
+            end = std::max(end, m_project->project().tempo().beatAt(clip.start + clip.length));
+    return end;
+}
+
+bool EngineController::startExport(const QUrl& file, double startBeat, double endBeat, const QString& format,
+                                   int mp3Kbps, double tailSeconds, bool normalise, double normalisePeakDb)
+{
+    if (!m_project || m_exporting || takeBusy() || recording() || !file.isLocalFile()) return false;
+    if (format != QLatin1String("wav16") && format != QLatin1String("wav24") && format != QLatin1String("wav32f")
+        && format != QLatin1String("mp3")) return false;
+    if (!(endBeat > startBeat)) { startBeat = 0.0; endBeat = songEndBeats(); }
+    if (!std::isfinite(startBeat) || !std::isfinite(endBeat) || startBeat < 0 || endBeat <= startBeat) return false;
+    const auto& tempo = m_project->project().tempo();
+    const double rate = tempo.sampleRate() > 1000 ? tempo.sampleRate() : 48000.0;
+    songrender::Options options;
+    options.sampleRate = rate;
+    options.start = tempo.sampleAt(startBeat);
+    options.length = tempo.sampleAt(endBeat) - options.start;
+    options.tail = std::llround(std::clamp(std::isfinite(tailSeconds) ? tailSeconds : 0.0, 0.0, 10.0) * rate);
+    options.bpm = m_bpm;
+    options.masterVolume = m_project->project().masterVolume();
+    options.masterMuted = m_project->project().masterMuted();
+    if (options.length <= 0) return false;
+
+    // The live engine stops and goes silent so the offline render can use the same processors.
+    postTransport(int(EngineCommand::Type::Stop));
+    syncTrackEffects();
+    auto snapshot = SnapshotBuilder::buildPlaybackSnapshot(
+        m_project->project(),
+        [this](const std::string& poolId) { return m_project->audioFor(poolId); },
+        [this](int id) -> const SnapshotBuilder::TrackEffects* {
+            auto it = m_trackEffects.find(id);
+            return it != m_trackEffects.end() ? &it->second : nullptr;
+        },
+        /*multiMonitor=*/true);
+    m_engine->suspend();
+    m_exporting = true;
+    m_exportProgress = 0.0;
+    m_exportCancel = std::make_shared<std::atomic<bool>>(false);
+    emit exportChanged();
+    setTransportMessage(QStringLiteral("Exporting…"));
+
+    const auto cancel = m_exportCancel;
+    const std::string path = file.toLocalFile().toStdString();
+    const std::string kind = format.toStdString();
+    QPointer<EngineController> self(this);
+    auto job = std::make_shared<std::unique_ptr<EngineSnapshot>>(std::move(snapshot));
+    QThreadPool::globalInstance()->start([self, job, options, cancel, path, kind, mp3Kbps, normalise, normalisePeakDb, rate] {
+        QString message;
+        bool ok = false;
+        try {
+            auto channels = songrender::render(std::move(*job), options, [self, cancel](double done) {
+                if (self) QMetaObject::invokeMethod(self, [self, done] {
+                    if (!self) return;
+                    self->m_exportProgress = done * 0.9;
+                    emit self->exportChanged();
+                }, Qt::QueuedConnection);
+                return !cancel->load();
+            });
+            if (cancel->load() || channels[0].empty()) {
+                message = QStringLiteral("Export cancelled.");
+            } else {
+                if (normalise) songrender::normalise(channels, float(normalisePeakDb));
+                if (kind == "mp3") {
+                    audiofile::Mp3Options mp3;
+                    mp3.bitrateKbps = mp3Kbps;
+                    audiofile::writeMp3(path, channels, rate, mp3);
+                } else {
+                    audiofile::writeWav(path, channels, rate, kind == "wav16" ? audiofile::WavFormat::Int16
+                                        : kind == "wav24" ? audiofile::WavFormat::Int24 : audiofile::WavFormat::Float32);
+                }
+                ok = true;
+                message = QStringLiteral("Exported %1.").arg(QString::fromStdString(std::filesystem::path(path).filename().string()));
+            }
+        } catch (const std::exception& e) {
+            message = QStringLiteral("Export failed: %1").arg(QString::fromStdString(e.what()));
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self, [self, ok, message] {
+            if (!self) return;
+            self->m_engine->resume();
+            self->m_exporting = false;
+            self->m_exportProgress = ok ? 1.0 : 0.0;
+            emit self->exportChanged();
+            self->setTransportMessage(message);
+            emit self->exportFinished(ok, message);
+        }, Qt::QueuedConnection);
+    });
+    return true;
+}
+
+void EngineController::cancelExport()
+{
+    if (m_exportCancel) m_exportCancel->store(true);
+}
+
 void EngineController::publishPlayback() {
     if (!m_project) return;
     auto snapshot = SnapshotBuilder::buildPlaybackSnapshot(
@@ -1213,12 +1320,14 @@ bool EngineController::saveProject(const QUrl& file) {
         auto* fx=qobject_cast<GuitarSuiteModel*>(trackEffects(track->id));
         effects.push_back(fx ? fx->sessionDataStd() : std::string());
     }
-    std::string err;
+    std::string err, warning;
     const std::string localPath = QFileInfo(target.toLocalFile()).absoluteFilePath().toStdString();
-    if(!m_projectSession.saveProjectFile(localPath, m_project->project(), m_project->mediaPaths(), effects, &err)) {
+    if(!m_projectSession.saveProjectFile(localPath, m_project->project(), m_project->mediaPaths(), effects, &err, &warning)) {
         setTransportMessage("Could not save project: "+QString::fromStdString(err)); return false;
     }
-    emit projectFileChanged(); emit projectDirtyChanged(); setTransportMessage("Project saved."); return true;
+    emit projectFileChanged(); emit projectDirtyChanged();
+    setTransportMessage(warning.empty() ? QStringLiteral("Project saved.") : "Project saved. "+QString::fromStdString(warning));
+    return true;
 }
 void EngineController::cancelProjectLoad() {
     for(auto* model:m_loadingEffects)delete model;

@@ -15,8 +15,8 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 
 NEXT UP (2026-11-10), the user's order:
   1. G6 volume envelope committed (0597318); G6b curve shapes committed (758f523).
-  2. G9, G17, G14 committed (33ef5cc). R2 clip effects (effects on a time range) DONE
-     2026-11-11, NOT COMMITTED (the user is testing). Next: G8 fades, then G10, G15, G16,
+  2. G9, G17, G14 committed (33ef5cc). R2 clip effects committed (e3b3d42).
+     Then import / export (item 6, done first at the user's request). Next: G8 fades, then G10, G15, G16,
      G11, G13, G12. Later option: "render clip effects into the audio" (Reaper's apply FX).
   3. G8-G17 (fades, master FX, latency compensation, punch / takes, tempo changes, noise
      reduction, clip tools, time selection, shortcuts / undo history, tap tempo); the order
@@ -24,7 +24,7 @@ NEXT UP (2026-11-10), the user's order:
   4. C6 other instruments (strings first was suggested; not chosen yet), C11 synth.
   5. G18-G21 (live pitch monitor, guitar tone analyzer, drum pattern analyzer, chord / BPM
      analyzer; G20 and G21 share their analysis foundation).
-  6. Import and export (E, F2).
+  6. Import and export (E, F2): DONE 2026-11-11, committed. Bug found in testing: imported audio does not go through the track FX (being fixed).
   7. U6 guitar FX panel UI, at the very end.
 Start here when the user says "let's continue". Plans first, one step at a time.
 
@@ -424,17 +424,31 @@ Target: WAV, MP3 and FLAC import through a file picker, editable clips, reliable
 Note: the old plan proposes libsndfile, which breaks the from-scratch rule. Decoders would
 be hand-written (WAV first; MP3 is a large job). The FLAC decoder comes from C4 (built for
 the piano) and is reused here.
-[?] E0  Decide: hand-written decoders, which formats first.
-[ ] E1  Decoder foundation: common WAV variants, mono/stereo, damaged files, memory limits,
-        sample-rate handling, with focused test files.
-[ ] E2  Session import: Import Audio (multiple files), one new Audio track per file at the
-        playhead, background decoding + waveform with progress/cancel.
-[ ] E3  Editing/project integration: undoable import, project marked modified, shared decoder
-        on reopen; trims, splits, stereo, sample-rate differences, missing files.
-[ ] E4  Portability: project-local media copies with relative references (recordings and
-        cabinet IRs too), then drag and drop.
-[ ] F2  Phase 13: Export and finish — offline render of the whole song (backend/render is
-        empty), export controls, final verification.
+[x] E0  DONE 2026-11-11: all hand-written (WAV, FLAC from C4, MP3 from ISO 11172-3 / 13818-3).
+[x] E1  DONE: backend/audiofile/audioimport (format by content, ID3v2 skipped; 1-8 channel WAV,
+        more than 2 mixed down to stereo; saveAsTake -> float "import-<stem>.wav" takes),
+        mp3reader + mp3tables (MPEG-1/2/2.5, CBR/VBR, LAME gapless delay / padding; matches
+        ffmpeg within ~120 dB and to the sample on real songs). Tests: audioimport_test,
+        mp3reader_test (fixtures in tests/audiofile/data).
+[x] E2  DONE: File > Import audio... (Ctrl+I) and drops on the track list (at the playhead) or the
+        timeline (onto that row's track at the drop beat, else new tracks). ImportExportWrapper
+        decodes on a worker; status popup with progress, Cancel and per-file problems.
+[x] E3  DONE: one undo step for the whole import (Project::foldIntoAddedTracks / addedTracks);
+        reopen reads the float takes; wavreader takes 1-8 channels.
+[x] E4  DONE (clip media): persistence/mediacollect copies clip files from outside the project's
+        folder into "<project name> Media" on every project save (copies reused when the bytes
+        match, name clashes -2, -3 ...), saved by relative path; problems in the save message.
+        NOT YET: cabinet IRs (GuitarSuite saves absolute irPath and project loads don't pass the
+        project folder as its base) -- a follow-up.
+[x] F2  DONE: backend/render/songrender (offline AudioEngine of the playback snapshot; the live
+        engine is suspend()ed meanwhile), wavwriter (16-bit TPDF dither / 24 / 32f),
+        mp3writer (MPEG-1 Layer III CBR 32-320 kbps, long blocks, psy model, M/S, bit reservoir,
+        LAME-style Info tag: gapless in this app and ffmpeg; other rates resampled to 44.1 / 48k).
+        File > Export... (Ctrl+E): frontend/session/ExportDialog.qml (whole song / time
+        selection, format, MP3 bitrate, tail 0-10 s, normalise off / 0 / -1 dBFS, file,
+        progress + Cancel). Tests: mp3writer_test, songrender_test, mediacollect_test,
+        qtimportexport (both), UI file_menu_imports_audio..., file_menu_export_opens....
+        Possible later: FLAC export, stems, block switching in the MP3 encoder.
 
 -- At the end (the user, 2026-11-10)
 [ ] U6  A better UI for the guitar FX panel (GuitarSuite: pedal cards, amp, cabinet, tuner).

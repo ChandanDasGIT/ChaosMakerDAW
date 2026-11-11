@@ -131,6 +131,7 @@ Window {
             onTogglePianoRollRequested: window.togglePianoRoll()
             Layout.fillWidth: true
             onCloseRequested: { window.closeApproved = true; window.close() }
+            onExportRequested: exportDialog.open()
         }
 
         RowLayout {
@@ -140,6 +141,7 @@ Window {
             spacing: 0
             TrackList {
                 trackModel: trackModel
+                importJob: topBar.importJob
                 laneHeight: timeline.laneHeight
                 scrollOffset: timeline.verticalScrollPosition
                 onVerticalScrollRequested: amount => timeline.scrollVertically(amount)
@@ -182,6 +184,7 @@ Window {
                 timeSignature: EngineController.numerator
                 timeSignatureDenominator: EngineController.denominator
                 laneCount: trackModel.count
+                importJob: topBar.importJob
                 snapPlayhead: window.layoutSettings.snapPlayhead
                 snapSelection: window.layoutSettings.snapSelection
                 Layout.fillWidth: true
@@ -316,5 +319,13 @@ Window {
                 onCloseRequested: floatingPianoRollWindow.close()
             }
         }
+    }
+
+    // File > Export (restMap F2); offers the timeline's time selection as a range.
+    ExportDialog {
+        id: exportDialog
+        hasTimeSelection: timeline.hasTimeSelection
+        selectionStartBeat: timeline.rangeStartBeat
+        selectionEndBeat: timeline.rangeEndBeat
     }
 }

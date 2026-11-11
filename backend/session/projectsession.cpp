@@ -1,4 +1,5 @@
 #include "session/projectsession.h"
+#include "persistence/mediacollect.h"
 
 ProjectSession::ProjectSession() = default;
 ProjectSession::~ProjectSession() = default;
@@ -37,11 +38,19 @@ bool ProjectSession::saveProjectFile(
     const Project& project,
     const TrackList::MediaPaths& mediaPaths,
     const std::vector<std::string>& trackEffects,
-    std::string* error)
+    std::string* error,
+    std::string* warning)
 {
     if (targetPath.empty()) {
         if (error) *error = "Target path is empty";
         return false;
+    }
+    const auto collected = persistence::collectMedia(project, mediaPaths, targetPath);
+    if (warning) {
+        warning->clear();
+        if (!collected.problems.empty())
+            *warning = std::to_string(collected.problems.size()) + " audio file(s) could not be copied beside the project: "
+                     + collected.problems.front();
     }
     const bool ok = persistence::ProjectDocument::saveToFile(
         targetPath,
@@ -49,7 +58,8 @@ bool ProjectSession::saveProjectFile(
         mediaPaths,
         trackEffects,
         persistence::ProjectDocument::projectFormat,
-        error);
+        error,
+        &collected.paths);
     if (ok) {
         m_currentFilePath = targetPath;
         m_dirty = false;

@@ -28,6 +28,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include "audiodevice/audiodevice.h"
+#include "audiofile/wavwriter.h"
 
 class MultiInputUiDevice final : public AudioDevice {
 public:
@@ -3368,6 +3369,82 @@ private slots:
         chooseEditItem("editUndoItem"); QCOMPARE(tracks.clips().size(),1);
         chooseEditItem("editRedoItem"); QCOMPARE(tracks.clips().size(),0);
         top->setProperty("trackModel",QVariant());
+    }
+    void file_menu_imports_audio_and_shows_what_happened() {
+        QTest::failOnWarning(QRegularExpression("^(?!This plugin does not support raise\\(\\)).*"));
+        TrackListWrapper tracks;
+        auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
+        top->setProperty("trackModel",QVariant::fromValue(&tracks));
+        const auto restore=qScopeGuard([&] { top->setProperty("trackModel",QVariant()); });
+        // The File menu item opens the file chooser.
+        auto* chooser=window->findChild<QObject*>("importAudioDialog"); QVERIFY(chooser);
+        auto* button=visualItem(window->contentItem(),"fileMenuButton"); QVERIFY(button);
+        auto* menu=window->findChild<QObject*>("fileMenu"); QVERIFY(menu);
+        click(button); QTRY_VERIFY(menu->property("visible").toBool());
+        auto* item=visualItem(window->contentItem(),"fileImportItem"); QVERIFY(item); QVERIFY(item->isEnabled());
+        click(item); QTRY_VERIFY(!menu->property("visible").toBool());
+        QTRY_VERIFY(chooser->property("visible").toBool());
+        QMetaObject::invokeMethod(chooser,"reject"); QTRY_VERIFY(!chooser->property("visible").toBool());
+
+        // An import (as the chooser or a drop starts it): the status popup reports it.
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        audiofile::writeWav((dir.path()+"/Bass.wav").toStdString(),{std::vector<float>(4800,0.2f)},48000,audiofile::WavFormat::Int16);
+        auto* job=window->findChild<QObject*>("importJob"); QVERIFY(job);
+        job->setProperty("mediaFolder",dir.path()+"/media");
+        bool started=false;
+        QVERIFY(QMetaObject::invokeMethod(job,"importFiles",Q_RETURN_ARG(bool,started),
+            Q_ARG(QVariantList,QVariantList{QUrl::fromLocalFile(dir.path()+"/Bass.wav")}),Q_ARG(double,0.0),Q_ARG(int,-1)));
+        QVERIFY(started);
+        auto* popup=window->findChild<QObject*>("importStatusPopup"); QVERIFY(popup);
+        QTRY_VERIFY(popup->property("visible").toBool());
+        QTRY_VERIFY(!job->property("busy").toBool());
+        QTRY_COMPARE(tracks.count(),1);
+        QVERIFY(job->property("status").toString().contains("Imported 1"));
+        auto* close=visualItem(window->contentItem(),"importStatusClose"); QVERIFY(close);
+        click(close); QTRY_VERIFY(!popup->property("visible").toBool());
+    }
+    void file_menu_export_opens_the_export_dialog() {
+        QTest::failOnWarning(QRegularExpression("^(?!This plugin does not support raise\\(\\)).*"));
+        auto* dialog=window->findChild<QObject*>("exportDialog"); QVERIFY(dialog);
+        const auto restore=qScopeGuard([&] { QMetaObject::invokeMethod(dialog,"close"); });
+        auto* button=visualItem(window->contentItem(),"fileMenuButton"); QVERIFY(button);
+        auto* menu=window->findChild<QObject*>("fileMenu"); QVERIFY(menu);
+        click(button); QTRY_VERIFY(menu->property("visible").toBool());
+        auto* item=visualItem(window->contentItem(),"fileExportItem"); QVERIFY(item); QVERIFY(item->isEnabled());
+        click(item); QTRY_VERIFY(!menu->property("visible").toBool());
+        QTRY_VERIFY(dialog->property("visible").toBool());
+
+        auto* range=visualItem(window->contentItem(),"exportRange"); QVERIFY(range);
+        auto* format=visualItem(window->contentItem(),"exportFormat"); QVERIFY(format);
+        auto* bitrate=visualItem(window->contentItem(),"exportBitrate"); QVERIFY(bitrate);
+        auto* label=visualItem(window->contentItem(),"exportFileLabel"); QVERIFY(label);
+        QCOMPARE(range->property("count").toInt(),1);                 // no time selection: whole song only
+        QCOMPARE(format->property("currentIndex").toInt(),0);          // WAV 16-bit
+        QVERIFY(!bitrate->isVisible());
+        QVERIFY(label->property("text").toString().endsWith(".wav"));
+        // MP3: the bitrate shows (320 by default) and the file is renamed.
+        format->setProperty("currentIndex",3);
+        QTRY_VERIFY(bitrate->isVisible());
+        QCOMPARE(bitrate->property("currentText").toString(),QStringLiteral("320 kbps"));
+        QTRY_VERIFY(label->property("text").toString().endsWith(".mp3"));
+        format->setProperty("currentIndex",0);
+        QTRY_VERIFY(label->property("text").toString().endsWith(".wav"));
+        // A time selection is offered as a range (and chosen) when the dialog opens.
+        QMetaObject::invokeMethod(dialog,"close"); QTRY_VERIFY(!dialog->property("visible").toBool());
+        dialog->setProperty("hasTimeSelection",true);
+        QMetaObject::invokeMethod(dialog,"open"); QTRY_VERIFY(dialog->property("visible").toBool());
+        QCOMPARE(range->property("count").toInt(),2);
+        QCOMPARE(range->property("currentIndex").toInt(),1);
+        dialog->setProperty("hasTimeSelection",false);
+        // An empty song: Export says why nothing happened.
+        auto* start=visualItem(window->contentItem(),"exportStart"); QVERIFY(start);
+        auto* message=visualItem(window->contentItem(),"exportMessage"); QVERIFY(message);
+        range->setProperty("currentIndex",0);
+        click(start);
+        QTRY_VERIFY(!message->property("text").toString().isEmpty());
+        QVERIFY(!EngineController::instance() || !EngineController::instance()->exporting());
+        auto* close=visualItem(window->contentItem(),"exportClose"); QVERIFY(close);
+        click(close); QTRY_VERIFY(!dialog->property("visible").toBool());
     }
     void view_menu_ticks_follow_the_panels_and_requests_toggles() {
         auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);

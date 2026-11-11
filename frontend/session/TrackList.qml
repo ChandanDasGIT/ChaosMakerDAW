@@ -9,6 +9,9 @@ Rectangle {
     property int laneHeight: 106
     property real scrollOffset: 0
     property int dropRow: -1
+    // Audio files dropped here (restMap E2): onto the card's track, or a new track per file
+    // below the cards, at the playhead. Needs the app's import job.
+    property var importJob: null
     signal verticalScrollRequested(real amount)
     color: Theme.panelBg
     border.color: Theme.divider
@@ -775,6 +778,22 @@ Rectangle {
                     }
                 }
             }
+        }
+    }
+
+    DropArea {
+        objectName: "trackListFileDrop"
+        anchors.fill: parent
+        keys: ["text/uri-list"]
+        enabled: !!root.importJob
+        onDropped: drop => {
+            const files = drop.urls.filter(url => root.importJob.isImportable(url))
+            if (files.length === 0 || !root.trackModel) return
+            const y = drop.y - 38 + root.scrollOffset   // under the header, in the scrolled list
+            const row = root.trackModel.rowAtY(y)
+            const onTrack = row >= 0 && row < root.trackModel.count
+            root.importJob.importFiles(files, EngineController.positionBeats, onTrack ? root.trackModel.trackIdAt(row) : -1)
+            drop.acceptProposedAction()
         }
     }
 }
