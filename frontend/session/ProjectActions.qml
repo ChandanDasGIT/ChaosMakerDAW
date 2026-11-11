@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Dialogs
 import ".."
 import "../common"
 
@@ -33,13 +32,12 @@ RowLayout {
         onBusyChanged: if (busy) importStatus.open()
     }
 
-    FileDialog {
-        // Inside the main window, like the other file dialogs (keyboard focus comes back).
-        popupType: Popup.Item
+    FilePicker {
         id: importDialog
         objectName: "importAudioDialog"
         title: "Import audio"
-        fileMode: FileDialog.OpenFiles
+        fileMode: FilePicker.OpenFiles
+        acceptLabel: "Import"
         nameFilters: ["Audio files (*.wav *.WAV *.flac *.FLAC *.mp3 *.MP3)", "All files (*)"]
         onAccepted: importJob.importFiles(selectedFiles, EngineController.positionBeats, -1)
     }
@@ -159,17 +157,11 @@ RowLayout {
         onActivated: actionsBridge.requestAction("Open", EngineController.projectDirty)
     }
 
-    FileDialog {
-
-        // Inside the main window: a separate dialog window keeps app focus after closing,
-
-        // which left the app without keyboard input (plan item 1.11).
-
-        popupType: Popup.Item
+    FilePicker {
         id: saveProjectDialog
         objectName: "saveProjectDialog"
         title: "Save project"
-        fileMode: FileDialog.SaveFile
+        fileMode: FilePicker.SaveFile
         nameFilters: ["ChaosMaker projects (*.chaos)"]
         defaultSuffix: "chaos"
         onAccepted: {
@@ -182,16 +174,10 @@ RowLayout {
         onRejected: actionsBridge.onSaveCancelled()
     }
 
-    FileDialog {
-
-        // Inside the main window: a separate dialog window keeps app focus after closing,
-
-        // which left the app without keyboard input (plan item 1.11).
-
-        popupType: Popup.Item
+    FilePicker {
         id: openProjectDialog
         title: "Open project"
-        fileMode: FileDialog.OpenFile
+        fileMode: FilePicker.OpenFile
         nameFilters: ["ChaosMaker projects (*.chaos)", "JSON sessions (*.json)"]
         onAccepted: EngineController.openProject(selectedFile)
     }

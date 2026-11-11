@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Dialogs
 import QtQuick.Layouts
 
 Item {
@@ -488,13 +487,10 @@ Item {
                             }
                         }
                     }
-                    FileDialog {
-                        // Inside the main window: a separate dialog window keeps app focus after closing,
-                        // which left the app without keyboard input (plan item 1.11).
-                        popupType: Popup.Item
+                    FilePicker {
                         id: cabinetDialog
                         title: "Load cabinet impulse response"
-                        fileMode: FileDialog.OpenFile
+                        fileMode: FilePicker.OpenFile
                         nameFilters: ["WAV impulse responses (*.wav *.WAV)"]
                         onAccepted: root.effectsModel.loadCabinetIr(pedalCard.pedalId, selectedFile)
                     }
@@ -521,31 +517,19 @@ Item {
         }
     }
 
-    FileDialog {
-
-        // Inside the main window: a separate dialog window keeps app focus after closing,
-
-        // which left the app without keyboard input (plan item 1.11).
-
-        popupType: Popup.Item
+    FilePicker {
         id: savePresetDialog
         title: "Save GuitarSuite preset"
-        fileMode: FileDialog.SaveFile
+        fileMode: FilePicker.SaveFile
         nameFilters: ["GuitarSuite presets (*.gspreset)", "All files (*)"]
         defaultSuffix: "gspreset"
         onAccepted: root.effectsModel.savePresetTo(selectedFile)
     }
 
-    FileDialog {
-
-        // Inside the main window: a separate dialog window keeps app focus after closing,
-
-        // which left the app without keyboard input (plan item 1.11).
-
-        popupType: Popup.Item
+    FilePicker {
         id: loadPresetDialog
         title: "Load GuitarSuite preset"
-        fileMode: FileDialog.OpenFile
+        fileMode: FilePicker.OpenFile
         nameFilters: ["GuitarSuite presets (*.gspreset)", "All files (*)"]
         onAccepted: root.effectsModel.loadPresetFrom(selectedFile)
     }

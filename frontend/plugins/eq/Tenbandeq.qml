@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Dialogs
 
 Item {
     id: root
@@ -77,27 +76,18 @@ Item {
         Text { text: "Frequency (Hz)"; color: Theme.textMuted; font.pixelSize: 9; Layout.alignment: Qt.AlignHCenter }
     }
 
-    FileDialog {
-
-        // Inside the main window: a separate dialog window keeps app focus after closing,
-
-        // which left the app without keyboard input (plan item 1.11).
-
-        popupType: Popup.Item
+    FilePicker {
         id: eqSaveDialog
         title: "Save equalizer preset"
-        fileMode: FileDialog.SaveFile
+        fileMode: FilePicker.SaveFile
         nameFilters: ["Equalizer presets (*.eqpreset)"]
         defaultSuffix: "eqpreset"
         onAccepted: root.trackModel.saveEqPreset(root.trackId, selectedFile)
     }
-    FileDialog {
-        // Inside the main window: a separate dialog window keeps app focus after closing,
-        // which left the app without keyboard input (plan item 1.11).
-        popupType: Popup.Item
+    FilePicker {
         id: eqLoadDialog
         title: "Load equalizer preset"
-        fileMode: FileDialog.OpenFile
+        fileMode: FilePicker.OpenFile
         nameFilters: ["Equalizer presets (*.eqpreset)"]
         onAccepted: root.trackModel.loadEqPreset(root.trackId, selectedFile)
     }
