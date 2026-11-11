@@ -359,7 +359,8 @@ Window {
                             : root.selectedEffect === "piano" ? 6
                             : root.selectedEffect === "chords" ? 7
                             : root.selectedEffect === "denoise" ? 9
-                            : root.trackModel && root.trackModel.isMixEffect(root.selectedEffect) ? 8 : 10
+                            : root.selectedEffect === "pitchmonitor" ? 10
+                            : root.trackModel && root.trackModel.isMixEffect(root.selectedEffect) ? 8 : 11
                 Tenbandeq {
                     trackModel: root.trackModel
                     trackId: root.trackId
@@ -441,7 +442,8 @@ Window {
                     trackId: root.trackId
                     trackName: root.trackName
                     effectType: root.trackModel && root.trackModel.isMixEffect(root.selectedEffect)
-                                && root.selectedEffect !== "denoise" ? root.selectedEffect : ""
+                                && root.selectedEffect !== "denoise" && root.selectedEffect !== "pitchmonitor"
+                                ? root.selectedEffect : ""
                     active: root.visible && effectType !== ""
                 }
                 // Noise Reduction (restMap G13) has a page of its own, with a spectrum.
@@ -451,6 +453,14 @@ Window {
                     trackId: root.trackId
                     trackName: root.trackName
                     active: root.visible && root.selectedEffect === "denoise"
+                }
+                // Pitch Monitor (restMap G18): its own page, the pitch over the song.
+                PitchMonitorEditor {
+                    objectName: "trackPitchMonitor"
+                    trackModel: root.trackModel
+                    trackId: root.trackId
+                    trackName: root.trackName
+                    active: root.visible && root.selectedEffect === "pitchmonitor"
                 }
                 Item {
                     Text {

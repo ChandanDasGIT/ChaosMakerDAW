@@ -117,9 +117,10 @@ endforeach()
 if(DAW_BUILD_APP)
     add_executable(wrappertests
         tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp tests/wrapper/clipediting_qtcheck.cpp
-        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp tests/wrapper/volumeenvelope_qtcheck.cpp tests/wrapper/mixeffect_qtcheck.cpp tests/wrapper/importexport_qtcheck.cpp tests/wrapper/fileswrapper_qtcheck.cpp tests/wrapper/shortcuts_qtcheck.cpp tests/wrapper/denoise_qtcheck.cpp
+        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp tests/wrapper/volumeenvelope_qtcheck.cpp tests/wrapper/mixeffect_qtcheck.cpp tests/wrapper/importexport_qtcheck.cpp tests/wrapper/fileswrapper_qtcheck.cpp tests/wrapper/shortcuts_qtcheck.cpp tests/wrapper/denoise_qtcheck.cpp tests/wrapper/pitchmonitor_qtcheck.cpp
         wrapper/files/fileswrap/fileswrapper.cpp wrapper/files/fileswrap/fileswrapper.h
         wrapper/plugins/denoise/denoisewrap/denoisewrapper.cpp wrapper/plugins/denoise/denoisewrap/denoisewrapper.h
+        wrapper/plugins/pitchmonitor/pitchmonitorwrap/pitchmonitorwrapper.cpp wrapper/plugins/pitchmonitor/pitchmonitorwrap/pitchmonitorwrapper.h
         wrapper/settings/shortcutswrap/shortcutswrapper.cpp wrapper/settings/shortcutswrap/shortcutswrapper.h
         wrapper/pianorollwrap/pianorollwrapper.cpp wrapper/pianorollwrap/pianorollwrapper.h
         wrapper/pianorollwrap/pianorollnotemodel.cpp wrapper/pianorollwrap/pianorollnotemodel.h
@@ -150,6 +151,7 @@ if(DAW_BUILD_APP)
     add_test(NAME qtpresets COMMAND wrappertests qtpresets)
     add_test(NAME qtshortcuts COMMAND wrappertests qtshortcuts)
     add_test(NAME qtdenoise COMMAND wrappertests qtdenoise)
+    add_test(NAME qtpitchmonitor COMMAND wrappertests qtpitchmonitor)
     add_test(NAME qtrecording COMMAND wrappertests qtrecording)
     add_test(NAME qtmultirecording COMMAND wrappertests qtmultirecording)
     add_test(NAME qtclipediting COMMAND wrappertests qtclipediting)
@@ -200,7 +202,7 @@ if(DAW_BUILD_APP)
                       frontend/instruments/piano/PianoEditor.qml
                       frontend/instruments/piano/PianoPicture.qml
                       frontend/transportbar/VirtualKeyboard.qml
-                      frontend/plugins/TrackEffectsPanel.qml frontend/plugins/denoise/NoiseReductionEditor.qml frontend/plugins/eq/Tenbandeq.qml frontend/plugins/chaoseq/ChaosEqEditor.qml
+                      frontend/plugins/TrackEffectsPanel.qml frontend/plugins/denoise/NoiseReductionEditor.qml frontend/plugins/pitchmonitor/PitchMonitorEditor.qml frontend/plugins/eq/Tenbandeq.qml frontend/plugins/chaoseq/ChaosEqEditor.qml
                       frontend/plugins/chordplayer/ChordsEditor.qml frontend/plugins/chordplayer/ChordStrips.qml
                       frontend/session/TrackList.qml frontend/timeline/Timeline.qml frontend/timeline/VolumeEnvelopeLane.qml frontend/plugins/mixfx/MixEffectEditor.qml
                       frontend/mixer/MixerPanel.qml

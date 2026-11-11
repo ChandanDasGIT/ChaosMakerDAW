@@ -750,8 +750,8 @@ TEST(qttrackeffects, effects_role_lists_the_chain_and_edits_follow_the_backend_r
     CHECK(suite["type"].toString()=="guitarsuite" && suite["title"].toString()=="GuitarSuite" && !suite["removable"].toBool());
     CHECK(effects(vocal).isEmpty());
     // The picker offers each EQ once: the 10-band Equalizer and Chaos EQ (plan 6.2), then the
-    // eight mixing plugins (restMap G7, G7b).
-    CHECK(tracks.addableEffects(vocal).size()==10);
+    // ten mixing plugins (restMap G7, G7b, G13 noise reduction, G18 pitch monitor).
+    CHECK(tracks.addableEffects(vocal).size()==12);
     CHECK(tracks.addableEffects(vocal)[0].toMap()["title"].toString()=="Equalizer");
     CHECK(tracks.addableEffects(vocal)[1].toMap()["title"].toString()=="Chaos EQ");
     int roleChanges=0, projectChanges=0;
@@ -761,7 +761,7 @@ TEST(qttrackeffects, effects_role_lists_the_chain_and_edits_follow_the_backend_r
     const int eq=tracks.addTrackEffect(vocal,"eq"); CHECK(eq>0);
     CHECK(roleChanges==1 && projectChanges==1);
     CHECK(effects(vocal).size()==1 && effects(vocal)[0].toMap()["id"].toInt()==eq && effects(vocal)[0].toMap()["removable"].toBool());
-    CHECK(tracks.addableEffects(vocal).size()==9 && tracks.addableEffects(vocal)[0].toMap()["type"].toString()=="chaoseq");
+    CHECK(tracks.addableEffects(vocal).size()==11 && tracks.addableEffects(vocal)[0].toMap()["type"].toString()=="chaoseq");
     CHECK(tracks.addTrackEffect(vocal,"eq")==-1 && tracks.addTrackEffect(vocal,"guitarsuite")==-1);
     CHECK(roleChanges==1);                                          // refused edits notify nothing
     // Move and remove on the guitar; GuitarSuite cannot be removed.
