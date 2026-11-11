@@ -101,7 +101,7 @@ Window {
     }
 
     Shortcut {
-        sequence: "M"
+        sequence: Shortcuts.keys["view.mixer"]
         onActivated: window.toggleMixer()
     }
 

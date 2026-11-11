@@ -45,6 +45,13 @@ ToolButton {
         border.color: root.checked ? Theme.divider : "transparent"
     }
 
+    // Opened from the menu below (restMap G16).
+    function openUndoHistory() { undoHistory.open() }
+    UndoHistory {
+        id: undoHistory
+        trackModel: root.trackModel
+    }
+
     ThemedMenu {
         id: editMenu
         objectName: "editMenu"
@@ -54,16 +61,23 @@ ToolButton {
         ThemedMenuItem {
             objectName: "editUndoItem"
             text: "Undo"
-            shortcutText: "Ctrl+Z"
+            shortcutText: Shortcuts.texts["edit.undo"]
             enabled: !!root.trackModel && root.trackModel.canUndo
             onTriggered: root.trackModel.undo()
         }
         ThemedMenuItem {
             objectName: "editRedoItem"
             text: "Redo"
-            shortcutText: "Ctrl+Shift+Z"
+            shortcutText: Shortcuts.texts["edit.redo"]
             enabled: !!root.trackModel && root.trackModel.canRedo
             onTriggered: root.trackModel.redo()
+        }
+        ThemedMenuItem {
+            objectName: "editUndoHistoryItem"
+            text: "Undo History…"
+            shortcutText: Shortcuts.texts["edit.history"]
+            enabled: !!root.trackModel
+            onTriggered: undoHistory.open()
         }
 
         ThemedMenuSeparator {}
@@ -78,35 +92,35 @@ ToolButton {
         ThemedMenuItem {
             objectName: "editCutItem"
             text: "Cut"
-            shortcutText: "Ctrl+X"
+            shortcutText: Shortcuts.texts["edit.cut"]
             enabled: root.hasTimeline && root.timeline.menuCanCut
             onTriggered: root.runOnTimeline(() => root.timeline.cutSelection())
         }
         ThemedMenuItem {
             objectName: "editCopyItem"
             text: "Copy"
-            shortcutText: "Ctrl+C"
+            shortcutText: Shortcuts.texts["edit.copy"]
             enabled: root.hasTimeline && root.timeline.menuCanCopy
             onTriggered: root.runOnTimeline(() => root.timeline.copySelection())
         }
         ThemedMenuItem {
             objectName: "editPasteItem"
             text: "Paste"
-            shortcutText: "Ctrl+V"
+            shortcutText: Shortcuts.texts["edit.paste"]
             enabled: root.hasTimeline && root.timeline.menuCanPaste
             onTriggered: root.runOnTimeline(() => root.timeline.pasteAtPlayhead())
         }
         ThemedMenuItem {
             objectName: "editDuplicateItem"
             text: "Duplicate"
-            shortcutText: "Ctrl+D"
+            shortcutText: Shortcuts.texts["edit.duplicate"]
             enabled: root.hasTimeline && root.timeline.menuCanDuplicate
             onTriggered: root.runOnTimeline(() => root.timeline.duplicateSelection())
         }
         ThemedMenuItem {
             objectName: "editDeleteItem"
             text: "Delete"
-            shortcutText: "Del"
+            shortcutText: Shortcuts.texts["edit.delete"]
             enabled: root.hasTimeline && root.timeline.menuCanDelete
             onTriggered: root.runOnTimeline(() => root.timeline.deleteSelection())
         }
@@ -126,7 +140,7 @@ ToolButton {
         ThemedMenuItem {
             objectName: "editSelectAllItem"
             text: "Select All Clips"
-            shortcutText: "Ctrl+A"
+            shortcutText: Shortcuts.texts["edit.selectAll"]
             enabled: root.hasTimeline && root.timeline.menuCanSelectAll
             onTriggered: root.runOnTimeline(() => root.timeline.selectAllClips())
         }

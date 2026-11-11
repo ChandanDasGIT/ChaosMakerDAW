@@ -56,6 +56,7 @@ void Project::removeTrack(int id)
     ClipEdit edit;
     edit.removedTrack = **it;                                    // full copy: clips, name, EQ...
     edit.removedIndex = static_cast<std::size_t>(it - m_tracks.begin());
+    edit.label = "Delete track";
     m_tracks.erase(it);
     pushHistory(std::move(edit));
 }
@@ -72,6 +73,22 @@ void Project::pushHistory(ClipEdit edit)
     m_history.push_back(std::move(edit));
     if (m_history.size() > 100) m_history.erase(m_history.begin());
     m_historyPosition = m_history.size();
+    ++m_stepCount;
+}
+
+std::vector<std::string> Project::historyLabels() const
+{
+    std::vector<std::string> labels;
+    labels.reserve(m_history.size());
+    for (const auto& edit : m_history) labels.emplace_back(edit.label);
+    return labels;
+}
+
+bool Project::setLastStepLabel(const char* label) noexcept
+{
+    if (!label || m_history.empty() || m_historyPosition != m_history.size()) return false;
+    m_history.back().label = label;
+    return true;
 }
 
 std::optional<Project::TrackChange> Project::undoRestoresTrack() const
@@ -389,7 +406,7 @@ int Project::addAudioClip(int trackId, AudioClip clip)
     clip.id = m_nextClipId++;
     auto before = track->audioClips;
     track->audioClips.push_back(std::move(clip));
-    rememberClipEdit(trackId, std::move(before));
+    rememberClipEdit(trackId, std::move(before), "Add clip");
     return track->audioClips.back().id;
 }
 
@@ -416,10 +433,8 @@ std::vector<int> Project::addAudioClips(const std::vector<std::pair<int, AudioCl
         newIds.push_back(clip.id);
         trackEdit->after.push_back(std::move(clip));
     }
-    m_history.erase(m_history.begin() + m_historyPosition, m_history.end());
-    m_history.push_back(std::move(edit));
-    if (m_history.size() > 100) m_history.erase(m_history.begin());
-    m_historyPosition = m_history.size();
+    edit.label = clips.size() == 1 ? "Add clip" : "Add clips";
+    pushHistory(std::move(edit));
     for (const auto& state : m_history.back().tracks) findTrack(state.trackId)->audioClips = state.after;
     return newIds;
 }
@@ -436,7 +451,7 @@ bool Project::removeAudioClip(int trackId, int clipId)
         return false;
     auto before = track->audioClips;
     track->audioClips.erase(it);
-    rememberClipEdit(trackId, std::move(before));
+    rememberClipEdit(trackId, std::move(before), "Delete clip");
     return true;
 }
 
@@ -454,7 +469,7 @@ bool Project::resizeAudioClip(int trackId, int clipId, std::int64_t lengthSample
     if (it->length == lengthSamples) return true;
     auto before = track->audioClips;
     it->length = lengthSamples;
-    rememberClipEdit(trackId, std::move(before));
+    rememberClipEdit(trackId, std::move(before), "Resize clip");
     return true;
 }
 
@@ -466,7 +481,7 @@ bool Project::setClipBounds(int trackId, int clipId, std::int64_t start, std::in
     if (clip->start == start && clip->length == length && clip->sourceOffset == offset) return true;
     auto before = track->audioClips;
     clip->start=start; clip->length=length; clip->sourceOffset=offset;
-    rememberClipEdit(trackId,std::move(before)); return true;
+    rememberClipEdit(trackId,std::move(before), "Trim clip"); return true;
 }
 int Project::splitAudioClip(int trackId, int clipId, std::int64_t position, std::int64_t sourceOffset) {
     auto* track = findTrack(trackId); if (!track || sourceOffset < 0) return -1;
@@ -487,7 +502,7 @@ int Project::splitAudioClip(int trackId, int clipId, std::int64_t position, std:
         clip->notes=std::move(left);
     }
     track->audioClips.push_back(right);
-    rememberClipEdit(trackId,std::move(before)); return right.id;
+    rememberClipEdit(trackId,std::move(before), "Split clip"); return right.id;
 }
 
 bool Project::joinLastClipEdits()
@@ -531,7 +546,7 @@ bool Project::mergeAudioClips(int trackId, int first, int second, double sourceR
     auto before=track->audioClips;
     a->length+=b->length; a->fadeOut=b->fadeOut;
     track->audioClips.erase(b);
-    rememberClipEdit(trackId,std::move(before)); return true;
+    rememberClipEdit(trackId,std::move(before), "Merge clips"); return true;
 }
 
 bool Project::moveAudioClip(int trackId, int clipId, std::int64_t start) {
@@ -542,7 +557,7 @@ bool Project::moveAudioClip(int trackId, int clipId, std::int64_t start) {
     if (clip == track->audioClips.end() || start > INT64_MAX - clip->length) return false;
     if (clip->start == start) return true;
     auto before = track->audioClips; clip->start = start;
-    rememberClipEdit(trackId, std::move(before)); return true;
+    rememberClipEdit(trackId, std::move(before), "Move clip"); return true;
 }
 
 bool Project::setClipGain(int trackId, int clipId, float gainDb, bool continueEdit) {
@@ -561,7 +576,7 @@ bool Project::setClipGain(int trackId, int clipId, float gainDb, bool continueEd
     if (extendLast) {
         m_history.back().tracks.front().after = track->audioClips; // keep the original "before"
     } else {
-        rememberClipEdit(trackId, std::move(before));
+        rememberClipEdit(trackId, std::move(before), "Clip gain");
         m_history.back().gainClipId = clipId;
     }
     return true;
@@ -585,7 +600,7 @@ bool Project::setClipFades(int trackId, int clipId, std::int64_t fadeIn, std::in
     if (extendLast) {
         m_history.back().tracks.front().after = track->audioClips; // keep the original "before"
     } else {
-        rememberClipEdit(trackId, std::move(before));
+        rememberClipEdit(trackId, std::move(before), "Clip fades");
         m_history.back().fadeClipId = clipId;
     }
     return true;
@@ -628,7 +643,7 @@ bool Project::setClipNotes(int trackId, int clipId, std::vector<MidiNote> notes)
     if (it->notes == notes) return true;
     auto before = track->audioClips;
     it->notes = std::move(notes);
-    rememberClipEdit(trackId, std::move(before));
+    rememberClipEdit(trackId, std::move(before), "Edit notes");
     return true;
 }
 
@@ -660,10 +675,8 @@ bool Project::editClipGroup(const std::vector<ClipChange>& changes) {
             destination->after.push_back(clip);
         }
     }
-    m_history.erase(m_history.begin()+m_historyPosition,m_history.end());
-    m_history.push_back(std::move(edit));
-    if (m_history.size()>100) m_history.erase(m_history.begin());
-    m_historyPosition=m_history.size();
+    edit.label = "Edit clips";
+    pushHistory(std::move(edit));
     for (const auto& state:m_history.back().tracks) findTrack(state.trackId)->audioClips=state.after;
     return true;
 }
@@ -694,20 +707,19 @@ bool Project::replaceTrackContent(std::vector<TrackContent> contents) {
         after.restoreContent(content.envelope);
         edit.envelopes.push_back({content.trackId, track->volumeEnvelope, after});
     }
-    m_history.erase(m_history.begin() + static_cast<std::ptrdiff_t>(m_historyPosition), m_history.end());
-    m_history.push_back(std::move(edit));
-    if (m_history.size() > 100) m_history.erase(m_history.begin());
-    m_historyPosition = m_history.size();
+    edit.label = "Edit range";
+    pushHistory(std::move(edit));
     for (const auto& envelope : m_history.back().envelopes)
         findTrack(envelope.trackId)->volumeEnvelope.restoreContent(envelope.after);
     for (const auto& state : m_history.back().tracks) findTrack(state.trackId)->audioClips = state.after;
     return true;
 }
 
-void Project::rememberClipEdit(int trackId, std::vector<AudioClip> before)
+void Project::rememberClipEdit(int trackId, std::vector<AudioClip> before, const char* label)
 {
     ClipEdit edit;
     edit.tracks.push_back({trackId, std::move(before), findTrack(trackId)->audioClips});
+    edit.label = label;
     pushHistory(std::move(edit));
 }
 
@@ -717,7 +729,7 @@ int Project::addEnvelopePoint(int trackId, std::int64_t position, double level)
     if (!track) return -1;
     auto before = track->volumeEnvelope;
     const int index = track->volumeEnvelope.addPoint(position, level);
-    if (index >= 0) rememberEnvelopeEdit(trackId, std::move(before));
+    if (index >= 0) rememberEnvelopeEdit(trackId, std::move(before), "Add envelope point");
     return index;
 }
 
@@ -732,7 +744,7 @@ bool Project::moveEnvelopePoint(int trackId, int index, std::int64_t position, d
         && m_history.back().envelope && m_history.back().envelope->trackId == trackId
         && m_history.back().envelope->movedPoint == index;
     if (extendLast) m_history.back().envelope->after = track->volumeEnvelope;   // keep the original "before"
-    else rememberEnvelopeEdit(trackId, std::move(before), index);
+    else rememberEnvelopeEdit(trackId, std::move(before), "Move envelope point", index);
     return true;
 }
 
@@ -742,7 +754,7 @@ bool Project::removeEnvelopePoint(int trackId, int index)
     if (!track) return false;
     auto before = track->volumeEnvelope;
     if (!track->volumeEnvelope.removePoint(index)) return false;
-    rememberEnvelopeEdit(trackId, std::move(before));
+    rememberEnvelopeEdit(trackId, std::move(before), "Delete envelope point");
     return true;
 }
 
@@ -752,7 +764,7 @@ bool Project::setEnvelopePointShape(int trackId, int index, automation::CurveSha
     if (!track) return false;
     auto before = track->volumeEnvelope;
     if (!track->volumeEnvelope.setPointShape(index, shape)) return false;
-    if (!track->volumeEnvelope.sameContent(before)) rememberEnvelopeEdit(trackId, std::move(before));
+    if (!track->volumeEnvelope.sameContent(before)) rememberEnvelopeEdit(trackId, std::move(before), "Envelope curve");
     return true;
 }
 
@@ -763,7 +775,7 @@ bool Project::setEnvelopeBypassed(int trackId, bool bypassed)
     if (track->volumeEnvelope.bypassed() == bypassed) return true;
     auto before = track->volumeEnvelope;
     track->volumeEnvelope.setBypassed(bypassed);
-    rememberEnvelopeEdit(trackId, std::move(before));
+    rememberEnvelopeEdit(trackId, std::move(before), bypassed ? "Bypass envelope" : "Turn envelope on");
     return true;
 }
 
@@ -787,10 +799,11 @@ bool Project::setEnvelopeOverClips(int trackId, bool overClips)
     return true;
 }
 
-void Project::rememberEnvelopeEdit(int trackId, automation::VolumeEnvelope before, int movedPoint)
+void Project::rememberEnvelopeEdit(int trackId, automation::VolumeEnvelope before, const char* label, int movedPoint)
 {
     ClipEdit edit;
     edit.envelope = EnvelopeEdit{trackId, std::move(before), findTrack(trackId)->volumeEnvelope, movedPoint};
+    edit.label = label;
     pushHistory(std::move(edit));
 }
 
@@ -798,11 +811,11 @@ bool Project::foldIntoAddedTracks(std::size_t mark, const std::vector<int>& ids)
 {
     if (ids.empty() || mark > m_history.size() || m_historyPosition != m_history.size()) return false;
     m_history.erase(m_history.begin() + std::ptrdiff_t(mark), m_history.end());
+    m_historyPosition = m_history.size();
     ClipEdit edit;
     edit.addedTrackIds = ids;
-    m_history.push_back(std::move(edit));
-    if (m_history.size() > 100) m_history.erase(m_history.begin());
-    m_historyPosition = m_history.size();
+    edit.label = "Import audio";
+    pushHistory(std::move(edit));
     return true;
 }
 

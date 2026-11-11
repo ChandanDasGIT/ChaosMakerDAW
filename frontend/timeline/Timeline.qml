@@ -104,49 +104,49 @@ Item {
     }
 
     Shortcut {
-        sequence: "Delete"
+        sequence: Shortcuts.keys["edit.delete"]
         enabled: root.canDeleteSelection
         autoRepeat: false
         onActivated: root.deleteSelection()
     }
     Shortcut {
-        sequences: [StandardKey.Cut]
+        sequence: Shortcuts.keys["edit.cut"]
         enabled: root.canCut
         autoRepeat: false
         onActivated: root.cutSelection()
     }
     Shortcut {
-        sequences: [StandardKey.Copy]
+        sequence: Shortcuts.keys["edit.copy"]
         enabled: root.canCopy
         autoRepeat: false
         onActivated: root.copySelection()
     }
     Shortcut {
-        sequences: [StandardKey.Paste]
+        sequence: Shortcuts.keys["edit.paste"]
         enabled: root.canPaste
         autoRepeat: false
         onActivated: root.pasteAtPlayhead()
     }
     Shortcut {
-        sequence: "Ctrl+D"
+        sequence: Shortcuts.keys["edit.duplicate"]
         enabled: root.canDuplicate
         autoRepeat: false
         onActivated: root.duplicateSelection()
     }
     Shortcut {
-        sequence: "Left"
+        sequence: Shortcuts.keys["timeline.nudgeLeft"]
         enabled: root.canEditClipSelection
         autoRepeat: true
         onActivated: editor.nudgeClips(-1)
     }
     Shortcut {
-        sequence: "Right"
+        sequence: Shortcuts.keys["timeline.nudgeRight"]
         enabled: root.canEditClipSelection
         autoRepeat: true
         onActivated: editor.nudgeClips(1)
     }
     Shortcut {
-        sequences: [StandardKey.SelectAll]
+        sequence: Shortcuts.keys["edit.selectAll"]
         enabled: root.clipKeyboardActive
         autoRepeat: false
         onActivated: root.selectAllClips()
@@ -227,7 +227,7 @@ Item {
     }
 
     Shortcut {
-        sequence: "S"
+        sequence: Shortcuts.keys["timeline.split"]
         enabled: root.activeFocus && editor.canSplitSelection
         onActivated: root.trackModel.splitClipAtBeat(root.selectedTrackId, root.selectedClipId, root.transport.positionBeats)
     }
@@ -443,7 +443,7 @@ Item {
     }
     // V shows / hides the selected track's volume envelope.
     Shortcut {
-        sequence: "V"
+        sequence: Shortcuts.keys["timeline.envelope"]
         enabled: root.visible && !root.editingText && !!root.trackModel && root.trackModel.selectedTrackId >= 0
         autoRepeat: false
         onActivated: root.trackModel.toggleEnvelopeShown(root.trackModel.selectedTrackId)

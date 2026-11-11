@@ -74,6 +74,9 @@ TrackListWrapper::TrackListWrapper(QObject* parent)
     connect(this, &TrackListWrapper::countChanged, this, &TrackListWrapper::projectChanged);
     connect(this, &TrackListWrapper::clipsChanged, this, &TrackListWrapper::projectChanged);
     connect(this, &TrackListWrapper::clipsChanged, this, &TrackListWrapper::historyChanged);
+    connect(this, &TrackListWrapper::historyChanged, this, &TrackListWrapper::syncUndoHistory);
+    connect(this, &TrackListWrapper::projectChanged, this, &TrackListWrapper::syncUndoHistory);
+    connect(this, &QAbstractItemModel::modelReset, this, &TrackListWrapper::syncUndoHistory);
     // The selected track's key shift follows a new selection, its harmonium settings and loads.
     connect(this, &TrackListWrapper::selectedTrackChanged, this, &TrackListWrapper::syncKeyShift);
     connect(this, &TrackListWrapper::harmoniumChanged, this, &TrackListWrapper::syncKeyShift);
@@ -1100,6 +1103,31 @@ void TrackListWrapper::notifyClipGainEdit(int trackId) {
     if (row >= 0) emit dataChanged(index(row), index(row), {ClipsRole});
     emit historyChanged();
 }
+QStringList TrackListWrapper::undoHistory() const
+{
+    QStringList labels;
+    for (const auto& label : m_project.historyLabels()) labels.append(QString::fromStdString(label));
+    return labels;
+}
+
+bool TrackListWrapper::jumpToHistory(int position)
+{
+    if (position < 0 || position > static_cast<int>(m_project.historySize())) return false;
+    while (undoPosition() > position) if (!undo()) return false;
+    while (undoPosition() < position) if (!redo()) return false;
+    return true;
+}
+
+void TrackListWrapper::syncUndoHistory()
+{
+    const auto steps = m_project.stepCount();
+    const auto size = m_project.historySize();
+    const auto mark = m_project.historyMark();
+    if (steps == m_notifiedSteps && size == m_notifiedHistorySize && mark == m_notifiedHistoryMark) return;
+    m_notifiedSteps = steps; m_notifiedHistorySize = size; m_notifiedHistoryMark = mark;
+    emit undoHistoryChanged();
+}
+
 bool TrackListWrapper::undo()
 {
     // Undoing an import takes several rows away at once: views reload the list.

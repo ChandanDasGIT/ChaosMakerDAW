@@ -3,6 +3,7 @@
 #include "plugins/mixfx/mixfxspec.h"
 #include "wrapper/engineWrap/enginecontroller.h"
 #include "wrapper/settings/appsettingswrap/appsettingswrapper.h"
+#include "wrapper/settings/shortcutswrap/shortcutswrapper.h"
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
@@ -290,6 +291,106 @@ private slots:
         controller.transportAction("pause"); io->process();
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play); click(play); io->process();
         QVERIFY(controller.playing());
+        controller.shutdownSession();
+    }
+    void w_goes_to_start_and_the_shortcut_editor_changes_keys() {
+        auto* shortcuts=engine->singletonInstance<ShortcutsWrapper*>("TransportTests","Shortcuts"); QVERIFY(shortcuts);
+        auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
+        EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller.attachProject(&tracks);
+        tracks.addClipAtBeat(tracks.addAudioTrack(),0,64);                // long enough not to stop at the end
+        auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
+        const auto restore=qScopeGuard([&] {
+            shortcuts->resetAll();
+            for(const char* name:{"shortcutEditor","preferencesPopup","editMenu"})
+                if(auto* popup=window->findChild<QObject*>(name)) QMetaObject::invokeMethod(popup,"close");
+            top->setProperty("trackModel",QVariant());
+            window->setProperty("transport",QVariant::fromValue(EngineController::instance()));
+        });
+        window->setProperty("transport",QVariant::fromValue(&controller));
+        top->setProperty("trackModel",QVariant::fromValue(&tracks));
+        const auto playAWhile=[&] {
+            QTest::keyClick(window,Qt::Key_Space); io->process();
+            QVERIFY(controller.playing()); QTRY_VERIFY(bar->property("playing").toBool());
+            for(int i=0;i<20;++i) io->process();
+            QTest::keyClick(window,Qt::Key_Space); io->process();
+            QVERIFY(!controller.playing()); QTRY_VERIFY(!bar->property("playing").toBool());
+            QVERIFY(controller.positionSeconds()>0);
+        };
+        // W goes to the start (the default the user asked for); Space still plays / pauses.
+        playAWhile();
+        QTest::keyClick(window,Qt::Key_W);
+        QTRY_VERIFY((io->process(),controller.positionSeconds()<1e-9));
+
+        // The editor, from Preferences: give Go to start the Home key by pressing it.
+        auto* settingsButton=visualItem(window->contentItem(),"settingsButton"); QVERIFY(settingsButton); click(settingsButton);
+        auto* prefs=visualItem(window->contentItem(),"preferencesSetting"); QTRY_VERIFY(prefs && prefs->isVisible()); click(prefs);
+        auto* open=visualItem(window->contentItem(),"editShortcutsButton"); QTRY_VERIFY(open && open->isVisible()); click(open);
+        auto* editor=window->findChild<QObject*>("shortcutEditor"); QVERIFY(editor);
+        QTRY_VERIFY(editor->property("visible").toBool());
+        QQuickItem* key=nullptr;
+        QTRY_VERIFY((key=visualItem(window->contentItem(),"shortcutKey_transport.goToStart")) && key->isVisible());
+        QCOMPARE(key->property("text").toString(),QString("W"));
+        click(key); QTest::keyClick(window,Qt::Key_Home);
+        QTRY_COMPARE(shortcuts->keys()["transport.goToStart"].toString(),QString("Home"));
+        QCOMPARE(QSettings().value("shortcuts/transport.goToStart").toString(),QString("Home"));
+        // The row stays where it was (the list is not rebuilt), now with a Reset.
+        auto* reset=visualItem(window->contentItem(),"shortcutReset_transport.goToStart"); QVERIFY(reset);
+        QTRY_VERIFY(reset->isEnabled());
+        QCOMPARE(visualItem(window->contentItem(),"shortcutKey_transport.goToStart"),key);
+        QCOMPARE(key->property("text").toString(),QString("Home"));
+
+        // A key another action uses asks first; Cancel keeps both as they were.
+        click(visualItem(window->contentItem(),"shortcutKey_edit.history"));
+        QTest::keyClick(window,Qt::Key_X,Qt::ControlModifier);
+        auto* assign=visualItem(window->contentItem(),"shortcutAssign"); QVERIFY(assign);
+        QTRY_VERIFY(assign->isVisible()); QTest::qWait(30);           // let the row lay out first
+        auto* message=visualItem(window->contentItem(),"shortcutMessage"); QVERIFY(message);
+        QVERIFY(message->property("text").toString().contains("Cut"));
+        QCOMPARE(shortcuts->keys()["edit.history"].toString(),QString("Ctrl+Alt+Z"));
+        click(visualItem(window->contentItem(),"shortcutCancel"));
+        QTRY_VERIFY(!assign->isVisible());
+        QCOMPARE(shortcuts->keys()["edit.cut"].toString(),QString("Ctrl+X"));
+        // ... and Assign takes it over: Cut is left with none.
+        click(visualItem(window->contentItem(),"shortcutKey_edit.history"));
+        QTest::keyClick(window,Qt::Key_X,Qt::ControlModifier);
+        QTRY_VERIFY(assign->isVisible()); QTest::qWait(30); click(assign);
+        QTRY_COMPARE(shortcuts->keys()["edit.history"].toString(),QString("Ctrl+X"));
+        QVERIFY(shortcuts->keys()["edit.cut"].toString().isEmpty());
+        // Enter is kept for dialogs; Esc cancels the capture and leaves the editor open.
+        click(visualItem(window->contentItem(),"shortcutKey_edit.copy"));
+        QTest::keyClick(window,Qt::Key_Return);
+        QTRY_VERIFY(message->property("text").toString().contains("kept for dialogs"));
+        QTest::keyClick(window,Qt::Key_Escape);
+        QTRY_VERIFY(message->property("text").toString().isEmpty());
+        QVERIFY(editor->property("visible").toBool());
+        QCOMPARE(shortcuts->keys()["edit.copy"].toString(),QString("Ctrl+C"));
+        // Reset all, then Go to start gets Home again for the check below.
+        click(visualItem(window->contentItem(),"shortcutResetAll"));
+        QTRY_COMPARE(shortcuts->keys()["edit.cut"].toString(),QString("Ctrl+X"));
+        QCOMPARE(shortcuts->keys()["transport.goToStart"].toString(),QString("W"));
+        QVERIFY(!QSettings().childGroups().contains("shortcuts"));
+        QVERIFY(shortcuts->set("transport.goToStart","Home"));
+        QTest::keyClick(window,Qt::Key_Escape); QTRY_VERIFY(!editor->property("visible").toBool());
+        QTest::keyClick(window,Qt::Key_Escape);
+        QTRY_VERIFY(!window->findChild<QObject*>("preferencesPopup")->property("visible").toBool());
+
+        // The new key works and the old one no longer does.
+        playAWhile();
+        const double paused=controller.positionSeconds();
+        QTest::keyClick(window,Qt::Key_W); for(int i=0;i<5;++i) io->process();
+        QCOMPARE(controller.positionSeconds(),paused);
+        QTest::keyClick(window,Qt::Key_Home);
+        QTRY_VERIFY((io->process(),controller.positionSeconds()<1e-9));
+
+        // Menus show the keys as they are now.
+        QVERIFY(shortcuts->set("edit.undo","Ctrl+U"));
+        auto* editButton=visualItem(window->contentItem(),"editMenuButton"); QVERIFY(editButton); click(editButton);
+        auto* undoItem=visualItem(window->contentItem(),"editUndoItem"); QTRY_VERIFY(undoItem && undoItem->isVisible());
+        QCOMPARE(undoItem->property("shortcutText").toString(),QString("Ctrl+U"));
+        auto* historyItem=visualItem(window->contentItem(),"editUndoHistoryItem"); QVERIFY(historyItem);
+        QCOMPARE(historyItem->property("shortcutText").toString(),QString("Ctrl+Alt+Z"));
+        QMetaObject::invokeMethod(window->findChild<QObject*>("editMenu"),"close");
         controller.shutdownSession();
     }
     void stopping_recording_pauses_the_red_playhead_data() {
@@ -3716,6 +3817,49 @@ private slots:
         chooseEditItem("editCutItem"); QCOMPARE(tracks.clips().size(),0); QCOMPARE(tracks.clipboardClipCount(),2);
         chooseEditItem("editUndoItem"); QCOMPARE(tracks.clips().size(),2);
         controller.shutdownSession();
+    }
+    void undo_history_lists_the_steps_and_a_click_jumps_back_and_forth() {
+        TrackListWrapper tracks;
+        auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
+        const auto restore=qScopeGuard([&] {
+            if(auto* popup=window->findChild<QObject*>("undoHistoryPopup")) QMetaObject::invokeMethod(popup,"close");
+            top->setProperty("trackModel",QVariant());
+        });
+        top->setProperty("trackModel",QVariant::fromValue(&tracks));
+        const int track=tracks.addAudioTrack();
+        const int clip=tracks.addClipAtBeat(track,0,4);
+        QVERIFY(tracks.moveClipAtBeat(track,clip,2));
+        QVERIFY(tracks.setClipGain(track,clip,-6.0));
+        const auto theClip=[&] { return &tracks.project().findTrack(track)->audioClips.at(0); };
+        chooseEditItem("editUndoHistoryItem");
+        auto* popup=window->findChild<QObject*>("undoHistoryPopup"); QVERIFY(popup);
+        QTRY_VERIFY(popup->property("visible").toBool());
+        // "Start" and one row per step; the last one is current.
+        QQuickItem* row=nullptr;
+        QTRY_VERIFY((row=visualItem(window->contentItem(),"undoHistoryRow3")) && row->isVisible());
+        QVERIFY(!visualItem(window->contentItem(),"undoHistoryRow4"));
+        QVERIFY(row->property("current").toBool());
+        auto* contentText=qvariant_cast<QQuickItem*>(row->property("contentItem")); QVERIFY(contentText);
+        QCOMPARE(contentText->property("text").toString(),QString("Clip gain"));
+        // Click "Move clip": the gain step is undone (and greyed), the move stays.
+        auto* moveRow=visualItem(window->contentItem(),"undoHistoryRow2"); QVERIFY(moveRow);
+        click(moveRow);
+        QTRY_COMPARE(tracks.undoPosition(),2);
+        QCOMPARE(theClip()->gainDb,0.0f);
+        QCOMPARE(theClip()->start,qint64(48000));
+        QTRY_VERIFY(moveRow->property("current").toBool());
+        QVERIFY(row->property("undone").toBool());
+        // "Start": nothing done; then forward to the end again.
+        click(visualItem(window->contentItem(),"undoHistoryRow0"));
+        QTRY_COMPARE(tracks.undoPosition(),0); QVERIFY(tracks.clips().empty());
+        click(visualItem(window->contentItem(),"undoHistoryRow3"));
+        QTRY_COMPARE(tracks.undoPosition(),3); QCOMPARE(theClip()->gainDb,-6.0f);
+        QVERIFY(popup->property("visible").toBool());   // stays open to step through
+        // While recording the rows cannot be clicked.
+        tracks.lockRecordingTrack(track);
+        QTRY_VERIFY(!visualItem(window->contentItem(),"undoHistoryRow0")->isEnabled());
+        tracks.lockRecordingTrack(-1);
+        QTest::keyClick(window,Qt::Key_Escape); QTRY_VERIFY(!popup->property("visible").toBool());
     }
     void timeline_bpm_edit_updates_grid_and_preserves_recorded_audio_timing() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);

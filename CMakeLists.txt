@@ -117,8 +117,9 @@ endforeach()
 if(DAW_BUILD_APP)
     add_executable(wrappertests
         tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp tests/wrapper/clipediting_qtcheck.cpp
-        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp tests/wrapper/volumeenvelope_qtcheck.cpp tests/wrapper/mixeffect_qtcheck.cpp tests/wrapper/importexport_qtcheck.cpp tests/wrapper/fileswrapper_qtcheck.cpp
+        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp tests/wrapper/volumeenvelope_qtcheck.cpp tests/wrapper/mixeffect_qtcheck.cpp tests/wrapper/importexport_qtcheck.cpp tests/wrapper/fileswrapper_qtcheck.cpp tests/wrapper/shortcuts_qtcheck.cpp
         wrapper/files/fileswrap/fileswrapper.cpp wrapper/files/fileswrap/fileswrapper.h
+        wrapper/settings/shortcutswrap/shortcutswrapper.cpp wrapper/settings/shortcutswrap/shortcutswrapper.h
         wrapper/pianorollwrap/pianorollwrapper.cpp wrapper/pianorollwrap/pianorollwrapper.h
         wrapper/pianorollwrap/pianorollnotemodel.cpp wrapper/pianorollwrap/pianorollnotemodel.h
         wrapper/engineWrap/enginecontroller.cpp wrapper/engineWrap/enginecontroller.h
@@ -144,8 +145,9 @@ if(DAW_BUILD_APP)
         wrapper/midi/virtualkeyboardwrap/virtualkeyboardwrapper.cpp wrapper/midi/virtualkeyboardwrap/virtualkeyboardwrapper.h)
     target_include_directories(wrappertests PRIVATE "${CMAKE_CURRENT_LIST_DIR}" "${CMAKE_CURRENT_LIST_DIR}/tests" ${WRAPPER_DIRS})
     target_compile_options(wrappertests PRIVATE -Wall -Wextra)
-    target_link_libraries(wrappertests PRIVATE Qt6::Qml Qt6::Concurrent dawengine)
+    target_link_libraries(wrappertests PRIVATE Qt6::Qml Qt6::Gui Qt6::Concurrent dawengine)
     add_test(NAME qtpresets COMMAND wrappertests qtpresets)
+    add_test(NAME qtshortcuts COMMAND wrappertests qtshortcuts)
     add_test(NAME qtrecording COMMAND wrappertests qtrecording)
     add_test(NAME qtmultirecording COMMAND wrappertests qtmultirecording)
     add_test(NAME qtclipediting COMMAND wrappertests qtclipediting)
@@ -178,12 +180,12 @@ if(DAW_BUILD_APP)
             QML_FILES frontend/theme/Theme.qml frontend/theme/PianoRollColors.qml frontend/theme/TrackListColors.qml frontend/theme/TimelineColors.qml frontend/theme/MixerColors.qml frontend/theme/TransportColors.qml
                       frontend/theme/GuitarSuiteColors.qml frontend/theme/EffectsColors.qml frontend/theme/ChaosEqColors.qml
                       frontend/icons/Icons.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
-                      frontend/window/EditMenu.qml frontend/window/ViewMenu.qml frontend/window/PanelTabs.qml
+                      frontend/window/EditMenu.qml frontend/window/UndoHistory.qml frontend/window/ViewMenu.qml frontend/window/PanelTabs.qml
                       frontend/window/StatusStrip.qml
                       frontend/common/ThemedMenuItem.qml frontend/common/ThemedMenu.qml frontend/common/ThemedMenuSeparator.qml frontend/common/ToggleChip.qml frontend/common/PanelButton.qml frontend/common/ThemedComboBox.qml frontend/common/CloseButton.qml frontend/common/ThemedSlider.qml frontend/common/HardwareSlider.qml frontend/common/ThemedDialog.qml frontend/common/ThemedMenuButton.qml
                       frontend/engine/PlaybackControls.qml
                       frontend/session/ProjectActions.qml frontend/session/ExportDialog.qml frontend/dialogs/FilePicker.qml frontend/audiodevice/DeviceSettings.qml
-                      frontend/settings/AppSettings.qml frontend/settings/QuickSettings.qml
+                      frontend/settings/AppSettings.qml frontend/settings/QuickSettings.qml frontend/settings/ShortcutEditor.qml
                       frontend/tempo/TempoEditor.qml frontend/tempo/MeterEditor.qml
                       frontend/icons/MetronomeIcon.qml
                       frontend/instruments/guitar/GuitarSuitePanel.qml

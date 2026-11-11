@@ -32,6 +32,10 @@ class TrackListWrapper : public QAbstractListModel {
     Q_PROPERTY(int clipboardClipCount READ clipboardClipCount NOTIFY clipboardChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY historyChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY historyChanged)
+    // The undo history (restMap G16): step names oldest first, and how many of them are done
+    // (the ones from undoPosition on are undone).
+    Q_PROPERTY(QStringList undoHistory READ undoHistory NOTIFY undoHistoryChanged)
+    Q_PROPERTY(int undoPosition READ undoPosition NOTIFY undoHistoryChanged)
     Q_PROPERTY(bool cleanMonitorArmed READ cleanMonitorArmed NOTIFY cleanMonitorChanged)
     Q_PROPERTY(QString cleanMonitorInput READ cleanMonitorInput NOTIFY cleanMonitorInputChanged)
     Q_PROPERTY(double cleanMonitorGain READ cleanMonitorGain NOTIFY cleanMonitorGainChanged)
@@ -144,6 +148,12 @@ public:
     bool canRedo() const { return m_state.canRedo(); }
     Q_INVOKABLE bool undo();
     Q_INVOKABLE bool redo();
+    QStringList undoHistory() const;
+    int undoPosition() const { return static_cast<int>(m_project.historyMark()); }
+    // Undoes or redoes, one step at a time through undo() / redo(), until `position` steps are
+    // done (0 = before the first step). False for a position outside 0..steps, while recording,
+    // or when a step refuses (it then stops where it got to).
+    Q_INVOKABLE bool jumpToHistory(int position);
     Q_INVOKABLE int addAudioTrack();
     Q_INVOKABLE int addVocalTrack();
     Q_INVOKABLE int addInstrumentTrack();
@@ -300,6 +310,7 @@ signals:
     void selectedClipChanged(int clipId);
     void clipboardChanged();
     void historyChanged();
+    void undoHistoryChanged();
     void projectChanged();
     void chaosEqChanged(int trackId);
     void harmoniumChanged(int trackId);
@@ -351,4 +362,8 @@ private:
     int m_notifiedKeyShift = 0;
     void syncKeyShift();
     int m_notifiedClipId = -1;
+    // The history as last announced (restMap G16): undoHistoryChanged only when it differs.
+    void syncUndoHistory();
+    std::uint64_t m_notifiedSteps = 0;
+    std::size_t m_notifiedHistorySize = 0, m_notifiedHistoryMark = 0;
 };

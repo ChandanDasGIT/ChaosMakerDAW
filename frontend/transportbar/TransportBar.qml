@@ -110,7 +110,7 @@ Rectangle {
                     active: tempoEditor.tapCount > 0 && pressed
                     hoverHighlight: true
                     onPressed: tempoEditor.tap()
-                    tooltip: "Tap in time to set the BPM (Shift+T); a pause starts a new count"
+                    tooltip: "Tap in time to set the BPM" + (Shortcuts.texts["transport.tapTempo"] ? " (" + Shortcuts.texts["transport.tapTempo"] + ")" : "") + "; a pause starts a new count"
                 }
             }
         }
@@ -149,7 +149,7 @@ Rectangle {
 
     // Shift+T taps the tempo (plain T plays a note when the typing keyboard is on).
     Shortcut {
-        sequence: "Shift+T"
+        sequence: Shortcuts.keys["transport.tapTempo"]
         enabled: !(root.transport && root.transport.countingIn)
         autoRepeat: false
         onActivated: tempoEditor.tap()

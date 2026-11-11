@@ -854,3 +854,59 @@ TEST(tracklist, ripple_paste_duplicate_and_clip_delete_make_and_close_room)
     // Cut with ripple: clipboard and the closed gap.
     CHECK(tracks.cutClips({q}, true).size() == 1 && tracks.findClip(a, later)->start == 72000);
 }
+
+TEST(tracklist, every_undo_step_has_a_name_for_the_history_list)
+{
+    using L = std::vector<std::string>;
+    TrackList tracks;
+    const int t = tracks.addAudioTrack(), u = tracks.addAudioTrack();
+    const auto& project = tracks.project();
+    CHECK(project.historyLabels().empty());
+
+    const int a = tracks.addClipAtBeat(t, 0, 4);
+    auto audio = std::make_shared<AudioData>(); audio->path = "take.wav"; audio->sampleRate = 48000; audio->frames = 48000;
+    audio->channels = {std::vector<float>(48000, 0.2f)};
+    CHECK(tracks.attachTake(t, 192000, audio, false));
+    const int b = project.findTrack(t)->audioClips.back().id;
+    CHECK(tracks.editClips({a}, "move", 1).changed);
+    CHECK(tracks.editClips({a, b}, "move", 1).changed);
+    // A drag is one step with one name.
+    CHECK(tracks.setClipGain(t, a, -3.0).changed);
+    CHECK(tracks.setClipGain(t, a, -6.0, true).changed);
+    CHECK(tracks.setClipFade(t, b, true, 1.0).changed);
+    CHECK(tracks.addEnvelopePoint(t, 0, 0.5) >= 0);
+    CHECK(tracks.setEnvelopeBypassed(t, true).changed);
+    CHECK(project.historyLabels() == (L{"Add clip", "Record", "Move clip", "Move clips", "Clip gain",
+                                        "Fade out", "Add envelope point", "Bypass envelope"}));
+    CHECK(project.historyMark() == 8);
+
+    // An action made of others takes its own name: Cut (copy + delete) is "Cut", not "Delete".
+    CHECK(tracks.cutClips({a}, false).size() == 1);
+    CHECK(tracks.pasteClips(u, 0.0, false).size() == 1);
+    CHECK(tracks.duplicateClips({b}, 0.0, false).size() == 1);
+    CHECK(tracks.deleteRange(1.0, 2.0, true).changed);
+    CHECK(tracks.removeTrack(u));
+    auto labels = project.historyLabels();
+    CHECK((L(labels.end() - 5, labels.end()) == L{"Cut", "Paste", "Duplicate", "Ripple delete range", "Delete track"}));
+
+    // Undo keeps the names and moves the mark; renaming the newest step needs it to be current.
+    const auto steps = project.stepCount();
+    CHECK(tracks.undo() && tracks.undo());
+    CHECK(project.historyLabels() == labels && project.historyMark() == labels.size() - 2);
+    CHECK(!tracks.project().setLastStepLabel("Nope"));
+    CHECK(tracks.redo());
+    CHECK(project.historyMark() == labels.size() - 1);
+    // A new step drops the undone one after it.
+    CHECK(tracks.setClipGain(t, b, 2.0).changed);
+    labels = project.historyLabels();
+    CHECK(labels.back() == "Clip gain" && labels[labels.size() - 2] == "Ripple delete range");
+    CHECK(project.stepCount() == steps + 1);
+
+    // A refused action adds no step and renames nothing.
+    CHECK(!tracks.editClips({999}, "move", 1).accepted);
+    CHECK(project.historyLabels() == labels && project.stepCount() == steps + 1);
+
+    // At the 100-step cap the size stays put but the counter still moves.
+    for (int i = 0; i < 120; ++i) CHECK(tracks.setClipGain(t, b, -double(i % 7) - 1.0).accepted);
+    CHECK(project.historyLabels().size() == 100 && project.stepCount() > steps + 100);
+}

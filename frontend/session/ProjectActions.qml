@@ -121,18 +121,18 @@ RowLayout {
     }
 
     Shortcut {
-        sequences: [StandardKey.Save]
+        sequence: Shortcuts.keys["file.save"]
         enabled: !EngineController.takeBusy && !EngineController.projectLoading
         onActivated: actionsBridge.requestSave(EngineController.projectFile.toString().length > 0)
     }
 
     Shortcut {
-        sequence: "Ctrl+I"
+        sequence: Shortcuts.keys["file.import"]
         enabled: !EngineController.takeBusy && !EngineController.projectLoading && !importJob.busy
         onActivated: importDialog.open()
     }
     Shortcut {
-        sequence: "Ctrl+E"
+        sequence: Shortcuts.keys["file.export"]
         enabled: !EngineController.takeBusy && !EngineController.projectLoading
         onActivated: root.exportRequested()
     }
@@ -140,19 +140,19 @@ RowLayout {
     // Literal sequence so it always matches the "Ctrl+Shift+S" shown in the File menu
     // (StandardKey.SaveAs is empty on some desktops).
     Shortcut {
-        sequence: "Ctrl+Shift+S"
+        sequence: Shortcuts.keys["file.saveAs"]
         enabled: !EngineController.takeBusy && !EngineController.projectLoading
         onActivated: actionsBridge.requestSaveAs()
     }
 
     Shortcut {
-        sequences: [StandardKey.New]
+        sequence: Shortcuts.keys["file.new"]
         enabled: !EngineController.takeBusy && !EngineController.projectLoading
         onActivated: actionsBridge.requestAction("New", EngineController.projectDirty)
     }
 
     Shortcut {
-        sequences: [StandardKey.Open]
+        sequence: Shortcuts.keys["file.open"]
         enabled: !EngineController.takeBusy && !EngineController.projectLoading
         onActivated: actionsBridge.requestAction("Open", EngineController.projectDirty)
     }
@@ -238,7 +238,7 @@ RowLayout {
                 id: newAction
                 objectName: "fileNewItem"
                 text: "New"
-                shortcutText: "Ctrl+N"
+                shortcutText: Shortcuts.texts["file.new"]
                 enabled: !EngineController.takeBusy && !EngineController.projectLoading
                 onTriggered: actionsBridge.requestAction("New", EngineController.projectDirty)
             }
@@ -247,7 +247,7 @@ RowLayout {
                 id: openAction
                 objectName: "fileOpenItem"
                 text: "Open..."
-                shortcutText: "Ctrl+O"
+                shortcutText: Shortcuts.texts["file.open"]
                 enabled: !EngineController.takeBusy && !EngineController.projectLoading
                 onTriggered: actionsBridge.requestAction("Open", EngineController.projectDirty)
             }
@@ -291,7 +291,7 @@ RowLayout {
                 id: saveAction
                 objectName: "fileSaveItem"
                 text: "Save"
-                shortcutText: "Ctrl+S"
+                shortcutText: Shortcuts.texts["file.save"]
                 enabled: !EngineController.takeBusy && !EngineController.projectLoading
                 onTriggered: actionsBridge.requestSave(EngineController.projectFile.toString().length > 0)
             }
@@ -300,7 +300,7 @@ RowLayout {
                 id: saveAsAction
                 objectName: "fileSaveAsItem"
                 text: "Save As..."
-                shortcutText: "Ctrl+Shift+S"
+                shortcutText: Shortcuts.texts["file.saveAs"]
                 enabled: !EngineController.takeBusy && !EngineController.projectLoading
                 onTriggered: actionsBridge.requestSaveAs()
             }
@@ -310,7 +310,7 @@ RowLayout {
             ThemedMenuItem {
                 objectName: "fileImportItem"
                 text: "Import audio..."
-                shortcutText: "Ctrl+I"
+                shortcutText: Shortcuts.texts["file.import"]
                 enabled: !EngineController.takeBusy && !EngineController.projectLoading && !importJob.busy
                 onTriggered: importDialog.open()
             }
@@ -318,7 +318,7 @@ RowLayout {
             ThemedMenuItem {
                 objectName: "fileExportItem"
                 text: "Export..."
-                shortcutText: "Ctrl+E"
+                shortcutText: Shortcuts.texts["file.export"]
                 enabled: !EngineController.takeBusy && !EngineController.projectLoading
                 onTriggered: root.exportRequested()
             }

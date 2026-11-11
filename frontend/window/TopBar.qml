@@ -23,8 +23,9 @@ Rectangle {
         projectActions.requestAction(action)
     }
 
-    Shortcut { sequences: [StandardKey.Undo]; enabled: !!root.trackModel && root.trackModel.canUndo; onActivated: root.trackModel.undo() }
-    Shortcut { sequences: [StandardKey.Redo]; enabled: !!root.trackModel && root.trackModel.canRedo; onActivated: root.trackModel.redo() }
+    Shortcut { sequence: Shortcuts.keys["edit.undo"]; enabled: !!root.trackModel && root.trackModel.canUndo; onActivated: root.trackModel.undo() }
+    Shortcut { sequence: Shortcuts.keys["edit.redo"]; enabled: !!root.trackModel && root.trackModel.canRedo; onActivated: root.trackModel.redo() }
+    Shortcut { sequence: Shortcuts.keys["edit.history"]; enabled: !!root.trackModel; onActivated: editMenu.openUndoHistory() }
 
     height: 48
     color: Theme.panelBg

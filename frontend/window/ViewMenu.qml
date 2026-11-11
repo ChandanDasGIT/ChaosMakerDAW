@@ -49,7 +49,7 @@ ToolButton {
         ThemedMenuItem {
             objectName: "viewMixerItem"
             text: "Mixer"
-            shortcutText: "M"
+            shortcutText: Shortcuts.texts["view.mixer"]
             checkable: true
             // The tick follows the window state, also after a click.
             Binding on checked { value: root.mixerShown }
