@@ -8,6 +8,7 @@
 #include "plugins/saturation/saturation.h"
 #include "plugins/gate/gate.h"
 #include "plugins/denoise/denoise.h"
+#include "plugins/pitchmonitor/pitchmonitor.h"
 
 namespace mixfx {
 
@@ -24,6 +25,7 @@ std::shared_ptr<MixEffect> create(std::string_view type)
     if (type == Saturation) return std::make_shared<::Saturation>();
     if (type == Gate) return std::make_shared<::Gate>();
     if (type == Denoise) return std::make_shared<::Denoise>();
+    if (type == PitchMonitor) return std::make_shared<::PitchMonitor>();
     return nullptr;
 }
 

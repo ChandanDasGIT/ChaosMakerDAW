@@ -23,6 +23,8 @@ inline constexpr std::string_view Gate = "gate";
 inline constexpr std::string_view Denoise = "denoise";
 // Its learned noise: one level per frequency bin of a 2048-point FFT (DenoiseBins values).
 inline constexpr int DenoiseBins = 1025;
+// Pitch monitor (restMap G18): passes the sound through and shows its pitch against a key.
+inline constexpr std::string_view PitchMonitor = "pitchmonitor";
 
 enum class ControlKind {
     Slider,   // a value between min and max

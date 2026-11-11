@@ -134,7 +134,18 @@ constexpr std::array<Control, 4> denoiseControls{{
     {"listen", "Hear removed noise", K::Switch, 0, 1, 0, "", {}, "Noise Reduction"},
 }};
 
-constexpr std::array<Spec, 9> specs{{
+constexpr std::array<std::string_view, 12> keyTonics{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+constexpr std::array<std::string_view, 6> keyScales{"Major", "Minor", "Harmonic minor", "Major pentatonic",
+                                                    "Minor pentatonic", "Chromatic"};
+
+// The key the pitch is measured against (musickey: same tonics and scales, in that order).
+// Chromatic until the user picks the song's key: then every note counts.
+constexpr std::array<Control, 2> pitchMonitorControls{{
+    {"key", "Key", K::Choice, 0, 11, 0, "", keyTonics, "Key"},
+    {"scale", "Scale", K::Choice, 0, 5, 5, "", keyScales, "Key"},
+}};
+
+constexpr std::array<Spec, 10> specs{{
     {Compressor, "Compressor", compressorControls, true},
     {DeEsser, "De-esser", deEsserControls, true},
     {Reverb, "Reverb", reverbControls, false},
@@ -144,6 +155,7 @@ constexpr std::array<Spec, 9> specs{{
     {Saturation, "Saturation", saturationControls, false},
     {Gate, "Gate", gateControls, true},
     {Denoise, "Noise Reduction", denoiseControls, true},
+    {PitchMonitor, "Pitch Monitor", pitchMonitorControls, false},
 }};
 
 bool whole(ControlKind kind) { return kind == K::Choice || kind == K::Switch; }

@@ -1231,7 +1231,7 @@ private slots:
         QVERIFY(visualItem(window->contentItem(),"addEffectButton")->isEnabled());            // Chaos EQ is still offered
         addEffectFromPicker("chaoseq");
         QVERIFY(visualItem(window->contentItem(),"addEffectButton")->isEnabled());            // the mixing plugins (G7)
-        for(const char* mix:{"compressor","deesser","reverb","chaosverb","delay","limiter","saturation","gate","denoise"}) addEffectFromPicker(mix);
+        for(const char* mix:{"compressor","deesser","reverb","chaosverb","delay","limiter","saturation","gate","denoise","pitchmonitor"}) addEffectFromPicker(mix);
         QVERIFY(!visualItem(window->contentItem(),"addEffectButton")->isEnabled());           // nothing left to add
         {   // a long chain scrolls: Add FX stays inside the window
             auto* add=visualItem(window->contentItem(),"addEffectButton");
@@ -1239,7 +1239,7 @@ private slots:
             auto* chainScroll=visualItem(window->contentItem(),"effectChainScroll"); QVERIFY(chainScroll);
             QVERIFY(chainScroll->property("contentHeight").toDouble()>=chainScroll->height());
         }
-        for(const char* mix:{"compressor","deesser","reverb","chaosverb","delay","limiter","saturation","gate","denoise"}) {                    // back to the guitar's chain
+        for(const char* mix:{"compressor","deesser","reverb","chaosverb","delay","limiter","saturation","gate","denoise","pitchmonitor"}) {                    // back to the guitar's chain
             click(visualItem(window->contentItem(),QString("removeEffect_")+mix)); QTRY_VERIFY(!row(mix));
         }
         click(visualItem(window->contentItem(),"removeEffect_chaoseq"));
@@ -2535,6 +2535,70 @@ private slots:
         QTRY_VERIFY(status->property("text").toString().contains("no recorded audio"));
         click(forget);
         QTRY_VERIFY(tracks.mixEffect(vocal,mixfx::Denoise)->profile.empty());
+    }
+    void pitch_monitor_has_its_own_page_with_the_recorded_pitch_and_a_key() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int vocal=tracks.addVocalTrack();
+        auto audio=std::make_shared<AudioData>(); audio->path="sung-a3.wav"; audio->sampleRate=48000; audio->frames=48000;
+        audio->channels={std::vector<float>(48000)};
+        for(int i=0;i<48000;++i) audio->channels[0][std::size_t(i)]=0.25f*float(std::sin(2.0*3.14159265358979*220.0*i/48000.0));
+        audio->buildWaveform();
+        QVERIFY(tracks.attachTake(vocal,0,audio,false));
+        QVERIFY(tracks.addTrackEffect(vocal,"pitchmonitor")>0);
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        QObject* panel=nullptr;
+        const auto restore=qScopeGuard([&] {
+            if(panel) QMetaObject::invokeMethod(panel,"close");
+            list->setVisible(false); list->setProperty("trackModel",QVariant());
+        });
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QCoreApplication::processEvents();
+        auto* fxButton=visualItem(window->contentItem(),"trackFxButton"+QString::number(vocal)); QVERIFY(fxButton);
+        click(fxButton);
+        panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(vocal)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        auto* row=visualItem(window->contentItem(),"selectEffect_pitchmonitor"); QVERIFY(row); click(row);
+        QTRY_COMPARE(panel->property("selectedEffect").toString(),QString("pitchmonitor"));
+        // Its own page with the pitch graph, not the shared slider page.
+        QQuickItem* page=nullptr;
+        QTRY_VERIFY((page=visualItem(window->contentItem(),"trackPitchMonitor")) && page->isVisible());
+        QVERIFY(!visualItem(window->contentItem(),"trackMixEffect")->isVisible());
+        QVERIFY(!visualItem(window->contentItem(),"trackNoiseReduction")->isVisible());
+        QVERIFY(visualItem(page,"pitchGraph") && visualItem(page,"pitchKey") && visualItem(page,"pitchScale"));
+        // The recorded A3 is read in the background and drawn: the empty note goes away.
+        auto* model=page->property("page").value<QObject*>(); QVERIFY(model);
+        QTRY_VERIFY_WITH_TIMEOUT(model->property("hasLine").toBool(),5000);
+        QCOMPARE(model->property("lowestNote").toInt(),57);
+        QTRY_VERIFY(!visualItem(page,"pitchEmpty")->isVisible());
+        // About an octave shows, centred on the recorded note (A3), gliding there.
+        QCOMPARE(page->property("viewNotes").toInt(),13);
+        QCOMPARE(page->property("targetNote").toDouble(),57.0);
+        QTRY_VERIFY(std::abs(page->property("centreNote").toDouble()-57.0)<0.05);
+        // Chromatic until a scale is picked; the key drop-down waits for it.
+        auto* hint=visualItem(page,"pitchHint"); QVERIFY(hint);
+        QVERIFY(hint->property("text").toString().contains("Pick the song's key"));
+        QVERIFY(!visualItem(page,"pitchKey")->isEnabled());
+        auto* effect=page->property("effect").value<QObject*>(); QVERIFY(effect);
+        QVERIFY(QMetaObject::invokeMethod(effect,"setValue",Q_ARG(QString,"scale"),Q_ARG(double,1.0)));
+        QVERIFY(QMetaObject::invokeMethod(effect,"setValue",Q_ARG(QString,"key"),Q_ARG(double,9.0)));
+        QTRY_VERIFY(hint->property("text").toString().contains("A minor"));
+        QTRY_VERIFY(visualItem(page,"pitchKey")->isEnabled());
+        QCOMPARE(visualItem(page,"pitchKey")->property("currentIndex").toInt(),9);
+        QCOMPARE(visualItem(page,"pitchScale")->property("currentIndex").toInt(),1);
+        QCOMPARE(tracks.mixEffect(vocal,mixfx::PitchMonitor)->values.at("key"),9.0f);
+        // Ctrl+wheel zooms the bars shown.
+        auto* graph=visualItem(page,"pitchGraphMouse"); QVERIFY(graph);
+        const QPointF at=graph->mapToScene(QPointF(graph->width()/2,graph->height()/2));
+        QQuickWindow* fx=graph->window(); QVERIFY(fx);                     // the FX panel's own window
+        QWheelEvent wheel(at,fx->mapToGlobal(at.toPoint()),QPoint(),QPoint(0,120),Qt::NoButton,Qt::ControlModifier,Qt::NoScrollPhase,false);
+        QCoreApplication::sendEvent(fx,&wheel);
+        QTRY_COMPARE(page->property("viewBars").toDouble(),4.0);
+        // A plain wheel scrolls the view but never turns Follow off (only its chip does).
+        QWheelEvent scroll(at,fx->mapToGlobal(at.toPoint()),QPoint(),QPoint(0,-120),Qt::NoButton,Qt::NoModifier,Qt::NoScrollPhase,false);
+        QCoreApplication::sendEvent(fx,&scroll);
+        QTRY_VERIFY(page->property("viewStart").toDouble()>0.0);
+        QVERIFY(page->property("follow").toBool());
     }
     void the_master_strip_opens_the_master_effects_and_a_limiter_goes_on_the_mix() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);

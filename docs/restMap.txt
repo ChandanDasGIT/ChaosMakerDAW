@@ -16,8 +16,7 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 NEXT UP (2026-11-12), the user's order, easiest first:
   1. C3c  Acoustic kit cymbals CANCELLED by the user (2026-11-12). Sample cache clean-up DONE
           (uncommitted). Left: per-drum polyphony / live MIDI CC, by ear (the user).
-  2. G18  Live pitch monitor (vocals): reuses the guitar tuner's pitch detection; the work is
-          the scrolling graph UI.
+  2. G18  Pitch monitor: DONE 2026-11-12 (uncommitted), see G18 below.
   3. C11  Synth instrument: oscillators, filter, envelopes, LFO, presets, own track type.
   4. C6   Other instruments (strings, acoustic guitar, bass): CC0 samples or string models.
   5. G20  Drum pattern analyzer: onsets, tempo, kick / snare / hat; songs need a hand-written
@@ -514,9 +513,41 @@ Done items stay further down as the record.
         Tests: backendtests taptempo; transport_ui tap_tempo_sets_the_bpm_from_the_chip_and_shift_t.
 
 -- New tools (the user, 2026-11-10; none planned yet)
-[ ] G18 Live pitch monitor FX (for vocals): a scrolling graph of the sung pitch against the
-        notes / the key while singing or playing back, with cents off. Can reuse the guitar
-        tuner's pitch detection (backend/instruments/guitar/plugins/tuner).
+[x] G18 Pitch Monitor. DONE 2026-11-12 (uncommitted). The user's choices: an FX ("Pitch Monitor",
+        mix-effect type "pitchmonitor", tracks and clips); the graph follows the song position
+        (laid out by bars like the timeline); measured against notes + a chosen key; also the
+        pitch of audio already recorded on the track.
+        1 backend/dsp/pitchtracker (pitch::Tracker): 4-pole low-pass, decimated to 16-32 kHz, YIN
+          (cumulative-mean-normalised difference, threshold 0.2, parabola on the raw difference),
+          60-1500 Hz, a frame every 10 ms, voiced above -55 dBFS; live push (RT-safe) and analyse()
+          with cleanUp (octave slips moved back, voiced runs < 30 ms dropped). Within 3 cents from
+          82 Hz to 1318 Hz at 44.1 / 48 / 96 kHz; 3 minutes analysed in ~1 s.
+          backend/midi/musickey: tonics, scales (Major, Minor, Harmonic minor, Major / Minor
+          pentatonic, Chromatic), inKey, nearest in-key note + cents (ties to the lower).
+        2 backend/plugins/pitchmonitor/pitchanalysis: collect() reads the owner's clips through
+          TrackList::ownerAudio (trims, offsets, active take, reversed, clip gain; no effects),
+          overlapping spans merged; analyse() gives points by song sample (a tempo change needs no
+          new analysis), a gap point after each segment, cancellable.
+        3 PitchMonitor : MixEffect, passes the sound through; while listening queues a Reading
+          (song sample, Hz, clarity, level, playing) every 10 ms (RtQueue). Spec controls "key"
+          (C..B) and "scale" (default Chromatic), saved like every mixing plugin. Catalog entry.
+        4 wrapper PitchMonitorWrapper: re-analyses in the background (QtConcurrent, 250 ms after
+          the last clip change, only while the page is shown), curve() / live() as flat triples
+          (beat, pitch, cents) for a beat range, thinned; the live line comes from the input
+          (monitoring) chain while the transport runs and is cleared once the analysis covers
+          it; readout (note, cents) from either chain, held 250 ms.
+        5 frontend/plugins/pitchmonitor/PitchMonitorEditor.qml in the FX panel: key / scale
+          drop-downs, note + cents readout, note lanes (in-key lighter, tonic line), bar lines,
+          the line green <= 15 cents, amber <= 35, red beyond; the live line in the accent; the
+          playhead with a dot; Follow; wheel scrolls, Ctrl+wheel zooms (1-64 bars), Shift+wheel
+          moves the notes, a click seeks.
+        Tests: backendtests pitchtracker, musickey, pitchanalysis, pitchmonitor, effectchain;
+        wrappertests qtpitchmonitor, qttrackeffects (its addable-effects counts had been stale
+        since G13: 12 / 11 now); transport_ui pitch_monitor_has_its_own_page_with_the_recorded_
+        pitch_and_a_key (and the FX picker test's lists). App run offscreen, throwaway settings:
+        empty log.
+        Not done: the line does not see the track's effects (it reads the dry clips); a full mix
+        gives a jumpy line (one voice / one melody line only).
 [ ] G19 Guitar tone analyzer: analyse a reference guitar recording and suggest GuitarSuite
         settings that sound close (tone balance, gain / distortion amount, cab character), or
         match automatically by searching amp / cab / EQ settings against the reference
