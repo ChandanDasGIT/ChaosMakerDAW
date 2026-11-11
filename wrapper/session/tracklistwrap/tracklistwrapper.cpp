@@ -663,6 +663,23 @@ std::optional<mixfx::Settings> TrackListWrapper::mixEffect(int trackId, std::str
     return m_state.mixEffect(trackId, type);
 }
 
+QString TrackListWrapper::learnNoise(int effectsId, double startBeat, double endBeat)
+{
+    const auto before = m_state.mixEffect(effectsId, mixfx::Denoise);
+    const auto error = m_state.learnNoise(effectsId, startBeat, endBeat);
+    if (error.empty() && before != m_state.mixEffect(effectsId, mixfx::Denoise))
+        emit mixEffectChanged(effectsId, QString::fromUtf8(mixfx::Denoise.data(), qsizetype(mixfx::Denoise.size())));
+    return QString::fromStdString(error);
+}
+
+bool TrackListWrapper::forgetNoise(int effectsId)
+{
+    auto settings = m_state.mixEffect(effectsId, mixfx::Denoise);
+    if (!settings) return false;
+    settings->profile.clear();
+    return setMixEffect(effectsId, QString::fromUtf8(mixfx::Denoise.data(), qsizetype(mixfx::Denoise.size())), *settings);
+}
+
 bool TrackListWrapper::setMixEffect(int trackId, const QString& type, const mixfx::Settings& settings)
 {
     const auto change = m_state.setMixEffect(trackId, type.toStdString(), settings);

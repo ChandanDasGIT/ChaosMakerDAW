@@ -127,7 +127,14 @@ constexpr std::array<Control, 5> gateControls{{
     {"release", "Release", K::Slider, 5, 2000, 150, "ms", {}, "Timing"},
 }};
 
-constexpr std::array<Spec, 8> specs{{
+constexpr std::array<Control, 4> denoiseControls{{
+    {"reduction", "Reduction", K::Slider, 0, 40, 12, "dB", {}, "Noise Reduction"},
+    {"sensitivity", "Sensitivity", K::Slider, 0, 24, 6, "dB", {}, "Noise Reduction"},
+    {"smoothing", "Smoothing", K::Slider, 0, 500, 100, "ms", {}, "Noise Reduction"},
+    {"listen", "Hear removed noise", K::Switch, 0, 1, 0, "", {}, "Noise Reduction"},
+}};
+
+constexpr std::array<Spec, 9> specs{{
     {Compressor, "Compressor", compressorControls, true},
     {DeEsser, "De-esser", deEsserControls, true},
     {Reverb, "Reverb", reverbControls, false},
@@ -136,6 +143,7 @@ constexpr std::array<Spec, 8> specs{{
     {Limiter, "Limiter", limiterControls, true},
     {Saturation, "Saturation", saturationControls, false},
     {Gate, "Gate", gateControls, true},
+    {Denoise, "Noise Reduction", denoiseControls, true},
 }};
 
 bool whole(ControlKind kind) { return kind == K::Choice || kind == K::Switch; }
@@ -177,6 +185,9 @@ Settings sanitize(std::string_view type, const Settings& settings)
         if (whole(control.kind)) v = std::round(v);
         result.values.emplace(std::string(control.id), v);
     }
+    if (type == Denoise && settings.profile.size() == std::size_t(DenoiseBins)
+        && std::all_of(settings.profile.begin(), settings.profile.end(), [](float v) { return std::isfinite(v) && v >= 0.0f; }))
+        result.profile = settings.profile;
     return result;
 }
 

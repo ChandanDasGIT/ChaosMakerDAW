@@ -353,6 +353,25 @@ std::unique_ptr<EngineSnapshot> SnapshotBuilder::buildPlaybackSnapshot(
             }
         }
 
+        // Delay compensation (restMap G13): a clip is read early by the delay of the effects it
+        // goes through (its own, and the track's unless its effects are printed), so it is heard
+        // in time. Live input and MIDI notes are not moved.
+        std::int64_t trackDelay = 0;
+        for (const auto* processor : render.chain) if (processor) trackDelay += std::max(0, processor->latencySamples());
+        bool moved = false;
+        for (auto& c : render.clips) {
+            std::int64_t delay = 0;
+            for (const auto* processor : c.chain) if (processor) delay += std::max(0, processor->latencySamples());
+            c.tail = delay;
+            if (!c.effectsPrinted) delay += trackDelay;
+            c.start -= delay;
+            moved |= delay > 0;
+        }
+        if (moved)
+            std::stable_sort(render.clips.begin(), render.clips.end(), [](const ClipRender& a, const ClipRender& b) {
+                return a.start < b.start;
+            });
+
         snapshot->tracks.push_back(std::move(render));
     }
 

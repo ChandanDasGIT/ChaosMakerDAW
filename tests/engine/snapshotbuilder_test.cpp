@@ -762,3 +762,39 @@ TEST(snapshotbuilder, overlapping_audio_clips_crossfade_and_own_fades_stay_withi
     playedFades(tooLong);
     CHECK(tooLong[0].fadeIn == 75 && tooLong[0].fadeOut == 25);
 }
+
+TEST(snapshotbuilder, clips_are_read_early_by_the_delay_of_the_effects_they_go_through)
+{
+    Project project;
+    project.tempo().set(120.0, 4, 4, 48000.0);
+    auto& track = project.addTrack(TrackKind::Audio, "Vox");
+    AudioClip dry;
+    dry.poolId = "a";
+    dry.start = 10000;
+    dry.length = 4800;
+    dry.effectsPrinted = false;
+    const int dryId = project.addAudioClip(track.id, dry);
+    AudioClip printed = dry;
+    printed.start = 20000;
+    printed.effectsPrinted = true;
+    const int printedId = project.addAudioClip(track.id, printed);
+    CHECK(project.setTrackEffects(track.id, {"denoise"}));
+    CHECK(project.setTrackEffects(Project::clipEffectsId(printedId), {"denoise"}));
+    std::unordered_map<int, SnapshotBuilder::TrackEffects> effects;
+    SnapshotBuilder::ensureMixEffects(effects[track.id], {"denoise"}, 48000.0, 256);
+    SnapshotBuilder::ensureMixEffects(effects[Project::clipEffectsId(printedId)], {"denoise"}, 48000.0, 256);
+    auto audio = makeDummyAudio(48000);
+    auto snapshot = SnapshotBuilder::buildPlaybackSnapshot(project,
+        [&](const std::string&) -> std::shared_ptr<const AudioData> { return audio; },
+        [&](int id) -> const SnapshotBuilder::TrackEffects* {
+            const auto it = effects.find(id);
+            return it == effects.end() ? nullptr : &it->second;
+        }, false);
+    const auto& clips = snapshot->tracks[0].clips;
+    CHECK(clips.size() == 2);
+    // Through the track's noise reduction: 2048 early, no tail of its own.
+    CHECK(clips[0].start == 10000 - 2048 && clips[0].tail == 0 && clips[0].length == 4800);
+    // Printed (skips the track's effects) but with its own clip effect: only that delay.
+    CHECK(clips[1].start == 20000 - 2048 && clips[1].tail == 2048);
+    (void)dryId;
+}

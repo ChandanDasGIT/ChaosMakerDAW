@@ -358,7 +358,8 @@ Window {
                             : root.selectedEffect === "electrodrums" ? 5
                             : root.selectedEffect === "piano" ? 6
                             : root.selectedEffect === "chords" ? 7
-                            : root.trackModel && root.trackModel.isMixEffect(root.selectedEffect) ? 8 : 9
+                            : root.selectedEffect === "denoise" ? 9
+                            : root.trackModel && root.trackModel.isMixEffect(root.selectedEffect) ? 8 : 10
                 Tenbandeq {
                     trackModel: root.trackModel
                     trackId: root.trackId
@@ -439,8 +440,17 @@ Window {
                     trackModel: root.trackModel
                     trackId: root.trackId
                     trackName: root.trackName
-                    effectType: root.trackModel && root.trackModel.isMixEffect(root.selectedEffect) ? root.selectedEffect : ""
+                    effectType: root.trackModel && root.trackModel.isMixEffect(root.selectedEffect)
+                                && root.selectedEffect !== "denoise" ? root.selectedEffect : ""
                     active: root.visible && effectType !== ""
+                }
+                // Noise Reduction (restMap G13) has a page of its own, with a spectrum.
+                NoiseReductionEditor {
+                    objectName: "trackNoiseReduction"
+                    trackModel: root.trackModel
+                    trackId: root.trackId
+                    trackName: root.trackName
+                    active: root.visible && root.selectedEffect === "denoise"
                 }
                 Item {
                     Text {

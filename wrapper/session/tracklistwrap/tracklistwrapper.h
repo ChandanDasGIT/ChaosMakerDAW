@@ -200,6 +200,10 @@ public:
     // dataChanged. Not undoable.
     std::optional<mixfx::Settings> mixEffect(int trackId, std::string_view type) const;
     bool setMixEffect(int trackId, const QString& type, const mixfx::Settings& settings);
+    // Noise reduction (restMap G13) on an effects owner (a track, or a clip's effects id):
+    // learn its noise from the time selection ("" on success, else why not), or forget it.
+    QString learnNoise(int effectsId, double startBeat, double endBeat);
+    bool forgetNoise(int effectsId);
     Q_INVOKABLE bool isMixEffect(const QString& type) const;
     Q_INVOKABLE bool resetTrackEq(int trackId);
     bool newTrackRecordDry() const { return m_newTrackRecordDry; }

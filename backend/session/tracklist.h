@@ -149,6 +149,14 @@ public:
     // nullopt for a bad track or type. Not undoable, like the EQs.
     std::optional<mixfx::Settings> mixEffect(int id, std::string_view type) const;
     Change setMixEffect(int id, std::string_view type, const mixfx::Settings& settings);
+    // Noise reduction (restMap G13). ownerAudio: an effects owner's recorded audio (a track's
+    // audio clips, or the one clip for a clip-effects id) over [from, to) project samples,
+    // mixed to mono at the project's rate with clip gain, before any effects; empty when no
+    // audio plays there. learnNoise: the noise reduction on that owner learns its noise from
+    // [startBeat, endBeat). Empty on success, otherwise why not (for the page). Not undoable,
+    // like other effect settings.
+    std::vector<float> ownerAudio(int effectsId, std::int64_t from, std::int64_t to) const;
+    std::string learnNoise(int effectsId, double startBeat, double endBeat);
     Change setHarmonium(int id, const harmonium::Settings& settings);
     Change setDrumKit(int id, const drumkit::Settings& settings);
     Change setElectroDrums(int id, const electrodrums::Settings& settings);

@@ -54,6 +54,10 @@ class EngineController : public AudioEngineWrapper {
     Q_PROPERTY(bool repeating READ repeating NOTIFY transportChanged)
     // Punch (restMap G11): recording keeps only what lies inside the time selection.
     Q_PROPERTY(bool punch READ punch NOTIFY transportChanged)
+    // The timeline's time selection in beats (it is the repeat range); end <= start: none. For
+    // pages in other windows (Noise Reduction's Learn, restMap G13).
+    Q_PROPERTY(double timeSelectionStartBeat READ timeSelectionStartBeat NOTIFY transportChanged)
+    Q_PROPERTY(double timeSelectionEndBeat READ timeSelectionEndBeat NOTIFY transportChanged)
     Q_PROPERTY(bool metronomeEnabled READ metronomeEnabled WRITE setMetronomeEnabled NOTIFY metronomeChanged)
     Q_PROPERTY(double metronomeVolume READ metronomeVolume WRITE setMetronomeVolume NOTIFY metronomeChanged)
     Q_PROPERTY(QString transportMessage READ transportMessage NOTIFY transportMessageChanged)
@@ -144,6 +148,8 @@ public:
     int denominator() const { return m_denominator; }
     bool repeating() const { return m_repeating; }
     bool punch() const { return m_punch; }
+    double timeSelectionStartBeat() const { return m_repeatStartBeat; }
+    double timeSelectionEndBeat() const { return m_repeatEndBeat; }
     bool metronomeEnabled() const { return m_metronomeEnabled; }
     double metronomeVolume() const { return m_metronomeVolume; }
     void setMetronomeEnabled(bool enabled);
