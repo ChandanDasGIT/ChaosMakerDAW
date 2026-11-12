@@ -700,6 +700,7 @@ Rectangle {
             spacing: 10
 
             Row {
+                id: addTrackHeader
                 width: parent.width
                 spacing: 8
                 ToolButton {
@@ -729,14 +730,22 @@ Rectangle {
                 }
             }
 
-            Repeater {
+            ListView {
+                id: addTrackChoices
+                objectName: "addTrackChoices"
+                width: parent.width
+                height: parent.height - addTrackHeader.height - parent.spacing
+                clip: true
+                spacing: 10
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: ScrollBar { id: addTrackScroll; objectName: "addTrackScrollBar"; policy: ScrollBar.AlwaysOn }
                 model: !root.trackModel ? [] : addTrackPopup.addTrackStage === "kind" ? root.trackModel.trackChoices
                        : addTrackPopup.addTrackStage === "variant" ? root.trackModel.variantChoices(addTrackPopup.group.id)
                        : root.trackModel.instrumentChoices
                 delegate: Rectangle {
                     required property var modelData
                     objectName: "trackChoice_" + modelData.id
-                    width: parent.width
+                    width: ListView.view.width - addTrackScroll.width - 6   // clear of the scrollbar
                     height: 40
                     radius: 6
                     color: choiceArea.containsMouse ? Theme.trackList.optionHover : Theme.trackList.option

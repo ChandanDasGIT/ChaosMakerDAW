@@ -5,6 +5,7 @@
 #include "instruments/harmonium/harmoniumsettings.h"
 #include "instruments/piano/pianosettings.h"
 #include "instruments/synth/synthsettings.h"
+#include "instruments/bass/basssettings.h"
 #include "plugins/chaoseq/chaoseqsettings.h"
 #include "plugins/chordplayer/chordsettings.h"
 #include "plugins/mixfx/mixfxspec.h"
@@ -26,7 +27,7 @@ struct Track;
 //                {"type": "eq", "settings": {"gains": [0, 0, 3, ...10 values in dB]}},
 //                {"type": "chaoseq", "settings": {...chaoseqjson...}}]}
 // Effects are in processing order, each type at most once. An instrument page (GuitarSuite,
-// Harmonium, Drums, Electronic Drums, Piano, Chords, Synth) carries that instrument's settings; GuitarSuite's
+// Harmonium, Drums, Electronic Drums, Piano, Chords, Synth, Bass Guitar) carries that instrument's settings; GuitarSuite's
 // pedalboard comes from the Qt side (its preset JSON), so capture() takes it as a value.
 namespace persistence::chainjson {
 
@@ -69,6 +70,7 @@ struct ImportPlan {
     std::optional<piano::Settings> piano;
     std::optional<chords::Settings> chords;
     std::optional<synth::Settings> synth;
+    std::optional<bass::Settings> bass;
     std::optional<nlohmann::json> guitarSuite;
     std::map<std::string, mixfx::Settings> mixEffects;   // restMap G7, by type
 };

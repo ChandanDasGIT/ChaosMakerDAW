@@ -497,6 +497,11 @@ TrackList::Change TrackList::setSynth(int id, const synth::Settings& settings)
 {
     return result(m_project.setTrackSynth(id, settings));
 }
+
+TrackList::Change TrackList::setBass(int id, const bass::Settings& settings)
+{
+    return result(m_project.setTrackBass(id, settings));
+}
 int TrackList::addTrackEffect(int trackId, const std::string& type)
 {
     if (Project::isClipEffectsId(trackId) && !canHaveClipEffects(trackId - Project::ClipEffectsBase)) return -1;   // audio clips only (R2)

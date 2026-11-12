@@ -6,6 +6,7 @@ Window {
     width: 1100; height: 900; visible: true
     property var transport: EngineController
     TransportBar {
+        id: testTransportBar
         snapMode: testTimeline.snapMode
         onSnapModeEdited: value => testTimeline.snapMode = value
         ripple: testTimeline.ripple
@@ -27,6 +28,9 @@ Window {
     TopBar {
         id: testTopBar
         objectName: "testTopBar"; width: parent.width; timeline: testTimeline
+        bpm: testTransportBar.bpm; tapCount: testTransportBar.tapCount
+        onTapTempoRequested: testTransportBar.tapTempo()
+        onBpmEdited: value => EngineController.bpm = value
         onExportRequested: testExportDialog.open()
     }
     ExportDialog {

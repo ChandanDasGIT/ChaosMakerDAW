@@ -17,8 +17,19 @@ NEXT UP (2026-11-12), the user's order, easiest first:
   1. C3c  Acoustic kit cymbals CANCELLED by the user (2026-11-12). Sample cache clean-up DONE
           (committed in 85559a0). Left: per-drum polyphony / live MIDI CC, by ear (the user).
   2. G18  Pitch monitor: DONE 2026-11-12 (committed in e969479), see G18 below.
-  3. C11  Synth instrument: DONE 2026-11-12 (uncommitted), see C11 below.
-  4. C6   Other instruments (strings, acoustic guitar, bass): CC0 samples or string models.
+  3. C11  Synth instrument: DONE 2026-11-12 (committed in 763498b), see C11 below.
+  4. C6   Other instruments: the bass guitar DONE 2026-11-12 (committed with the UI fixes
+          below), see C6 below.
+          Left: strings and acoustic guitar (CC0 samples or string models; ask the user).
+          UI fixes the same day (same commit): the add-track instrument list scrolls (scrollbar
+          always shown, rows clear of it); File / Edit / View / Options / Settings toggle from
+          their buttons; "Ripple editing" in the Edit menu has a white-outlined box; Settings >
+          Keyboard shortcuts… opens the shortcut editor; the TAP chip moved to Options >
+          Tap tempo…, a popup with a tap pad (Space / T tap), the BPM and "Back to".
+          Known: the UI test transport_keys_fire_once_while_quick_settings_is_open fails after
+          the File > New / Save As tests (fails without these changes too; passes alone).
+          MIDI routing left as is by the user: with nothing armed, keys reach a track only
+          when it is the only instrument track.
   5. G20  Drum pattern analyzer: onsets, tempo, kick / snare / hat; songs need a hand-written
           harmonic / percussive separation.
   6. G21  Chord / BPM analyzer: chromagram, chord templates, Viterbi, key; builds on G20.
@@ -27,8 +38,8 @@ NEXT UP (2026-11-12), the user's order, easiest first:
   8. U6   Guitar FX panel UI, at the very end (ask the user what they want first).
   Everything the user chose to do later (G12 tempo / meter changes, C3b, C8, B1-B9 checks, F4,
   H1-H3 and the smaller "later" ideas L1-L6) is in docs/laterGator.txt.
-  Done and committed up to 2026-11-12: G1-G11, G13-G18, C3c's cache clean-up, R2, import /
-  export, file chooser (last commit e969479, G18 pitch monitor).
+  Done and committed up to 2026-11-12: G1-G11, G13-G18, C11, C3c's cache clean-up, R2, import /
+  export, file chooser (last commit 763498b, C11 synth).
 
 Start here when the user says "let's continue". Plans first, one step at a time.
 
@@ -587,9 +598,42 @@ Done items stay further down as the record.
           Real kit: Close 972 samples / 434 MB, Full 1701 / 738 MB, back to Close 972 / 419 MB.
           Choosing a room again reads it from disk again. Test: backendtests drumkit
           samples_no_track_plays_are_dropped_from_the_cache.
-[ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
-        model), mapped in instrumentfactory.cpp.
-[x] C11 DONE 2026-11-12 (uncommitted): the Synth, a hand-written subtractive synth (the user,
+[~] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
+        model), mapped in instrumentfactory.cpp. Strings and acoustic guitar still play TestSynth.
+        - [x] Bass guitar DONE 2026-11-12 (uncommitted). The user's choices: a hand-written string
+          model (no samples); electric 4-string only; Finger, Slap / pop and Palm mute; the
+          style set on the page AND by keyswitches / velocity.
+          Sound (backend/instruments/bass):
+          - bassstring: a Karplus-Strong / waveguide loop per string. Cubic fractional delay
+            (in tune within 3 cents at 44.1 / 48 / 96 kHz, smooth for slides and bends); a
+            one-pole loss filter designed per pitch from two decay times (fundamental and
+            ~2 kHz), so a low E rings as long in seconds as a high G; a slight stiffness
+            all-pass. Release = a lifted finger (T60 ~0.09 s); palm mute shortens both times.
+          - bassexciter: Hann bump through a strike-position comb (Finger; narrower = brighter
+            when hard), Slap (thumb, short, + fret click), Pop (+ sharper click), Muted (wide).
+          - basspickup: neck (0.19) / bridge (0.055) pickup combs read from the string, moving
+            with the fret, levels evened at the fundamental; blend. ToneStage: tone knob
+            (12 dB/oct low-pass 350 Hz .. 16 kHz), drive (tanh), compressor (1 ms / 150 ms).
+          - bassfretboard: E1 A1 D2 G2, 24 frets; keys outside E1..G4 move by octaves; each note
+            on the string nearest the hand's fret (open strings free), not on a string holding a
+            key; all held: the oldest is taken. One note per string (the old one fades 6 ms).
+          - bassguitar: keyswitches C0 finger / D0 slap / E0 palm mute (when on; the page's
+            style change wins); "slap on hard hits" from a velocity (Finger style); slap = E / A
+            strings, pop = D / G. A key over one held >= 30 ms slides on that string (slide time;
+            0 = never), so chords struck together do not slide. Bend (0-12), CC 64, 120, 123.
+          - Settings (16 controls by key, bass::controls()), 6 presets (Finger P-Bass, Bright
+            J-Bass, Slap, Palm Muted, Dub, Rock Drive); a 4-note fff chord of each < 0.83.
+            The user's own as .basspreset in the app data folder's "bass-presets".
+          Track type "Bass Guitar" (catalog after Synth, page "bassguitar", fixed like the
+          synth's), Track::bass, project files ("bass"), .chaosfx chains, snapshot builder.
+          Wrapper: BassWrapper (like SynthWrapper); TrackListWrapper::bassChanged ->
+          EngineController. Frontend: frontend/instruments/bass/BassEditor.qml: presets row,
+          Style, Strings, Pickups and tone, Playing.
+          Renders: renders/bass/ and renders/bass/presets/ (git-ignored).
+          Tests: backendtests bass, bassjson, basspresetstore (+ instrumentcatalog,
+          effectchain, trackeffectspanel, tracklist lists); wrappertests qtbass; transport_ui
+          bass_guitar_lives_in_fx_and_edits_by_its_controls_and_presets.
+[x] C11 DONE 2026-11-12 (in 763498b): the Synth, a hand-written subtractive synth (the user,
         2026-11-10) as its own track type. The user's choices: listed in the Instrument list
         (after Harmonium), not as a kind of its own; the LFO rate in Hz OR synced to the
         project tempo by a note length, as an option (the same 7 divisions as the GuitarSuite

@@ -163,6 +163,7 @@ public:
     Change setPiano(int id, const piano::Settings& settings);
     Change setChords(int id, const chords::Settings& settings);
     Change setSynth(int id, const synth::Settings& settings);
+    Change setBass(int id, const bass::Settings& settings);
     // Recording mode for tracks the user adds from now on (the "default recording mode"
     // preference); unset keeps Project's rule (dry only for plain Audio tracks). Loaded tracks
     // keep their saved mode.

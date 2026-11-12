@@ -18,6 +18,7 @@ std::span<const InstrumentDefinition> instrumentcatalog::instruments()
         entries.push_back({"Harmonium", "Harmonium", false, false, "harmonium"});
         entries.push_back({"Electronic Drums", "Electronic Drums", false, false, "electrodrums", "Drums", "Electronic"});
         entries.push_back({"Synth", "Synth", false, false, "synth"});
+        entries.push_back({"Bass Guitar", "Bass Guitar", false, false, "bassguitar"});
         entries.push_back({"Chords", "Chords", false, false, "chords", {}, {}, "piano", true});
         return entries;
     }();

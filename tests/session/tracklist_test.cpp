@@ -399,7 +399,7 @@ TEST(tracklist, the_picker_groups_guitars_and_drums_by_kind)
 {
     std::vector<std::string> ids, names;
     for (const auto& c : TrackList::instrumentChoices()) { ids.push_back(c.id); names.push_back(c.name); }
-    CHECK(names == (std::vector<std::string>{"Piano", "Guitar", "Strings", "Drums", "Harmonium", "Synth"}));
+    CHECK(names == (std::vector<std::string>{"Piano", "Guitar", "Strings", "Drums", "Harmonium", "Synth", "Bass Guitar"}));
     CHECK(ids[1] == "group:Guitar" && ids[3] == "group:Drums");
     for (const auto& c : TrackList::instrumentChoices()) CHECK(c.hasChildren == (c.id.rfind("group:", 0) == 0));
 

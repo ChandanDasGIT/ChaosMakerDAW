@@ -25,6 +25,10 @@ Rectangle {
     signal snapModeEdited(int value)
     signal rippleEdited(bool on)
     signal transportAction(string action)
+    // Tap tempo (restMap G17), asked for from Options > Tap tempo and Shift+T: tap in time;
+    // a pause over 2 s starts a new count.
+    readonly property int tapCount: tempoEditor.tapCount
+    function tapTempo() { if (!(root.transport && root.transport.countingIn)) tempoEditor.tap() }
     height: 72
     color: Theme.transport.bar
     border.color: Theme.divider
@@ -101,16 +105,6 @@ Rectangle {
                     Layout.preferredHeight: 29
                     value: root.bpm
                     onValueEdited: value => root.bpmEdited(value)
-                }
-                // Tap tempo (restMap G17): tap in time; a pause over 2 s starts a new count.
-                ToggleChip {
-                    objectName: "tapTempo"
-                    text: "TAP"; textSize: 9
-                    implicitWidth: 34; implicitHeight: 29
-                    active: tempoEditor.tapCount > 0 && pressed
-                    hoverHighlight: true
-                    onPressed: tempoEditor.tap()
-                    tooltip: "Tap in time to set the BPM" + (Shortcuts.texts["transport.tapTempo"] ? " (" + Shortcuts.texts["transport.tapTempo"] + ")" : "") + "; a pause starts a new count"
                 }
             }
         }

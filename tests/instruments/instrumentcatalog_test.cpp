@@ -7,9 +7,9 @@
 
 TEST(instrumentcatalog, existing_track_type_ids_names_and_choice_order_are_preserved)
 {
-    constexpr std::array<std::string_view, 9> expected{
+    constexpr std::array<std::string_view, 10> expected{
         "Piano", "Acoustic Guitar", "Electric Guitar", "Strings", "Drums", "Harmonium", "Electronic Drums", "Synth",
-        "Chords"
+        "Bass Guitar", "Chords"
     };
     const auto entries = instrumentcatalog::instruments();
     CHECK(entries.size() == expected.size());
@@ -55,6 +55,8 @@ TEST(instrumentcatalog, instruments_with_controls_name_their_fx_page)
     CHECK(instrumentcatalog::find("Electronic Drums")->page == "electrodrums");
     CHECK(instrumentcatalog::find("Synth")->page == "synth");
     CHECK(!instrumentcatalog::find("Synth")->ownKind && instrumentcatalog::find("Synth")->group.empty());
+    CHECK(instrumentcatalog::find("Bass Guitar")->page == "bassguitar");
+    CHECK(!instrumentcatalog::find("Bass Guitar")->ownKind && instrumentcatalog::find("Bass Guitar")->group.empty());
     CHECK(instrumentcatalog::find("Piano")->page == "piano");
     CHECK(instrumentcatalog::find("Strings")->page.empty());
     // The Chords track: its strips, then the grand piano it plays through; listed on its own.

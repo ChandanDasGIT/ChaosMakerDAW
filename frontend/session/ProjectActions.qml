@@ -202,7 +202,6 @@ RowLayout {
         objectName: "fileMenuButton"
         text: "File"
         implicitHeight: 32
-        checkable: true
         checked: fileMenu.visible
         onClicked: fileMenu.visible ? fileMenu.close() : fileMenu.open()
         contentItem: RowLayout {
@@ -231,6 +230,7 @@ RowLayout {
             id: fileMenu
             objectName: "fileMenu"
             y: parent.height + 4
+            closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent   // the button toggles it
             width: 190
             onAboutToShow: recentProjects.refresh()
 

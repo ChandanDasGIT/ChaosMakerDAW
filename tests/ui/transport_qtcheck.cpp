@@ -6,6 +6,7 @@
 #include "wrapper/settings/shortcutswrap/shortcutswrapper.h"
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
 #include "instruments/synth/synthpresets.h"
+#include "instruments/bass/basspresets.h"
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QSignalSpy>
@@ -2280,6 +2281,83 @@ private slots:
         auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
         QTRY_VERIFY(!panel->property("visible").toBool());
     }
+    void bass_guitar_lives_in_fx_and_edits_by_its_controls_and_presets() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int id=tracks.addInstrumentTrackOfType("Bass Guitar");
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QTest::qWait(30);
+        const auto settings=[&]{ return tracks.project().findTrack(id)->bass; };
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(id)); QVERIFY(fx); click(fx);
+        auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(id)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("bassguitar"));   // opens on its page
+        QVERIFY(panel->property("supportsBassGuitar").toBool());
+        QVERIFY(!panel->property("supportsSynth").toBool());
+        QVERIFY(!visualItem(window->contentItem(),"removeEffect_bassguitar")->isVisible());   // fixed
+        QVERIFY(!visualItem(window->contentItem(),"addEffect_bassguitar"));
+        QTRY_VERIFY(visualItem(window->contentItem(),"trackBass"+QString::number(id)));
+        auto* bridge=visualObject(window->contentItem(),"bassBridge"); QVERIFY(bridge);
+        // Presets live in the throwaway data folder, never the real one.
+        QVERIFY(bridge->property("folder").toString().startsWith(storage.path()));
+
+        // A choice: the style; the palm mute amount shows only in Mute.
+        auto* mute=visualItem(window->contentItem(),"bass_muteAmount"); QVERIFY(mute);
+        QVERIFY(!mute->isVisible());
+        auto* style=visualItem(window->contentItem(),"bass_style"); QVERIFY(style); QVERIFY(style->isVisible());
+        style->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Down);
+        QTRY_VERIFY(settings().style==bass::Style::Slap);
+        QTest::keyClick(fxWindow(),Qt::Key_Down);
+        QTRY_VERIFY(settings().style==bass::Style::Mute);
+        QTRY_VERIFY(visualItem(window->contentItem(),"bass_muteAmount")->isVisible());
+
+        // A toggle that enables another control: slap on hard hits, then its velocity.
+        auto* velocity=visualItem(window->contentItem(),"bass_slapVelocity"); QVERIFY(velocity);
+        QVERIFY(!velocity->isEnabled());
+        auto* hard=visualItem(window->contentItem(),"bass_slapOnHardHits"); QVERIFY(hard); QVERIFY(hard->isVisible());
+        click(hard); QTRY_VERIFY(settings().slapOnHardHits);
+        QTRY_VERIFY(velocity->isEnabled());
+
+        // A slider: the pickup blend reads as neck / bridge shares and moves with the arrow key.
+        auto* blend=visualItem(window->contentItem(),"bass_pickupBlend"); QVERIFY(blend); QVERIFY(blend->isVisible());
+        QCOMPARE(blend->property("valueText").toString(),QString("60 / 40"));
+        QQuickItem* slider=nullptr;
+        for (auto* child : blend->findChildren<QQuickItem*>()) if (child->inherits("QQuickSlider")) slider=child;
+        QVERIFY(slider);
+        slider->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Right);
+        QTRY_VERIFY(settings().pickupBlend>0.4);
+        auto* slide=visualItem(window->contentItem(),"bass_slide"); QVERIFY(slide);
+        QCOMPARE(slide->property("valueText").toString(),QString("80 ms"));
+
+        // Presets: a built-in one replaces the sound; the box names it, "Custom" once changed.
+        auto* preset=visualItem(window->contentItem(),"bassPreset"); QVERIFY(preset);
+        QCOMPARE(preset->property("displayText").toString(),QString("Custom"));
+        preset->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Down);           // the first: Finger P-Bass
+        QTRY_VERIFY(settings()==bass::factoryPresets().front().settings);
+        QTRY_COMPARE(preset->property("displayText").toString(),QString("Finger P-Bass"));
+        QVERIFY(!visualItem(window->contentItem(),"bassDeletePreset")->isVisible());      // built-in
+
+        // Saving one of your own: named in the dialog; then it can be deleted.
+        click(visualItem(window->contentItem(),"bassSavePreset"));
+        auto* dialog=visualObject(window->contentItem(),"bassPresetNameDialog"); QVERIFY(dialog);
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        auto* nameField=dialog->findChild<QQuickItem*>("bassPresetNameField"); QVERIFY(nameField);
+        nameField->forceActiveFocus();
+        nameField->setProperty("text",QString("My Bass"));
+        QTest::keyClick(fxWindow(),Qt::Key_Return);
+        QTRY_COMPARE(preset->property("displayText").toString(),QString("My Bass"));
+        QVERIFY(QFile::exists(bridge->property("folder").toString()+"/my-bass.basspreset"));
+        QTRY_VERIFY(visualItem(window->contentItem(),"bassDeletePreset")->isVisible());
+        if (auto* fxQuick=qobject_cast<QQuickWindow*>(fxWindow())) QVERIFY(fxQuick->grabWindow().save("/tmp/chaosmaker-bass.png"));
+        QVERIFY(QMetaObject::invokeMethod(bridge,"removePreset",Q_ARG(QString,"My Bass")));
+        QTRY_COMPARE(preset->property("displayText").toString(),QString("Finger P-Bass"));
+
+        auto* reset=visualItem(window->contentItem(),"bassReset"); QVERIFY(reset);
+        click(reset); QTRY_VERIFY(settings()==bass::Settings{});
+        auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!panel->property("visible").toBool());
+    }
     void harmonium_lives_in_fx_like_guitarsuite_and_edits_its_settings() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller->attachProject(&tracks);
@@ -2721,14 +2799,52 @@ private slots:
         auto* close=visualItem(panel->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
         QTRY_VERIFY(!panel->isVisible());
     }
-    void tap_tempo_sets_the_bpm_from_the_chip_and_shift_t() {
+    void tap_tempo_sets_the_bpm_from_the_options_popup_and_shift_t() {
         auto* controller=EngineController::instance();
-        const auto restore=qScopeGuard([&] { controller->setBpm(120); });
+        auto* menu=window->findChild<QObject*>("optionsMenu"); QVERIFY(menu);
+        auto* dialog=window->findChild<QObject*>("tapTempoDialog"); QVERIFY(dialog);
+        const auto restore=qScopeGuard([&] { controller->setBpm(120); QMetaObject::invokeMethod(menu,"close"); QMetaObject::invokeMethod(dialog,"close"); });
         controller->setBpm(120);
-        auto* tap=visualItem(window->contentItem(),"tapTempo"); QVERIFY(tap); QVERIFY(tap->isVisible());
+        QVERIFY(!visualItem(window->contentItem(),"tapTempo"));                 // no TAP chip by the BPM field
+        const auto left=[](QQuickItem* i){ return i->mapToScene(QPointF(0,0)).x(); };
+        const auto right=[](QQuickItem* i){ return i->mapToScene(QPointF(i->width(),0)).x(); };
+        auto* view=visualItem(window->contentItem(),"viewMenuButton"); QVERIFY(view);
+        auto* options=visualItem(window->contentItem(),"optionsMenuButton"); QVERIFY(options);
+        auto* settings=visualItem(window->contentItem(),"settingsButton"); QVERIFY(settings);
+        auto* mixerTab=visualItem(window->contentItem(),"mixerTab"); QVERIFY(mixerTab);
+        QVERIFY(right(view)<=left(options)); QVERIFY(right(options)<=left(settings));   // View, Options, Settings
+        QVERIFY(right(settings)<=left(mixerTab));                                       // the panel tabs after Settings
+        // Options > Tap tempo… opens the popup.
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+        click(options); QTRY_VERIFY(menu->property("visible").toBool());
+        QQuickItem* entry=nullptr; QTRY_VERIFY((entry=visualItem(window->contentItem(),"optionsTapTempo")) && entry->isVisible());
+        click(entry);
+        QTRY_VERIFY(dialog->property("visible").toBool()); QTRY_VERIFY(!menu->property("visible").toBool());
+        auto* pad=visualItem(window->contentItem(),"tapTempoPad"); QVERIFY(pad); QTRY_VERIFY(pad->isVisible());
+        auto* shown=visualItem(window->contentItem(),"tapTempoBpm"); QVERIFY(shown);
+        auto* status=visualItem(window->contentItem(),"tapTempoStatus"); QVERIFY(status);
+        QCOMPARE(shown->property("text").toString(),QString("120"));
         QTest::qWait(2200);                                     // a fresh count
-        for(int i=0;i<4;++i) { click(tap); QTest::qWait(400); } // 400 ms apart: 150 BPM
+        click(pad); QTRY_COMPARE(status->property("text").toString(),QString("Keep tapping…"));
+        QCOMPARE(controller->bpm(),120.0);                      // one tap sets nothing yet
+        for(int i=0;i<3;++i) { QTest::qWait(400); click(pad); } // 400 ms apart: 150 BPM
         QVERIFY2(std::abs(controller->bpm()-150.0)<12.0, qPrintable(QString::number(controller->bpm())));
+        QTRY_COMPARE(shown->property("text").toString(),QString::number(qRound(controller->bpm())));
+        QCOMPARE(status->property("text").toString(),QString("4 taps"));
+        // "Back to 120" undoes the tapping.
+        auto* back=visualItem(window->contentItem(),"tapTempoRestore"); QVERIFY(back);
+        QCOMPARE(back->property("text").toString(),QString("Back to 120"));
+        click(back); QTRY_COMPARE(controller->bpm(),120.0);
+        // Space taps in the popup and does not start playback.
+        QSignalSpy actions(bar,SIGNAL(transportAction(QString))); QVERIFY(actions.isValid());
+        QTest::qWait(2200);
+        for(int i=0;i<4;++i) { QTest::keyClick(window,Qt::Key_Space); QTest::qWait(600); }    // 600 ms apart: 100 BPM
+        QCOMPARE(actions.count(),0);
+        QVERIFY(!controller->playing());
+        QCOMPARE(status->property("text").toString(),QString("4 taps"));
+        QVERIFY2(std::abs(controller->bpm()-100.0)<8.0, qPrintable(QString::number(controller->bpm())));
+        QTest::keyClick(window,Qt::Key_Escape); QTRY_VERIFY(!dialog->property("visible").toBool());
+        controller->setBpm(120);
         QTest::qWait(2200);
         window->requestActivate(); auto* other=visualItem(window->contentItem(),"otherFocus"); if(other) other->forceActiveFocus();
         for(int i=0;i<4;++i) { QTest::keyClick(window,Qt::Key_T,Qt::ShiftModifier); QTest::qWait(600); }   // 100 BPM
@@ -2975,6 +3091,34 @@ private slots:
         QCOMPARE(tracks.project().tracks()[2]->type, std::string("Electronic Drums"));
         QTRY_VERIFY(!popup->property("visible").toBool());
         QCOMPARE(popup->property("addTrackStage").toString(), QString("kind"));
+
+        // The instrument list is longer than the popup: the wheel scrolls it to the last choice.
+        click(add); QTest::qWait(20);
+        instrument = visualItem(window->contentItem(), "trackChoice_Instrument"); QVERIFY(instrument); click(instrument); QTest::qWait(20);
+        auto* choices = qobject_cast<QQuickItem*>(visualObject(window->contentItem(), "addTrackChoices")); QVERIFY(choices);
+        QVERIFY(choices->property("contentHeight").toDouble() > choices->height());
+        auto* scrollBar=visualItem(window->contentItem(),"addTrackScrollBar"); QVERIFY(scrollBar);
+        QVERIFY(scrollBar->isVisible() && scrollBar->opacity()>0.99);                           // always shown
+        const double barLeft=scrollBar->mapToItem(choices,QPointF(0,0)).x();
+        for(auto* row:choices->findChildren<QQuickItem*>())                                    // no row under it
+            if(row->objectName().startsWith("trackChoice_"))
+                QVERIFY2(row->mapToItem(choices,QPointF(row->width(),0)).x()<=barLeft,qPrintable(row->objectName()));
+        const QPointF middle = choices->mapToScene(QPointF(choices->width() / 2, choices->height() / 2));
+        for (int i = 0; i < 20 && !choices->property("atYEnd").toBool(); ++i) {
+            QWheelEvent wheel(middle, window->mapToGlobal(middle.toPoint()), QPoint(), QPoint(0, -120),
+                              Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+            QCoreApplication::sendEvent(window, &wheel);
+            QTest::qWait(30);
+        }
+        QTRY_VERIFY(choices->property("atYEnd").toBool());
+        auto* bassChoice = visualItem(window->contentItem(), "trackChoice_Bass Guitar"); QVERIFY(bassChoice);
+        const QRectF bassInList = bassChoice->mapRectToItem(choices, QRectF(0, 0, bassChoice->width(), bassChoice->height()));
+        QVERIFY(bassInList.top() >= 0 && bassInList.bottom() <= choices->height());   // fully in view
+        QTRY_VERIFY(!choices->property("moving").toBool());                       // a press stops a glide
+        click(bassChoice);
+        QTRY_COMPARE(tracks.count(), 4);
+        QCOMPARE(tracks.project().tracks()[3]->type, std::string("Bass Guitar"));
+        QTRY_VERIFY(!popup->property("visible").toBool());
     }
     void track_names_edit_inline_commit_cancel_and_update_mixer_and_fx() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
@@ -3572,8 +3716,28 @@ private slots:
         auto* edit=visualItem(window->contentItem(),"editMenuButton"); QVERIFY(edit); click(edit);
         QQuickItem* item=nullptr; QTRY_VERIFY((item=visualItem(window->contentItem(),"editRippleItem")) && item->isVisible());
         QVERIFY(item->property("checked").toBool());
+        auto* box=visualItem(item,"menuItemBox"); QVERIFY(box); QVERIFY(box->isVisible());       // a white box, seen on and off
+        QCOMPARE(box->property("border").value<QObject*>()->property("color").value<QColor>(),QColor("#ffffff"));
         click(item); QTRY_VERIFY(!timeline->property("ripple").toBool());
+        click(edit); QTRY_VERIFY((item=visualItem(window->contentItem(),"editRippleItem")) && item->isVisible());
+        box=visualItem(item,"menuItemBox"); QVERIFY(box); QVERIFY(box->isVisible()); QVERIFY(!item->property("checked").toBool());
+        QTest::keyClick(window,Qt::Key_Escape);
         controller.shutdownSession();
+    }
+    void top_bar_menus_toggle_from_their_buttons() {
+        const char* pairs[][2]={{"fileMenuButton","fileMenu"},{"editMenuButton","editMenu"},
+                                {"viewMenuButton","viewMenu"},{"optionsMenuButton","optionsMenu"},
+                                {"settingsButton","settingsMenu"}};
+        for(const auto& pair:pairs){
+            auto* button=visualItem(window->contentItem(),pair[0]); QVERIFY2(button,pair[0]);
+            auto* menu=window->findChild<QObject*>(pair[1]); QVERIFY2(menu,pair[1]);
+            click(button); QTRY_VERIFY2(menu->property("visible").toBool(),pair[0]);
+            QVERIFY(button->property("checked").toBool());
+            click(button); QTRY_VERIFY2(!menu->property("visible").toBool(),pair[0]);            // the second click closes it
+            QTRY_VERIFY(!button->property("checked").toBool());
+            click(button); QTRY_VERIFY2(menu->property("visible").toBool(),pair[0]);             // and it opens again
+            QTest::keyClick(window,Qt::Key_Escape); QTRY_VERIFY(!menu->property("visible").toBool());
+        }
     }
     void normal_drag_selects_grid_range_and_repeat_stays_inside_it() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
@@ -4021,6 +4185,24 @@ private slots:
         QVERIFY(entry("viewPianoRollItem")->property("checked").toBool());
         QVERIFY(!entry("viewMixerItem")->property("checked").toBool());
         QMetaObject::invokeMethod(menu,"close"); QTRY_VERIFY(!menu->property("visible").toBool());
+    }
+    void settings_menu_opens_the_keyboard_shortcuts_panel() {
+        auto* shortcuts=engine->singletonInstance<ShortcutsWrapper*>("TransportTests","Shortcuts"); QVERIFY(shortcuts);
+        auto* editor=window->findChild<QObject*>("shortcutEditor"); QVERIFY(editor);
+        const auto restore=qScopeGuard([&] { shortcuts->resetAll(); QMetaObject::invokeMethod(editor,"close"); });
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+        auto* settings=visualItem(window->contentItem(),"settingsButton"); QVERIFY(settings); click(settings);
+        auto* menu=window->findChild<QObject*>("settingsMenu"); QVERIFY(menu); QTRY_VERIFY(menu->property("visible").toBool());
+        QQuickItem* item=nullptr; QTRY_VERIFY((item=visualItem(window->contentItem(),"shortcutsSetting")) && item->isVisible());
+        QCOMPARE(item->property("text").toString(),QString("Keyboard shortcuts…"));
+        click(item);
+        QTRY_VERIFY(editor->property("visible").toBool()); QTRY_VERIFY(!menu->property("visible").toBool());
+        QVERIFY(!window->findChild<QObject*>("preferencesPopup")->property("visible").toBool());   // straight to the panel
+        QQuickItem* key=nullptr;
+        QTRY_VERIFY((key=visualItem(window->contentItem(),"shortcutKey_transport.goToStart")) && key->isVisible());
+        click(key); QTest::keyClick(window,Qt::Key_Home);
+        QTRY_COMPARE(shortcuts->keys()["transport.goToStart"].toString(),QString("Home"));
+        QTest::keyClick(window,Qt::Key_Escape); QTRY_VERIFY(!editor->property("visible").toBool());
     }
     void panel_tabs_light_only_the_shown_panel_and_request_toggles() {
         auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);

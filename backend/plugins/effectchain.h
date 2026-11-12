@@ -38,6 +38,8 @@ inline constexpr std::string_view Piano = "piano";
 inline constexpr std::string_view Chords = "chords";
 // The synth's controls (oscillators, filter, envelopes, LFO, presets), a page like the harmonium's.
 inline constexpr std::string_view Synth = "synth";
+// The bass guitar's controls (style, strings, pickups, tone, presets), a page like the synth's.
+inline constexpr std::string_view BassGuitar = "bassguitar";
 // The mixing plugins (restMap G7) use their mixfx type names: "compressor", ...
 
 // Every effect type, in the order an "Add FX" picker lists them.

@@ -29,6 +29,7 @@ Window {
     readonly property bool supportsPiano: panelBridge.supportsPiano
     readonly property bool supportsChords: panelBridge.supportsChords
     readonly property bool supportsSynth: panelBridge.supportsSynth
+    readonly property bool supportsBassGuitar: panelBridge.supportsBassGuitar
     // What "+ Add FX" offers; re-read whenever the chain changes.
     readonly property var addableEffects: (root.effects, root.trackModel && root.trackId >= 0
                                            ? root.trackModel.addableEffects(root.trackId) : [])
@@ -362,7 +363,8 @@ Window {
                             : root.selectedEffect === "denoise" ? 9
                             : root.selectedEffect === "pitchmonitor" ? 10
                             : root.selectedEffect === "synth" ? 11
-                            : root.trackModel && root.trackModel.isMixEffect(root.selectedEffect) ? 8 : 12
+                            : root.selectedEffect === "bassguitar" ? 12
+                            : root.trackModel && root.trackModel.isMixEffect(root.selectedEffect) ? 8 : 13
                 Tenbandeq {
                     trackModel: root.trackModel
                     trackId: root.trackId
@@ -468,6 +470,15 @@ Window {
                     active: root.supportsSynth
                     sourceComponent: SynthEditor {
                         objectName: "trackSynth" + root.trackId
+                        trackModel: root.trackModel
+                        trackId: root.trackId
+                        trackName: root.trackName
+                    }
+                }
+                Loader {
+                    active: root.supportsBassGuitar
+                    sourceComponent: BassEditor {
+                        objectName: "trackBass" + root.trackId
                         trackModel: root.trackModel
                         trackId: root.trackId
                         trackName: root.trackName

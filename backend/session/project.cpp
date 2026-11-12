@@ -332,6 +332,14 @@ bool Project::setTrackSynth(int id, const synth::Settings& settings)
     return true;
 }
 
+bool Project::setTrackBass(int id, const bass::Settings& settings)
+{
+    auto* track = findTrack(id);
+    if (!track) return false;
+    track->bass = bass::sanitize(settings);
+    return true;
+}
+
 bool Project::setTrackChords(int id, const chords::Settings& settings)
 {
     auto* track = findTrack(id);

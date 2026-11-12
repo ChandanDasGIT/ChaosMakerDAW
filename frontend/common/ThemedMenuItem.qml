@@ -7,14 +7,32 @@ import QtQuick.Layouts
 MenuItem {
     id: root
     property string shortcutText: ""
+    // A checkable entry drawn as a white-outlined box (ticked when on), so it is seen off too.
+    property bool boxed: false
     implicitHeight: 30
     leftPadding: Theme.margin
     rightPadding: Theme.margin
     indicator: Item {}
     arrow: Item {}
     contentItem: RowLayout {
+        Rectangle {
+            objectName: "menuItemBox"
+            visible: root.checkable && root.boxed
+            Layout.preferredWidth: 14; Layout.preferredHeight: 14
+            Layout.rightMargin: 2
+            radius: 3
+            color: "transparent"
+            border.color: root.enabled ? Theme.textStrong : Theme.textMuted
+            border.width: 1
+            Text {
+                anchors.centerIn: parent
+                text: root.checked ? Icons.check : ""
+                color: root.enabled ? Theme.accent : Theme.textMuted
+                font.pixelSize: Theme.captionSize
+            }
+        }
         Text {
-            visible: root.checkable
+            visible: root.checkable && !root.boxed
             text: root.checked ? Icons.check : ""
             color: root.enabled ? Theme.accent : Theme.textMuted
             font.pixelSize: Theme.bodySize

@@ -199,6 +199,9 @@ public:
     // Synth tracks, for SynthWrapper, the same way: synthChanged.
     const synth::Settings* synth(int trackId) const;             // null unless a Synth track
     bool setSynth(int trackId, const synth::Settings& settings);
+    // Bass Guitar tracks, for BassWrapper, the same way: bassChanged.
+    const bass::Settings* bass(int trackId) const;               // null unless a Bass Guitar track
+    bool setBass(int trackId, const bass::Settings& settings);
     // Mixing plugins (restMap G7), for MixEffectWrapper the same way: mixEffectChanged, not
     // dataChanged. Not undoable.
     std::optional<mixfx::Settings> mixEffect(int trackId, std::string_view type) const;
@@ -333,6 +336,7 @@ signals:
     void pianoChanged(int trackId);
     void chordsChanged(int trackId);
     void synthChanged(int trackId);
+    void bassChanged(int trackId);
     void mixEffectChanged(int trackId, const QString& type);
     void eqPresetErrorChanged();
     void countChanged();

@@ -129,6 +129,10 @@ Window {
             pianoRollAvailable: window.pianoRollAvailable
             onToggleMixerRequested: window.toggleMixer()
             onTogglePianoRollRequested: window.togglePianoRoll()
+            bpm: transportBar.bpm
+            tapCount: transportBar.tapCount
+            onTapTempoRequested: transportBar.tapTempo()
+            onBpmEdited: value => EngineController.bpm = value
             Layout.fillWidth: true
             onCloseRequested: { window.closeApproved = true; window.close() }
             onExportRequested: exportDialog.open()
@@ -198,6 +202,7 @@ Window {
         }
 
         TransportBar {
+            id: transportBar
             trackModel: window.projectTracks
             snapMode: timeline.snapMode
             onSnapModeEdited: value => timeline.snapMode = value

@@ -774,6 +774,21 @@ bool TrackListWrapper::setSynth(int trackId, const synth::Settings& settings)
     return change.accepted;
 }
 
+const bass::Settings* TrackListWrapper::bass(int trackId) const
+{
+    const auto* track = m_project.findTrack(trackId);
+    return track && track->type == "Bass Guitar" ? &track->bass : nullptr;
+}
+
+bool TrackListWrapper::setBass(int trackId, const bass::Settings& settings)
+{
+    if (!bass(trackId)) return false;
+    const auto before = *bass(trackId);
+    const auto change = m_state.setBass(trackId, settings);
+    if (change.accepted && !(before == *bass(trackId))) emit bassChanged(trackId);
+    return change.accepted;
+}
+
 const harmonium::Settings* TrackListWrapper::harmonium(int trackId) const
 {
     const auto* track = m_project.findTrack(trackId);
