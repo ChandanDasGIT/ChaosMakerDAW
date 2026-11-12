@@ -18,7 +18,7 @@ Rectangle {
     signal exportRequested()
     signal toggleMixerRequested()
     signal togglePianoRollRequested()
-    // Options > Tap tempo: the window passes the tap on to the transport bar's BPM field.
+    // Tools > Tap tempo: the window passes the tap on to the transport bar's BPM field.
     property real bpm: 120
     property int tapCount: 0
     signal tapTempoRequested()
@@ -63,10 +63,11 @@ Rectangle {
             onTogglePianoRollRequested: root.togglePianoRollRequested()
         }
 
-        OptionsMenu {
-            id: optionsMenu
+        ToolsMenu {
+            id: toolsMenu
             bpm: root.bpm
             tapCount: root.tapCount
+            trackModel: root.trackModel
             onTapTempoRequested: root.tapTempoRequested()
             onBpmEdited: value => root.bpmEdited(value)
         }

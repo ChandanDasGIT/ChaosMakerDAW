@@ -94,6 +94,10 @@ target_link_libraries(chordrender PRIVATE dawengine)
 add_executable(latencytest tools/latencytest/latencytest.cpp)
 target_compile_options(latencytest PRIVATE -Wall -Wextra)
 target_link_libraries(latencytest PRIVATE dawengine)
+# drumbench: scores the drum pattern analyzer against the MIDI a drummer played (restMap G20).
+add_executable(drumbench tools/drumbench/drumbench.cpp)
+target_compile_options(drumbench PRIVATE -Wall -Wextra)
+target_link_libraries(drumbench PRIVATE dawengine)
 
 # ---------------------------------------------------------------- the tests (no Qt)
 # tests/abc/abc_test.cpp is found by itself, and ctest gets one entry named abc.
@@ -117,7 +121,7 @@ endforeach()
 if(DAW_BUILD_APP)
     add_executable(wrappertests
         tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp tests/wrapper/clipediting_qtcheck.cpp
-        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp tests/wrapper/volumeenvelope_qtcheck.cpp tests/wrapper/mixeffect_qtcheck.cpp tests/wrapper/importexport_qtcheck.cpp tests/wrapper/fileswrapper_qtcheck.cpp tests/wrapper/shortcuts_qtcheck.cpp tests/wrapper/denoise_qtcheck.cpp tests/wrapper/pitchmonitor_qtcheck.cpp tests/wrapper/synth_qtcheck.cpp tests/wrapper/bass_qtcheck.cpp
+        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp tests/wrapper/volumeenvelope_qtcheck.cpp tests/wrapper/mixeffect_qtcheck.cpp tests/wrapper/importexport_qtcheck.cpp tests/wrapper/fileswrapper_qtcheck.cpp tests/wrapper/shortcuts_qtcheck.cpp tests/wrapper/denoise_qtcheck.cpp tests/wrapper/pitchmonitor_qtcheck.cpp tests/wrapper/synth_qtcheck.cpp tests/wrapper/bass_qtcheck.cpp tests/wrapper/drumanalyzer_qtcheck.cpp
         wrapper/files/fileswrap/fileswrapper.cpp wrapper/files/fileswrap/fileswrapper.h
         wrapper/plugins/denoise/denoisewrap/denoisewrapper.cpp wrapper/plugins/denoise/denoisewrap/denoisewrapper.h
         wrapper/plugins/pitchmonitor/pitchmonitorwrap/pitchmonitorwrapper.cpp wrapper/plugins/pitchmonitor/pitchmonitorwrap/pitchmonitorwrapper.h
@@ -141,6 +145,7 @@ if(DAW_BUILD_APP)
         wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.cpp wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.h
         wrapper/instruments/synth/synthwrap/synthwrapper.cpp wrapper/instruments/synth/synthwrap/synthwrapper.h
         wrapper/instruments/bass/basswrap/basswrapper.cpp wrapper/instruments/bass/basswrap/basswrapper.h
+        wrapper/analysis/drumanalyzerwrap/drumanalyzerwrapper.cpp wrapper/analysis/drumanalyzerwrap/drumanalyzerwrapper.h
         wrapper/instruments/drums/drumkitwrap/drumkitwrapper.cpp wrapper/instruments/drums/drumkitwrap/drumkitwrapper.h
         wrapper/instruments/drums/groovewrap/drumgroovewrapper.cpp wrapper/instruments/drums/groovewrap/drumgroovewrapper.h
         wrapper/plugins/chordplayer/chordswrap/chordswrapper.cpp wrapper/plugins/chordplayer/chordswrap/chordswrapper.h
@@ -166,6 +171,7 @@ if(DAW_BUILD_APP)
     add_test(NAME qtharmonium COMMAND wrappertests qtharmonium)
     add_test(NAME qtsynth COMMAND wrappertests qtsynth)
     add_test(NAME qtbass COMMAND wrappertests qtbass)
+    add_test(NAME qtdrumanalyzer COMMAND wrappertests qtdrumanalyzer)
     add_test(NAME qtdrumkit COMMAND wrappertests qtdrumkit)
     add_test(NAME qtdrumgroove COMMAND wrappertests qtdrumgroove)
     add_test(NAME qteffectchain COMMAND wrappertests qteffectchain)
@@ -188,7 +194,7 @@ if(DAW_BUILD_APP)
             QML_FILES frontend/theme/Theme.qml frontend/theme/PianoRollColors.qml frontend/theme/TrackListColors.qml frontend/theme/TimelineColors.qml frontend/theme/MixerColors.qml frontend/theme/TransportColors.qml
                       frontend/theme/GuitarSuiteColors.qml frontend/theme/EffectsColors.qml frontend/theme/ChaosEqColors.qml
                       frontend/icons/Icons.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
-                      frontend/window/EditMenu.qml frontend/window/UndoHistory.qml frontend/window/ViewMenu.qml frontend/window/OptionsMenu.qml frontend/window/TapTempoDialog.qml frontend/window/PanelTabs.qml
+                      frontend/window/EditMenu.qml frontend/window/UndoHistory.qml frontend/window/ViewMenu.qml frontend/window/ToolsMenu.qml frontend/window/TapTempoDialog.qml frontend/tools/DrumAnalyzerDialog.qml frontend/window/PanelTabs.qml
                       frontend/window/StatusStrip.qml
                       frontend/common/ThemedMenuItem.qml frontend/common/ThemedMenu.qml frontend/common/ThemedMenuSeparator.qml frontend/common/ToggleChip.qml frontend/common/PanelButton.qml frontend/common/ThemedComboBox.qml frontend/common/CloseButton.qml frontend/common/ThemedSlider.qml frontend/common/HardwareSlider.qml frontend/common/ThemedDialog.qml frontend/common/ThemedMenuButton.qml
                       frontend/engine/PlaybackControls.qml
