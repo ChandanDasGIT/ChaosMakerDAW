@@ -6,6 +6,7 @@
 #include "instruments/harmonium/harmonium.h"
 #include "instruments/piano/piano.h"
 #include "instruments/synth/synth.h"
+#include "instruments/bass/bassguitar.h"
 #include "dsp/panlaw.h"
 #include "plugins/mixfx/mixfxfactory.h"
 
@@ -108,6 +109,8 @@ void SnapshotBuilder::syncTrackEq(const Project& project, const MutableEffectRes
             static_cast<Piano&>(*fx->instrument).setSettings(track->piano);
         if (fx->instrument && fx->instrument->typeId() == "synth")
             static_cast<Synth&>(*fx->instrument).setSettings(track->synth);
+        if (fx->instrument && fx->instrument->typeId() == "bassguitar")
+            static_cast<BassGuitar&>(*fx->instrument).setSettings(track->bass);
         if (fx->instrument && fx->instrument->typeId() == "chords") {
             auto& chordsTrack = static_cast<ChordsInstrument&>(*fx->instrument);
             chordsTrack.piano().setSettings(track->piano);

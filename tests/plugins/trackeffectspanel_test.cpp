@@ -73,6 +73,15 @@ TEST(trackeffectspanel, synth_track_opens_on_its_own_page) {
     CHECK(panel.selectedEffect() == "synth");
 }
 
+TEST(trackeffectspanel, bass_guitar_track_opens_on_its_own_page) {
+    TrackEffectsPanel panel;
+    panel.setTrackInfo(7, "Bass", "Bass Guitar", false, false);
+    panel.setChain({"bassguitar", "chaoseq"});
+    CHECK(panel.supportsBassGuitar());
+    CHECK(!panel.supportsSynth() && !panel.supportsHarmonium() && !panel.supportsGuitarSuite());
+    CHECK(panel.selectedEffect() == "bassguitar");
+}
+
 TEST(trackeffectspanel, harmonium_track_opens_on_its_harmonium_page) {
     TrackEffectsPanel panel;
     panel.setTrackInfo(3, "Harmonium", "Harmonium", false, false);

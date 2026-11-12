@@ -21,7 +21,6 @@ ToolButton {
     objectName: "editMenuButton"
     text: "Edit"
     implicitHeight: 32
-    checkable: true
     checked: editMenu.visible
     onClicked: editMenu.visible ? editMenu.close() : editMenu.open()
     contentItem: RowLayout {
@@ -56,6 +55,7 @@ ToolButton {
         id: editMenu
         objectName: "editMenu"
         y: parent.height + 4
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent   // the button toggles it
         width: 200
 
         ThemedMenuItem {
@@ -129,6 +129,7 @@ ToolButton {
             objectName: "editRippleItem"
             text: "Ripple editing"
             checkable: true
+            boxed: true                              // white box: visible when off as well
             checked: root.hasTimeline && root.timeline.ripple
             enabled: root.hasTimeline
             onTriggered: root.timeline.rippleEdited(!root.timeline.ripple)

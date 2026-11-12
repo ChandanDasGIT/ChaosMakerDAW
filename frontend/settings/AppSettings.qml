@@ -9,7 +9,6 @@ ToolButton {
     objectName: "settingsButton"
     text: "Settings"
     implicitHeight: 32
-    checkable: true
     checked: settingsMenu.visible
     onClicked: settingsMenu.visible ? settingsMenu.close() : settingsMenu.open()
 
@@ -45,7 +44,9 @@ ToolButton {
 
     ThemedMenu {
         id: settingsMenu
+        objectName: "settingsMenu"
         y: parent.height + 4
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent   // the button toggles it
         width: 220
 
         ThemedMenuItem {
@@ -79,6 +80,15 @@ ToolButton {
             onTriggered: {
                 settingsMenu.close()
                 preferencesPopup.open()
+            }
+        }
+
+        ThemedMenuItem {
+            objectName: "shortcutsSetting"
+            text: "Keyboard shortcuts…"
+            onTriggered: {
+                settingsMenu.close()
+                shortcutEditor.open()
             }
         }
     }

@@ -35,6 +35,8 @@ public:
     bool supportsChords() const;
     // The synth's page likewise, on Synth tracks.
     bool supportsSynth() const;
+    // The bass guitar's page likewise, on Bass Guitar tracks.
+    bool supportsBassGuitar() const;
 
     const std::string& selectedEffect() const { return m_selectedEffect; }
     void setSelectedEffect(std::string_view key);

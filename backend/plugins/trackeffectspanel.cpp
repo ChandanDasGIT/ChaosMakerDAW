@@ -51,6 +51,11 @@ bool TrackEffectsPanel::supportsSynth() const
     return std::find(m_chain.begin(), m_chain.end(), effectchain::Synth) != m_chain.end();
 }
 
+bool TrackEffectsPanel::supportsBassGuitar() const
+{
+    return std::find(m_chain.begin(), m_chain.end(), effectchain::BassGuitar) != m_chain.end();
+}
+
 void TrackEffectsPanel::setSelectedEffect(std::string_view key)
 {
     m_selectedEffect = validateSelectedEffect(key, m_chain);

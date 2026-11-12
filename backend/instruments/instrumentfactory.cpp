@@ -5,6 +5,7 @@
 #include "instruments/harmonium/harmonium.h"
 #include "instruments/piano/piano.h"
 #include "instruments/synth/synth.h"
+#include "instruments/bass/bassguitar.h"
 #include "instruments/instrumentcatalog.h"
 #include "plugins/testsynth/testsynth.h"
 
@@ -16,6 +17,7 @@ std::shared_ptr<Processor> createInstrument(std::string_view typeId)
     if (typeId == "Piano") return std::make_shared<Piano>();
     if (typeId == "Chords") return std::make_shared<ChordsInstrument>();
     if (typeId == "Synth") return std::make_shared<Synth>();
+    if (typeId == "Bass Guitar") return std::make_shared<BassGuitar>();
     // The other instrument types play through TestSynth until their real instruments exist.
     return std::make_shared<TestSynth>();
 }

@@ -12,6 +12,7 @@
 #include "instruments/piano/pianosettings.h"
 #include "instruments/harmonium/harmoniumsettings.h"
 #include "instruments/synth/synthsettings.h"
+#include "instruments/bass/basssettings.h"
 #include "plugins/chordplayer/chordsettings.h"
 #include "automation/volumeenvelope.h"
 #include "plugins/mixfx/mixfxspec.h"
@@ -88,6 +89,8 @@ struct Track : EffectState {
     chords::Settings chords;
     // Synth tracks: oscillators, filter, envelopes, LFO, play mode (the synth instrument).
     synth::Settings synth;
+    // Bass Guitar tracks: style, strings, pickups and tone (the bass guitar instrument).
+    bass::Settings bass;
     std::vector<AudioClip> audioClips;
     // Volume envelope (restMap G6): multiplies the fader; no points = no effect.
     automation::VolumeEnvelope volumeEnvelope;
@@ -151,6 +154,7 @@ public:
     bool setTrackPiano(int id, const piano::Settings& settings);
     bool setTrackChords(int id, const chords::Settings& settings);
     bool setTrackSynth(int id, const synth::Settings& settings);
+    bool setTrackBass(int id, const bass::Settings& settings);
     // Insert effects. Not undoable by design (the user removes an effect by hand); undoing a
     // track removal still brings the track back with its effects.
     int addTrackEffect(int trackId, const std::string& type); // new effect id, or -1

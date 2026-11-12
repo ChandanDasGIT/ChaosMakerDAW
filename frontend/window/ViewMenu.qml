@@ -16,7 +16,6 @@ ToolButton {
     objectName: "viewMenuButton"
     text: "View"
     implicitHeight: 32
-    checkable: true
     checked: viewMenu.visible
     onClicked: viewMenu.visible ? viewMenu.close() : viewMenu.open()
     contentItem: RowLayout {
@@ -44,6 +43,7 @@ ToolButton {
         id: viewMenu
         objectName: "viewMenu"
         y: parent.height + 4
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent   // the button toggles it
         width: 200
 
         ThemedMenuItem {
