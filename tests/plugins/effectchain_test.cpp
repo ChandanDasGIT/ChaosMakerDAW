@@ -23,6 +23,7 @@ TEST(effectchain, only_instrument_tracks_start_with_their_instrument_fx)
     CHECK(effectchain::initialEffects("Drums") == List{"drumkit"});
     CHECK(effectchain::initialEffects("Electronic Drums") == List{"electrodrums"});
     CHECK(effectchain::initialEffects("Piano") == List{"piano"});
+    CHECK(effectchain::initialEffects("Synth") == List{"synth"});
     for (const char* type : {"Vocal", "Audio", "Instrument", "Strings", "Unknown"})
         CHECK(effectchain::initialEffects(type).empty());
 }
@@ -149,6 +150,22 @@ TEST(effectchain, electronic_drum_page_is_fixed_like_the_drum_kit_page)
     CHECK(project.setTrackEffects(track.id, {"eq"}));
     CHECK(types(track) == (std::vector<std::string>{"electrodrums", "eq"}));
     CHECK(!project.setTrackEffects(track.id, {"drumkit"}));       // the acoustic kit's page
+}
+
+TEST(effectchain, synth_page_is_fixed_like_the_harmonium_page)
+{
+    std::vector<TrackEffectSlot> chain;
+    CHECK(!effectchain::canAdd(chain, "synth"));           // only placed on Synth tracks
+    CHECK(!effectchain::canRemove("synth"));
+    const auto* page = effectchain::find("synth");
+    CHECK(page && page->title == "Synth");
+
+    Project project;
+    auto& track = project.addTrack(TrackKind::Instrument, "Lead", "Synth");
+    CHECK(types(track) == (std::vector<std::string>{"synth"}));
+    CHECK(project.setTrackEffects(track.id, {"eq"}));
+    CHECK(types(track) == (std::vector<std::string>{"synth", "eq"}));
+    CHECK(!project.setTrackEffects(track.id, {"harmonium"}));
 }
 
 TEST(effectchain, piano_page_is_fixed_and_comes_back_on_older_files)

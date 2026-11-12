@@ -15,9 +15,9 @@ Status legend:  [ ] todo   [~] in progress   [x] done   [?] needs the user (deci
 
 NEXT UP (2026-11-12), the user's order, easiest first:
   1. C3c  Acoustic kit cymbals CANCELLED by the user (2026-11-12). Sample cache clean-up DONE
-          (uncommitted). Left: per-drum polyphony / live MIDI CC, by ear (the user).
-  2. G18  Pitch monitor: DONE 2026-11-12 (uncommitted), see G18 below.
-  3. C11  Synth instrument: oscillators, filter, envelopes, LFO, presets, own track type.
+          (committed in 85559a0). Left: per-drum polyphony / live MIDI CC, by ear (the user).
+  2. G18  Pitch monitor: DONE 2026-11-12 (committed in e969479), see G18 below.
+  3. C11  Synth instrument: DONE 2026-11-12 (uncommitted), see C11 below.
   4. C6   Other instruments (strings, acoustic guitar, bass): CC0 samples or string models.
   5. G20  Drum pattern analyzer: onsets, tempo, kick / snare / hat; songs need a hand-written
           harmonic / percussive separation.
@@ -27,8 +27,8 @@ NEXT UP (2026-11-12), the user's order, easiest first:
   8. U6   Guitar FX panel UI, at the very end (ask the user what they want first).
   Everything the user chose to do later (G12 tempo / meter changes, C3b, C8, B1-B9 checks, F4,
   H1-H3 and the smaller "later" ideas L1-L6) is in docs/laterGator.txt.
-  Done and committed up to 2026-11-12: G1-G11, G13-G17, R2, import / export, file chooser
-  (last commit bb27814, G13 noise reduction).
+  Done and committed up to 2026-11-12: G1-G11, G13-G18, C3c's cache clean-up, R2, import /
+  export, file chooser (last commit e969479, G18 pitch monitor).
 
 Start here when the user says "let's continue". Plans first, one step at a time.
 
@@ -513,7 +513,7 @@ Done items stay further down as the record.
         Tests: backendtests taptempo; transport_ui tap_tempo_sets_the_bpm_from_the_chip_and_shift_t.
 
 -- New tools (the user, 2026-11-10; none planned yet)
-[x] G18 Pitch Monitor. DONE 2026-11-12 (uncommitted). The user's choices: an FX ("Pitch Monitor",
+[x] G18 Pitch Monitor. DONE 2026-11-12 (in e969479). The user's choices: an FX ("Pitch Monitor",
         mix-effect type "pitchmonitor", tracks and clips); the graph follows the song position
         (laid out by bars like the timeline); measured against notes + a chosen key; also the
         pitch of audio already recorded on the track.
@@ -580,7 +580,7 @@ Done items stay further down as the record.
           Electronic Drums kit already has cymbals, which is enough. Keys 73 / 75 stay free.
         - Judge by ear first: per-drum polyphony, live MIDI CC (hardware hi-hat pedal, mic mix
           knob). The high-pass mic filters are C3b.
-        - [x] The sample cache never shrinks: DONE 2026-11-12 (uncommitted). drumkit::Library
+        - [x] The sample cache never shrinks: DONE 2026-11-12 (in 85559a0). drumkit::Library
           remembers every sampler it built for; after each rebuild and when a DrumKit goes
           away (trimSoon) its worker runs trim() every 0.5 s, 20 times: collectRetired() on
           each sampler, then drops cache entries only the cache holds, then malloc_trim (glibc).
@@ -589,8 +589,46 @@ Done items stay further down as the record.
           samples_no_track_plays_are_dropped_from_the_cache.
 [ ] C6  Other instruments after that: strings, acoustic guitar, bass (samples or the string
         model), mapped in instrumentfactory.cpp.
-[ ] C11 A synth instrument (the user, 2026-11-10): a hand-written subtractive synth (oscillators,
-        filter, envelopes, LFO, presets) as its own track type. Not planned yet.
+[x] C11 DONE 2026-11-12 (uncommitted): the Synth, a hand-written subtractive synth (the user,
+        2026-11-10) as its own track type. The user's choices: listed in the Instrument list
+        (after Harmonium), not as a kind of its own; the LFO rate in Hz OR synced to the
+        project tempo by a note length, as an option (the same 7 divisions as the GuitarSuite
+        tremolo, tempo::noteFrequency).
+        Sound (backend/instruments/synth):
+        - Two oscillators (saw, pulse, triangle, sine; octave, semitones, fine, pulse width,
+          level), saw and pulse anti-aliased by PolyBLEP; a sub an octave below oscillator 1
+          (sine / square) and noise.
+        - Soft drive, then a TPT state-variable filter: low-pass 12 / 24 dB, high-pass,
+          band-pass; cutoff, resonance (up to Q 20), key tracking, envelope amount (+-6 oct),
+          velocity.
+        - ADSR for the filter and the amp (attack straight; decay / release reach 1 % in their
+          time); sustain 0 ends the voice with the key held (plucks).
+        - One LFO for the whole synth (sine, triangle, saw, square, random) on pitch, filter,
+          volume or pulse width; depth (the mod wheel adds to it) and a fade-in after each
+          note. Synced: while the song plays its phase is locked to the song's beat.
+        - Poly (16 keys; the oldest held fades in 4 ms past that), Mono and Legato with glide;
+          pitch bend (range 0-24), CC 1, CC 64 sustain pedal, CC 120 / 123.
+        - synth::controls(): every setting by its save-file key ("filter.cutoff" ...), with its
+          range, kind and choices; the page edits through it.
+        - Presets: 8 built in (Fat Bass, Solo Lead, Warm Pad, Pluck, Brass, Soft Keys, Strings,
+          Wobble = the 1/8-synced filter wobble); the user's own as .synthpreset files in the
+          app data folder's "synth-presets" (SynthPresetStore, like the groove store: names
+          unique ignoring case, built-in ones fixed, broken files skipped). A 4-note chord of
+          every built-in preset stays below full scale.
+        Track type: catalog "Synth" (page "synth", fixed like the harmonium's), the instrument
+        factory, Track::synth (not undoable, like the other instruments' knobs), project files
+        ("synth", backend/persistence/synthjson) and .chaosfx chains; the snapshot builder
+        gives a new Synth its track's settings.
+        Wrapper: SynthWrapper (values / controls by key, set(), presets: load, save, rename,
+        delete; currentPreset names the preset the sound still is, the one last loaded or saved
+        first); TrackListWrapper::synthChanged -> EngineController straight into the synth.
+        Frontend: frontend/instruments/synth/SynthEditor.qml in the FX window: presets row,
+        then Oscillator 1 / 2, Sub and noise, Filter, Filter / Amp envelope, LFO (rate, or the
+        note length when synced), Playing (voices, glide in Mono / Legato, bend, volume).
+        Renders: renders/synth/ and renders/synth/presets/ (git-ignored).
+        Tests: backendtests synth, synthjson, synthpresetstore (+ instrumentcatalog,
+        effectchain, trackeffectspanel, tracklist lists); wrappertests qtsynth; transport_ui
+        synth_lives_in_fx_and_edits_by_its_controls_and_presets.
 [L] C8  Credits: moved to docs/laterGator.txt (2026-11-12).
 
 -- Piano roll (was section D)

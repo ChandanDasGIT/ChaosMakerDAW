@@ -5,6 +5,7 @@
 #include "wrapper/settings/appsettingswrap/appsettingswrapper.h"
 #include "wrapper/settings/shortcutswrap/shortcutswrapper.h"
 #include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
+#include "instruments/synth/synthpresets.h"
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QSignalSpy>
@@ -2187,6 +2188,95 @@ private slots:
 
         auto* reset=visualItem(window->contentItem(),"pianoReset"); QVERIFY(reset);
         click(reset); QTRY_VERIFY(settings()==piano::Settings{});
+        auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
+        QTRY_VERIFY(!panel->property("visible").toBool());
+    }
+    void synth_lives_in_fx_and_edits_by_its_controls_and_presets() {
+        auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
+        TrackListWrapper tracks; controller->attachProject(&tracks);
+        const int id=tracks.addInstrumentTrackOfType("Synth");
+        auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
+        list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
+        QTest::qWait(30);
+        const auto settings=[&]{ return tracks.project().findTrack(id)->synth; };
+        auto* fx=visualItem(list,"trackFxButton"+QString::number(id)); QVERIFY(fx); click(fx);
+        auto* panel=visualObject(window->contentItem(),"trackEffectsPanel"+QString::number(id)); QVERIFY(panel);
+        QTRY_VERIFY(panel->property("visible").toBool());
+        QCOMPARE(panel->property("selectedEffect").toString(),QString("synth"));        // opens on its page
+        QVERIFY(panel->property("supportsSynth").toBool());
+        QVERIFY(!panel->property("supportsHarmonium").toBool());
+        QVERIFY(!visualItem(window->contentItem(),"removeEffect_synth")->isVisible());   // fixed
+        QVERIFY(!visualItem(window->contentItem(),"addEffect_synth"));
+        QTRY_VERIFY(visualItem(window->contentItem(),"trackSynth"+QString::number(id)));
+        auto* bridge=visualObject(window->contentItem(),"synthBridge"); QVERIFY(bridge);
+        // Presets live in the throwaway data folder, never the real one.
+        QVERIFY(bridge->property("folder").toString().startsWith(storage.path()));
+
+        // A toggle: oscillator 2 on.
+        auto* osc2=visualItem(window->contentItem(),"synth_osc2_on"); QVERIFY(osc2); QVERIFY(osc2->isVisible());
+        QVERIFY(!osc2->property("active").toBool());
+        click(osc2); QTRY_VERIFY(settings().osc[1].on);
+
+        // A slider on a log scale: the cutoff goes up with the arrow key.
+        auto* cutoff=visualItem(window->contentItem(),"synth_filter_cutoff"); QVERIFY(cutoff); QVERIFY(cutoff->isVisible());
+        QCOMPARE(cutoff->property("valueText").toString(),QString("4.00 kHz"));
+        QQuickItem* slider=nullptr;
+        for (auto* child : cutoff->findChildren<QQuickItem*>()) if (child->inherits("QQuickSlider")) slider=child;
+        QVERIFY(slider);
+        slider->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Right);
+        QTRY_VERIFY(settings().filter.cutoffHz>4000.0);
+
+        // A choice: the wave; the pulse width shows only for the pulse.
+        auto* width=visualItem(window->contentItem(),"synth_osc1_pulseWidth"); QVERIFY(width);
+        QVERIFY(!width->isVisible());
+        auto* wave=visualItem(window->contentItem(),"synth_osc1_wave"); QVERIFY(wave); QVERIFY(wave->isVisible());
+        wave->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Down);
+        QTRY_VERIFY(settings().osc[0].wave==synth::Wave::Pulse);
+        QTRY_VERIFY(visualItem(window->contentItem(),"synth_osc1_pulseWidth")->isVisible());
+
+        // The LFO: Hz rate, or a note length when synced to the tempo.
+        auto* rate=visualItem(window->contentItem(),"synth_lfo_rate"); QVERIFY(rate); QVERIFY(rate->isVisible());
+        auto* division=visualItem(window->contentItem(),"synth_lfo_division"); QVERIFY(division); QVERIFY(!division->isVisible());
+        auto* sync=visualItem(window->contentItem(),"synth_lfo_sync"); QVERIFY(sync);
+        click(sync); QTRY_VERIFY(settings().lfo.sync);
+        QTRY_VERIFY(division->isVisible()); QTRY_VERIFY(!rate->isVisible());
+        QCOMPARE(division->property("currentText").toString().left(3),QString("1/4"));
+        division->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Down);
+        QTRY_COMPARE(settings().lfo.division,3);                                          // 1/8
+
+        // Glide works in Mono / Legato only.
+        auto* glide=visualItem(window->contentItem(),"synth_glide"); QVERIFY(glide);
+        QVERIFY(!glide->isEnabled());
+        auto* mode=visualItem(window->contentItem(),"synth_mode"); QVERIFY(mode);
+        mode->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Down);
+        QTRY_VERIFY(settings().mode==synth::PlayMode::Mono);
+        QTRY_VERIFY(glide->isEnabled());
+
+        // Presets: a built-in one replaces the sound; the box names it, "Custom" once changed.
+        auto* preset=visualItem(window->contentItem(),"synthPreset"); QVERIFY(preset);
+        QCOMPARE(preset->property("displayText").toString(),QString("Custom"));
+        preset->forceActiveFocus(); QTest::keyClick(fxWindow(),Qt::Key_Down);           // the first: Fat Bass
+        QTRY_VERIFY(settings()==synth::factoryPresets().front().settings);
+        QTRY_COMPARE(preset->property("displayText").toString(),QString("Fat Bass"));
+        QVERIFY(!visualItem(window->contentItem(),"synthDeletePreset")->isVisible());     // built-in
+
+        // Saving one of your own: named in the dialog; then it can be renamed and deleted.
+        click(visualItem(window->contentItem(),"synthSavePreset"));
+        auto* dialog=visualObject(window->contentItem(),"synthPresetNameDialog"); QVERIFY(dialog);
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        auto* nameField=dialog->findChild<QQuickItem*>("synthPresetNameField"); QVERIFY(nameField);
+        nameField->forceActiveFocus();
+        nameField->setProperty("text",QString("My Bass"));
+        QTest::keyClick(fxWindow(),Qt::Key_Return);
+        QTRY_COMPARE(preset->property("displayText").toString(),QString("My Bass"));
+        QVERIFY(QFile::exists(bridge->property("folder").toString()+"/my-bass.synthpreset"));
+        QTRY_VERIFY(visualItem(window->contentItem(),"synthDeletePreset")->isVisible());
+        if (auto* fxQuick=qobject_cast<QQuickWindow*>(fxWindow())) QVERIFY(fxQuick->grabWindow().save("/tmp/chaosmaker-synth.png"));
+        QVERIFY(QMetaObject::invokeMethod(bridge,"removePreset",Q_ARG(QString,"My Bass")));
+        QTRY_COMPARE(preset->property("displayText").toString(),QString("Fat Bass"));
+
+        auto* reset=visualItem(window->contentItem(),"synthReset"); QVERIFY(reset);
+        click(reset); QTRY_VERIFY(settings()==synth::Settings{});
         auto* close=visualItem(window->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
         QTRY_VERIFY(!panel->property("visible").toBool());
     }

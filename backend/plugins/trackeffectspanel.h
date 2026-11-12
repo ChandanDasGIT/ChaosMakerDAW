@@ -33,6 +33,8 @@ public:
     bool supportsPiano() const;
     // The Chords track's strips page likewise, on Chords tracks.
     bool supportsChords() const;
+    // The synth's page likewise, on Synth tracks.
+    bool supportsSynth() const;
 
     const std::string& selectedEffect() const { return m_selectedEffect; }
     void setSelectedEffect(std::string_view key);

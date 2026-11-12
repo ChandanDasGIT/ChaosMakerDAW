@@ -324,6 +324,14 @@ bool Project::setTrackPiano(int id, const piano::Settings& settings)
     return true;
 }
 
+bool Project::setTrackSynth(int id, const synth::Settings& settings)
+{
+    auto* track = findTrack(id);
+    if (!track) return false;
+    track->synth = synth::sanitize(settings);
+    return true;
+}
+
 bool Project::setTrackChords(int id, const chords::Settings& settings)
 {
     auto* track = findTrack(id);

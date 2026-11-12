@@ -18,6 +18,7 @@
 #include "instruments/drums/drumkit.h"
 #include "instruments/electrodrums/electrodrums.h"
 #include "instruments/harmonium/harmonium.h"
+#include "instruments/synth/synth.h"
 #include "instruments/piano/piano.h"
 #include "instruments/chords/chordsinstrument.h"
 #include "persistence/projectdocument.h"
@@ -1028,6 +1029,16 @@ void EngineController::attachProject(TrackListWrapper* model) {
         }
         if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
     });
+    // Synth edits: straight into the track's synth (atomic parameters); no playback rebuild.
+    connect(model, &TrackListWrapper::synthChanged, this, [this](int trackId) {
+        if (!m_project) return;
+        const auto* settings = m_project->synth(trackId);
+        const auto it = m_trackEffects.find(trackId);
+        if (!settings || it == m_trackEffects.end()) return;
+        if (it->second.instrument && it->second.instrument->typeId() == "synth")
+            static_cast<Synth&>(*it->second.instrument).setSettings(*settings);
+        if (!m_restoring) { m_sessionTimer.start(); setProjectDirty(true); }
+    });
     // Electronic drum edits: straight into the track's kit (atomic parameters); no rebuild.
     connect(model, &TrackListWrapper::electroDrumsChanged, this, [this](int trackId) {
         if (!m_project) return;
@@ -1616,6 +1627,7 @@ QVariantMap EngineController::importEffectChain(int trackId, const QUrl& file)
     if (plan.electrodrums) m_project->setElectroDrums(trackId, *plan.electrodrums);
     if (plan.piano) m_project->setPiano(trackId, *plan.piano);
     if (plan.chords) m_project->setChords(trackId, *plan.chords);
+    if (plan.synth) m_project->setSynth(trackId, *plan.synth);
     for (const auto& [type, settings] : plan.mixEffects) m_project->setMixEffect(trackId, QString::fromStdString(type), settings);
     if (pedals && plan.guitarSuite && !pedals->restoreSessionData(QByteArray::fromStdString(plan.guitarSuite->dump())))
         return chainResult(false, QStringLiteral("The effects were replaced, but the GuitarSuite pedalboard in the file did not load."),

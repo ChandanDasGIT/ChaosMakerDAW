@@ -117,7 +117,7 @@ endforeach()
 if(DAW_BUILD_APP)
     add_executable(wrappertests
         tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp tests/wrapper/clipediting_qtcheck.cpp
-        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp tests/wrapper/volumeenvelope_qtcheck.cpp tests/wrapper/mixeffect_qtcheck.cpp tests/wrapper/importexport_qtcheck.cpp tests/wrapper/fileswrapper_qtcheck.cpp tests/wrapper/shortcuts_qtcheck.cpp tests/wrapper/denoise_qtcheck.cpp tests/wrapper/pitchmonitor_qtcheck.cpp
+        tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp tests/wrapper/volumeenvelope_qtcheck.cpp tests/wrapper/mixeffect_qtcheck.cpp tests/wrapper/importexport_qtcheck.cpp tests/wrapper/fileswrapper_qtcheck.cpp tests/wrapper/shortcuts_qtcheck.cpp tests/wrapper/denoise_qtcheck.cpp tests/wrapper/pitchmonitor_qtcheck.cpp tests/wrapper/synth_qtcheck.cpp
         wrapper/files/fileswrap/fileswrapper.cpp wrapper/files/fileswrap/fileswrapper.h
         wrapper/plugins/denoise/denoisewrap/denoisewrapper.cpp wrapper/plugins/denoise/denoisewrap/denoisewrapper.h
         wrapper/plugins/pitchmonitor/pitchmonitorwrap/pitchmonitorwrapper.cpp wrapper/plugins/pitchmonitor/pitchmonitorwrap/pitchmonitorwrapper.h
@@ -139,6 +139,7 @@ if(DAW_BUILD_APP)
         wrapper/plugins/mixfx/mixfxwrap/mixeffectwrapper.cpp wrapper/plugins/mixfx/mixfxwrap/mixeffectwrapper.h
         wrapper/session/importexportwrap/importexportwrapper.cpp wrapper/session/importexportwrap/importexportwrapper.h
         wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.cpp wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.h
+        wrapper/instruments/synth/synthwrap/synthwrapper.cpp wrapper/instruments/synth/synthwrap/synthwrapper.h
         wrapper/instruments/drums/drumkitwrap/drumkitwrapper.cpp wrapper/instruments/drums/drumkitwrap/drumkitwrapper.h
         wrapper/instruments/drums/groovewrap/drumgroovewrapper.cpp wrapper/instruments/drums/groovewrap/drumgroovewrapper.h
         wrapper/plugins/chordplayer/chordswrap/chordswrapper.cpp wrapper/plugins/chordplayer/chordswrap/chordswrapper.h
@@ -162,6 +163,7 @@ if(DAW_BUILD_APP)
     add_test(NAME qtaudioengine COMMAND wrappertests qtaudioengine)
     add_test(NAME qtpianoroll COMMAND wrappertests qtpianoroll)
     add_test(NAME qtharmonium COMMAND wrappertests qtharmonium)
+    add_test(NAME qtsynth COMMAND wrappertests qtsynth)
     add_test(NAME qtdrumkit COMMAND wrappertests qtdrumkit)
     add_test(NAME qtdrumgroove COMMAND wrappertests qtdrumgroove)
     add_test(NAME qteffectchain COMMAND wrappertests qteffectchain)
@@ -195,6 +197,7 @@ if(DAW_BUILD_APP)
                       frontend/instruments/guitar/GuitarSuitePanel.qml
                       frontend/instruments/guitar/GuitarSuiteEditor.qml
                       frontend/instruments/harmonium/HarmoniumEditor.qml
+                      frontend/instruments/synth/SynthEditor.qml
                       frontend/instruments/drums/DrumKitEditor.qml
                       frontend/instruments/drums/DrumKitPicture.qml frontend/instruments/drums/GroovePanel.qml
                       frontend/instruments/electrodrums/ElectroDrumsEditor.qml

@@ -6,7 +6,7 @@
 #include <array>
 
 namespace {
-constexpr std::array<EffectDefinition, 18> catalog{{
+constexpr std::array<EffectDefinition, 19> catalog{{
     {effectchain::Eq, "Equalizer", "10-band tone shaping", true, true},
     {effectchain::ChaosEq, "Chaos EQ", "Parametric EQ, up to 24 bands", true, true},
     {mixfx::Compressor, "Compressor", "Evens out loud and quiet parts", true, true},
@@ -25,6 +25,7 @@ constexpr std::array<EffectDefinition, 18> catalog{{
     {effectchain::ElectroDrums, "Electronic drums", "Style, tune, decay and levels", false, false},
     {effectchain::Piano, "Grand piano", "Tone, pedal and scale", false, false},
     {effectchain::Chords, "Chords", "Chord strips and autoplay", false, false},
+    {effectchain::Synth, "Synth", "Oscillators, filter, envelopes and LFO", false, false},
 }};
 
 bool onChain(std::span<const TrackEffectSlot> chain, std::string_view type)
