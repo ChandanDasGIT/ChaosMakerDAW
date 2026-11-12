@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../common"
 
-// Tap tempo (restMap G17), opened from Options > Tap tempo…: a big pad to click in time (or
+// Tap tempo (restMap G17), opened from Tools > Tap tempo…: a big pad to click in time (or
 // Space / T while open), the BPM it gives, and a way back to the BPM from before. The taps
 // themselves are counted by the transport bar's tempo field; this popup asks for them.
 Popup {

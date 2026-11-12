@@ -18,6 +18,8 @@
 #include <functional>
 #include <QSettings>
 #include <QTemporaryDir>
+#include "tests/analysis/drumrender.h"
+#include "persistence/groovestore.h"
 #include <QStandardPaths>
 #include <QScopeGuard>
 #include <QAbstractItemModelTester>
@@ -2799,9 +2801,9 @@ private slots:
         auto* close=visualItem(panel->contentItem(),"closeTrackEffects"); QVERIFY(close); click(close);
         QTRY_VERIFY(!panel->isVisible());
     }
-    void tap_tempo_sets_the_bpm_from_the_options_popup_and_shift_t() {
+    void tap_tempo_sets_the_bpm_from_the_tools_popup_and_shift_t() {
         auto* controller=EngineController::instance();
-        auto* menu=window->findChild<QObject*>("optionsMenu"); QVERIFY(menu);
+        auto* menu=window->findChild<QObject*>("toolsMenu"); QVERIFY(menu);
         auto* dialog=window->findChild<QObject*>("tapTempoDialog"); QVERIFY(dialog);
         const auto restore=qScopeGuard([&] { controller->setBpm(120); QMetaObject::invokeMethod(menu,"close"); QMetaObject::invokeMethod(dialog,"close"); });
         controller->setBpm(120);
@@ -2809,15 +2811,15 @@ private slots:
         const auto left=[](QQuickItem* i){ return i->mapToScene(QPointF(0,0)).x(); };
         const auto right=[](QQuickItem* i){ return i->mapToScene(QPointF(i->width(),0)).x(); };
         auto* view=visualItem(window->contentItem(),"viewMenuButton"); QVERIFY(view);
-        auto* options=visualItem(window->contentItem(),"optionsMenuButton"); QVERIFY(options);
+        auto* tools=visualItem(window->contentItem(),"toolsMenuButton"); QVERIFY(tools);
         auto* settings=visualItem(window->contentItem(),"settingsButton"); QVERIFY(settings);
         auto* mixerTab=visualItem(window->contentItem(),"mixerTab"); QVERIFY(mixerTab);
-        QVERIFY(right(view)<=left(options)); QVERIFY(right(options)<=left(settings));   // View, Options, Settings
+        QVERIFY(right(view)<=left(tools)); QVERIFY(right(tools)<=left(settings));   // View, Tools, Settings
         QVERIFY(right(settings)<=left(mixerTab));                                       // the panel tabs after Settings
-        // Options > Tap tempo… opens the popup.
+        // Tools > Tap tempo… opens the popup.
         window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
-        click(options); QTRY_VERIFY(menu->property("visible").toBool());
-        QQuickItem* entry=nullptr; QTRY_VERIFY((entry=visualItem(window->contentItem(),"optionsTapTempo")) && entry->isVisible());
+        click(tools); QTRY_VERIFY(menu->property("visible").toBool());
+        QQuickItem* entry=nullptr; QTRY_VERIFY((entry=visualItem(window->contentItem(),"toolsTapTempo")) && entry->isVisible());
         click(entry);
         QTRY_VERIFY(dialog->property("visible").toBool()); QTRY_VERIFY(!menu->property("visible").toBool());
         auto* pad=visualItem(window->contentItem(),"tapTempoPad"); QVERIFY(pad); QTRY_VERIFY(pad->isVisible());
@@ -2851,6 +2853,98 @@ private slots:
         QVERIFY2(std::abs(controller->bpm()-100.0)<8.0, qPrintable(QString::number(controller->bpm())));
         auto* field=visualItem(window->contentItem(),"bpmField"); QVERIFY(field);
         QTRY_COMPARE(field->property("text").toString(),QString::number(controller->bpm()));
+    }
+    void drum_pattern_analyzer_turns_the_selected_clip_into_a_drum_clip_and_a_groove() {
+        auto* controller=EngineController::instance();
+        const double bpmBefore=controller->bpm();
+        TrackListWrapper tracks; tracks.setSampleRate(48000);
+        const int audioTrack=tracks.addAudioTrack();
+        auto audio=std::make_shared<AudioData>(); audio->path="loop.wav"; audio->sampleRate=48000;
+        audio->channels={drumrender::electroDrums(drumrender::timed(drumrender::rock(),110.0,6,0.4),16.0)};
+        audio->frames=std::int64_t(audio->channels[0].size()); audio->buildWaveform();
+        QVERIFY(tracks.attachTake(audioTrack,0,audio,false));
+        const int clipId=tracks.project().findTrack(audioTrack)->audioClips.at(0).id;
+        auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
+        auto* menu=window->findChild<QObject*>("toolsMenu"); QVERIFY(menu);
+        auto* dialog=window->findChild<QObject*>("drumAnalyzerDialog"); QVERIFY(dialog);
+        auto* bridge=window->findChild<QObject*>("drumAnalyzerBridge"); QVERIFY(bridge);
+        QTemporaryDir grooves; QVERIFY(grooves.isValid());
+        bridge->setProperty("grooveFolder",grooves.path());
+        const auto restore=qScopeGuard([&] {
+            QMetaObject::invokeMethod(dialog,"close"); QMetaObject::invokeMethod(menu,"close");
+            bridge->setProperty("grooveFolder",QString()); top->setProperty("trackModel",QVariant());
+            controller->setBpm(bpmBefore); controller->setMeter(4,4);
+        });
+        top->setProperty("trackModel",QVariant::fromValue(&tracks));
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+        const auto openIt=[&] {
+            auto* tools=visualItem(window->contentItem(),"toolsMenuButton"); QVERIFY(tools); click(tools);
+            QTRY_VERIFY(menu->property("visible").toBool());
+            QQuickItem* entry=nullptr; QTRY_VERIFY((entry=visualItem(window->contentItem(),"toolsDrumAnalyzer")) && entry->isVisible());
+            QCOMPARE(entry->property("text").toString(),QString("Drum pattern analyzer…"));
+            click(entry); QTRY_VERIFY(dialog->property("visible").toBool());
+        };
+        // Nothing selected: it says so and Analyse is off.
+        tracks.setSelectedClipId(-1);
+        openIt();
+        auto* analyse=visualItem(window->contentItem(),"drumAnalyzerAnalyse"); QVERIFY(analyse);
+        auto* clipText=visualItem(window->contentItem(),"drumAnalyzerClip"); QVERIFY(clipText);
+        QVERIFY(clipText->property("text").toString().contains("Select an audio clip"));
+        QVERIFY(!analyse->isEnabled());
+        QTest::keyClick(window,Qt::Key_Escape); QTRY_VERIFY(!dialog->property("visible").toBool());
+
+        // The clip selected: analyse it.
+        tracks.setSelectedClipId(clipId);
+        openIt();
+        QTRY_VERIFY(analyse->isEnabled());
+        QVERIFY(clipText->property("text").toString().startsWith("Clip: "));
+        click(analyse);
+        QTRY_VERIFY_WITH_TIMEOUT(bridge->property("hasResult").toBool() && !bridge->property("busy").toBool(),30000);
+        auto* bpm=visualItem(window->contentItem(),"drumAnalyzerBpm"); QVERIFY(bpm);
+        QTRY_COMPARE(bpm->property("text").toString(),QString("110 BPM"));
+        QCOMPARE(visualItem(window->contentItem(),"drumAnalyzerMeter")->property("text").toString(),QString("4/4"));
+        QVERIFY(visualItem(window->contentItem(),"drumAnalyzerCounts")->property("text").toString().contains("kicks"));
+        QVERIFY(visualItem(window->contentItem(),"drumAnalyzerPreview")->isVisible());
+        // x2 and back.
+        click(visualItem(window->contentItem(),"drumAnalyzerDouble")); QTRY_COMPARE(bpm->property("text").toString(),QString("220 BPM"));
+        click(visualItem(window->contentItem(),"drumAnalyzerHalve")); QTRY_COMPARE(bpm->property("text").toString(),QString("110 BPM"));
+        // The dialog fits the window and nothing in it runs past its edge.
+        auto* box=qobject_cast<QQuickItem*>(dialog->property("contentItem").value<QObject*>()); QVERIFY(box);
+        QVERIFY(box->mapToScene(QPointF(box->width(),0)).x()<=window->width());
+        QVERIFY(window->grabWindow().save(QDir::tempPath()+"/chaosmaker-drum-analyzer.png"));
+
+        // Make clip: a new Drums track (Acoustic, the choice to start with), the project's BPM and meter set.
+        QVERIFY(visualItem(window->contentItem(),"drumAnalyzerAcoustic")->property("checked").toBool());
+        auto* make=visualItem(window->contentItem(),"drumAnalyzerMakeClip"); QVERIFY(make);
+        const int before=tracks.count();
+        click(make);
+        QTRY_COMPARE(tracks.count(),before+1);
+        const int drums=tracks.trackIdAt(tracks.count()-1);
+        QCOMPARE(tracks.project().findTrack(drums)->type,std::string("Drums"));
+        QCOMPARE(tracks.project().findTrack(drums)->audioClips.size(),std::size_t(1));
+        QVERIFY(tracks.project().findTrack(drums)->audioClips[0].notes.size()>20);
+        QCOMPARE(controller->bpm(),110.0);
+        // Electronic: the next clip goes on a new Electronic Drums track; the choice stays.
+        auto* electronic=visualItem(window->contentItem(),"drumAnalyzerElectronic"); QVERIFY(electronic);
+        click(electronic);
+        QTRY_VERIFY(electronic->property("checked").toBool());
+        QVERIFY(!visualItem(window->contentItem(),"drumAnalyzerAcoustic")->property("checked").toBool());
+        click(make);
+        QTRY_COMPARE(tracks.count(),before+2);
+        QCOMPARE(tracks.project().findTrack(tracks.trackIdAt(tracks.count()-1))->type,std::string("Electronic Drums"));
+        QVERIFY(electronic->property("checked").toBool());
+        QVERIFY(visualItem(window->contentItem(),"drumAnalyzerTarget")->isVisible());   // the project's drum tracks can be chosen too
+
+        // Save as groove…: the name field, then Save.
+        click(visualItem(window->contentItem(),"drumAnalyzerSaveGroove"));
+        auto* name=visualItem(window->contentItem(),"drumAnalyzerGrooveName"); QVERIFY(name);
+        QTRY_VERIFY(name->isVisible());
+        QVERIFY(name->property("text").toString().endsWith(" groove"));
+        name->setProperty("text","Analysed rock");
+        click(visualItem(window->contentItem(),"drumAnalyzerSaveGrooveConfirm"));
+        QTRY_VERIFY(!name->isVisible());
+        QVERIFY(GrooveStore(grooves.path().toStdString()).find("Analysed rock").has_value());
+        click(visualItem(window->contentItem(),"drumAnalyzerClose")); QTRY_VERIFY(!dialog->property("visible").toBool());
     }
     void clip_takes_show_on_the_clip_the_menu_picks_one_and_punch_toggles() {
         TrackListWrapper tracks; tracks.setSampleRate(48000);
@@ -3726,7 +3820,7 @@ private slots:
     }
     void top_bar_menus_toggle_from_their_buttons() {
         const char* pairs[][2]={{"fileMenuButton","fileMenu"},{"editMenuButton","editMenu"},
-                                {"viewMenuButton","viewMenu"},{"optionsMenuButton","optionsMenu"},
+                                {"viewMenuButton","viewMenu"},{"toolsMenuButton","toolsMenu"},
                                 {"settingsButton","settingsMenu"}};
         for(const auto& pair:pairs){
             auto* button=visualItem(window->contentItem(),pair[0]); QVERIFY2(button,pair[0]);

@@ -30,12 +30,17 @@ NEXT UP (2026-11-12), the user's order, easiest first:
           the File > New / Save As tests (fails without these changes too; passes alone).
           MIDI routing left as is by the user: with nothing armed, keys reach a track only
           when it is the only instrument track.
-  5. G20  Drum pattern analyzer: onsets, tempo, kick / snare / hat; songs need a hand-written
-          harmonic / percussive separation.
-  6. G21  Chord / BPM analyzer: chromagram, chord templates, Viterbi, key; builds on G20.
-  7. G19  Guitar tone analyzer: searching GuitarSuite settings against a reference; only good
+  5. G20  Drum pattern analyzer: DONE 2026-11-13 (committed), see G20 below. Better on drum
+          stems after measuring on real playing; a whole song is not accurate (that needs a
+          stem splitter: laterGator L7).
+  6. G22  BPM analyzer (split from G21 by the user: chords and BPM are separate tools); reuses
+          G20's beat tracker.
+  7. G21  Chord analyzer: chromagram, chord templates, Viterbi, key.
+  8. G19  Guitar tone analyzer: searching GuitarSuite settings against a reference; only good
           on an isolated guitar.
-  8. U6   Guitar FX panel UI, at the very end (ask the user what they want first).
+     G19-G22 all open from the top bar's Tools menu (was "Options", renamed by the user
+     2026-11-12; Tap tempo… lives there too).
+  9. U6   Guitar FX panel UI, at the very end (ask the user what they want first).
   Everything the user chose to do later (G12 tempo / meter changes, C3b, C8, B1-B9 checks, F4,
   H1-H3 and the smaller "later" ideas L1-L6) is in docs/laterGator.txt.
   Done and committed up to 2026-11-12: G1-G11, G13-G18, C11, C3c's cache clean-up, R2, import /
@@ -564,16 +569,87 @@ Done items stay further down as the record.
         match automatically by searching amp / cab / EQ settings against the reference
         (offline, like fxrender --analyze). Works best on an isolated guitar stem; a full mix
         needs the guitar separated first, which is out of reach without ML (from-scratch rule).
-[ ] G20 Drum pattern analyzer: find kick / snare / hi-hat hits and the tempo in a drum
-        recording or loop (onset detection + spectral bands), quantise them, and make a drum
-        groove (G1) or a pattern clip from them. The user wants it to work on whole SONGS too
-        (a drum stem is the fallback if that is too much). Plan: stage 1 drum stems / loops
-        (reliable); stage 2 songs: first pull the drums forward with harmonic / percussive
-        separation (median filtering of the spectrogram, hand-written, no ML), then the same
-        detection. On songs, tempo and beat grid should be reliable and hi-hat / snare fair;
-        the kick under a bass is the hardest. The result is a draft to fix in the piano roll.
-[ ] G21 Chord and BPM analyzer (the user, 2026-11-10): from a song, find the BPM / beat grid,
-        the key and the chords. Hand-written: tempo from the onset envelope (shared with G20);
+[x] G20 Drum pattern analyzer. DONE 2026-11-13 (committed). The user: the selected audio
+        clip, whole songs from the start, kick / snare / hi-hat, also the time signature; out:
+        a pattern clip on a drum track of the user's choice (a new Drums or Electronic Drums
+        track, or one they have), a groove, the project BPM (and meter).
+        - backend/analysis (no Qt, no learning, hand-written):
+          spectrogram: 10 ms frames, 8 bands / octave 30 Hz..16 kHz (5 min song ~2 MB).
+          hpss: harmonic / percussive split by median filters (17 frames along time, 9 bands
+            across), soft masks.
+          onsets: log spectral flux of the percussive part (total, low, mid, high), the high-range
+            level (open hats), harmonicChange (chord changes, for the bar start in songs).
+          drumnmf: KL NMF of the percussive part: kick / snare / hi-hat shapes start generic
+            and adapt (keep 0.85 -> 0.4 of the start shape), 4 free shapes below 3 kHz take bass /
+            pad / the rest; each drum's level and rise per frame. 40 iterations.
+          beattracker: autocorrelation candidates 40..200 BPM, multiples capped by the period's
+            own repeat (no in-between pulse), a 0.9-octave preference around 120; the comb fit
+            on the first 30 s, then the window doubles to the whole sound (a 5 min song stays
+            locked); a tempo within 0.12 of a whole number is taken as it if it fits as well.
+          meterdetect: triple when the drums sit on the beat's thirds (6/8, 9/8, 12/8 with a
+            dotted-quarter beat), else 3 or 4 beats from how the kick / snare per beat repeat
+            (fast beats may make 6/8 or 7/8 of eighths); the bar starts on the strongest kick
+            and weakest snare, plus (faded in with the harmonic share 0.42..0.52) chord changes.
+          drumtranscriber: hits from each drum's rise (kick 45 %, snare 40 %, hi-hat 3.5 % of
+            that drum's typical hit, and above the local median); a weak kick / snare with a much
+            stronger other one at the same time is its spill; open hat when the highs ring on
+            after 150 ms; the grid (16ths or 8ths, eighths / sixteenths in compound meters) by
+            how much hit strength falls between the coarse lines; a steady hi-hat line is
+            continued under a kick / snare with hats one step either side; typicalBars (the two
+            bars that repeat most) for the groove; retempo (double / half without analysing
+            again). Keys: kick 60, snare 62, hi-hat 66 / open 70 (both kits).
+        - Wrapper: wrapper/analysis/drumanalyzerwrap/DrumAnalyzerWrapper (QtConcurrent with
+          progress and cancel; makeClip places the pattern by the project's tempo then: the same
+          beats at the found tempo, otherwise each hit at its real time; saveGroove into the drum
+          pages' grooves folder).
+        - UI: Tools > Drum pattern analyzer… (toolsDrumAnalyzer) opens frontend/tools/
+          DrumAnalyzerDialog.qml: clip, Analyse / progress / Cancel, Tempo with Half / Double,
+          Time signature, counts, a two-bar preview, Put on, Set the project BPM / time
+          signature (ticked; EngineController), Make clip, Save as groove….
+        Results (tests render known grooves through the app's own kits; songs add the Synth's
+        Warm Pad chords and the Bass Guitar on eighths): drum loops 4/4, 3/4 and 6/8 on both
+        kits: tempo exact, meter and bar right, kick / snare / hi-hat 100 %. Electronic kit in
+        a song: 95-100 %. Acoustic kit in a song (the hardest): kick 100 %, snare 100 % found /
+        ~76 % right, hi-hat ~66 % found / 98 % right. 5 min song analysed in ~3 s.
+        2026-11-13, after the user found it "way off" on a real drum stem: it had only ever
+        been tested on our own two kits. Now measured on real playing with tools/drumbench
+        (<audio> [<ref.mid>] [--dump], or --dir <folder>: tempo, beats, meter, hits before the
+        grid and the pattern after it, per drum, against the MIDI the drummer played). Test
+        sets, local only (local-reference/, git-ignored): drum-bench/ = 44 clips of the Groove
+        MIDI Dataset (Roland kit, real drummers, CC BY 4.0); drum-bench-idmt/ = 95 loops of
+        IDMT-SMT-Drums (real / sampled / techno kits, CC BY-NC-ND). baseline-2026-11-12.txt
+        and after-2026-11-13.txt in each.
+        2026-11-13 later: the user had all the test sets deleted (nothing is downloaded
+        without the user's yes, and outside material must be CC0 / public domain: Groove is
+        CC BY, IDMT non-commercial). The numbers below are the record of those runs;
+        drumbench stays and works on any audio with a MIDI of what was played.
+        The "Put on" row has Acoustic / Electronic buttons (asked by the user), the project's
+        drum tracks in a dropdown beside them when there are any.
+        Changed for drums-only sound (harmonic share < 0.45; a song keeps the old way, its
+        tests unchanged): kitshapes (new) learns the kit's own kick / snare / hat from the
+        recording (hits grouped by spectrum; groups that are two others together left out),
+        the factorisation runs on compressed levels (power 0.5) with those shapes held firm,
+        thresholds 0.5 / 0.5 / 0.25, generic snare / hat shapes redone from measured kits, the
+        tempo halves on a plain backbeat, beats move onto the kick and snare, the meter reads
+        the kick's plain low rise. Both ways: the hat line is also filled under kicks and
+        snares that hide every other hat; kick / snare spill within 35 ms (was 20).
+        Hits F (before the grid, 30 ms), before -> after: Groove set kick 89 -> 93, snare
+        57 -> 61, hat 75 -> 69; IDMT kick 92 -> 94, snare 60 -> 82, hat 80 -> 86. Tempo right
+        in 31 -> 32 of 44. Still weak: ghost notes (nearly all missed), hats on the Groove set
+        (soft ones missed, extras on snares), toms read as snare / hat, tempo doubled / halved /
+        4:3 in about a quarter of the clips, a stem with long cymbal wash may count as a song.
+        Tests: backendtests spectrogram, beattracker (incl. 3 min locked), drumtranscriber;
+        wrappertests qtdrumanalyzer; transport_ui drum_pattern_analyzer_turns_the_selected_clip_
+        into_a_drum_clip_and_a_groove (screenshot at $TMPDIR/chaosmaker-drum-analyzer.png).
+        Known limits: one steady tempo per clip (a drifting live take gets an average); 2/4 reads
+        as 4/4; odd meters (7/8) are a best guess; toms and cymbals are not told apart; real
+        songs untested here - the user's ears decide.
+[ ] G22 BPM analyzer (split out of G21 by the user, 2026-11-12: "chord and bpm are separate
+        things"): from a song, the BPM, the beat grid and the time signature into the project.
+        A Tools entry of its own; reuses G20's analysis (backend/analysis beattracker,
+        meterdetect).
+[ ] G21 Chord analyzer (the user, 2026-11-10; the BPM part is G22 now): from a song, find
+        the key and the chords. Hand-written: the beat grid from G22 / G20;
         chords from a chromagram (12 pitch classes per beat, the harmonic part from G20's
         separation), matched against chord templates (major, minor, then 7ths ...) and smoothed
         over time (Viterbi); key from the chord / pitch-class profile. Output: the chords on the

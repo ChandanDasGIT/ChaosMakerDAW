@@ -27,6 +27,18 @@ FEATURES
 [L] L6  Cabinet IRs in the project's media folder (left over from E4): GuitarSuite saves an
         absolute irPath and project loads don't pass the project folder as its base, so the
         IR is not copied into "<project name> Media" like clip files are.
+[L] L7  Stem splitter tool (asked 2026-11-13, moved here by the user the same day): a Tools
+        entry that splits a song into stems (drums; better still vocals, bass and the rest).
+        Three ways were weighed: A. hand-written signal processing only (free, no model, rough:
+        drums against the rest with bleed, vocals only when dead centre); B. a pretrained
+        separation model (Demucs class) run by our own hand-written C++ (four good stems,
+        slow on CPU, a 100-300 MB weights file kept outside the repo); C. the same model
+        through a runtime library (a real dependency). Why it waits: the Demucs code is MIT
+        but its weights have no stated licence (the author: "not clear", MusDB data was
+        research-only, likely non-commercial), so they are fine for the user's own use and
+        not safe to ship or sell. Before picking it up: ask the user whether the app will be
+        distributed; if so, find a model whose weights are clearly free (Spleeter's are
+        remembered as MIT, not checked).
 [L] H1  (was A4) Chaos EQ extras the user chose "not now": dynamic EQ, linear phase.
 [L] H2  (was A5) The 10-band EQ page's look: the user said they would redo it themselves
         (plan 3.10).
