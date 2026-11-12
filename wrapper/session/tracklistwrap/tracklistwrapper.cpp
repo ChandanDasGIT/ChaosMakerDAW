@@ -759,6 +759,21 @@ bool TrackListWrapper::setElectroDrums(int trackId, const electrodrums::Settings
     return change.accepted;
 }
 
+const synth::Settings* TrackListWrapper::synth(int trackId) const
+{
+    const auto* track = m_project.findTrack(trackId);
+    return track && track->type == "Synth" ? &track->synth : nullptr;
+}
+
+bool TrackListWrapper::setSynth(int trackId, const synth::Settings& settings)
+{
+    if (!synth(trackId)) return false;
+    const auto before = *synth(trackId);
+    const auto change = m_state.setSynth(trackId, settings);
+    if (change.accepted && !(before == *synth(trackId))) emit synthChanged(trackId);
+    return change.accepted;
+}
+
 const harmonium::Settings* TrackListWrapper::harmonium(int trackId) const
 {
     const auto* track = m_project.findTrack(trackId);

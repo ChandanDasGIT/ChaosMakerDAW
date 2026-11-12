@@ -492,6 +492,11 @@ TrackList::Change TrackList::setChords(int id, const chords::Settings& settings)
 {
     return result(m_project.setTrackChords(id, settings));
 }
+
+TrackList::Change TrackList::setSynth(int id, const synth::Settings& settings)
+{
+    return result(m_project.setTrackSynth(id, settings));
+}
 int TrackList::addTrackEffect(int trackId, const std::string& type)
 {
     if (Project::isClipEffectsId(trackId) && !canHaveClipEffects(trackId - Project::ClipEffectsBase)) return -1;   // audio clips only (R2)

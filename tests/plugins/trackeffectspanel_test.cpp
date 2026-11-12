@@ -64,6 +64,15 @@ TEST(trackeffectspanel, electronic_drums_track_opens_on_its_own_page) {
     CHECK(panel.selectedEffect() == "electrodrums");
 }
 
+TEST(trackeffectspanel, synth_track_opens_on_its_own_page) {
+    TrackEffectsPanel panel;
+    panel.setTrackInfo(6, "Lead", "Synth", false, false);
+    panel.setChain({"synth", "chaoseq"});
+    CHECK(panel.supportsSynth());
+    CHECK(!panel.supportsHarmonium() && !panel.supportsPiano() && !panel.supportsGuitarSuite());
+    CHECK(panel.selectedEffect() == "synth");
+}
+
 TEST(trackeffectspanel, harmonium_track_opens_on_its_harmonium_page) {
     TrackEffectsPanel panel;
     panel.setTrackInfo(3, "Harmonium", "Harmonium", false, false);

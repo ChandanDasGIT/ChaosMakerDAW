@@ -36,6 +36,8 @@ inline constexpr std::string_view ElectroDrums = "electrodrums";
 inline constexpr std::string_view Piano = "piano";
 // The Chords track's eight chord strips and autoplay; the grand piano's page follows it.
 inline constexpr std::string_view Chords = "chords";
+// The synth's controls (oscillators, filter, envelopes, LFO, presets), a page like the harmonium's.
+inline constexpr std::string_view Synth = "synth";
 // The mixing plugins (restMap G7) use their mixfx type names: "compressor", ...
 
 // Every effect type, in the order an "Add FX" picker lists them.

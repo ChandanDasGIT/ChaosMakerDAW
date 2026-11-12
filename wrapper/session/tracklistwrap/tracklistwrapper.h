@@ -196,6 +196,9 @@ public:
     // Chords tracks (strips, autoplay, key), for ChordsWrapper: chordsChanged.
     const chords::Settings* chords(int trackId) const;           // null unless a Chords track
     bool setChords(int trackId, const chords::Settings& settings);
+    // Synth tracks, for SynthWrapper, the same way: synthChanged.
+    const synth::Settings* synth(int trackId) const;             // null unless a Synth track
+    bool setSynth(int trackId, const synth::Settings& settings);
     // Mixing plugins (restMap G7), for MixEffectWrapper the same way: mixEffectChanged, not
     // dataChanged. Not undoable.
     std::optional<mixfx::Settings> mixEffect(int trackId, std::string_view type) const;
@@ -329,6 +332,7 @@ signals:
     void electroDrumsChanged(int trackId);
     void pianoChanged(int trackId);
     void chordsChanged(int trackId);
+    void synthChanged(int trackId);
     void mixEffectChanged(int trackId, const QString& type);
     void eqPresetErrorChanged();
     void countChanged();

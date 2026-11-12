@@ -7,6 +7,7 @@
 #include "pianojson.h"
 #include "chordsjson.h"
 #include "harmoniumjson.h"
+#include "synthjson.h"
 #include "mixer/mixerpanel.h"
 #include "recording/takerecorder.h"
 #include <nlohmann/json.hpp>
@@ -131,6 +132,7 @@ std::string ProjectDocument::serialize(const Project& project,
             trackObj["electrodrums"] = electrodrumsjson::toJson(track->electrodrums);
         if (track->type == "Piano" || track->type == "Chords") trackObj["piano"] = pianojson::toJson(track->piano);
         if (track->type == "Chords") trackObj["chords"] = chordsjson::toJson(track->chords);
+        if (track->type == "Synth") trackObj["synth"] = synthjson::toJson(track->synth);
         json effectsList = json::array();
         for (const auto& slot : track->effects) effectsList.push_back(slot.type);
         trackObj["effects"] = std::move(effectsList);   // insert effects in chain order (plan 6.1)
@@ -359,6 +361,11 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             electrodrums::Settings settings;
             if (!electrodrumsjson::fromJson(item["electrodrums"], settings, error)) return false;
             candidate.setTrackElectroDrums(track.id, settings);
+        }
+        if (item.contains("synth")) {
+            synth::Settings settings;
+            if (!synthjson::fromJson(item["synth"], settings, error)) return false;
+            candidate.setTrackSynth(track.id, settings);
         }
         if (item.contains("piano")) {
             piano::Settings settings;

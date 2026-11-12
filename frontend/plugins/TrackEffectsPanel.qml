@@ -28,6 +28,7 @@ Window {
     readonly property bool supportsElectroDrums: panelBridge.supportsElectroDrums
     readonly property bool supportsPiano: panelBridge.supportsPiano
     readonly property bool supportsChords: panelBridge.supportsChords
+    readonly property bool supportsSynth: panelBridge.supportsSynth
     // What "+ Add FX" offers; re-read whenever the chain changes.
     readonly property var addableEffects: (root.effects, root.trackModel && root.trackId >= 0
                                            ? root.trackModel.addableEffects(root.trackId) : [])
@@ -360,7 +361,8 @@ Window {
                             : root.selectedEffect === "chords" ? 7
                             : root.selectedEffect === "denoise" ? 9
                             : root.selectedEffect === "pitchmonitor" ? 10
-                            : root.trackModel && root.trackModel.isMixEffect(root.selectedEffect) ? 8 : 11
+                            : root.selectedEffect === "synth" ? 11
+                            : root.trackModel && root.trackModel.isMixEffect(root.selectedEffect) ? 8 : 12
                 Tenbandeq {
                     trackModel: root.trackModel
                     trackId: root.trackId
@@ -461,6 +463,15 @@ Window {
                     trackId: root.trackId
                     trackName: root.trackName
                     active: root.visible && root.selectedEffect === "pitchmonitor"
+                }
+                Loader {
+                    active: root.supportsSynth
+                    sourceComponent: SynthEditor {
+                        objectName: "trackSynth" + root.trackId
+                        trackModel: root.trackModel
+                        trackId: root.trackId
+                        trackName: root.trackName
+                    }
                 }
                 Item {
                     Text {

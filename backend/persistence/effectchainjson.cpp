@@ -5,6 +5,7 @@
 #include "drumkitjson.h"
 #include "electrodrumsjson.h"
 #include "harmoniumjson.h"
+#include "synthjson.h"
 #include "mixfxjson.h"
 #include "pianojson.h"
 #include "plugins/effectchain.h"
@@ -96,6 +97,8 @@ ChainFile capture(const Track& track, const json& guitarSuite)
             e.settings = pianojson::toJson(track.piano);
         } else if (slot.type == effectchain::Chords) {
             e.settings = chordsjson::toJson(track.chords);
+        } else if (slot.type == effectchain::Synth) {
+            e.settings = synthjson::toJson(track.synth);
         } else if (slot.type == effectchain::GuitarSuite) {
             e.settings = guitarSuite.is_object() ? guitarSuite : json::object();
         }
@@ -166,6 +169,10 @@ bool planImport(const Track& target, const ChainFile& chain, ImportPlan& plan, s
             chords::Settings v;
             if (!chordsjson::fromJson(s, v, why)) return bad(why);
             p.chords = v;
+        } else if (e.type == effectchain::Synth) {
+            synth::Settings v;
+            if (!synthjson::fromJson(s, v, why)) return bad(why);
+            p.synth = v;
         } else if (e.type == effectchain::GuitarSuite) {
             if (!s.empty()) p.guitarSuite = s;               // the pedalboard checks itself on load
         }
