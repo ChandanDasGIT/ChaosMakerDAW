@@ -1362,6 +1362,32 @@ private slots:
             QVERIFY(box.contains(r));
         }
     }
+    // The device line at the top bar's far right (like Reaper's) opens Preferences; the
+    // transport bar's BPM ... KEYS group sits at its far right.
+    void top_bar_device_line_opens_preferences_and_tempo_group_sits_right() {
+        auto* controller=EngineController::instance();
+        auto* top=window->findChild<QQuickItem*>("testTopBar"); QVERIFY(top);
+        auto* line=visualItem(top,"deviceSummaryButton"); QVERIFY(line); QVERIFY(line->isVisible());
+        auto* text=visualItem(top,"deviceSummaryText"); QVERIFY(text);
+        QCOMPARE(text->property("text").toString(),"["+controller->deviceSummaryText()+"]");
+        QVERIFY(!controller->deviceSummaryText().isEmpty());
+        // Far right: its right edge sits at the bar's right margin, past the Settings button.
+        const double right=line->mapToItem(top,QPointF(line->width(),0)).x();
+        QVERIFY(std::abs(right-(top->width()-10))<1.5);
+        auto* settings=visualItem(top,"settingsButton"); QVERIFY(settings);
+        QVERIFY(line->mapToItem(top,QPointF(0,0)).x()>settings->mapToItem(top,QPointF(settings->width(),0)).x());
+        click(line);
+        auto* popup=window->findChild<QObject*>("preferencesPopup"); QVERIFY(popup);
+        QTRY_VERIFY(popup->property("visible").toBool());
+        QMetaObject::invokeMethod(popup,"close"); QTRY_VERIFY(!popup->property("visible").toBool());
+
+        auto* bar=window->findChild<QQuickItem*>("transport"); QVERIFY(bar);
+        auto* tempo=visualItem(bar,"transportTempoGroup"); QVERIFY(tempo);
+        auto* keys=visualItem(bar,"typingKeyboardButton"); QVERIFY(keys);
+        QVERIFY(std::abs(keys->mapToItem(bar,QPointF(keys->width(),0)).x()-(bar->width()-10))<1.5);
+        // BPM starts in the right half (it sat right after the playback buttons before).
+        QVERIFY(tempo->mapToItem(bar,QPointF(0,0)).x()>bar->width()/2);
+    }
     void startup_setting_saves_and_restores_session_stopped() {
         auto* controller=EngineController::instance();
         controller->setRestoreSessionOnStartup(false);
@@ -2751,6 +2777,20 @@ private slots:
         click(visualItem(window->contentItem(),"chaosEqSolo")); QTRY_VERIFY(chaos().bands[0].solo);
         click(visualItem(window->contentItem(),"chaosEqSolo")); QTRY_VERIFY(!chaos().bands[0].solo);
         click(visualItem(window->contentItem(),"chaosEqAutoGain")); QTRY_VERIFY(chaos().autoGain);
+        // Right-click the node: its shape menu, Bell ticked; Low cut changes the band (and the Shape box).
+        const double qBeforeMenu=chaos().bands[0].filter.q;
+        QTest::mouseClick(fxWindow(),Qt::RightButton,Qt::NoModifier,node->mapToScene(QPointF(node->width()/2,node->height()/2)).toPoint());
+        auto* bellItem=visualItem(window->contentItem(),"chaosEqNodeShape_bell"); QVERIFY(bellItem);
+        QTRY_VERIFY(bellItem->isVisible()); QVERIFY(bellItem->property("checked").toBool());
+        auto* lowCutItem=visualItem(window->contentItem(),"chaosEqNodeShape_lowCut"); QVERIFY(lowCutItem);
+        QVERIFY(!lowCutItem->property("checked").toBool());
+        QCOMPARE(chaos().bands[0].filter.q,qBeforeMenu);   // the right button did not drag or scroll
+        QTest::qWait(300);   // let the menu finish opening: a click straight away is sometimes lost
+        click(lowCutItem);
+        QTRY_COMPARE(int(chaos().bands[0].filter.shape),int(eqband::Shape::LowCut));
+        QTRY_VERIFY(!lowCutItem->isVisible());
+        auto* shapeBox=visualItem(window->contentItem(),"chaosEqShape"); QVERIFY(shapeBox);
+        QTRY_COMPARE(shapeBox->property("currentValue").toString(),QString("lowCut"));
         QVERIFY(window->grabWindow().save("/tmp/chaosmaker-chaos-eq.png"));
         // Select the node and press Delete: the band goes away.
         click(node); QTest::keyClick(fxWindow(),Qt::Key_Delete);
@@ -4290,48 +4330,51 @@ private slots:
         QTRY_VERIFY(envelope.shown());
         auto* lane=visualItem(timeline,"volumeEnvelope"+QString::number(a)); QVERIFY(lane); QVERIFY(lane->isVisible());
         QCOMPARE(lane->y(),38.0+64);
-        QCOMPARE(lane->height(),72.0);
-        QTRY_COMPARE(block->y(),38.0+64+72+2);
+        QCOMPARE(lane->height(),64.0);
+        QTRY_COMPARE(block->y(),38.0+64+64+2);
         // The new lane starts with one point at the start, on the 0 dB line.
         QCOMPARE(envelope.points().size(),std::size_t(1));
         QCOMPARE(envelope.points()[0].position,qint64(0));
         auto* startPoint=visualItem(timeline,"envelopePoint"+QString::number(a)+"_0"); QVERIFY(startPoint);
         QCOMPARE(startPoint->x()+startPoint->width()/2,0.0);
-        QVERIFY(std::abs(startPoint->y()+startPoint->height()/2-(1-tracks.envelopeUnityLevel())*72)<0.5);
+        QVERIFY(std::abs(startPoint->y()+startPoint->height()/2-(1-tracks.envelopeUnityLevel())*64)<0.5);
         QCOMPARE(tracks.canUndo(),undoBeforeV); QCOMPARE(tracks.canRedo(),redoBeforeV);   // no undo step of its own
 
-        // Double-click: a point at the mouse (2 beats in, half way up the lane).
+        // Double-click well below the line: a point at that time (2 beats in), but ON the line
+        // (0 dB here), not at the mouse's height; the line keeps its shape.
         const double beatWidth=timeline->property("beatWidth").toDouble();
         auto* area=visualItem(timeline,"envelopeArea"+QString::number(a)); QVERIFY(area);
-        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,area->mapToScene(QPointF(2*beatWidth,36)).toPoint());
+        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,area->mapToScene(QPointF(2*beatWidth,50)).toPoint());
         QTRY_COMPARE(envelope.points().size(),std::size_t(2));
         QVERIFY(std::abs(envelope.points()[1].position-48000)<=600);
-        QVERIFY(std::abs(envelope.points()[1].level-0.5)<0.03);
+        QVERIFY(std::abs(envelope.points()[1].level-tracks.envelopeUnityLevel())<1e-6);
 
-        // Drag it right and up: one undo step.
+        // Drag it right and down: one undo step.
         auto* point=visualItem(timeline,"envelopePoint"+QString::number(a)+"_1"); QVERIFY(point);
         const QPoint from=point->mapToScene(QPointF(point->width()/2,point->height()/2)).toPoint();
-        const QPoint to=from+QPoint(int(beatWidth),-18);
+        const QPoint to=from+QPoint(int(beatWidth),16);
         QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,from);
-        QTest::mouseMove(window,from+QPoint(int(beatWidth)/2,-9));
+        QTest::mouseMove(window,from+QPoint(int(beatWidth)/2,8));
         QTest::mouseMove(window,to);
         QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,to);
         QVERIFY(std::abs(envelope.points()[1].position-72000)<=1200);
-        QVERIFY(std::abs(envelope.points()[1].level-0.75)<0.03);
+        QVERIFY(std::abs(envelope.points()[1].level-(tracks.envelopeUnityLevel()-0.25))<0.03);
         QVERIFY(tracks.undo());
         QVERIFY(std::abs(envelope.points()[1].position-48000)<=600);
         QVERIFY(tracks.redo());
 
-        // Right-click a point: deleted (undoable).
+        // Ctrl+click a point: deleted (undoable), not moved.
         point=visualItem(timeline,"envelopePoint"+QString::number(a)+"_1"); QVERIFY(point);
-        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,point->mapToScene(QPointF(point->width()/2,point->height()/2)).toPoint());
+        const qint64 beforeCtrl=envelope.points()[1].position;
+        QTest::mouseClick(window,Qt::LeftButton,Qt::ControlModifier,point->mapToScene(QPointF(point->width()/2,point->height()/2)).toPoint());
         QTRY_COMPARE(envelope.points().size(),std::size_t(1));
         QVERIFY(tracks.undo()); QCOMPARE(envelope.points().size(),std::size_t(2));
+        QCOMPARE(envelope.points()[1].position,beforeCtrl);
 
-        // Shift+right-click a point: its curve shape menu (restMap G6b).
+        // Right-click a point: its curve shape menu (restMap G6b), not a delete.
         point=visualItem(timeline,"envelopePoint"+QString::number(a)+"_0"); QVERIFY(point);
         const QPoint startCentre=point->mapToScene(QPointF(point->width()/2,point->height()/2)).toPoint();
-        QTest::mouseClick(window,Qt::RightButton,Qt::ShiftModifier,startCentre);
+        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,startCentre);
         QCOMPARE(envelope.points().size(),std::size_t(2));   // not deleted
         auto* linear=visualItem(window->contentItem(),"envelopeShape_linear"); QVERIFY(linear);
         QTRY_VERIFY(linear->isVisible());
@@ -4342,7 +4385,7 @@ private slots:
         click(smooth);
         QTRY_VERIFY(envelope.points()[0].shape==automation::CurveShape::Smooth);
         QTRY_VERIFY(!linear->isVisible());
-        QTest::mouseClick(window,Qt::RightButton,Qt::ShiftModifier,startCentre);
+        QTest::mouseClick(window,Qt::RightButton,Qt::ShiftModifier,startCentre);   // Shift+right-click still opens it
         QTRY_VERIFY(smooth->isVisible());
         QVERIFY(smooth->property("checked").toBool()); QVERIFY(!linear->property("checked").toBool());
         QTest::keyClick(window,Qt::Key_Escape); QTRY_VERIFY(!smooth->isVisible());
@@ -4350,7 +4393,7 @@ private slots:
         QVERIFY(tracks.redo());
         // The last point has no curve after it: shapes greyed out; Delete point works.
         point=visualItem(timeline,"envelopePoint"+QString::number(a)+"_1"); QVERIFY(point);
-        QTest::mouseClick(window,Qt::RightButton,Qt::ShiftModifier,point->mapToScene(QPointF(point->width()/2,point->height()/2)).toPoint());
+        QTest::mouseClick(window,Qt::RightButton,Qt::NoModifier,point->mapToScene(QPointF(point->width()/2,point->height()/2)).toPoint());
         QTRY_VERIFY(smooth->isVisible()); QVERIFY(!smooth->isEnabled());
         auto* deletePoint=visualItem(window->contentItem(),"envelopePointDeleteAction"); QVERIFY(deletePoint);
         QTest::qWait(300);   // let the menu finish opening: a click straight away is sometimes lost
@@ -4378,9 +4421,9 @@ private slots:
         trackList->setProperty("trackModel",QVariant::fromValue(&tracks)); trackList->setVisible(true);
         QTest::qWait(20);
         auto* header=visualItem(trackList,"envelopeLaneHeader"+QString::number(a)); QVERIFY(header);
-        QVERIFY(header->isVisible()); QCOMPARE(header->height(),72.0);
+        QVERIFY(header->isVisible()); QCOMPARE(header->height(),64.0);
         auto* card=visualItem(trackList,"trackColourAccent"+QString::number(b)); QVERIFY(card);
-        QCOMPARE(card->parentItem()->y(),64.0+72);
+        QCOMPARE(card->parentItem()->y(),64.0+64);
         auto* bypassChip=visualItem(trackList,"envelopeBypassButton"+QString::number(a)); QVERIFY(bypassChip);
         click(bypassChip); QTRY_VERIFY(envelope.bypassed());
         QVERIFY(tracks.toggleEnvelopeShown(a));
@@ -4437,10 +4480,10 @@ private slots:
         QTRY_VERIFY(v->property("active").toBool());
         trackList->setVisible(false); timeline->setVisible(true); QTest::qWait(20);
         auto* lane=visualItem(timeline,"volumeEnvelope"+QString::number(a)); QVERIFY(lane);
-        QTRY_COMPARE(lane->height(),72.0);
+        QTRY_COMPARE(lane->height(),64.0);
 
-        // The lane's bottom edge: 30 px taller; the rows below follow.
-        drag(visualItem(timeline,"envelopeResizeHandle"+QString::number(a)),30);
+        // The lane's bottom edge: 38 px taller (64 to 102); the rows below follow.
+        drag(visualItem(timeline,"envelopeResizeHandle"+QString::number(a)),38);
         QTRY_COMPARE(tracks.project().findTrack(a)->envelopeHeight,102.0f);
         QTRY_COMPARE(lane->height(),102.0);
         QCOMPARE(blockB->y(),38.0+64+102+2);
@@ -4460,10 +4503,28 @@ private slots:
         QCOMPARE(cardB->y(),84.0+102);
         // A taller card keeps its controls at the top, as in a 64 px row.
         QVERIFY(visualItem(trackList,"trackVolume"+QString::number(a))->mapToItem(cardA,QPointF(0,0)).y()<64);
+        // The same edges in the track list: the card 16 px taller, the Volume header 22 px shorter.
+        drag(visualItem(trackList,"trackListResizeHandle"+QString::number(a)),16);
+        QTRY_COMPARE(tracks.project().findTrack(a)->rowHeight,100.0f);
+        QTRY_COMPARE(cardA->height(),100.0);
+        QTRY_COMPARE(header->y(),100.0);
+        QCOMPARE(cardB->y(),100.0+102);
+        drag(visualItem(trackList,"trackListEnvelopeResizeHandle"+QString::number(a)),-22);
+        QTRY_COMPARE(tracks.project().findTrack(a)->envelopeHeight,80.0f);
+        QTRY_COMPARE(header->height(),80.0);
+        QTRY_COMPARE(cardB->y(),100.0+80);
+        // Far up: the card stops at 64 px; the timeline rows follow.
+        drag(visualItem(trackList,"trackListResizeHandle"+QString::number(a)),-200);
+        QTRY_COMPARE(tracks.project().findTrack(a)->rowHeight,64.0f);
+        QTRY_COMPARE(cardB->y(),64.0+80);
+        trackList->setVisible(false); timeline->setVisible(true); QTest::qWait(20);
+        QTRY_COMPARE(lane->y(),38.0+64); QTRY_COMPARE(lane->height(),80.0);
+        QCOMPARE(blockB->y(),38.0+64+80+2);
+        timeline->setVisible(false); trackList->setVisible(true); QTest::qWait(20);
         // V again hides the lane.
         click(v);
         QTRY_VERIFY(!tracks.project().findTrack(a)->volumeEnvelope.shown());
-        QTRY_COMPARE(cardB->y(),84.0);
+        QTRY_COMPARE(cardB->y(),64.0);
         QCOMPARE(tracks.canUndo(),couldUndo);   // view state: no undo steps
     }
     void undo_redo_buttons_restore_deleted_clips() {

@@ -79,6 +79,9 @@ class EngineController : public AudioEngineWrapper {
     Q_PROPERTY(int xrunCount READ xrunCount NOTIFY audioInfoChanged)
     Q_PROPERTY(QString xrunText READ xrunText NOTIFY audioInfoChanged)
     Q_PROPERTY(QString xrunTooltip READ xrunTooltip NOTIFY audioInfoChanged)
+    // The top bar's device line, like Reaper's (click opens the audio settings).
+    Q_PROPERTY(QString deviceSummaryText READ deviceSummaryText NOTIFY audioInfoChanged)
+    Q_PROPERTY(QString deviceSummaryTooltip READ deviceSummaryTooltip NOTIFY audioInfoChanged)
     Q_PROPERTY(QStringList inputPorts READ inputPorts CONSTANT)
     Q_PROPERTY(QStringList inputDevices READ inputDevices NOTIFY inputDevicesChanged)
     Q_PROPERTY(QStringList outputDevices READ outputDevices NOTIFY outputDevicesChanged)
@@ -206,6 +209,8 @@ public:
     int xrunCount() const;
     QString xrunText() const;
     QString xrunTooltip() const;
+    QString deviceSummaryText() const;
+    QString deviceSummaryTooltip() const;
     Q_INVOKABLE void resetXruns();
     QStringList inputPorts() const { return m_inputPorts; }
     QStringList inputDevices() const { return m_inputDevices; }
@@ -333,6 +338,9 @@ private:
     // Last values sent to QML by refreshAudioInfo().
     double m_infoRate = 0.0;
     int m_infoFrames = 0;
+    int m_infoCapture = 0;
+    int m_infoPlayback = 0;
+    int m_infoRoundTrip = 0;
     std::uint64_t m_infoXruns = 0;
     GuitarSuiteModel* m_guitarSuite = nullptr;
     QTimer m_snapshotTimer;

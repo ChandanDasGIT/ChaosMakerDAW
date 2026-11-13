@@ -9,7 +9,7 @@ namespace trackheight {
 inline constexpr double defaultTrack = 64.0;
 inline constexpr double minTrack = defaultTrack;
 inline constexpr double maxTrack = 400.0;
-inline constexpr double defaultEnvelope = 72.0;
+inline constexpr double defaultEnvelope = 64.0;
 inline constexpr double minEnvelope = 40.0;
 inline constexpr double maxEnvelope = 400.0;
 // Nonfinite values give the default.
@@ -32,7 +32,7 @@ public:
         bool operator==(const Row&) const = default;
     };
     // trackHeight: a track's own part; envelopeHeight: an envelope lane under it.
-    explicit TrackLayout(double trackHeight = 64.0, double envelopeHeight = 72.0);
+    explicit TrackLayout(double trackHeight = trackheight::defaultTrack, double envelopeHeight = trackheight::defaultEnvelope);
     // One flag per row, in row order: true when the row shows its envelope lane under it.
     void setRows(std::vector<bool> envelopeLanes);
     void setRowSpecs(std::vector<Row> rows);

@@ -70,7 +70,7 @@ TEST(qtvolumeenvelope, showing_a_lane_changes_the_row_layout_but_not_the_undo_hi
     const int a = tracks.addAudioTrack(), b = tracks.addAudioTrack();
     // Each track has its own height (restMap U9); 106 for both here.
     CHECK(tracks.setTrackHeight(a, 106) && tracks.setTrackHeight(b, 106));
-    tracks.setEnvelopeLaneHeight(72);
+    tracks.setEnvelopeLaneHeight(64);
     CHECK(tracks.layoutHeight() == 212);
     const bool couldUndo = tracks.canUndo();
 
@@ -79,8 +79,8 @@ TEST(qtvolumeenvelope, showing_a_lane_changes_the_row_layout_but_not_the_undo_hi
     CHECK(tracks.toggleEnvelopeShown(a));
     CHECK(role(tracks, 0, TrackListWrapper::EnvelopeShownRole).toBool());
     CHECK(layout == 1);
-    CHECK(tracks.layoutHeight() == 284);
-    CHECK(tracks.rowTops()[1].toDouble() == 178);
+    CHECK(tracks.layoutHeight() == 276);
+    CHECK(tracks.rowTops()[1].toDouble() == 170);
     CHECK(tracks.rowAtY(150) == 0 && tracks.inEnvelopeLane(150));
     CHECK(tracks.rowAtY(180) == 1 && !tracks.inEnvelopeLane(180));
     CHECK_NEAR(tracks.rowCoordinate(150), 1.0, 1e-12);
@@ -95,11 +95,11 @@ TEST(qtvolumeenvelope, showing_a_lane_changes_the_row_layout_but_not_the_undo_hi
     CHECK(tracks.setEnvelopeOverClips(a, true));
     CHECK(tracks.layoutHeight() == 212);
     CHECK(tracks.setEnvelopeOverClips(a, false));
-    CHECK(tracks.layoutHeight() == 284);
+    CHECK(tracks.layoutHeight() == 276);
 
     // The lane goes with its track when rows move.
     CHECK(tracks.moveTrack(a, 1));
-    CHECK(tracks.rowTops()[1].toDouble() == 106 && tracks.layoutHeight() == 284);
+    CHECK(tracks.rowTops()[1].toDouble() == 106 && tracks.layoutHeight() == 276);
     CHECK(tracks.trackIdAt(0) == b);
 
     CHECK(tracks.toggleEnvelopeShown(a));
@@ -131,7 +131,7 @@ TEST(qtvolumeenvelope, each_track_and_its_lane_have_their_own_height)
 
     // The lane: shown under b, at b's own lane height.
     CHECK(tracks.toggleEnvelopeShown(b));
-    CHECK(tracks.layoutHeight() == 64 + 64 + 72);
+    CHECK(tracks.layoutHeight() == 64 + 64 + 64);
     CHECK(tracks.setTrackEnvelopeHeight(b, 120));
     CHECK(role(tracks, 1, TrackListWrapper::EnvelopeHeightRole).toDouble() == 120);
     CHECK(tracks.envelopeHeights()[1].toDouble() == 120);

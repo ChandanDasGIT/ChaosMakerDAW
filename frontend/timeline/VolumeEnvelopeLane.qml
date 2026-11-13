@@ -17,7 +17,7 @@ Item {
     property real viewWidth: 0
     property int selectedPoint: -1
     signal menuRequested(int trackId, real x, real y)
-    // Shift+right-click on a point: its curve shape menu (scene coordinates).
+    // Right-click on a point: its curve shape menu (scene coordinates).
     signal pointMenuRequested(int index, real x, real y)
 
     readonly property real unityLevel: trackModel ? trackModel.envelopeUnityLevel : 0.8
@@ -88,7 +88,7 @@ Item {
         }
     }
 
-    // Background: double-click adds a point at the mouse, right-click opens the menu.
+    // Background: double-click adds a point on the line at the mouse's time, right-click opens the menu.
     MouseArea {
         id: background
         objectName: "envelopeArea" + lane.envelopeTrackId
@@ -109,7 +109,9 @@ Item {
         }
         onDoubleClicked: mouse => {
             if (mouse.button !== Qt.LeftButton || !lane.trackModel) return
-            const index = lane.trackModel.addEnvelopePoint(lane.envelopeTrackId, mouse.x / lane.beatWidth, lane.levelForY(mouse.y))
+            // On the line at that time (its current level), not at the mouse's height: the
+            // line keeps its shape; drag the point to change it.
+            const index = lane.trackModel.addEnvelopePoint(lane.envelopeTrackId, mouse.x / lane.beatWidth, lane.levelAtX(mouse.x))
             if (index >= 0) lane.selectedPoint = index
         }
     }
@@ -143,7 +145,8 @@ Item {
                 onPressed: mouse => {
                     if (lane.trackModel) lane.trackModel.selectTrack(lane.envelopeTrackId)
                     lane.selectedPoint = pointItem.index
-                    if (mouse.button !== Qt.LeftButton) return
+                    // Ctrl+click deletes (in onClicked): no drag.
+                    if (mouse.button !== Qt.LeftButton || (mouse.modifiers & Qt.ControlModifier)) return
                     const centre = mapToItem(lane, mouse.x, mouse.y)
                     grabX = centre.x - pointItem.modelData.beat * lane.beatWidth
                     grabY = centre.y - lane.yForLevel(pointItem.modelData.level)
@@ -158,14 +161,15 @@ Item {
                 }
                 onReleased: dragging = false
                 onCanceled: dragging = false
-                // Right-click a point: delete it. Shift+right-click: its curve shape menu.
+                // Right-click a point (with or without Shift): its curve shape menu.
+                // Ctrl+click: delete it.
                 onClicked: mouse => {
-                    if (mouse.button === Qt.RightButton && (mouse.modifiers & Qt.ShiftModifier)) {
+                    if (mouse.button === Qt.RightButton) {
                         const at = mapToItem(null, mouse.x, mouse.y)
                         lane.pointMenuRequested(pointItem.index, at.x, at.y)
                         return
                     }
-                    if (mouse.button === Qt.RightButton && lane.trackModel) {
+                    if (mouse.button === Qt.LeftButton && (mouse.modifiers & Qt.ControlModifier) && lane.trackModel) {
                         // This delegate goes away during the removal: nothing after it here.
                         const owner = lane, point = pointItem.index
                         owner.selectedPoint = -1

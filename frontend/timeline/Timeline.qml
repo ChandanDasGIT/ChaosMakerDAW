@@ -183,7 +183,7 @@ Item {
     readonly property int clipBottom: 3
     readonly property int clipHeight: laneHeight - clipTop - clipBottom
     readonly property int clipBarHeight: 16
-    property int envelopeLaneHeight: 72   // a volume lane under its track (restMap G6)
+    property int envelopeLaneHeight: 64   // a volume lane under its track (restMap G6)
     property int rulerHeight: 38
     // Rows can be taller than laneHeight when a volume lane is shown under the track; the
     // backend's row layout (TrackLayout via the track model) says where every row is.
@@ -454,7 +454,7 @@ Item {
             }
         }
     }
-    // Shift+right-click on an envelope point: the curve from it to the next point (restMap G6b).
+    // Right-click on an envelope point: the curve from it to the next point (restMap G6b).
     // The last point has no curve after it, so its shapes are greyed out.
     ThemedMenu {
         id: envelopePointMenu

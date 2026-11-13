@@ -7,9 +7,40 @@ import QtQuick.Layouts
 // ChaosEqWrapper.
 //
 // On the curve: double-click to add a band, drag a node to move it, scroll on a node to
-// change its Q, double-click a node to bypass it, Delete removes the selected band.
+// change its Q, double-click a node to bypass it, right-click a node for its shape, Delete
+// removes the selected band.
 Item {
     id: root
+
+    // Right-click on a band node: its shape, the same choice as the Shape box.
+    ThemedMenu {
+        id: nodeShapeMenu
+        objectName: "chaosEqNodeShapeMenu"
+        parent: root
+        popupType: Popup.Item
+        width: 160
+        z: 20
+        property int slot: -1
+        readonly property var band: slot >= 0 ? (root.bandBySlot[slot] ?? null) : null
+        Instantiator {
+            model: bridge.shapes
+            delegate: ThemedMenuItem {
+                required property var modelData
+                function current() { return !!nodeShapeMenu.band && nodeShapeMenu.band.shape === modelData.id }
+                objectName: "chaosEqNodeShape_" + modelData.id
+                text: modelData.title
+                checkable: true
+                checked: current()
+                // A click toggles "checked" itself: put the binding back after choosing.
+                onTriggered: {
+                    if (nodeShapeMenu.band) bridge.setBand(nodeShapeMenu.slot, { shape: modelData.id })
+                    checked = Qt.binding(current)
+                }
+            }
+            onObjectAdded: (index, object) => nodeShapeMenu.insertItem(index, object)
+            onObjectRemoved: (index, object) => nodeShapeMenu.removeItem(object)
+        }
+    }
     property var trackModel
     property int trackId: -1
     property string trackName: ""
@@ -331,21 +362,31 @@ Item {
                                 anchors.margins: -4
                                 hoverEnabled: true
                                 cursorShape: Qt.SizeAllCursor
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
                                 property point grab: Qt.point(0, 0)   // where in the node it was grabbed
                                 onPressed: mouse => {
                                     root.selectedSlot = node.index
                                     plot.forceActiveFocus()
                                     grab = Qt.point(mouse.x - width / 2, mouse.y - height / 2)
                                 }
+                                // Right-click: the band's shape menu.
+                                onClicked: mouse => {
+                                    if (mouse.button !== Qt.RightButton || !node.band) return
+                                    const at = mapToItem(root, mouse.x, mouse.y)
+                                    nodeShapeMenu.slot = node.index
+                                    nodeShapeMenu.popup(at.x, at.y)
+                                }
                                 onPositionChanged: mouse => {
-                                    if (!pressed || !node.band) return
+                                    if (!pressed || !(pressedButtons & Qt.LeftButton) || !node.band) return
                                     const p = mapToItem(plot, mouse.x - grab.x, mouse.y - grab.y)
                                     const changes = { frequency: plot.hzOf(p.x) }
                                     if (node.band.usesGain)
                                         changes.gain = Math.max(bridge.minGain, Math.min(bridge.maxGain, plot.dbOf(p.y)))
                                     bridge.setBand(node.index, changes)
                                 }
-                                onDoubleClicked: if (node.band) bridge.setBand(node.index, { bypass: !node.band.bypass })
+                                onDoubleClicked: mouse => {
+                                    if (mouse.button === Qt.LeftButton && node.band) bridge.setBand(node.index, { bypass: !node.band.bypass })
+                                }
                                 onWheel: wheel => {
                                     if (!node.band) return
                                     bridge.setBand(node.index, { q: node.band.q * Math.pow(1.1, wheel.angleDelta.y / 120) })

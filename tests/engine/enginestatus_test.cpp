@@ -27,6 +27,23 @@ TEST(enginestatus, sample_rate_buffer_and_xrun_readouts)
     CHECK(enginestatus::xrunTooltip(3).find("click to reset") != std::string::npos);
 }
 
+TEST(enginestatus, device_summary_reads_like_reapers_top_bar_line)
+{
+    CHECK(enginestatus::deviceSummary(48000.0, 128, 128, 128, "JACK")
+          == "48 kHz \xc2\xb7 128 smp \xc2\xb7 ~2.7/2.7 ms \xc2\xb7 JACK");
+    CHECK(enginestatus::deviceSummary(44100.0, 512, 512, 1024, "")
+          == "44.1 kHz \xc2\xb7 512 smp \xc2\xb7 ~11.6/23.2 ms");
+    CHECK(enginestatus::deviceSummary(0.0, 128, 128, 128, "JACK") == "Audio device closed");
+    CHECK(enginestatus::deviceSummary(48000.0, 0, 0, 0, "JACK") == "Audio device closed");
+
+    CHECK(enginestatus::deviceSummaryTooltip(48000.0, 128, 128, 128, 0)
+          == "Sample rate 48 kHz \xc2\xb7 buffer 128 frames \xc2\xb7 input latency 2.67 ms, output latency 2.67 ms"
+             " \xc2\xb7 click for audio settings");
+    CHECK(enginestatus::deviceSummaryTooltip(48000.0, 128, 128, 128, 480).find("hardware round trip 10.00 ms")
+          != std::string::npos);
+    CHECK(enginestatus::deviceSummaryTooltip(0.0, 0, 0, 0, 0) == "Audio device closed \xc2\xb7 click for audio settings");
+}
+
 TEST(enginestatus, engine_counts_xruns_from_the_device_and_resets)
 {
     AudioEngine engine(nullptr);

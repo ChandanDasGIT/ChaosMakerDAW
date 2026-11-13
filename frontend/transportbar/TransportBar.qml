@@ -62,8 +62,10 @@ Rectangle {
             keyShift: root.trackModel ? root.trackModel.selectedKeyShift : 0
             onVisibleChanged: if (!visible) typingKeys.enabled = false
         }
-        // Tempo, time signature and the metronome sit right after the readout; KEYS follows.
+        // Tempo, time signature, quick settings and KEYS sit at the far right.
+        Item { Layout.fillWidth: true }
         RowLayout {
+            objectName: "transportTempoGroup"
             spacing: 6
             Layout.leftMargin: 10
             enabled: !(root.transport && root.transport.countingIn)
@@ -131,8 +133,6 @@ Rectangle {
                     : "Play instruments from the on-screen piano and the computer keyboard"
             }
         }
-
-        Item { Layout.fillWidth: true }
     }
 
     // Shift+T taps the tempo (plain T plays a note when the typing keyboard is on).

@@ -321,7 +321,7 @@ TEST(projectdocument, timeline_heights_are_optional_and_validated)
     std::string error;
     CHECK(ProjectDocument::deserialize(document(""), loaded, error, 48000.0));   // older files: defaults
     CHECK(loaded.project.tracks()[0]->rowHeight == 64.0f);
-    CHECK(loaded.project.tracks()[0]->envelopeHeight == 72.0f);
+    CHECK(loaded.project.tracks()[0]->envelopeHeight == 64.0f);
     CHECK(ProjectDocument::deserialize(document(R"(,"rowHeight":200,"envelopeHeight":40)"), loaded, error, 48000.0));
     CHECK(loaded.project.tracks()[0]->rowHeight == 200.0f);
     CHECK(loaded.project.tracks()[0]->envelopeHeight == 40.0f);

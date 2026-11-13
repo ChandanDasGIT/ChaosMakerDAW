@@ -84,5 +84,32 @@ Rectangle {
             onTogglePianoRollRequested: root.togglePianoRollRequested()
         }
         Item { Layout.fillWidth: true }
+
+        // The audio device line at the far right, like Reaper's; click for the audio settings.
+        ToolButton {
+            id: deviceSummary
+            objectName: "deviceSummaryButton"
+            implicitHeight: 30
+            leftPadding: 8
+            rightPadding: 8
+            Layout.maximumWidth: Math.max(80, root.width / 3)
+            onClicked: appSettings.openPreferences()
+            contentItem: Text {
+                objectName: "deviceSummaryText"
+                text: "[" + EngineController.deviceSummaryText + "]"
+                color: deviceSummary.hovered ? Theme.text : Theme.textMuted
+                font.pixelSize: Theme.smallSize
+                font.family: Theme.monospaceFontFamily
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideLeft
+            }
+            background: Rectangle {
+                radius: Theme.controlRadius
+                color: deviceSummary.down ? Theme.controlBgActive : deviceSummary.hovered ? Theme.controlBgHover : "transparent"
+            }
+            ToolTip.visible: hovered
+            ToolTip.delay: 450
+            ToolTip.text: EngineController.deviceSummaryTooltip
+        }
     }
 }

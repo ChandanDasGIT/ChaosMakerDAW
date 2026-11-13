@@ -51,7 +51,7 @@ NEXT UP (2026-11-12), the user's order, easiest first:
           Then (committed in 619c9f3): the four meters hold their place and size whatever they
           read; the "Preset file:" line is gone (the line shows only while the IR loads or on an
           error). Side effect the user accepted: a narrower INPUT TRIM slider at small widths.
- 12. U9   Resizable tracks and the V button: DONE 2026-11-13 (uncommitted).
+ 12. U9   Resizable tracks and the V button: DONE 2026-11-13 (committed in 11f113e).
           - Drag a track's bottom edge on the timeline (a 4 px strip in the gap under its clips)
             to change its height; drag the volume lane's bottom edge the same way. Track 64 px
             (the default is the least) to 400; lane 40 to 400, default 72. Per track, saved in
@@ -69,8 +69,42 @@ NEXT UP (2026-11-12), the user's order, easiest first:
             card; a V chip after FX shows / hides the volume lane (lit while shown).
           - The track list's least width went from 180 to 210 px so the button line (with V)
             still fits on one line.
-          Not tested: how the drag feels (the user's eye), resizing from the track list side
-          (not built: the user asked for the timeline).
+          Not tested: how the drag feels (the user's eye).
+          2026-11-14: the user meant the left track list too ("u got it wrong"): see U10; the
+          timeline edges stay as well (the user: keep both).
+ 13. U10  Top bar device line, transport layout, list-side resizing, point menus: DONE 2026-11-14
+          (uncommitted). The user's five steps, run together ("let's finish all the steps"):
+          - Device line at the top bar's far right, like Reaper's:
+            "[48 kHz · 128 smp · ~2.7/2.7 ms · JACK]" (input / output latency); "Audio device
+            closed" without a device. Tooltip spells it out, with the hardware round trip when
+            JACK reports one. Click: Preferences (Audio & MIDI). No bit depth / file format /
+            channel count as in Reaper: the engine does not have them, so nothing is made up.
+            Backend enginestatus::deviceSummary / deviceSummaryTooltip; EngineController
+            deviceSummaryText / deviceSummaryTooltip; TopBar.qml; AppSettings.openPreferences().
+          - Transport bar: BPM, SIG, quick settings and KEYS moved to the far right (the spacer
+            now sits after the playback buttons).
+          - Track list: a 4 px drag strip on each card's bottom edge and each Volume header's
+            (same setters and limits as the timeline's edges, which stay).
+          - Volume envelope points: Ctrl+click deletes; right-click opens the curve shape menu
+            (Linear / Smooth / Fast start / Fast end / Hold, plus Delete point); Shift+right-click
+            still opens it too. Bell / low cut / high cut were asked for as well: told the user
+            plainly those are EQ filter shapes and mean nothing on a volume envelope.
+          - Chaos EQ: right-click a band node for its shape menu (all eight shapes, the current
+            one ticked), the same choice as the Shape box. Ctrl+click delete NOT added there
+            (not asked).
+          Tests: backendtests enginestatus device_summary_reads_like_reapers_top_bar_line;
+          transport_ui top_bar_device_line_opens_preferences_and_tempo_group_sits_right, and
+          volume_envelope_lane_edits_points_bypasses_and_keeps_rows_aligned,
+          tracks_and_volume_lanes_resize_by_dragging_their_bottom_edge,
+          chaos_eq_adds_drags_edits_and_removes_bands_on_the_curve extended.
+          Not tested: how the drags and menus feel (the user's eye).
+          Same day, after: the Volume lane's default height went from 72 to 64 px (the user:
+          "a bit less, just slight"; trackheight::defaultEnvelope, Track::envelopeHeight,
+          Timeline.qml); saved projects keep their lanes' heights. Double-click on the lane now
+          adds the point ON the line at that time (its current level), not at the mouse's height,
+          so the line keeps its shape (the user did not want the point to "go to the cursor").
+          Taller tracks keep their buttons at the top at the same size (the user chose this,
+          option A, as in Reaper; scaling them was turned down).
   Everything the user chose to do later (G12 tempo / meter changes, C3b, C8, B1-B9 checks, F4,
   H1-H3 and the smaller "later" ideas L1-L6) is in docs/laterGator.txt.
   Done and committed up to 2026-11-12: G1-G11, G13-G18, C11, C3c's cache clean-up, R2, import /
@@ -162,7 +196,8 @@ Done items stay further down as the record.
 [x] G6b Envelope curve shapes (the user, 2026-11-10). DONE 2026-11-10 (uncommitted).
         Each point has the shape of the curve to the next point: Linear (default, new points),
         Smooth (S-curve), Fast start, Fast end, Hold (flat, then a jump at the next point); no
-        Bezier for now. Right-click a point still deletes it; Shift+right-click a point opens its
+        Bezier for now. (Changed 2026-11-14, U10: Ctrl+click deletes, right-click opens the
+        menu.) Right-click a point still deletes it; Shift+right-click a point opens its
         shape menu (current one ticked; greyed for the last point, which has no curve after it)
         with "Delete point".
         - automation::CurveShape, curveProgress (in level space, so the curve is what is heard),

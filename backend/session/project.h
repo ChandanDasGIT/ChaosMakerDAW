@@ -80,7 +80,7 @@ struct Track : EffectState {
     // Timeline heights in px (restMap U9): the track's own row and its volume envelope lane
     // (trackheight::defaultTrack / defaultEnvelope, clamped by trackheight::clampTrack / clampEnvelope).
     float rowHeight = 64.0f;
-    float envelopeHeight = 72.0f;
+    float envelopeHeight = 64.0f;
     // Harmonium tracks: stops, bellows, drones... (the harmonium instrument).
     harmonium::Settings harmonium;
     // Drums tracks: room, part levels, tuning, character (the acoustic drum kit).

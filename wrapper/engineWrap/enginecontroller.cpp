@@ -726,11 +726,29 @@ void EngineController::updateAudioStatus()
 void EngineController::refreshAudioInfo()
 {
     const double rate = m_audioReady && m_engine ? m_engine->sampleRate() : 0.0;
-    const int frames = m_audioReady && m_engine ? m_engine->latency().captureFrames : 0;
+    const DeviceLatency latency = m_audioReady && m_engine ? m_engine->latency() : DeviceLatency{};
+    const int frames = latency.captureFrames;
     const std::uint64_t xruns = m_engine ? m_engine->xrunCount() : 0;
-    if (rate == m_infoRate && frames == m_infoFrames && xruns == m_infoXruns) return;
+    if (rate == m_infoRate && frames == m_infoFrames && xruns == m_infoXruns
+        && latency.captureFrames == m_infoCapture && latency.playbackFrames == m_infoPlayback
+        && latency.roundTripFrames == m_infoRoundTrip) return;
     m_infoRate = rate; m_infoFrames = frames; m_infoXruns = xruns;
+    m_infoCapture = latency.captureFrames; m_infoPlayback = latency.playbackFrames;
+    m_infoRoundTrip = latency.roundTripFrames;
     emit audioInfoChanged();
+}
+
+QString EngineController::deviceSummaryText() const
+{
+    // The engine runs on JACK only (the status line says so too).
+    return QString::fromStdString(enginestatus::deviceSummary(m_infoRate, m_infoFrames, m_infoCapture,
+                                                              m_infoPlayback, "JACK"));
+}
+
+QString EngineController::deviceSummaryTooltip() const
+{
+    return QString::fromStdString(enginestatus::deviceSummaryTooltip(m_infoRate, m_infoFrames, m_infoCapture,
+                                                                     m_infoPlayback, m_infoRoundTrip));
 }
 
 QString EngineController::sampleRateText() const
