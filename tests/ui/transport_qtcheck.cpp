@@ -565,6 +565,41 @@ private slots:
             QCOMPARE(chip->property("pedalName").toString(),model->data(model->index(i),GuitarSuiteModel::PedalNameRole).toString());
         }
     }
+    // The four meters (Raw input, Pre-FX, Output L / R) never move or resize as their readings
+    // change; the status line under the board stays hidden with nothing loading and no error.
+    void guitar_meters_hold_their_place_whatever_they_read_and_the_status_line_hides() {
+        auto* board=window->findChild<QObject*>("guitarSuitePanel");QVERIFY(board);
+        QVERIFY(QMetaObject::invokeMethod(board,"open"));QTRY_VERIFY(board->property("visible").toBool());
+        auto* root=window->contentItem();
+        QList<QQuickItem*> meters;
+        for(int i=0;i<4;++i) { auto* m=visualItem(root,"guitarLevelMeter"+QString::number(i));QVERIFY(m);meters<<m; }
+        QQuickItem* editor=meters[0]->parentItem();
+        while(editor&&!editor->property("levels").isValid()) editor=editor->parentItem();
+        QVERIFY(editor);
+        // Writes `levels` (drops its binding to the engine's levels: offscreen there are none).
+        const auto restore=qScopeGuard([&] { editor->setProperty("levels",QVariantMap{}); QMetaObject::invokeMethod(board,"close"); });
+        const auto place=[&] { QList<QRectF> r; for(auto* m:meters) r<<QRectF(m->mapToItem(root,QPointF(0,0)),m->size()); return r; };
+        const auto readings=[&](double raw,double pre,double l,double r) {
+            editor->setProperty("levels",QVariantMap{{"rawDb",raw},{"preFxDb",pre},{"leftDb",l},{"rightDb",r}});
+            QTest::qWait(50);
+        };
+        readings(-120,-120,-120,-120);
+        const auto first=place();
+        for(int i=1;i<4;++i) QVERIFY(qAbs(first[i].width()-first[0].width())<=1);   // four equal shares (whole pixels)
+        readings(-3.2,-60,-0.1,-120);
+        QCOMPARE(place(),first);
+        readings(0,-12.5,-45.7,-6);
+        QCOMPARE(place(),first);
+        // The reading's box keeps one width too, so the label beside it stays still.
+        auto* reading=visualItem(meters[0],"levelMeterReading");QVERIFY(reading);
+        const qreal w=reading->width(),x=reading->x();
+        readings(-120,0,0,0);
+        QCOMPARE(reading->width(),w);QCOMPARE(reading->x(),x);
+        // Every label shows in full ("Raw input", not "Ra…").
+        for(auto* m:meters) { auto* label=visualItem(m,"levelMeterLabel");QVERIFY(label);QVERIFY2(!label->property("truncated").toBool(),qPrintable(label->property("text").toString())); }
+        auto* status=visualItem(root,"guitarStatusLine");QVERIFY(status);
+        QVERIFY(!status->isVisible());
+    }
     // Dragging a pedal's grip: the others slide aside during the drag, one move on release, and
     // the card glides into its new slot.
     void dragging_a_pedal_slides_the_others_aside_and_moves_it_once() {

@@ -120,6 +120,7 @@ Item {
                     }
                 }
             }
+            TextMetrics { id: widestMeterLabel; font.pixelSize: Theme.microSize; text: "Raw input" }
             Repeater {
                 model: [
                     {label: "Raw input", db: "rawDb", clip: "rawClip"},
@@ -129,7 +130,12 @@ Item {
                 ]
                 delegate: LevelMeter {
                     required property var modelData
+                    objectName: "guitarLevelMeter" + index
+                    required property int index
                     Layout.fillWidth: true
+                    // Four equal widths, set by the widest label, whatever the readings say.
+                    Layout.preferredWidth: widthFor(widestMeterLabel.advanceWidth)
+                    Layout.minimumWidth: Layout.preferredWidth
                     label: modelData.label
                     levelDb: root.monitoring ? (root.levels[modelData.db] ?? -120) : -120
                     clipped: root.monitoring && (root.levels[modelData.clip] ?? false)
@@ -670,19 +676,15 @@ Item {
                 }
             }
         }
+        // Only while the cabinet IR loads, or when something went wrong.
         Text {
+            objectName: "guitarStatusLine"
             Layout.fillWidth: true
-            text: root.effectsModel.busy ? "Loading and preparing cabinet IR…" : root.effectsModel.lastError.length > 0
-                ? root.effectsModel.lastError
-                : "Preset file: " + root.effectsModel.presetFilePath.split("/").pop()
-            color: root.effectsModel.lastError.length > 0 ? Theme.record : Theme.textMuted
+            visible: root.effectsModel.busy || root.effectsModel.lastError.length > 0
+            text: root.effectsModel.busy ? "Loading and preparing cabinet IR…" : root.effectsModel.lastError
+            color: root.effectsModel.busy ? Theme.textMuted : Theme.record
             font.pixelSize: Theme.microSize
             elide: Text.ElideMiddle
-            // The whole path under the mouse.
-            HoverHandler { id: presetPathHover }
-            ToolTip.visible: presetPathHover.hovered && root.effectsModel.lastError.length === 0 && !root.effectsModel.busy
-            ToolTip.text: root.effectsModel.presetFilePath
-            ToolTip.delay: 450
         }
     }
 
