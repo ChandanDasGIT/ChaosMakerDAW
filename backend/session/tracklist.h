@@ -144,6 +144,9 @@ public:
     Change setVolume(int id, double volume);
     Change setPan(int id, double pan);
     Change setStripWidth(int id, double width);
+    // Timeline heights (restMap U9): view state, not undoable, saved with the project.
+    Change setRowHeight(int id, double height);
+    Change setEnvelopeHeight(int id, double height);
     Change setEqBand(int id, int band, double gainDb);
     Change setChaosEq(int id, const chaoseq::Settings& settings);
     // Mixing plugins (restMap G7): a track's settings for one type (defaults when never set);

@@ -1279,12 +1279,12 @@ private slots:
         const QString n=QString::number(id);
         auto* accent=visualItem(list,"trackColourAccent"+n); QVERIFY(accent);
         auto* card=accent->parentItem(); QVERIFY(card);
-        for(const qreal width:{340.0,180.0}) {
+        for(const qreal width:{340.0,210.0}) {   // 210: the narrowest track list (restMap U9)
             list->setWidth(width); QTest::qWait(30);
             const QRectF cardRect=card->mapRectToScene(QRectF(0,0,card->width(),card->height()));
             QList<QRectF> placed;
             for(const char* stem:{"trackMuteButton","trackSoloButton","trackInputButton","trackMonitorButton",
-                                   "trackRecordButton","trackFxButton","trackRemoveButton","trackVolume"}) {
+                                   "trackRecordButton","trackFxButton","trackEnvelopeButton","trackRemoveButton","trackVolume"}) {
                 auto* item=visualItem(list,stem+n); QVERIFY2(item,stem);
                 const QRectF rect=item->mapRectToScene(QRectF(0,0,item->width(),item->height()));
                 const QString where=QString("%1 at %2 px: %3,%4 %5x%6").arg(stem).arg(width).arg(rect.x()).arg(rect.y()).arg(rect.width()).arg(rect.height());
@@ -1293,11 +1293,11 @@ private slots:
                 for(const QRectF& other:placed) QVERIFY2(!other.intersects(rect),qPrintable(where+" overlaps"));
                 placed.append(rect);
             }
-            // The buttons stay on one line, also at 180 px; the remove cross sits above them on
+            // The buttons stay on one line, also at 210 px; the remove cross sits above them on
             // the name's line and the volume slider below (restMap U8 C2).
-            for(int i=1;i<6;++i) QCOMPARE(placed[i].top(),placed[0].top());
-            QVERIFY(placed[6].bottom()<=placed[0].top());
-            QVERIFY(placed[7].top()>=placed[0].bottom());
+            for(int i=1;i<7;++i) QCOMPARE(placed[i].top(),placed[0].top());
+            QVERIFY(placed[7].bottom()<=placed[0].top());
+            QVERIFY(placed[8].top()>=placed[0].bottom());
             QCOMPARE(card->height(),64.0);
         }
     }
@@ -1318,7 +1318,7 @@ private slots:
             settings.setProperty("pianoRollDockHeight",450.0);      // unchanged: not saved again
             QCOMPARE(changed.count(),3);
             QCOMPARE(settings.mixerHeight(),480.0);
-            QCOMPARE(settings.clampTrackListWidth(10),180.0);
+            QCOMPARE(settings.clampTrackListWidth(10),210.0);
         }
         // Main.qml reads the sizes through the top bar's settings button (topBar.appSettings.bridge).
         auto* topBar=window->findChild<QQuickItem*>("testTopBar"); QVERIFY(topBar);
@@ -4386,6 +4386,85 @@ private slots:
         QVERIFY(tracks.toggleEnvelopeShown(a));
         QTRY_VERIFY(!header->isVisible());
         QTRY_COMPARE(card->parentItem()->y(),64.0);
+    }
+    // restMap U9: drag a track's bottom edge (or its volume lane's) on the timeline to resize it;
+    // the V chip after FX shows / hides the lane. Not undo steps; a track never below 64 px.
+    void tracks_and_volume_lanes_resize_by_dragging_their_bottom_edge() {
+        TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
+        const int clipA=tracks.addClipAtBeat(a,0,2),clipB=tracks.addClipAtBeat(b,0,2);
+        auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
+        auto* trackList=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(trackList);
+        const auto restore=qScopeGuard([&] {
+            timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
+            trackList->setVisible(false); trackList->setProperty("trackModel",QVariant());
+        });
+        const bool couldUndo=tracks.canUndo();
+        const auto drag=[&](QQuickItem* handle,int dy) {
+            QVERIFY(handle); QVERIFY(handle->isVisible());
+            const QPoint from=handle->mapToScene(QPointF(40,handle->height()/2)).toPoint();
+            QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,from);
+            for(int step=1;step<=4;++step) QTest::mouseMove(window,from+QPoint(0,dy*step/4));
+            QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,from+QPoint(0,dy));
+        };
+        timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
+        QTest::qWait(20);
+        auto* blockA=visualItem(timeline,"clipBlock"+QString::number(clipA)); QVERIFY(blockA);
+        auto* blockB=visualItem(timeline,"clipBlock"+QString::number(clipB)); QVERIFY(blockB);
+        QCOMPARE(blockA->height(),64.0-5); QCOMPARE(blockB->y(),38.0+64+2);
+
+        // Down 50 px: track a is 114 px, its clip fills it, track b moves down.
+        drag(visualItem(timeline,"trackResizeHandle"+QString::number(a)),50);
+        QTRY_COMPARE(tracks.project().findTrack(a)->rowHeight,114.0f);
+        QTRY_COMPARE(blockA->height(),114.0-5);
+        QCOMPARE(blockB->y(),38.0+114+2);
+        QCOMPARE(blockB->height(),64.0-5);
+        // Far up: it stops at the default 64 px.
+        drag(visualItem(timeline,"trackResizeHandle"+QString::number(a)),-200);
+        QTRY_COMPARE(tracks.project().findTrack(a)->rowHeight,64.0f);
+        QTRY_COMPARE(blockB->y(),38.0+64+2);
+        QVERIFY(!visualItem(timeline,"envelopeResizeHandle"+QString::number(a))->isVisible());
+
+        // The V chip (after FX) shows the lane; it is lit while shown.
+        timeline->setVisible(false);
+        trackList->setProperty("trackModel",QVariant::fromValue(&tracks)); trackList->setVisible(true);
+        QTest::qWait(20);
+        auto* fx=visualItem(trackList,"trackFxButton"+QString::number(a)); QVERIFY(fx);
+        auto* v=visualItem(trackList,"trackEnvelopeButton"+QString::number(a)); QVERIFY(v);
+        QCOMPARE(v->y(),fx->y()); QVERIFY(v->x()>fx->x()+fx->width()-1);
+        QVERIFY(!v->property("active").toBool());
+        click(v);
+        QTRY_VERIFY(tracks.project().findTrack(a)->volumeEnvelope.shown());
+        QTRY_VERIFY(v->property("active").toBool());
+        trackList->setVisible(false); timeline->setVisible(true); QTest::qWait(20);
+        auto* lane=visualItem(timeline,"volumeEnvelope"+QString::number(a)); QVERIFY(lane);
+        QTRY_COMPARE(lane->height(),72.0);
+
+        // The lane's bottom edge: 30 px taller; the rows below follow.
+        drag(visualItem(timeline,"envelopeResizeHandle"+QString::number(a)),30);
+        QTRY_COMPARE(tracks.project().findTrack(a)->envelopeHeight,102.0f);
+        QTRY_COMPARE(lane->height(),102.0);
+        QCOMPARE(blockB->y(),38.0+64+102+2);
+        // The track above the lane grows too; the lane moves down with it.
+        drag(visualItem(timeline,"trackResizeHandle"+QString::number(a)),20);
+        QTRY_COMPARE(tracks.project().findTrack(a)->rowHeight,84.0f);
+        QTRY_COMPARE(lane->y(),38.0+84);
+        QCOMPARE(blockB->y(),38.0+84+102+2);
+
+        // The track list keeps the same rows: a's card, its Volume header, then b.
+        timeline->setVisible(false); trackList->setVisible(true); QTest::qWait(20);
+        auto* cardA=visualItem(trackList,"trackColourAccent"+QString::number(a))->parentItem();
+        auto* cardB=visualItem(trackList,"trackColourAccent"+QString::number(b))->parentItem();
+        QTRY_COMPARE(cardA->height(),84.0);
+        auto* header=visualItem(trackList,"envelopeLaneHeader"+QString::number(a)); QVERIFY(header);
+        QCOMPARE(header->height(),102.0);
+        QCOMPARE(cardB->y(),84.0+102);
+        // A taller card keeps its controls at the top, as in a 64 px row.
+        QVERIFY(visualItem(trackList,"trackVolume"+QString::number(a))->mapToItem(cardA,QPointF(0,0)).y()<64);
+        // V again hides the lane.
+        click(v);
+        QTRY_VERIFY(!tracks.project().findTrack(a)->volumeEnvelope.shown());
+        QTRY_COMPARE(cardB->y(),84.0);
+        QCOMPARE(tracks.canUndo(),couldUndo);   // view state: no undo steps
     }
     void undo_redo_buttons_restore_deleted_clips() {
         TrackListWrapper tracks;

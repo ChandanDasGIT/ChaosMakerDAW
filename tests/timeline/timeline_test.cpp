@@ -39,6 +39,25 @@ TEST(timeline, group_preview_constrains_all_lanes_and_changes_no_document_until_
     CHECK(editor.selectedIds().size() == 1 && editor.selectedIds()[0] == y);
 }
 
+// restMap U9: in pixels, each lane trims its clips by its own track's height, so a box that only
+// reaches the top of a tall track's clip still picks it.
+TEST(timeline, pixel_selection_insets_follow_each_tracks_own_height)
+{
+    TrackList tracks; const int a = tracks.addAudioTrack(), b = tracks.addAudioTrack();
+    tracks.setRowHeight(b, 400);
+    tracks.addClipAtBeat(a, 0, 4); const int y = tracks.addClipAtBeat(b, 0, 4);
+    Timeline editor; editor.setTracks(&tracks);
+    // From row 0's bottom 6 px into row 1 (0.015 of 400 px); the clip starts 2 px down, so
+    // the box reaches it.
+    editor.beginSelection(0, 0.99, true); editor.updateSelection(4, 1.015, true);
+    editor.finishSelectionPixels(2, 3, 1);
+    CHECK(editor.selectedIds() == std::vector<int>({y}));
+    // With 64 px row fractions (the clip 2 / 64 = 0.031 down) the same box missed it.
+    editor.beginSelection(0, 0.99, true); editor.updateSelection(4, 1.015, true);
+    editor.finishSelection(2.0 / 64, 3.0 / 64, 1.0 / 64);
+    CHECK(editor.selectedIds().empty());
+}
+
 TEST(timeline, overlap_selection_repeat_acknowledgement_and_busy_rules_are_backend_owned)
 {
     TrackList tracks; const int a = tracks.addAudioTrack(), b = tracks.addVocalTrack();

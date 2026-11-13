@@ -2,6 +2,7 @@
 #include "plugins/denoise/denoise.h"
 #include "dsp/panlaw.h"
 #include "mixer/mixerpanel.h"
+#include "timeline/tracklayout.h"
 #include "instruments/instrumentcatalog.h"
 
 #include <algorithm>
@@ -390,6 +391,20 @@ TrackList::Change TrackList::setStripWidth(int id, double value)
     if (!track || !std::isfinite(value)) return {};
     if (track->stripWidth == static_cast<float>(mixer::clampStripWidth(value))) return {true, false};
     return result(m_project.setTrackStripWidth(id, static_cast<float>(value)));
+}
+TrackList::Change TrackList::setRowHeight(int id, double value)
+{
+    const auto* track = m_project.findTrack(id);
+    if (!track || !std::isfinite(value)) return {};
+    if (track->rowHeight == static_cast<float>(trackheight::clampTrack(value))) return {true, false};
+    return result(m_project.setTrackRowHeight(id, static_cast<float>(value)));
+}
+TrackList::Change TrackList::setEnvelopeHeight(int id, double value)
+{
+    const auto* track = m_project.findTrack(id);
+    if (!track || !std::isfinite(value)) return {};
+    if (track->envelopeHeight == static_cast<float>(trackheight::clampEnvelope(value))) return {true, false};
+    return result(m_project.setTrackEnvelopeHeight(id, static_cast<float>(value)));
 }
 TrackList::Change TrackList::setMasterVolume(double value)
 {

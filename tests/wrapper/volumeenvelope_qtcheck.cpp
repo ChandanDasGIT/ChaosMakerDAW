@@ -68,7 +68,8 @@ TEST(qtvolumeenvelope, showing_a_lane_changes_the_row_layout_but_not_the_undo_hi
 {
     TrackListWrapper tracks;
     const int a = tracks.addAudioTrack(), b = tracks.addAudioTrack();
-    tracks.setTrackRowHeight(106);
+    // Each track has its own height (restMap U9); 106 for both here.
+    CHECK(tracks.setTrackHeight(a, 106) && tracks.setTrackHeight(b, 106));
     tracks.setEnvelopeLaneHeight(72);
     CHECK(tracks.layoutHeight() == 212);
     const bool couldUndo = tracks.canUndo();
@@ -105,6 +106,42 @@ TEST(qtvolumeenvelope, showing_a_lane_changes_the_row_layout_but_not_the_undo_hi
     CHECK(tracks.layoutHeight() == 212);
     CHECK(tracks.removeTrack(b));
     CHECK(tracks.layoutHeight() == 106);
+}
+
+// restMap U9: a track and its envelope lane each have their own height.
+TEST(qtvolumeenvelope, each_track_and_its_lane_have_their_own_height)
+{
+    TrackListWrapper tracks;
+    const int a = tracks.addAudioTrack(), b = tracks.addAudioTrack();
+    CHECK(tracks.layoutHeight() == 128);                     // two tracks at the default 64
+    CHECK(tracks.minTrackHeight() == 64 && tracks.maxTrackHeight() == 400);
+    CHECK(tracks.minEnvelopeHeight() == 40 && tracks.maxEnvelopeHeight() == 400);
+    const bool couldUndo = tracks.canUndo();
+
+    int layout = 0;
+    QObject::connect(&tracks, &TrackListWrapper::layoutChanged, [&] { ++layout; });
+    CHECK(tracks.setTrackHeight(a, 150));
+    CHECK(layout == 1);
+    CHECK(role(tracks, 0, TrackListWrapper::TrackHeightRole).toDouble() == 150);
+    CHECK(tracks.trackHeights()[0].toDouble() == 150 && tracks.trackHeights()[1].toDouble() == 64);
+    CHECK(tracks.rowTops()[1].toDouble() == 150 && tracks.layoutHeight() == 214);
+    CHECK(tracks.rowAtY(149) == 0 && tracks.rowAtY(150) == 1);
+    CHECK(tracks.setTrackHeight(a, 10));                       // never below the default
+    CHECK(tracks.trackHeights()[0].toDouble() == 64);
+
+    // The lane: shown under b, at b's own lane height.
+    CHECK(tracks.toggleEnvelopeShown(b));
+    CHECK(tracks.layoutHeight() == 64 + 64 + 72);
+    CHECK(tracks.setTrackEnvelopeHeight(b, 120));
+    CHECK(role(tracks, 1, TrackListWrapper::EnvelopeHeightRole).toDouble() == 120);
+    CHECK(tracks.envelopeHeights()[1].toDouble() == 120);
+    CHECK(tracks.layoutHeight() == 64 + 64 + 120);
+    CHECK(tracks.inEnvelopeLane(64 + 64 + 119) && !tracks.inEnvelopeLane(64 + 63));
+    // The heights go with the track when rows move.
+    CHECK(tracks.moveTrack(b, 0));
+    CHECK(tracks.envelopeHeights()[0].toDouble() == 120 && tracks.rowTops()[1].toDouble() == 64 + 120);
+    CHECK(!tracks.setTrackHeight(a + b + 100, 100));          // no such track
+    CHECK(tracks.canUndo() == couldUndo);                      // view state: no undo step
 }
 
 TEST(qtvolumeenvelope, envelope_beats_follow_a_tempo_change)

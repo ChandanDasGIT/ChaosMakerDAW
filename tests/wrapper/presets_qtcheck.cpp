@@ -246,6 +246,7 @@ TEST(qtpresets, session_roundtrip_keeps_audio_controls_tempo_and_tremolo_sustain
     const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar");
     tracks.setTempo(97.5,7,8); tracks.setVolume(guitar,0.6); tracks.setMuted(guitar,true); tracks.setSolo(guitar,true);
     tracks.setEqBand(guitar,4,-3); tracks.setRecordArmed(guitar,true); tracks.setTrackInputPort(guitar,"test:input");
+    CHECK(tracks.setTrackHeight(guitar,180)); CHECK(tracks.setTrackEnvelopeHeight(guitar,55));   // restMap U9
     auto audio=std::make_shared<AudioData>(); audio->path=f.path("take.wav").toStdString(); audio->sampleRate=48000;
     audio->frames=128; audio->channels={std::vector<float>(128,0.25f)};
     {
@@ -258,6 +259,7 @@ TEST(qtpresets, session_roundtrip_keeps_audio_controls_tempo_and_tremolo_sustain
     CHECK_NEAR(restored.project().tempo().bpm(),97.5,1e-9); CHECK(restored.project().tempo().numerator()==7);
     const auto& track=*restored.project().tracks().front(); CHECK(track.muted && track.solo); CHECK(!track.recordArmed);
     CHECK_NEAR(track.volume,0.6,1e-6); CHECK(track.eqGainDb[4]==-3); CHECK(track.inputPort=="test:input");
+    CHECK(track.rowHeight==180.0f); CHECK(track.envelopeHeight==55.0f);
     auto snapshot=restored.playbackSnapshot(); CHECK(snapshot->tracks[0].clips.size()==1);
     CHECK(snapshot->tracks[0].clips[0].start==24000); CHECK(snapshot->keepAudio[0]->channels[0]==audio->channels[0]);
     GuitarSuiteModel pedals; CHECK(pedals.addPedal("Tremolo")); const int tremolo=id(pedals,0);

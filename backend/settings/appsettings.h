@@ -28,7 +28,8 @@ public:
 
     // Main window layout (pixels). Setters clamp into these ranges; non-finite values are ignored.
     struct SizeLimits { double min, max, fallback; };
-    static constexpr SizeLimits TrackListWidthLimits{180.0, 460.0, 230.0};
+    // At least 210 px: one line of track buttons, the volume-envelope V included (restMap U9).
+    static constexpr SizeLimits TrackListWidthLimits{210.0, 460.0, 230.0};
     static constexpr SizeLimits MixerHeightLimits{120.0, 480.0, 180.0};
     // The view also keeps the docked piano roll above its own minimum and below the window.
     static constexpr SizeLimits PianoRollDockHeightLimits{200.0, 2000.0, 380.0};

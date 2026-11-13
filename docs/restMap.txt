@@ -48,6 +48,29 @@ NEXT UP (2026-11-12), the user's order, easiest first:
  10. U8   UI polish, groups A to I (the user, 2026-11-13: "at least presentable"): A to I and H4
           DONE: A to I committed in 7c53f60, H4 (= U6) committed after it, see U8 below.
  11. U6   Guitar FX panel UI: DONE 2026-11-13 as U8 H4 (signal chain, animated rearranging).
+          Then (committed in 619c9f3): the four meters hold their place and size whatever they
+          read; the "Preset file:" line is gone (the line shows only while the IR loads or on an
+          error). Side effect the user accepted: a narrower INPUT TRIM slider at small widths.
+ 12. U9   Resizable tracks and the V button: DONE 2026-11-13 (uncommitted).
+          - Drag a track's bottom edge on the timeline (a 4 px strip in the gap under its clips)
+            to change its height; drag the volume lane's bottom edge the same way. Track 64 px
+            (the default is the least) to 400; lane 40 to 400, default 72. Per track, saved in
+            the project file ("rowHeight", "envelopeHeight"; optional, older files get the
+            defaults) and the session state; view state, not undo steps.
+          - Backend: trackheight limits and per-row heights in timeline/tracklayout
+            (TrackLayout::Row, setRowSpecs, trackHeightOf / envelopeHeightOf); Track::rowHeight /
+            envelopeHeight; TrackList::setRowHeight / setEnvelopeHeight. Box selection takes its
+            clip insets in pixels per track (Timeline::finishSelectionPixels), so a tall track's
+            clips are not trimmed more.
+          - Wrapper: roles trackHeight / envelopeHeight, trackHeights / envelopeHeights lists,
+            setTrackHeight / setTrackEnvelopeHeight, the limits.
+          - UI: Timeline.qml resize strips, clips / lanes / recording box at each track's height;
+            TrackList.qml cards and Volume headers follow, controls stay at the top of a taller
+            card; a V chip after FX shows / hides the volume lane (lit while shown).
+          - The track list's least width went from 180 to 210 px so the button line (with V)
+            still fits on one line.
+          Not tested: how the drag feels (the user's eye), resizing from the track list side
+          (not built: the user asked for the timeline).
   Everything the user chose to do later (G12 tempo / meter changes, C3b, C8, B1-B9 checks, F4,
   H1-H3 and the smaller "later" ideas L1-L6) is in docs/laterGator.txt.
   Done and committed up to 2026-11-12: G1-G11, G13-G18, C11, C3c's cache clean-up, R2, import /

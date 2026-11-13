@@ -17,6 +17,8 @@ TEST(projectdocument, round_trip_serialization_and_deserialization)
     t1.volume = 0.8f;
     t1.pan = -0.35f;
     t1.stripWidth = 150.0f;
+    t1.rowHeight = 130.0f;
+    t1.envelopeHeight = 50.0f;
     t1.solo = true;
     t1.muted = false;
     t1.recordDry = true;
@@ -58,6 +60,8 @@ TEST(projectdocument, round_trip_serialization_and_deserialization)
     CHECK_NEAR(track->volume, 0.8f, 1e-6);
     CHECK_NEAR(track->pan, -0.35f, 1e-6);
     CHECK_NEAR(track->stripWidth, 150.0f, 1e-6);
+    CHECK_NEAR(track->rowHeight, 130.0f, 1e-6);
+    CHECK_NEAR(track->envelopeHeight, 50.0f, 1e-6);
     CHECK(track->inputPort == "system:capture_1");
     for (int i = 0; i < 10; ++i) {
         CHECK_NEAR(track->eqGainDb[i], static_cast<float>(i - 5), 1e-6);
@@ -304,6 +308,27 @@ TEST(projectdocument, mixer_strip_width_is_optional_and_validated)
     CHECK(loaded.project.tracks()[0]->stripWidth == 200.0f);
     CHECK(!ProjectDocument::deserialize(document(R"(,"stripWidth":20)"), loaded, error, 48000.0));
     CHECK(!ProjectDocument::deserialize(document(R"(,"stripWidth":"wide")"), loaded, error, 48000.0));
+}
+
+TEST(projectdocument, timeline_heights_are_optional_and_validated)
+{
+    const auto document = [](const std::string& field) {
+        return R"({"format":"ChaosMakerProject","version":2,"project":{"version":1,"bpm":120.0,
+            "sampleRate":48000.0,"numerator":4,"denominator":4,"tracks":[{"name":"T1","type":"Audio",
+            "volume":1.0)" + field + R"(,"eq":[0,0,0,0,0,0,0,0,0,0],"clips":[]}]},"trackEffects":[""]})";
+    };
+    ProjectFileContent loaded;
+    std::string error;
+    CHECK(ProjectDocument::deserialize(document(""), loaded, error, 48000.0));   // older files: defaults
+    CHECK(loaded.project.tracks()[0]->rowHeight == 64.0f);
+    CHECK(loaded.project.tracks()[0]->envelopeHeight == 72.0f);
+    CHECK(ProjectDocument::deserialize(document(R"(,"rowHeight":200,"envelopeHeight":40)"), loaded, error, 48000.0));
+    CHECK(loaded.project.tracks()[0]->rowHeight == 200.0f);
+    CHECK(loaded.project.tracks()[0]->envelopeHeight == 40.0f);
+    CHECK(!ProjectDocument::deserialize(document(R"(,"rowHeight":63)"), loaded, error, 48000.0));   // below the default
+    CHECK(!ProjectDocument::deserialize(document(R"(,"rowHeight":401)"), loaded, error, 48000.0));
+    CHECK(!ProjectDocument::deserialize(document(R"(,"envelopeHeight":39)"), loaded, error, 48000.0));
+    CHECK(!ProjectDocument::deserialize(document(R"(,"rowHeight":"tall")"), loaded, error, 48000.0));
 }
 
 TEST(projectdocument, track_effects_round_trip_old_files_get_defaults_and_bad_lists_are_rejected)

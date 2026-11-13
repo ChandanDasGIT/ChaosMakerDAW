@@ -59,3 +59,35 @@ TEST(tracklayout, heights_change_and_bad_values_are_ignored)
     CHECK(layout.totalHeight() == 156);
     CHECK(!layout.hasEnvelopeLane(-1) && !layout.hasEnvelopeLane(1));
 }
+
+// restMap U9: each row can have its own heights.
+TEST(tracklayout, rows_have_their_own_heights)
+{
+    TrackLayout layout(64, 72);
+    layout.setRowSpecs({{false, 100, 0}, {true, 0, 50}, {true, 80, 0}});
+    CHECK(layout.trackHeightOf(0) == 100 && layout.trackHeightOf(1) == 64 && layout.trackHeightOf(2) == 80);
+    CHECK(layout.envelopeHeightOf(1) == 50 && layout.envelopeHeightOf(2) == 72);
+    CHECK(layout.rowTop(1) == 100);
+    CHECK(layout.envelopeTop(1) == 164);
+    CHECK(layout.rowTop(2) == 214);
+    CHECK(layout.envelopeTop(2) == 294);
+    CHECK(layout.totalHeight() == 366);
+    CHECK(layout.rowAt(99) == 0 && layout.rowAt(100) == 1 && layout.rowAt(213) == 1 && layout.rowAt(214) == 2);
+    CHECK(layout.inEnvelopeLane(164) && !layout.inEnvelopeLane(163.9));
+    CHECK_NEAR(layout.rowCoordinate(50), 0.5, 1e-12);        // half of row 0's own 100
+    CHECK_NEAR(layout.rowCoordinate(214 + 40), 2.5, 1e-12);
+    CHECK(layout.rowAt(366 + 64) == 4);                     // past the end: default steps
+    // The layout's heights still apply to rows without their own.
+    layout.setTrackHeight(70);
+    CHECK(layout.trackHeightOf(1) == 70 && layout.trackHeightOf(0) == 100);
+}
+
+TEST(tracklayout, height_limits_keep_the_default_as_the_least_track_height)
+{
+    CHECK(trackheight::clampTrack(10) == trackheight::defaultTrack);
+    CHECK(trackheight::clampTrack(150) == 150);
+    CHECK(trackheight::clampTrack(1e9) == trackheight::maxTrack);
+    CHECK(trackheight::clampTrack(std::nan("")) == trackheight::defaultTrack);
+    CHECK(trackheight::clampEnvelope(10) == trackheight::minEnvelope);
+    CHECK(trackheight::clampEnvelope(1e9) == trackheight::maxEnvelope);
+}

@@ -2,6 +2,7 @@
 #include <utility>
 #include "dsp/panlaw.h"
 #include "mixer/mixerpanel.h"
+#include "timeline/tracklayout.h"
 #include "instruments/instrumentcatalog.h"
 
 #include <algorithm>
@@ -276,6 +277,27 @@ bool Project::setTrackStripWidth(int id, float width)
     if (!track || !std::isfinite(width))
         return false;
     track->stripWidth = static_cast<float>(mixer::clampStripWidth(width));
+    return true;
+}
+
+static_assert(Track{}.rowHeight == trackheight::defaultTrack, "Track row height default must match the timeline");
+static_assert(Track{}.envelopeHeight == trackheight::defaultEnvelope, "Track envelope height default must match the timeline");
+
+bool Project::setTrackRowHeight(int id, float height)
+{
+    auto* track = findTrack(id);
+    if (!track || !std::isfinite(height))
+        return false;
+    track->rowHeight = static_cast<float>(trackheight::clampTrack(height));
+    return true;
+}
+
+bool Project::setTrackEnvelopeHeight(int id, float height)
+{
+    auto* track = findTrack(id);
+    if (!track || !std::isfinite(height))
+        return false;
+    track->envelopeHeight = static_cast<float>(trackheight::clampEnvelope(height));
     return true;
 }
 

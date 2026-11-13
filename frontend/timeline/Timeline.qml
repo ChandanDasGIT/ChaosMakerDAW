@@ -168,7 +168,7 @@ Item {
         editor.updateSelection(x / beatWidth, rowCoordinate(y), Math.abs(x - selectionStartX) > 2)
     }
     function finishSelection() {
-        editor.finishSelection(clipTop / laneHeight, clipBottom / laneHeight, 1 / laneHeight)
+        editor.finishSelectionPixels(clipTop, clipBottom, 1)   // each track its own height (U9)
     }
     property real selectionStartX: 0
     property real selectionEndX: 0
@@ -196,6 +196,16 @@ Item {
         return tops[tops.length - 1] + (row - tops.length + 1) * root.laneHeight
     }
     function rowHeight(row) { return rowTop(row + 1) - rowTop(row) }
+    // Each track's own heights (restMap U9): its part of the row and its volume lane.
+    function trackHeightAt(row) {
+        const heights = root.trackModel ? root.trackModel.trackHeights : []
+        return row >= 0 && row < heights.length ? heights[row] : root.laneHeight
+    }
+    function envelopeHeightAt(row) {
+        const heights = root.trackModel ? root.trackModel.envelopeHeights : []
+        return row >= 0 && row < heights.length ? heights[row] : root.envelopeLaneHeight
+    }
+    function clipHeightAt(row) { return trackHeightAt(row) - clipTop - clipBottom }
     function rowAt(y) { return root.trackModel ? root.trackModel.rowAtY(y) : Math.floor(y / root.laneHeight) }
     function rowCoordinate(y) { return root.trackModel ? root.trackModel.rowCoordinate(y) : y / root.laneHeight }
     readonly property real rowsHeight: root.trackModel ? root.trackModel.layoutHeight : root.laneCount * root.laneHeight
@@ -658,7 +668,7 @@ Item {
                 x: (preview.startBeat ?? startBeat) * root.beatWidth + 4
                 y: root.rulerHeight + root.rowTop(preview.laneIndex ?? laneIndex) + root.clipTop
                 width: Math.max(4, (preview.lengthBeats ?? lengthBeats) * root.beatWidth - 8)
-                height: root.clipHeight
+                height: root.clipHeightAt(preview.laneIndex ?? laneIndex)
                 radius: Theme.controlRadius
                 color: Qt.darker(baseColour, 2.4)
                 border.color: isSelected ? Theme.accent : baseColour
@@ -1100,9 +1110,9 @@ Item {
                 viewX: scroll.contentX
                 viewWidth: scroll.width
                 x: 0
-                y: root.rulerHeight + root.rowTop(index) + (envelopeOverClips ? root.clipTop : root.laneHeight)
+                y: root.rulerHeight + root.rowTop(index) + (envelopeOverClips ? root.clipTop : root.trackHeightAt(index))
                 width: root.contentWidth
-                height: envelopeOverClips ? root.clipHeight : root.envelopeLaneHeight
+                height: envelopeOverClips ? root.clipHeightAt(index) : root.envelopeHeightAt(index)
                 z: envelopeOverClips ? 3.5 : 2.5
                 onMenuRequested: (id, x, y) => {
                     envelopeMenu.lane = envelopeLane
@@ -1118,6 +1128,68 @@ Item {
             }
         }
 
+        // Track and volume-lane heights (restMap U9): drag the bottom edge of a track, or of its
+        // volume lane, up or down. The strips sit in the gap between clips, so clips keep their
+        // own mouse handling. Heights are clamped by the backend (a track never below 64 px).
+        Repeater {
+            model: root.trackModel
+            delegate: Item {
+                id: resizeRow
+                required property int index
+                required property int trackId
+                required property bool envelopeShown
+                required property bool envelopeOverClips
+                x: 0; y: 0; width: root.contentWidth; height: 0
+                z: 6
+                component EdgeHandle: Item {
+                    id: edge
+                    property real startY: 0
+                    property real startHeight: 0
+                    // The height this edge sets, and how to set it.
+                    property real currentHeight: 0
+                    property var apply: function(height) {}
+                    readonly property bool active: edgeMouse.containsMouse || edgeMouse.pressed
+                    width: root.contentWidth; height: 4
+                    Rectangle {
+                        anchors.left: parent.left; anchors.right: parent.right
+                        anchors.bottom: parent.bottom; anchors.bottomMargin: 1
+                        height: 2
+                        visible: edge.active
+                        color: Theme.accent
+                    }
+                    MouseArea {
+                        id: edgeMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        preventStealing: true
+                        cursorShape: Qt.SizeVerCursor
+                        onPressed: mouse => {
+                            edge.startY = mapToItem(root, mouse.x, mouse.y).y
+                            edge.startHeight = edge.currentHeight
+                        }
+                        onPositionChanged: mouse => {
+                            if (!pressed) return
+                            edge.apply(edge.startHeight + mapToItem(root, mouse.x, mouse.y).y - edge.startY)
+                        }
+                    }
+                }
+                EdgeHandle {
+                    objectName: "trackResizeHandle" + resizeRow.trackId
+                    // From 3 px above the track's bottom (below its clips) to 1 px into the next row.
+                    y: root.rulerHeight + root.rowTop(resizeRow.index) + root.trackHeightAt(resizeRow.index) - 3
+                    currentHeight: root.trackHeightAt(resizeRow.index)
+                    apply: function(height) { root.trackModel.setTrackHeight(resizeRow.trackId, height) }
+                }
+                EdgeHandle {
+                    objectName: "envelopeResizeHandle" + resizeRow.trackId
+                    visible: resizeRow.envelopeShown && !resizeRow.envelopeOverClips
+                    y: root.rulerHeight + root.rowTop(resizeRow.index + 1) - 3
+                    currentHeight: root.envelopeHeightAt(resizeRow.index)
+                    apply: function(height) { root.trackModel.setTrackEnvelopeHeight(resizeRow.trackId, height) }
+                }
+            }
+        }
+
         Repeater {
           model: root.recording ? root.transport.recordingTracks : []
           delegate: Rectangle {
@@ -1128,7 +1200,7 @@ Item {
             x: root.transport.recordingStartBeats * root.beatWidth
             y: root.rulerHeight + root.rowTop(root.trackModel ? root.trackModel.indexOfTrack(modelData) : 0) + root.clipTop
             width: Math.max(2, root.playhead - x)
-            height: root.clipHeight
+            height: root.clipHeightAt(root.trackModel ? root.trackModel.indexOfTrack(modelData) : 0)
             color: Theme.recordActiveBg; border.color: Theme.record; radius: Theme.controlRadius; z: 3
             Text { anchors.left: parent.left; anchors.leftMargin: 8; y: 0; height: root.clipBarHeight; verticalAlignment: Text.AlignVCenter; text: "Recording…"; color: Theme.text; font.pixelSize: Theme.captionSize }
             // The take's waveform as it is recorded (live, like Reaper's), laid out like a clip's.

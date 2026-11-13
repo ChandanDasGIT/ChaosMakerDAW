@@ -1,6 +1,7 @@
 #include "timeline.h"
 #include "core/valueformat.h"
 #include "transport/musicalgrid.h"
+#include "timeline/tracklayout.h"
 
 #include <algorithm>
 #include <cmath>
@@ -288,6 +289,21 @@ double Timeline::playheadBeat(double beat) const
 }
 std::optional<Timeline::RepeatRange> Timeline::finishSelection(double topInset, double bottomInset, double padding)
 {
+    return finishSelectionWith(topInset, bottomInset, padding, false);
+}
+std::optional<Timeline::RepeatRange> Timeline::finishSelectionPixels(double topInset, double bottomInset, double padding)
+{
+    return finishSelectionWith(topInset, bottomInset, padding, true);
+}
+double Timeline::laneHeightPixels(int lane) const
+{
+    if (!m_tracks || lane < 0) return trackheight::defaultTrack;
+    const auto& tracks = m_tracks->project().tracks();
+    if (lane >= static_cast<int>(tracks.size())) return trackheight::defaultTrack;
+    return tracks[static_cast<std::size_t>(lane)]->rowHeight;
+}
+std::optional<Timeline::RepeatRange> Timeline::finishSelectionWith(double topInset, double bottomInset, double padding, bool pixels)
+{
     if (!m_selecting) return std::nullopt;
     if (!m_clipSelection) {
         const double start = rangeStart(), end = m_dragged ? rangeEnd() : 0;
@@ -299,11 +315,14 @@ std::optional<Timeline::RepeatRange> Timeline::finishSelection(double topInset, 
     m_selecting = false;
     if (m_tracks && m_endBeat != m_startBeat) {
         const double left = std::min(m_startBeat, m_endBeat), right = std::max(m_startBeat, m_endBeat);
-        const double top = std::min(m_startLane, m_endLane), bottom = std::max(m_startLane, m_endLane) + padding;
-        for (const auto& clip : m_tracks->clips())
+        const double top = std::min(m_startLane, m_endLane), lowest = std::max(m_startLane, m_endLane);
+        const double bottom = lowest + (pixels ? padding / laneHeightPixels(int(std::floor(lowest))) : padding);
+        for (const auto& clip : m_tracks->clips()) {
+            const double h = pixels ? laneHeightPixels(clip.laneIndex) : 1.0;
             if (clip.startBeat < right && clip.startBeat + clip.lengthBeats > left
-                && clip.laneIndex + topInset < bottom && clip.laneIndex + 1 - bottomInset > top)
+                && clip.laneIndex + topInset / h < bottom && clip.laneIndex + 1 - bottomInset / h > top)
                 m_selectedIds.push_back(clip.clipId);
+        }
     }
     return std::nullopt;
 }

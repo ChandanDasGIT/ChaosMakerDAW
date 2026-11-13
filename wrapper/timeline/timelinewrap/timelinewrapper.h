@@ -156,6 +156,8 @@ public:
     Q_INVOKABLE void beginSelection(double beat, double lane, bool clips) { m_timeline.beginSelection(beat, lane, clips); emit stateChanged(); }
     Q_INVOKABLE void updateSelection(double beat, double lane, bool dragged) { m_timeline.updateSelection(beat, lane, dragged); emit stateChanged(); }
     Q_INVOKABLE void finishSelection(double top, double bottom, double padding);
+    // In pixels: each track's own height turns them into lane fractions (restMap U9).
+    Q_INVOKABLE void finishSelectionPixels(double top, double bottom, double padding);
     Q_INVOKABLE void acceptRepeatRange(bool accepted) { m_timeline.acceptRepeatRange(accepted); emit stateChanged(); }
     Q_INVOKABLE void cancelSelection() { m_timeline.cancelSelection(); emit stateChanged(); }
 
