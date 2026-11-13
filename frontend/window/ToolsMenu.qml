@@ -26,6 +26,14 @@ ToolButton {
         id: drumAnalyzer
         trackModel: root.trackModel
     }
+    ChordAnalyzerDialog {
+        id: chordAnalyzer
+        trackModel: root.trackModel
+    }
+    ToneAnalyzerDialog {
+        id: toneAnalyzer
+        trackModel: root.trackModel
+    }
 
     objectName: "toolsMenuButton"
     text: "Tools"
@@ -70,6 +78,16 @@ ToolButton {
             objectName: "toolsDrumAnalyzer"
             text: "Drum pattern analyzer…"
             onTriggered: drumAnalyzer.open()
+        }
+        ThemedMenuItem {
+            objectName: "toolsChordAnalyzer"
+            text: "Chord analyzer…"
+            onTriggered: chordAnalyzer.open()
+        }
+        ThemedMenuItem {
+            objectName: "toolsToneAnalyzer"
+            text: "Guitar tone analyzer…"
+            onTriggered: toneAnalyzer.open()
         }
     }
 }

@@ -18,6 +18,8 @@
 #include <functional>
 #include <QSettings>
 #include <QTemporaryDir>
+#include "analysis/dryguitar.h"
+#include "tests/analysis/chordrender.h"
 #include "tests/analysis/drumrender.h"
 #include "persistence/groovestore.h"
 #include <QStandardPaths>
@@ -2945,6 +2947,199 @@ private slots:
         QTRY_VERIFY(!name->isVisible());
         QVERIFY(GrooveStore(grooves.path().toStdString()).find("Analysed rock").has_value());
         click(visualItem(window->contentItem(),"drumAnalyzerClose")); QTRY_VERIFY(!dialog->property("visible").toBool());
+    }
+    void chord_analyzer_reads_the_selected_song_and_fills_a_chords_track() {
+        auto* controller=EngineController::instance();
+        const double bpmBefore=controller->bpm();
+        TrackListWrapper tracks; tracks.setSampleRate(44100);
+        const int audioTrack=tracks.addAudioTrack();
+        auto audio=std::make_shared<AudioData>(); audio->path="song.wav"; audio->sampleRate=chordrender::rate;
+        audio->channels={chordrender::song(chordrender::repeated({{0,chordrender::major},{9,chordrender::minor},{5,chordrender::major},{7,chordrender::seventh}},4),100.0)};
+        audio->frames=std::int64_t(audio->channels[0].size()); audio->buildWaveform();
+        QVERIFY(tracks.attachTake(audioTrack,0,audio,false));
+        const int clipId=tracks.project().findTrack(audioTrack)->audioClips.at(0).id;
+        auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
+        auto* menu=window->findChild<QObject*>("toolsMenu"); QVERIFY(menu);
+        auto* dialog=window->findChild<QObject*>("chordAnalyzerDialog"); QVERIFY(dialog);
+        auto* bridge=window->findChild<QObject*>("chordAnalyzerBridge"); QVERIFY(bridge);
+        const auto restore=qScopeGuard([&] {
+            QMetaObject::invokeMethod(dialog,"close"); QMetaObject::invokeMethod(menu,"close");
+            bridge->setProperty("sevenths",false); top->setProperty("trackModel",QVariant());
+            controller->setBpm(bpmBefore); controller->setMeter(4,4);
+        });
+        top->setProperty("trackModel",QVariant::fromValue(&tracks));
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+        const auto openIt=[&] {
+            auto* tools=visualItem(window->contentItem(),"toolsMenuButton"); QVERIFY(tools); click(tools);
+            QTRY_VERIFY(menu->property("visible").toBool());
+            QQuickItem* entry=nullptr; QTRY_VERIFY((entry=visualItem(window->contentItem(),"toolsChordAnalyzer")) && entry->isVisible());
+            QCOMPARE(entry->property("text").toString(),QString("Chord analyzer…"));
+            click(entry); QTRY_VERIFY(dialog->property("visible").toBool());
+        };
+        // Nothing selected: it says so and Analyse is off.
+        tracks.setSelectedClipId(-1);
+        openIt();
+        auto* analyse=visualItem(window->contentItem(),"chordAnalyzerAnalyse"); QVERIFY(analyse);
+        auto* clipText=visualItem(window->contentItem(),"chordAnalyzerClip"); QVERIFY(clipText);
+        QVERIFY(clipText->property("text").toString().contains("Select the song"));
+        QVERIFY(!analyse->isEnabled());
+        QVERIFY(!visualItem(window->contentItem(),"chordAnalyzerResult")->isVisible());
+        QTest::keyClick(window,Qt::Key_Escape); QTRY_VERIFY(!dialog->property("visible").toBool());
+
+        // The song selected: analyse it.
+        tracks.setSelectedClipId(clipId);
+        openIt();
+        QTRY_VERIFY(analyse->isEnabled());
+        QVERIFY(clipText->property("text").toString().startsWith("Clip: "));
+        click(analyse);
+        QTRY_VERIFY_WITH_TIMEOUT(bridge->property("hasResult").toBool() && !bridge->property("busy").toBool(),30000);
+        QTRY_COMPARE(visualItem(window->contentItem(),"chordAnalyzerKey")->property("text").toString(),QString("C major"));
+        QCOMPARE(visualItem(window->contentItem(),"chordAnalyzerBpm")->property("text").toString(),QString("100 BPM · 4/4"));
+        QVERIFY(!visualItem(window->contentItem(),"chordAnalyzerTuning")->isVisible());
+        auto* common=visualItem(window->contentItem(),"chordAnalyzerCommon"); QVERIFY(common);
+        QVERIFY(common->property("text").toString().startsWith("Most played: "));
+        QVERIFY(common->property("text").toString().contains("Am") && !common->property("text").toString().contains("G7"));
+        QVERIFY(visualItem(window->contentItem(),"chordAnalyzerChart")->isVisible());
+        QTRY_VERIFY(visualItem(window->contentItem(),"chordAnalyzerBlock"));
+        // Sevenths on: G becomes G7, without a new analysis.
+        click(visualItem(window->contentItem(),"chordAnalyzerSevenths"));
+        QTRY_VERIFY(common->property("text").toString().contains("G7"));
+        // The dialog fits the window and nothing in it runs past its edge.
+        auto* box=qobject_cast<QQuickItem*>(dialog->property("contentItem").value<QObject*>()); QVERIFY(box);
+        QVERIFY(box->mapToScene(QPointF(box->width(),0)).x()<=window->width());
+        QVERIFY(box->mapToScene(QPointF(0,box->height())).y()<=window->height());
+        QVERIFY(window->grabWindow().save(QDir::tempPath()+"/chaosmaker-chord-analyzer.png"));
+
+        // Put on track: a new Chords track with the chords on its strips, the key, a clip, and the project's BPM.
+        auto* put=visualItem(window->contentItem(),"chordAnalyzerPut"); QVERIFY(put);
+        const int before=tracks.count();
+        click(put);
+        QTRY_COMPARE(tracks.count(),before+1);
+        const int chordsTrack=tracks.trackIdAt(tracks.count()-1);
+        QCOMPARE(tracks.project().findTrack(chordsTrack)->type,std::string("Chords"));
+        const auto* settings=tracks.chords(chordsTrack); QVERIFY(settings);
+        QVERIFY(std::find(settings->chords.begin(),settings->chords.end(),std::string("G7"))!=settings->chords.end());
+        QVERIFY(std::find(settings->chords.begin(),settings->chords.end(),std::string("Am"))!=settings->chords.end());
+        QCOMPARE(settings->chords[7],std::string());
+        QVERIFY(settings->key==(chords::Key{0,false}));
+        QCOMPARE(tracks.project().findTrack(chordsTrack)->audioClips.size(),std::size_t(1));
+        QVERIFY(tracks.project().findTrack(chordsTrack)->audioClips[0].notes.size()>=16);
+        QCOMPARE(controller->bpm(),100.0);
+        QVERIFY(visualItem(window->contentItem(),"chordAnalyzerMessage")->property("text").toString().contains("clip"));
+        // The new track is now the place it goes: once more makes no further track.
+        click(put);
+        QTRY_COMPARE(tracks.project().findTrack(chordsTrack)->audioClips.size(),std::size_t(2));
+        QCOMPARE(tracks.count(),before+1);
+        click(visualItem(window->contentItem(),"chordAnalyzerCopy"));
+        click(visualItem(window->contentItem(),"chordAnalyzerClose")); QTRY_VERIFY(!dialog->property("visible").toBool());
+    }
+    void guitar_tone_analyzer_finds_a_pedalboard_for_the_selected_clip_and_saves_a_preset() {
+        TrackListWrapper tracks; tracks.setSampleRate(48000);
+        const int audioTrack=tracks.addAudioTrack();
+        auto audio=std::make_shared<AudioData>(); audio->path="riff.wav"; audio->sampleRate=48000;
+        auto sound=analysis::dryGuitarChords(48000.0);
+        for (float& v:sound) v=0.3f*std::tanh(40.0f*v);
+        audio->channels={std::move(sound)}; audio->frames=std::int64_t(audio->channels[0].size()); audio->buildWaveform();
+        QVERIFY(tracks.attachTake(audioTrack,0,audio,false));
+        const int clipId=tracks.project().findTrack(audioTrack)->audioClips.at(0).id;
+        auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
+        auto* menu=window->findChild<QObject*>("toolsMenu"); QVERIFY(menu);
+        auto* dialog=window->findChild<QObject*>("toneAnalyzerDialog"); QVERIFY(dialog);
+        auto* bridge=window->findChild<QObject*>("toneAnalyzerBridge"); QVERIFY(bridge);
+        QTemporaryDir presets; QVERIFY(presets.isValid());
+        bridge->setProperty("presetFolder",presets.path());
+        const auto restore=qScopeGuard([&] {
+            QMetaObject::invokeMethod(dialog,"close"); QMetaObject::invokeMethod(menu,"close");
+            bridge->setProperty("presetFolder",QString()); bridge->setProperty("playing",0); top->setProperty("trackModel",QVariant());
+            QMetaObject::invokeMethod(bridge,"setDefaultFolder",Q_ARG(QUrl,QUrl()));
+            if (auto* p=window->findChild<QObject*>("toneAnalyzerSaveAsDialog")) QMetaObject::invokeMethod(p,"close");
+        });
+        top->setProperty("trackModel",QVariant::fromValue(&tracks));
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+        const auto openIt=[&] {
+            auto* tools=visualItem(window->contentItem(),"toolsMenuButton"); QVERIFY(tools); click(tools);
+            QTRY_VERIFY(menu->property("visible").toBool());
+            QQuickItem* entry=nullptr; QTRY_VERIFY((entry=visualItem(window->contentItem(),"toolsToneAnalyzer")) && entry->isVisible());
+            QCOMPARE(entry->property("text").toString(),QString("Guitar tone analyzer…"));
+            click(entry); QTRY_VERIFY(dialog->property("visible").toBool());
+        };
+        // Nothing selected: it says so and Analyse is off.
+        tracks.setSelectedClipId(-1);
+        openIt();
+        auto* analyse=visualItem(window->contentItem(),"toneAnalyzerAnalyse"); QVERIFY(analyse);
+        auto* clipText=visualItem(window->contentItem(),"toneAnalyzerClip"); QVERIFY(clipText);
+        QVERIFY(clipText->property("text").toString().contains("Select an audio clip"));
+        QVERIFY(!analyse->isEnabled());
+        QVERIFY(!visualItem(window->contentItem(),"toneAnalyzerResult")->isVisible());
+        QTest::keyClick(window,Qt::Key_Escape); QTRY_VERIFY(!dialog->property("visible").toBool());
+
+        // The clip selected, said to be chords: analyse it.
+        tracks.setSelectedClipId(clipId);
+        openIt();
+        QTRY_VERIFY(analyse->isEnabled());
+        QVERIFY(visualItem(window->contentItem(),"toneAnalyzerPlayingAuto")->property("checked").toBool());
+        click(visualItem(window->contentItem(),"toneAnalyzerPlayingChords"));
+        QTRY_COMPARE(bridge->property("playing").toInt(),1);
+        click(analyse);
+        QTRY_VERIFY(visualItem(window->contentItem(),"toneAnalyzerCancel")->isVisible());
+        QTRY_VERIFY_WITH_TIMEOUT(bridge->property("hasResult").toBool() && !bridge->property("busy").toBool(),120000);
+        auto* summary=visualItem(window->contentItem(),"toneAnalyzerSummary"); QVERIFY(summary);
+        QTRY_VERIFY(summary->property("text").toString().startsWith("Chords"));
+        QVERIFY(visualItem(window->contentItem(),"toneAnalyzerCloseness")->property("text").toString().contains("dB off"));
+        QVERIFY(visualItem(window->contentItem(),"toneAnalyzerBands")->isVisible());
+        QVERIFY(visualItem(window->contentItem(),"toneAnalyzerPedals")->isVisible());
+        // The dialog fits the window and nothing in it runs past its edge.
+        auto* box=qobject_cast<QQuickItem*>(dialog->property("contentItem").value<QObject*>()); QVERIFY(box);
+        QVERIFY(box->mapToScene(QPointF(box->width(),0)).x()<=window->width());
+        QVERIFY(box->mapToScene(QPointF(0,box->height())).y()<=window->height());
+        QVERIFY(window->grabWindow().save(QDir::tempPath()+"/chaosmaker-tone-analyzer.png"));
+
+        // Save as preset: the suggested name, then one of our own.
+        auto* name=visualItem(window->contentItem(),"toneAnalyzerName"); QVERIFY(name);
+        QCOMPARE(name->property("text").toString(),QString("riff tone"));
+        name->setProperty("text","Found tone");
+        click(visualItem(window->contentItem(),"toneAnalyzerSave"));
+        QTRY_VERIFY(QFileInfo::exists(presets.path()+"/Found tone.gspreset"));
+        QVERIFY(visualItem(window->contentItem(),"toneAnalyzerMessage")->property("text").toString().contains("Found tone"));
+        // The same name again: refused, and it says why.
+        click(visualItem(window->contentItem(),"toneAnalyzerSave"));
+        QTRY_VERIFY(visualItem(window->contentItem(),"toneAnalyzerMessage")->property("text").toString().contains("already there"));
+        // Save as…: the file chooser opens in the default folder with the name; another name there is saved there.
+        auto* folderText=visualItem(window->contentItem(),"toneAnalyzerFolder"); QVERIFY(folderText);
+        QVERIFY(folderText->property("text").toString().contains(presets.path()));
+        QVERIFY(!visualItem(window->contentItem(),"toneAnalyzerResetFolder")->isVisible());
+        auto* picker=window->findChild<QObject*>("toneAnalyzerSaveAsDialog"); QVERIFY(picker);
+        auto* saveAs=visualItem(window->contentItem(),"toneAnalyzerSaveAs"); QVERIFY(saveAs);
+        click(saveAs); QTRY_VERIFY(picker->property("visible").toBool());
+        auto* content=qvariant_cast<QQuickItem*>(picker->property("contentItem")); QVERIFY(content);
+        auto* fileName=visualItemIn(content,"filePickerName"); QVERIFY(fileName);
+        auto* accept=visualItemIn(content,"filePickerAccept"); QVERIFY(accept);
+        QCOMPARE(picker->property("folder").toUrl(),QUrl::fromLocalFile(presets.path()));
+        QCOMPARE(fileName->property("text").toString(),QStringLiteral("Found tone.gspreset"));
+        QTRY_COMPARE(accept->property("text").toString(),QStringLiteral("Replace"));
+        fileName->setProperty("text","Picked");
+        QTRY_COMPARE(accept->property("text").toString(),QStringLiteral("Save"));
+        click(accept); QTRY_VERIFY(!picker->property("visible").toBool());
+        QTRY_VERIFY(QFileInfo::exists(presets.path()+"/Picked.gspreset"));
+        QVERIFY(!bridge->property("hasOwnDefaultFolder").toBool());
+        // With "also sets the default folder" ticked, a pick elsewhere becomes the default; "App folder" undoes it.
+        QTemporaryDir elsewhere; QVERIFY(elsewhere.isValid());
+        bridge->setProperty("presetFolder",QString());
+        click(visualItem(window->contentItem(),"toneAnalyzerMakeDefault"));
+        click(saveAs); QTRY_VERIFY(picker->property("visible").toBool());
+        picker->setProperty("folder",QUrl::fromLocalFile(elsewhere.path()));
+        fileName->setProperty("text","Mine");
+        QTRY_COMPARE(accept->property("text").toString(),QStringLiteral("Save"));
+        click(accept); QTRY_VERIFY(!picker->property("visible").toBool());
+        QTRY_VERIFY(QFileInfo::exists(elsewhere.path()+"/Mine.gspreset"));
+        QTRY_VERIFY(bridge->property("hasOwnDefaultFolder").toBool());
+        QTRY_VERIFY(folderText->property("text").toString().contains(elsewhere.path()));
+        auto* reset=visualItem(window->contentItem(),"toneAnalyzerResetFolder"); QVERIFY(reset);
+        QTRY_VERIFY(reset->isVisible());
+        click(reset);
+        QTRY_VERIFY(!bridge->property("hasOwnDefaultFolder").toBool());
+        QVERIFY(!folderText->property("text").toString().contains(elsewhere.path()));
+        click(visualItem(window->contentItem(),"toneAnalyzerClose")); QTRY_VERIFY(!dialog->property("visible").toBool());
     }
     void clip_takes_show_on_the_clip_the_menu_picks_one_and_punch_toggles() {
         TrackListWrapper tracks; tracks.setSampleRate(48000);
