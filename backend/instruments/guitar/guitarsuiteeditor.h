@@ -49,6 +49,12 @@ public:
     static std::vector<std::string> factoryPresetNames();
     static std::vector<std::string> availablePedals();
 
+    // The preset the pedalboard came from: a factory preset's name or a preset file's name;
+    // empty when the board was built by hand. presetEdited(): a pedal was added, removed, moved, bypassed or set since.
+    // Both are kept in the session data, so a project remembers them.
+    const std::string& presetName() const { return m_presetName; }
+    bool presetEdited() const { return m_presetEdited; }
+
     // Presets & persistence
     const std::string& presetFilePath() const { return m_presetFilePath; }
     void setPresetFilePath(std::string path) { m_presetFilePath = std::move(path); }
@@ -68,6 +74,8 @@ public:
         std::vector<std::shared_ptr<PedalSlot>> candidateSlots;
         int nextId = 1;
         double trim = 0.0;
+        std::string name;                  // the preset's own name, when it carries one
+        bool edited = false;
         bool needsAsync = false;
         std::string error;
     };
@@ -76,7 +84,8 @@ public:
         const std::string& directory,
         bool keepCalibrationAndCabinet = false);
 
-    void commitPreset(std::vector<std::shared_ptr<PedalSlot>> candidateSlots, int nextId, double trim);
+    void commitPreset(std::vector<std::shared_ptr<PedalSlot>> candidateSlots, int nextId, double trim,
+                      std::string name = {}, bool edited = false);
 
     // Worker thread resource preparation for IR loading
     static void prepareSlotResources(std::vector<std::shared_ptr<PedalSlot>>& slots, double rate, int frames);
@@ -95,6 +104,8 @@ public:
     bool restoreSessionData(std::string_view bytes);
 
 private:
+    void markEdited() { m_presetEdited = !m_presetName.empty(); }
+
     std::vector<std::shared_ptr<PedalSlot>> m_slots;
     std::function<void(std::shared_ptr<GuitarSuite>)> m_publisher;
     std::function<void(std::shared_ptr<GuitarSuite>)> m_playbackPublisher;
@@ -105,6 +116,8 @@ private:
     std::vector<PlaybackSlot> m_playbackSlots;
 
     std::string m_presetFilePath;
+    std::string m_presetName;
+    bool m_presetEdited = false;
     std::string m_lastError;
     int m_nextPedalId = 1;
     double m_inputTrimDb = 0.0;

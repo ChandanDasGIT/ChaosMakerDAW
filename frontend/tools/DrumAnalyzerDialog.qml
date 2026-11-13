@@ -8,7 +8,7 @@ import "../common"
 // pattern as a clip on a drum track under the audio, or saves its most typical two bars as a
 // groove. The analysis is DrumAnalyzerWrapper's; the project's BPM and meter are set here, the
 // way the transport bar sets them.
-Popup {
+ToolWindow {
     id: root
     property var trackModel: null
     // Where "Make clip" puts the pattern: -1 a new Acoustic Drums track, -2 a new Electronic
@@ -23,15 +23,9 @@ Popup {
     }
 
     objectName: "drumAnalyzerDialog"
-    parent: Overlay.overlay
-    x: Math.round((parent.width - width) / 2)
-    y: Math.round((parent.height - height) / 2)
+    title: "Drum pattern analyzer"
     width: 560
-    padding: 18
-    modal: true
-    focus: true
-    closePolicy: bridge.busy ? Popup.NoAutoClose : Popup.CloseOnEscape | Popup.CloseOnPressOutside
-    background: Rectangle { radius: 10; color: Theme.popupBg; border.color: Theme.popupBorder }
+    busy: bridge.busy                                       // no closing while it analyses
 
     onAboutToShow: {
         bridge.clipId = root.trackModel ? root.trackModel.selectedClipId : -1
@@ -47,7 +41,8 @@ Popup {
 
     readonly property var rowNames: ["Kick", "Snare", "Hi-hat"]
 
-    contentItem: ColumnLayout {
+    ColumnLayout {
+        width: parent.width
         spacing: 12
 
         // Title and the clip.
@@ -222,6 +217,7 @@ Popup {
                     visible: root.existingTracks.length > 0
                     Layout.fillWidth: true
                     model: root.existingTracks
+                    popup.margins: 4                    // the list stays inside this window
                     textRole: "name"
                     valueRole: "id"
                     displayText: currentIndex >= 0 ? currentText : "a drum track in the project…"

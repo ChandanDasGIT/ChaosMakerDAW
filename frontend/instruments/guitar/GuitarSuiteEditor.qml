@@ -27,7 +27,22 @@ Item {
                 text: "Load preset"
                 onClicked: loadPresetDialog.open()
             }
-
+            // The preset that is playing now.
+            Text {
+                text: "PRESET"
+                color: Theme.textMuted; font.pixelSize: 9; font.bold: true
+                Layout.leftMargin: 10
+            }
+            Text {
+                objectName: "guitarPresetName"
+                Layout.fillWidth: true
+                text: root.effectsModel.presetName.length === 0 ? "None (your own board)"
+                    : root.effectsModel.presetName + (root.effectsModel.presetEdited ? "  ·  edited" : "")
+                color: root.effectsModel.presetName.length === 0 ? Theme.textMuted : Theme.text
+                font.pixelSize: 12
+                font.bold: root.effectsModel.presetName.length > 0
+                elide: Text.ElideRight
+            }
         }
         RowLayout {
             Layout.fillWidth: true

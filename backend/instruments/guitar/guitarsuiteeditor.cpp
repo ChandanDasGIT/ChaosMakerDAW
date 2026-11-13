@@ -52,6 +52,7 @@ bool GuitarSuiteEditor::addPedal(const std::string& type)
     slot->processor = std::move(processor);
 
     m_slots.push_back(std::move(slot));
+    markEdited();
     publishChain();
     m_lastError.clear();
     return true;
@@ -66,6 +67,7 @@ bool GuitarSuiteEditor::removePedal(int pedalId)
     if (it == m_slots.end()) return false;
 
     m_slots.erase(it);
+    markEdited();
     publishChain();
     return true;
 }
@@ -81,6 +83,7 @@ bool GuitarSuiteEditor::movePedal(int from, int to)
     auto slot = std::move(m_slots[static_cast<std::size_t>(from)]);
     m_slots.erase(m_slots.begin() + from);
     m_slots.insert(m_slots.begin() + to, std::move(slot));
+    markEdited();
     publishChain();
     return true;
 }
@@ -90,6 +93,7 @@ bool GuitarSuiteEditor::setBypassed(int pedalId, bool bypassed)
     const auto slot = findSlot(pedalId);
     if (!slot) return false;
 
+    if (slot->bypassed.load(std::memory_order_relaxed) != bypassed) markEdited();
     slot->bypassed.store(bypassed, std::memory_order_relaxed);
     for (const auto& copy : m_playbackSlots) {
         if (copy.source == slot && copy.mirror) {
@@ -107,7 +111,9 @@ bool GuitarSuiteEditor::setParameter(int pedalId, const std::string& parameterId
 
     for (const auto& parameter : slot->processor->parameters()) {
         if (parameter && parameter->id == parameterId) {
+            const float before = parameter->get();
             parameter->set(static_cast<float>(value));
+            if (parameter->get() != before) markEdited();
             for (const auto& copy : m_playbackSlots) {
                 if (copy.source == slot && copy.mirror && copy.mirror->processor) {
                     for (const auto& mirrorParam : copy.mirror->processor->parameters()) {
@@ -235,10 +241,14 @@ bool GuitarSuiteEditor::savePresetTo(const std::string& filePath)
 {
     if (m_busy) return false;
     m_presetFilePath = filePath;
-    auto preset = GuitarSuitePreset::extractPresetData(m_slots, m_inputTrimDb);
+    // The preset is named after its file; what is playing is that preset from now on.
+    const std::string name = fs::path(filePath).stem().string();
+    auto preset = GuitarSuitePreset::extractPresetData(m_slots, m_inputTrimDb, name);
     if (!GuitarSuitePreset::saveToFile(filePath, preset, &m_lastError)) {
         return false;
     }
+    m_presetName = name;
+    m_presetEdited = false;
     m_lastError.clear();
     return true;
 }
@@ -282,7 +292,7 @@ bool GuitarSuiteEditor::loadPresetFrom(const std::string& filePath)
     if (candidate.needsAsync) {
         prepareSlotResources(candidate.candidateSlots, m_sampleRate, m_maxFrames);
     }
-    commitPreset(std::move(candidate.candidateSlots), candidate.nextId, candidate.trim);
+    commitPreset(std::move(candidate.candidateSlots), candidate.nextId, candidate.trim, fs::path(filePath).stem().string());
     return true;
 }
 
@@ -299,6 +309,8 @@ GuitarSuiteEditor::PresetLoadCandidate GuitarSuiteEditor::preparePresetData(
 
     const double trim = keepCalibrationAndCabinet ? m_inputTrimDb : parsed->inputTrimDb;
     result.trim = trim;
+    result.name = parsed->name;
+    result.edited = parsed->edited;
     int nextId = m_nextPedalId;
 
     if (!GuitarSuitePreset::instantiateSlots(
@@ -354,9 +366,13 @@ void GuitarSuiteEditor::prepareSlotResources(
 void GuitarSuiteEditor::commitPreset(
     std::vector<std::shared_ptr<PedalSlot>> candidateSlots,
     int nextId,
-    double trim)
+    double trim,
+    std::string name,
+    bool edited)
 {
     m_slots = std::move(candidateSlots);
+    m_presetName = std::move(name);
+    m_presetEdited = edited && !m_presetName.empty();
     m_nextPedalId = nextId;
     setInputTrimDb(trim);
     publishChain();
@@ -389,6 +405,7 @@ bool GuitarSuiteEditor::clearCabinetIr(int pedalId)
     if (it != m_slots.end()) {
         *it = std::move(slot);
     }
+    markEdited();
     publishChain();
     m_lastError.clear();
     return true;
@@ -428,13 +445,14 @@ bool GuitarSuiteEditor::replaceCabinetSlot(
     if (it != m_slots.end()) {
         *it = std::move(next);
     }
+    markEdited();
     publishChain();
     return true;
 }
 
 std::string GuitarSuiteEditor::sessionData() const
 {
-    auto preset = GuitarSuitePreset::extractPresetData(m_slots, m_inputTrimDb);
+    auto preset = GuitarSuitePreset::extractPresetData(m_slots, m_inputTrimDb, m_presetName, m_presetEdited);
     return GuitarSuitePreset::serialize(preset, "");
 }
 
@@ -448,6 +466,6 @@ bool GuitarSuiteEditor::restoreSessionData(std::string_view bytes)
     if (candidate.needsAsync) {
         prepareSlotResources(candidate.candidateSlots, m_sampleRate, m_maxFrames);
     }
-    commitPreset(std::move(candidate.candidateSlots), candidate.nextId, candidate.trim);
+    commitPreset(std::move(candidate.candidateSlots), candidate.nextId, candidate.trim, candidate.name, candidate.edited);
     return true;
 }

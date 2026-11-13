@@ -20,6 +20,7 @@ struct GuitarSuitePresetData {
     std::string format = "GuitarSuitePreset";
     int version = 1;
     std::string name;
+    bool edited = false;                   // changed since the preset of that name was loaded (sessions)
     double inputTrimDb = 0.0;
     std::vector<PedalPresetData> pedals;
 };
@@ -62,5 +63,6 @@ public:
     static GuitarSuitePresetData extractPresetData(
         const std::vector<std::shared_ptr<PedalSlot>>& slots,
         double inputTrimDb,
-        const std::string& name = {});
+        const std::string& name = {},
+        bool edited = false);
 };

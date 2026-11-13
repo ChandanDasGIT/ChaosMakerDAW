@@ -38,13 +38,12 @@ NEXT UP (2026-11-12), the user's order, easiest first:
   7. G21  Chord analyzer: DONE 2026-11-13 (uncommitted; the user took it before G22), see G21
           below. Right on rendered test songs; on the user's real songs the result is not
           checked (no trusted charts) and looks unsure: the user judges by ear.
-  8. G19  Guitar tone analyzer: DONE 2026-11-13 (uncommitted; the user took it before G22), see
-          G19 below. Matches the tone's colour to about 2-3 dB; how much gain it picks is the
-          unsure part. Only good on a guitar alone.
-     G19-G22 all open from the top bar's Tools menu (was "Options", renamed by the user
+  8. G19  Guitar tone analyzer: REMOVED 2026-11-13 by the user (it was not accurate and cannot
+          be made so), see G19 below.
+     G20-G22 all open from the top bar's Tools menu (was "Options", renamed by the user
      2026-11-12; Tap tempo… lives there too).
-  9. U7   Every tool opens as a window of its own, like the virtual MIDI (asked 2026-11-13),
-          see U7 below.
+  9. U7   Every tool opens as a window of its own, like the virtual MIDI: DONE 2026-11-13
+          (uncommitted), see U7 below.
  10. U6   Guitar FX panel UI, at the very end (ask the user what they want first).
   Everything the user chose to do later (G12 tempo / meter changes, C3b, C8, B1-B9 checks, F4,
   H1-H3 and the smaller "later" ideas L1-L6) is in docs/laterGator.txt.
@@ -569,48 +568,31 @@ Done items stay further down as the record.
         empty log.
         Not done: the line does not see the track's effects (it reads the dry clips); a full mix
         gives a jumpy line (one voice / one melody line only).
-[x] G19 Guitar tone analyzer. DONE 2026-11-13 (uncommitted). The user: analyse the guitar tone
-        of a clip (chords or solo), then save it as a custom GuitarSuite preset; no dry clip of
-        their own to supply. Hand-written, no downloads.
-        - backend/analysis/tonefeatures: measureTone(): the colour (third-octave bands 80 Hz -
-          8 kHz against their mean), the crest (50 ms windows, median), the level, chords or
-          single notes (the share of the time 3+ note names sound, by the chromagram), the
-          tail (time to fall 30 dB where the playing stops for a second; -1 when it never
-          does). Only the parts within 45 dB of the loud parts count. balanceDistance().
-        - backend/analysis/dryguitar: the built-in dry guitar the pedalboards are tried with (a
-          string model: delay loop, loss filter, pick and pickup combs, the pickup's
-          resonance, overtones falling off from 170 Hz and faster from 2 kHz), as strummed
-          open chords + muted power chords, or a pentatonic run; -30 dBFS like a guitar
-          plugged in. Its colour was set against the user's own DI recordings (measured only).
-        - backend/analysis/tonematch: matchTone(): 1. the gain (Clean / Crunch / High Gain x
-          6 drives, an Overdrive in front or not: 30 renders, by the crest mostly); 2. cabinet
-          model (1x12 / 2x12 / 4x12, built in, no IR file), bass, mid, treble, presence,
-          resonance, drive +-3, the Overdrive's tone, one at a time, twice; 3. the parametric
-          EQ's three bands where the colour is furthest off. Settings far from the middle
-          cost a little (the drive too, or every amp ends at 40). A gate in front; reverb by
-          the tail (a delay too for a solo with a long one). About 85 renders of 6 s, 15-20 s.
-        - wrapper ToneAnalyzerWrapper (selected clip, its first minute; worker thread,
-          progress, cancel): what it plays (found / chords / single notes), the gain, cabinet
-          and room in words, how close (dB and words), the bands {hz, want, got}, the pedals
-          {name, settings}; savePreset(name): "<name>.gspreset" in the default folder, a
-          taken name refused; savePresetTo(file, makeDefault): any file the user picks.
-          The default folder is the app's (AppData/GuitarSuite) until the user chooses one
-          (QSettings toneAnalyzer/presetFolder; setDefaultFolder, empty = the app's again).
-          Asked by the user 2026-11-13: "Save as preset" (default folder), "Save as…" (the
-          app's file chooser), a tick "Save as… also sets the default folder", "App folder".
-        - frontend/tools/ToneAnalyzerDialog.qml (Tools > Guitar tone analyzer…).
-        Tests: backendtests tonematch (features, dry guitar, a rendered high-gain tone found
-        again to 0.7 dB, a clean solo with reverb); wrappertests qttoneanalyzer; transport_ui
-        guitar_tone_analyzer_finds_a_pedalboard_for_the_selected_clip_and_saves_a_preset
-        (screenshot $TMPDIR/chaosmaker-tone-analyzer.png).
-        On the three references in local-reference (testing only; rock and metal are whole
-        songs): colour 2.6-3.4 dB off. The gain differs from the hand fits of 6.3 (needGuitar-
-        Stem: Crunch 34 + OD against High Gain 31.5 + OD; rock: High Gain 28 + OD against
-        Crunch 18; metal: Crunch 34 + OD against High Gain 32 + OD): the crest depends on the
-        playing as much as on the gain, so the channel is the part to check by ear.
-        Not done: loading the preset straight onto a guitar track (EngineController's
-        guitarSuite is one model, not the selected track's: GuitarSuite's Load preset is the
-        way); fxrender --analyze still has its own measuring code; IR files are never chosen.
+[-] G19 Guitar tone analyzer. REMOVED 2026-11-13 (the user: "not even close, I would rather not
+        have one if this is so bad"; asked for a clear yes or no on whether it can be made
+        accurate: no). Built and committed in bceefc0 (backend/analysis tonefeatures, dryguitar,
+        tonematch; wrapper ToneAnalyzerWrapper; frontend/tools/ToneAnalyzerDialog.qml; tests),
+        then taken out whole: the code is in git history only. Do not rebuild it.
+        Why it cannot be accurate (measured with the user's own dry guitar, local-reference/
+        sampleGuitarRaw.wav and soloGuitarRaw.wav, through known boards, and on
+        local-reference/Songs/needGuitarStem-ref.wav against the user's hand fit):
+        - It chose the gain by the crest, and on a real guitar the crest goes the wrong way
+          (6.8 dB on Clean 10, 10.6 dB on High Gain 34 + Overdrive), so channel and drive were
+          picked almost blindly; the EQ then bent the colour to fit, so it still said "2-3 dB
+          off". needGuitarStem: Crunch 34 found, the user's hand fit is High Gain 31.5.
+        - Every other gain cue tried moves as much with WHAT is played as with the gain (7-12 dB
+          between two halves of one recording, the whole gain range being about 15 dB), and
+          the same board distorts each guitar differently. From a recording alone the gain
+          cannot be told from the guitar and the playing. A tone is fitted by ear.
+        Kept from the same day (asked by the user): GuitarSuite shows the preset that is
+        playing ("PRESET  Jazz", "Jazz  ·  edited", "None (your own board)") next to Save /
+        Load preset. GuitarSuiteEditor presetName() / presetEdited(): set by a factory preset
+        (its name) or a preset file loaded or saved (the file's name); edited once a pedal is
+        added, removed, moved, bypassed or set to another value. Kept in the session data
+        ("name", "edited"), so a project remembers it; older projects show None.
+        Tests: backendtests guitarsuiteeditor, wrappertests qtpresets, transport_ui
+        factory_preset_picker_applies_djent_and_jazz.
+        Lesson: say "this will not be accurate" before building, not as a caveat afterwards.
 [x] G20 Drum pattern analyzer. DONE 2026-11-13 (committed). The user: the selected audio
         clip, whole songs from the start, kick / snare / hi-hat, also the time signature; out:
         a pattern clip on a drum track of the user's choice (a new Drums or Electronic Drums
@@ -883,15 +865,26 @@ the piano) and is reused here.
         Possible later: FLAC export, stems, block switching in the MP3 encoder.
 
 -- Tools as windows (asked 2026-11-13)
-[ ] U7  Every tool opens like a window, like the virtual MIDI (the on-screen piano,
-        frontend/transportbar/VirtualKeyboard.qml, a floating Window of its own).
-        Today the Tools menu's tools are Popups inside the main window: Tap tempo
-        (frontend/window/TapTempoDialog.qml) and the Drum / Chord / Tone analyzers
-        (frontend/tools/*AnalyzerDialog.qml). The BPM analyzer (G22) should be built as a
-        window from the start. Frontend only; keep each tool's content and look as they are
-        (no-unasked-redesign), and set the themed tooltip colours on each window (see U3).
-        To confirm with the user when planning: is Tap tempo included, and do the windows
-        stay on top of the main window like the piano.
+[x] U7  DONE 2026-11-13 (uncommitted). Every tool opens like a window, like the virtual MIDI
+        (the on-screen piano) and the FX panel: Tap tempo and the Drum / Chord analyzers (the
+        Tone analyzer too, until it was removed, see G19)
+        were Popups inside the main window; each is now a floating window of its own (Qt.Tool,
+        stays on top, moved freely, the app behind stays usable).
+        - frontend/common/ToolWindow.qml: the shared base. As wide as the tool says and as tall
+          as its content (not resizable); open() centres it on the app the first time, then it
+          stays where the user left it; Escape, Close or the window's own close hide it and the
+          main window takes the keyboard back; themed tooltip colours (as U3). While an
+          analysis runs (busy) it does not close, as before: Cancel first.
+        - frontend/window/TapTempoDialog.qml and frontend/tools/*AnalyzerDialog.qml are
+          ToolWindows; their content and look are unchanged (file and object names kept).
+          Space / T tap while the tap window has the keyboard. The analyzers' track lists
+          open inside the tool's own window.
+        - Unchanged: a tool reads the selected clip when it is opened; with the window left
+          open, choose Tools > … again to take a newly selected clip.
+        - G22 (BPM analyzer): build it as a ToolWindow from the start.
+        Tests (transporttests): tap_tempo_sets_the_bpm_from_the_tools_window_and_shift_t,
+        drum_pattern_analyzer_*, chord_analyzer_* (each checks the
+        tool is a Qt.Tool window apart from the main one, Escape closes it, it fits its content).
 
 -- At the end (the user, 2026-11-10)
 [ ] U6  A better UI for the guitar FX panel (GuitarSuite: pedal cards, amp, cabinet, tuner).

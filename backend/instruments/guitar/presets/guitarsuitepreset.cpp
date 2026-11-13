@@ -43,6 +43,7 @@ std::optional<GuitarSuitePresetData> GuitarSuitePreset::parse(
     if (j.contains("name") && j["name"].is_string()) {
         data.name = j["name"].get<std::string>();
     }
+    data.edited = !data.name.empty() && j.contains("edited") && j["edited"].is_boolean() && j["edited"].get<bool>();
 
     if (j.contains("inputTrimDb")) {
         if (!j["inputTrimDb"].is_number()) {
@@ -155,6 +156,7 @@ std::string GuitarSuitePreset::serialize(
     j["pedals"] = pedalsArray;
     if (!preset.name.empty()) {
         j["name"] = preset.name;
+        if (preset.edited) j["edited"] = true;
     }
 
     return j.dump(2);
@@ -315,10 +317,12 @@ bool GuitarSuitePreset::instantiateSlots(
 GuitarSuitePresetData GuitarSuitePreset::extractPresetData(
     const std::vector<std::shared_ptr<PedalSlot>>& slots,
     double inputTrimDb,
-    const std::string& name)
+    const std::string& name,
+    bool edited)
 {
     GuitarSuitePresetData data;
     data.name = name;
+    data.edited = edited && !name.empty();
     data.inputTrimDb = inputTrimDb;
 
     for (const auto& slot : slots) {
