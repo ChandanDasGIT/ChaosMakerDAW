@@ -27,6 +27,10 @@ class GuitarSuiteEditorWrapper : public QAbstractListModel {
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     Q_PROPERTY(QString presetFilePath READ presetFilePath NOTIFY presetFilePathChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
+    // The preset that is playing (a factory preset or a preset file); empty when the board was
+    // built by hand. presetEdited: changed since.
+    Q_PROPERTY(QString presetName READ presetName NOTIFY presetNameChanged)
+    Q_PROPERTY(bool presetEdited READ presetEdited NOTIFY presetNameChanged)
     // Editor rules from backend pedaleditorrules (lists, tuner texts, per-pedal features).
     Q_PROPERTY(QStringList beatDivisionNames READ beatDivisionNames CONSTANT)
     Q_PROPERTY(QStringList tunerStringLabels READ tunerStringLabels CONSTANT)
@@ -59,6 +63,8 @@ public:
     void setInputTrimDb(double db);
     QString presetFilePath() const;
     QString lastError() const;
+    QString presetName() const { return QString::fromStdString(m_editor.presetName()); }
+    bool presetEdited() const { return m_editor.presetEdited(); }
 
     void setPublisher(std::function<void(std::shared_ptr<GuitarSuite>)> publisher);
     void setPlaybackPublisher(std::function<void(std::shared_ptr<GuitarSuite>)> publisher);
@@ -106,12 +112,19 @@ signals:
     void countChanged();
     void presetFilePathChanged();
     void lastErrorChanged();
+    void presetNameChanged();
 
 private:
     QVariantList parameterList(const PedalSlot& slot) const;
     void setBusy(bool busy);
     void setError(const QString& message);
-    bool loadPresetData(const QByteArray& bytes, const QString& directory, bool keepCalibrationAndCabinet = false);
+    // name: what the preset is called here (a null string: the name the data carries).
+    bool loadPresetData(const QByteArray& bytes, const QString& directory, bool keepCalibrationAndCabinet = false,
+                        const QString& name = {});
+    void notePreset();                                     // presetNameChanged when either changed
+
+    QString m_notedName;
+    bool m_notedEdited = false;
 
     GuitarSuiteEditor m_editor;
 };

@@ -8,7 +8,7 @@ import "../common"
 // a clip that plays them under the song when asked, or copies the chart as text. The analysis
 // is ChordAnalyzerWrapper's; the project's BPM and meter are set here, the way the transport
 // bar sets them.
-Popup {
+ToolWindow {
     id: root
     property var trackModel: null
     // Where "Put on track" puts the chords: -1 a new Chords track, else the id of a Chords track
@@ -27,15 +27,9 @@ Popup {
     }
 
     objectName: "chordAnalyzerDialog"
-    parent: Overlay.overlay
-    x: Math.round((parent.width - width) / 2)
-    y: Math.round((parent.height - height) / 2)
+    title: "Chord analyzer"
     width: 620
-    padding: 18
-    modal: true
-    focus: true
-    closePolicy: bridge.busy ? Popup.NoAutoClose : Popup.CloseOnEscape | Popup.CloseOnPressOutside
-    background: Rectangle { radius: 10; color: Theme.popupBg; border.color: Theme.popupBorder }
+    busy: bridge.busy                                       // no closing while it analyses
 
     onAboutToShow: {
         bridge.clipId = root.trackModel ? root.trackModel.selectedClipId : -1
@@ -48,7 +42,8 @@ Popup {
         trackModel: root.trackModel ? root.trackModel : null
     }
 
-    contentItem: ColumnLayout {
+    ColumnLayout {
+        width: parent.width
         spacing: 12
 
         // Title and the clip.
@@ -226,6 +221,7 @@ Popup {
                     objectName: "chordAnalyzerTarget"
                     Layout.fillWidth: true
                     model: root.targets
+                    popup.margins: 4                    // the list stays inside this window
                     textRole: "name"
                     valueRole: "id"
                     onActivated: root.target = currentValue

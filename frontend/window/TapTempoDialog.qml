@@ -5,15 +5,15 @@ import "../common"
 
 // Tap tempo (restMap G17), opened from Tools > Tap tempo…: a big pad to click in time (or
 // Space / T while open), the BPM it gives, and a way back to the BPM from before. The taps
-// themselves are counted by the transport bar's tempo field; this popup asks for them.
-Popup {
+// themselves are counted by the transport bar's tempo field; this window asks for them.
+ToolWindow {
     id: root
     property real bpm: 120                 // the project's BPM now
     property int tapCount: 0               // taps in the current count
     signal tapRequested()
     signal bpmEdited(real value)           // "Back to …"
 
-    property real startBpm: 120            // the BPM when the popup opened
+    property real startBpm: 120            // the BPM when the window opened
     property bool paused: true             // no tap for over 2 s: the next one starts a new count
 
     function tap() {
@@ -24,25 +24,19 @@ Popup {
     }
 
     objectName: "tapTempoDialog"
-    parent: Overlay.overlay
-    x: Math.round((parent.width - width) / 2)
-    y: Math.round((parent.height - height) / 2)
+    title: "Tap tempo"
     width: 320
-    padding: 18
-    modal: true
-    focus: true
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
     onAboutToShow: { root.startBpm = root.bpm; root.paused = true }
     onOpened: keys.forceActiveFocus()
-    background: Rectangle { radius: 10; color: Theme.popupBg; border.color: Theme.popupBorder }
 
     Timer { id: pauseTimer; interval: 2000; onTriggered: root.paused = true }
 
-    contentItem: Item {
+    Item {
         id: keys
-        implicitHeight: column.implicitHeight
+        width: parent.width
+        height: column.implicitHeight
         focus: true
-        // Space and T tap here: taken before the window's shortcuts (Space would play).
+        // Space and T tap here, while this window has the keyboard.
         Keys.onShortcutOverride: event => {
             if (event.key === Qt.Key_Space || event.key === Qt.Key_T) event.accepted = true
         }

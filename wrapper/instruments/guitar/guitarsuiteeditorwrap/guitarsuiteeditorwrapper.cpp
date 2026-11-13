@@ -154,6 +154,7 @@ bool GuitarSuiteEditorWrapper::addPedal(const QString& type)
     endInsertRows();
     emit countChanged();
     setError({});
+    notePreset();
     return true;
 }
 
@@ -168,6 +169,7 @@ bool GuitarSuiteEditorWrapper::removePedal(int pedalId)
     endRemoveRows();
     if (ok) {
         emit countChanged();
+        notePreset();
     }
     return ok;
 }
@@ -184,6 +186,7 @@ bool GuitarSuiteEditorWrapper::movePedal(int from, int to)
 
     bool ok = m_editor.movePedal(from, to);
     endMoveRows();
+    notePreset();
     return ok;
 }
 
@@ -197,6 +200,7 @@ bool GuitarSuiteEditorWrapper::setBypassed(int pedalId, bool bypassed)
 
     const QModelIndex changed = index(row, 0);
     emit dataChanged(changed, changed, {BypassedRole});
+    notePreset();
     return true;
 }
 
@@ -210,6 +214,7 @@ bool GuitarSuiteEditorWrapper::setParameter(int pedalId, const QString& paramete
 
     const QModelIndex changed = index(row, 0);
     emit dataChanged(changed, changed, {ParametersRole});
+    notePreset();
     return true;
 }
 
@@ -228,6 +233,7 @@ bool GuitarSuiteEditorWrapper::savePreset()
         return false;
     }
     setError({});
+    notePreset();
     return true;
 }
 
@@ -273,7 +279,7 @@ bool GuitarSuiteEditorWrapper::loadPreset()
         setError(QStringLiteral("GuitarSuite preset is too large."));
         return false;
     }
-    return loadPresetData(file.readAll(), QFileInfo(file).absolutePath());
+    return loadPresetData(file.readAll(), QFileInfo(file).absolutePath(), false, QFileInfo(file).completeBaseName());
 }
 
 bool GuitarSuiteEditorWrapper::applyFactoryPreset(const QString& name)
@@ -288,13 +294,22 @@ bool GuitarSuiteEditorWrapper::applyFactoryPreset(const QString& name)
         setError(QStringLiteral("Could not open GuitarSuite factory preset."));
         return false;
     }
-    return loadPresetData(file.readAll(), {}, true);
+    return loadPresetData(file.readAll(), {}, true, name);
+}
+
+void GuitarSuiteEditorWrapper::notePreset()
+{
+    if (presetName() == m_notedName && presetEdited() == m_notedEdited) return;
+    m_notedName = presetName();
+    m_notedEdited = presetEdited();
+    emit presetNameChanged();
 }
 
 bool GuitarSuiteEditorWrapper::loadPresetData(
     const QByteArray& bytes,
     const QString& directory,
-    bool keepCalibrationAndCabinet)
+    bool keepCalibrationAndCabinet,
+    const QString& name)
 {
     auto candidate = m_editor.preparePresetData(
         std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())),
@@ -306,13 +321,18 @@ bool GuitarSuiteEditorWrapper::loadPresetData(
         return false;
     }
 
+    // A name given here is a preset just taken: not edited yet. None given: the data's own (a session).
+    const std::string presetName = name.isNull() ? candidate.name : name.toStdString();
+    const bool presetEdited = name.isNull() && candidate.edited;
+
     if (!candidate.needsAsync) {
         beginResetModel();
-        m_editor.commitPreset(std::move(candidate.candidateSlots), candidate.nextId, candidate.trim);
+        m_editor.commitPreset(std::move(candidate.candidateSlots), candidate.nextId, candidate.trim, presetName, presetEdited);
         endResetModel();
         emit countChanged();
         emit inputTrimDbChanged();
         setError({});
+        notePreset();
         return true;
     }
 
@@ -330,7 +350,7 @@ bool GuitarSuiteEditorWrapper::loadPresetData(
     const int nextId = candidate.nextId;
     const double trim = candidate.trim;
 
-    connect(watcher, &QFutureWatcher<AsyncResult>::finished, this, [this, watcher, nextId, trim] {
+    connect(watcher, &QFutureWatcher<AsyncResult>::finished, this, [this, watcher, nextId, trim, presetName, presetEdited] {
         auto result = watcher->result();
         watcher->deleteLater();
         setBusy(false);
@@ -341,11 +361,12 @@ bool GuitarSuiteEditorWrapper::loadPresetData(
         }
 
         beginResetModel();
-        m_editor.commitPreset(std::move(result.candidateSlots), nextId, trim);
+        m_editor.commitPreset(std::move(result.candidateSlots), nextId, trim, presetName, presetEdited);
         endResetModel();
         emit countChanged();
         emit inputTrimDbChanged();
         setError({});
+        notePreset();
     });
 
     auto candidatePedals = std::move(candidate.candidateSlots);
@@ -434,6 +455,7 @@ bool GuitarSuiteEditorWrapper::loadCabinetIr(int pedalId, const QUrl& url)
                 const auto changed = index(changedRow);
                 emit dataChanged(changed, changed, {ParametersRole, ResourcePathRole});
             }
+            notePreset();
         }
     });
 
@@ -463,6 +485,7 @@ bool GuitarSuiteEditorWrapper::clearCabinetIr(int pedalId)
     const auto changed = index(row);
     emit dataChanged(changed, changed, {ParametersRole, ResourcePathRole});
     setError({});
+    notePreset();
     return true;
 }
 

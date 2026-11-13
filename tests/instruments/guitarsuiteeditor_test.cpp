@@ -65,3 +65,47 @@ TEST(guitarsuiteeditor, session_data_roundtrip) {
     CHECK(restored.slotAt(1)->type == "pedal.delay");
     CHECK(!restored.slotAt(1)->bypassed.load());
 }
+
+TEST(guitarsuiteeditor, the_preset_playing_is_named_marked_edited_and_kept_by_the_session) {
+    GuitarSuiteEditor editor;
+    CHECK(editor.presetName().empty() && !editor.presetEdited());
+    CHECK(editor.addPedal("pedal.overdrive"));
+    CHECK(editor.presetName().empty() && !editor.presetEdited());     // a board built by hand has no name
+
+    // A preset taken under a name: that name, not edited.
+    auto candidate = editor.preparePresetData(editor.sessionData(), "");
+    CHECK(candidate.error.empty() && candidate.name.empty());
+    editor.commitPreset(std::move(candidate.candidateSlots), candidate.nextId, candidate.trim, "Found tone");
+    CHECK(editor.presetName() == "Found tone" && !editor.presetEdited());
+    const int id = editor.slotAt(0)->id;
+    // Setting a knob to what it already is, or the bypass to what it is, is no edit.
+    const auto& drive = editor.slotAt(0)->processor->parameters().front();
+    CHECK(editor.setParameter(id, drive->id, drive->get()));
+    CHECK(editor.setBypassed(id, false));
+    CHECK(!editor.presetEdited());
+    CHECK(editor.setBypassed(id, true));
+    CHECK(editor.presetName() == "Found tone" && editor.presetEdited());
+
+    // The session keeps the name and the mark.
+    GuitarSuiteEditor restored;
+    CHECK(restored.restoreSessionData(editor.sessionData()));
+    CHECK(restored.presetName() == "Found tone" && restored.presetEdited());
+    // Adding, moving and removing pedals are edits too.
+    for (int kind = 0; kind < 3; ++kind) {
+        GuitarSuiteEditor other;
+        CHECK(other.addPedal("pedal.overdrive") && other.addPedal("pedal.reverb"));
+        auto c = other.preparePresetData(other.sessionData(), "");
+        other.commitPreset(std::move(c.candidateSlots), c.nextId, c.trim, "Two");
+        CHECK(!other.presetEdited());
+        if (kind == 0) CHECK(other.addPedal("pedal.delay"));
+        if (kind == 1) CHECK(other.movePedal(0, 1));
+        if (kind == 2) CHECK(other.removePedal(other.slotAt(0)->id));
+        CHECK(other.presetEdited());
+        // Not edited round the session: the name alone.
+        auto again = other.preparePresetData(other.sessionData(), "");
+        other.commitPreset(std::move(again.candidateSlots), again.nextId, again.trim, again.name);
+        GuitarSuiteEditor clean;
+        CHECK(clean.restoreSessionData(other.sessionData()));
+        CHECK(clean.presetName() == "Two" && !clean.presetEdited());
+    }
+}

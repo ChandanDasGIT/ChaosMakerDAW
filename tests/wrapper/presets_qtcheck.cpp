@@ -218,6 +218,29 @@ TEST(qtpresets, factory_presets_preserve_cached_cabinet_and_allow_custom_save_lo
     CHECK(model.data(model.index(4),GuitarSuiteModel::BypassedRole).toBool());CHECK(model.inputTrimDb()==-5);
 }
 
+TEST(qtpresets, the_board_says_which_preset_is_playing_and_whether_it_was_changed) {
+    Fixture fixture; GuitarSuiteModel model;
+    model.setPublisher([](auto){});
+    int changes=0; QObject::connect(&model,&GuitarSuiteModel::presetNameChanged,[&]{++changes;});
+    CHECK(model.presetName().isEmpty());CHECK(!model.presetEdited());
+    CHECK(model.addPedal("Overdrive"));CHECK(model.presetName().isEmpty());CHECK(changes==0);
+    // A factory preset: its name; a knob moved: edited; the same preset again: as new.
+    CHECK(model.applyFactoryPreset("Jazz"));CHECK(model.presetName()=="Jazz");CHECK(!model.presetEdited());CHECK(changes==1);
+    CHECK(model.setParameter(id(model,1),"master",-7));CHECK(model.presetEdited());CHECK(changes==2);
+    CHECK(model.setParameter(id(model,1),"master",-8));CHECK(changes==2);
+    // The session keeps both.
+    { GuitarSuiteModel other; other.setPublisher([](auto){});
+      CHECK(other.restoreSessionData(model.sessionData()));CHECK(other.presetName()=="Jazz");CHECK(other.presetEdited()); }
+    CHECK(model.applyFactoryPreset("Jazz"));CHECK(!model.presetEdited());CHECK(changes==3);
+    // Saved to a file: named after the file, and so is a file loaded.
+    CHECK(model.setBypassed(id(model,0),true));CHECK(model.presetEdited());
+    CHECK(model.savePresetTo(fixture.url("My clean.gspreset")));
+    CHECK(model.presetName()=="My clean");CHECK(!model.presetEdited());
+    CHECK(model.applyFactoryPreset("Djent"));CHECK(model.presetName()=="Djent");
+    CHECK(model.loadPresetFrom(fixture.url("My clean.gspreset")));wait(model);
+    CHECK(model.presetName()=="My clean");CHECK(!model.presetEdited());
+}
+
 TEST(qtpresets, session_roundtrip_keeps_audio_controls_tempo_and_tremolo_sustain) {
     Fixture f; TrackListWrapper tracks;
     const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar");
