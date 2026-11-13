@@ -205,7 +205,7 @@ if(DAW_BUILD_APP)
                       frontend/tempo/TempoEditor.qml frontend/tempo/MeterEditor.qml
                       frontend/icons/MetronomeIcon.qml frontend/icons/MagnetIcon.qml
                       frontend/instruments/guitar/GuitarSuitePanel.qml
-                      frontend/instruments/guitar/GuitarSuiteEditor.qml
+                      frontend/instruments/guitar/GuitarSuiteEditor.qml frontend/instruments/guitar/SignalChainBar.qml
                       frontend/instruments/harmonium/HarmoniumEditor.qml
                       frontend/instruments/synth/SynthEditor.qml
                       frontend/instruments/bass/BassEditor.qml

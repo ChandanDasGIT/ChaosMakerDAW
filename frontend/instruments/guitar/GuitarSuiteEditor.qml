@@ -10,7 +10,35 @@ Item {
     property var levels: EngineController.monitorLevels
     // Pedal card size: wide enough for a name | slider | value row per parameter.
     readonly property real cardWidth: 276
-    readonly property real cardStep: cardWidth + 12
+    // The board is the signal chain: IN jack, a cable, each pedal with a cable after it, OUT jack.
+    readonly property real jackWidth: 44
+    readonly property real cableLength: 34
+    readonly property real cardStep: cardWidth + cableLength
+    readonly property real cardTop: 24          // room above the cards for the bypass arcs
+    readonly property real cableY: cardTop + 19 // cables run at the height of a card's title
+    function slotX(slot) { return jackWidth + cableLength + slot * cardStep }
+    // A pedal being dragged (restMap U8 H4): the others slide aside to show where it lands.
+    property int dragFrom: -1
+    property int dragTo: -1
+    function visualSlot(index) {
+        if (dragFrom < 0 || index === dragFrom) return dragFrom < 0 ? index : dragTo
+        if (dragFrom < dragTo && index > dragFrom && index <= dragTo) return index - 1
+        if (dragTo < dragFrom && index >= dragTo && index < dragFrom) return index + 1
+        return index
+    }
+    // Bring a pedal into view on the board (from the chain bar), with a short highlight.
+    property int flashIndex: -1
+    function showPedal(index) {
+        boardScroll.to = Math.max(0, Math.min(pedalScroll.contentWidth - pedalScroll.width,
+                                              slotX(index) - cableLength - 12))
+        boardScroll.restart()
+        flashIndex = index
+        flashTimer.restart()
+    }
+    function slotAt(x) {
+        const count = root.effectsModel ? root.effectsModel.count : 0
+        return Math.max(0, Math.min(count - 1, Math.round((x - slotX(0)) / cardStep)))
+    }
     signal clearClipsRequested()
     ColumnLayout {
         enabled: root.effectsModel && !root.effectsModel.busy
@@ -138,16 +166,33 @@ Item {
             Text {
                 text: "Scroll inside a pedal for all controls"
                 color: Theme.textMuted; font.pixelSize: Theme.captionSize
-                Layout.fillWidth: true; horizontalAlignment: Text.AlignRight
+                Layout.fillWidth: true; horizontalAlignment: Text.AlignRight; elide: Text.ElideRight
             }
+        }
+        SignalChainBar {
+            id: chainBar
+            objectName: "guitarChainBar"
+            Layout.fillWidth: true
+            effectsModel: root.effectsModel
+            boardFrom: root.dragFrom
+            boardTo: root.dragTo
+            onPedalClicked: index => root.showPedal(index)
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.divider }
         Flickable {
             id: pedalScroll
+            NumberAnimation { id: boardScroll; target: pedalScroll; property: "contentX"; duration: 280; easing.type: Easing.OutCubic }
+            // A shorter chain (pedals removed): never stay scrolled past its end.
+            // (A scroll still running towards a pedal that is gone stops first.)
+            onContentWidthChanged: {
+                if (boardScroll.running && boardScroll.to > contentWidth - width) boardScroll.stop()
+                contentX = Math.max(0, Math.min(contentX, contentWidth - width))
+            }
+            Timer { id: flashTimer; interval: 700; onTriggered: root.flashIndex = -1 }
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            contentWidth: Math.max(width, pedalCards.count * root.cardStep)
+            contentWidth: Math.max(width, root.slotX(pedalCards.count) + root.jackWidth + 8)
             contentHeight: height
             boundsBehavior: Flickable.StopAtBounds
             // More pedals than fit: the bar stays on screen, so a cut-off pedal is seen to scroll.
@@ -155,10 +200,45 @@ Item {
             ScrollBar.horizontal: ScrollBar { id: pedalScrollBar; objectName: "guitarPedalScrollBar"; policy: pedalScroll.overflowing ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff }
             Text {
                 visible: root.effectsModel.count === 0
-                anchors.centerIn: parent
+                x: root.slotX(0) + 8
+                y: root.cableY + 24
                 text: "Choose a pedal above to build your chain."
                 color: Theme.textMuted
                 font.pixelSize: Theme.smallSize
+            }
+            // The guitar goes in here ...
+            component Jack: Rectangle {
+                property string label
+                width: root.jackWidth; height: 30
+                y: root.cableY - height / 2
+                radius: Theme.controlRadius
+                color: Theme.guitarSuite.jack
+                border.color: Theme.guitarSuite.cable
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 4
+                    Rectangle { width: 8; height: 8; radius: 4; anchors.verticalCenter: parent.verticalCenter; color: Theme.guitarSuite.jackSocket; border.color: Theme.guitarSuite.cable }
+                    Text { text: parent.parent.label; color: Theme.text; font.pixelSize: Theme.microSize; font.bold: true; anchors.verticalCenter: parent.verticalCenter }
+                }
+            }
+            Jack { objectName: "guitarChainIn"; label: "IN"; x: 0 }
+            Jack { objectName: "guitarChainOut"; label: "OUT"; x: root.slotX(pedalCards.count) }
+            // ... and through a cable before each pedal and one after the last, out to OUT.
+            Repeater {
+                model: pedalCards.count + 1
+                delegate: Item {
+                    required property int index
+                    objectName: "guitarChainCable" + index
+                    x: root.slotX(index) - root.cableLength
+                    y: root.cableY - 5
+                    width: root.cableLength; height: 10
+                    Rectangle { x: 2; width: parent.width - 8; height: 2; anchors.verticalCenter: parent.verticalCenter; color: Theme.guitarSuite.cable }
+                    Text {   // arrow head: the way the signal goes
+                        anchors.right: parent.right; anchors.rightMargin: 1
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: Icons.signalFlow; color: Theme.guitarSuite.cable; font.pixelSize: Theme.microSize
+                    }
+                }
             }
             Repeater {
                 id: pedalCards
@@ -190,38 +270,92 @@ Item {
                             if (parameter.id === id) return parameter.value
                         return fallback
                     }
-                    x: index * root.cardStep
-                    y: 4
+                    objectName: "guitarPedal" + index
+                    readonly property bool isAmp: pedalType === "pedal.amp"
+                    readonly property bool isCabinet: pedalType === "pedal.cabinet"
+                    readonly property bool dragging: dragArea.drag.active
+                    // Its place in the chain; while another pedal is dragged, where it slides to.
+                    x: root.slotX(root.visualSlot(index))
+                    Behavior on x {
+                        enabled: !pedalCard.dragging
+                        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                    }
+                    y: root.cardTop
+                    z: dragging ? 10 : 1
                     width: root.cardWidth
-                    height: pedalScroll.height - 12 - (pedalScroll.overflowing ? pedalScrollBar.height + 2 : 0)
+                    height: pedalScroll.height - root.cardTop - 8 - (pedalScroll.overflowing ? pedalScrollBar.height + 2 : 0)
                     radius: Theme.panelRadius
                     color: Theme.guitarSuite.card
-                    border.color: dragArea.drag.active ? Theme.accent : Theme.guitarSuite.cardBorder
-                    Drag.source: pedalCard
-                    Drag.keys: ["guitarsuite-pedal"]
-                    Drag.hotSpot.x: width / 2
-                    Drag.hotSpot.y: 18
-                    Drag.active: dragArea.drag.active
+                    border.color: dragging || root.flashIndex === index ? Theme.accent : Theme.guitarSuite.cardBorder
+                    Behavior on border.color { ColorAnimation { duration: 200 } }
+                    // Lifted while dragged.
+                    scale: dragging ? 1.02 : 1
+                    Behavior on scale { NumberAnimation { duration: 120 } }
+                    // The amp and the cabinet stand out in the chain: a band in their own colour.
+                    Rectangle {
+                        objectName: "guitarPedalBand" + pedalCard.pedalId
+                        visible: pedalCard.isAmp || pedalCard.isCabinet
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                        anchors.margins: 1
+                        height: 4
+                        radius: 2
+                        color: pedalCard.isAmp ? Theme.guitarSuite.ampBand : Theme.guitarSuite.cabinetBand
+                    }
+                    // A bypassed pedal: the signal goes over it (a dashed arc from cable to cable).
+                    Canvas {
+                        objectName: "guitarBypassArc" + pedalCard.pedalId
+                        visible: pedalCard.isBypassed && !pedalCard.dragging
+                        x: -root.cableLength / 2
+                        y: -root.cardTop + 2
+                        width: pedalCard.width + root.cableLength
+                        height: root.cableY - 2 + 6
+                        onVisibleChanged: requestPaint()
+                        onWidthChanged: requestPaint()
+                        onPaint: {
+                            const ctx = getContext("2d")
+                            ctx.reset()
+                            ctx.strokeStyle = Theme.guitarSuite.cable
+                            ctx.lineWidth = 2
+                            ctx.setLineDash([4, 3])
+                            const bottom = height - 6, top = 4, r = 14
+                            ctx.beginPath()
+                            ctx.moveTo(1, bottom)
+                            ctx.lineTo(1, top + r)
+                            ctx.quadraticCurveTo(1, top, 1 + r, top)
+                            ctx.lineTo(width - 1 - r, top)
+                            ctx.quadraticCurveTo(width - 1, top, width - 1, top + r)
+                            ctx.lineTo(width - 1, bottom)
+                            ctx.stroke()
+                        }
+                    }
 
                     ColumnLayout {
                         anchors.fill: parent
                         anchors.margins: 10
                         spacing: 7
+                        opacity: pedalCard.isBypassed ? 0.55 : 1
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
                         RowLayout {
                             Layout.fillWidth: true
                             MouseArea {
                                 id: dragArea
+                                objectName: "guitarPedalGrip" + pedalCard.index
                                 Layout.preferredWidth: 22
                                 Layout.preferredHeight: 26
-                                cursorShape: Qt.OpenHandCursor
+                                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                                 Accessible.role: Accessible.Grip
                                 Accessible.name: "Drag to reorder pedal"
                                 drag.target: pedalCard
                                 drag.axis: Drag.XAxis
-                                onReleased: {
-                                    pedalCard.Drag.drop()
-                                    pedalCard.x = Qt.binding(function() { return pedalCard.index * root.cardStep })
-                                }
+                                drag.minimumX: root.slotX(0) - root.cableLength
+                                drag.maximumX: root.slotX(Math.max(0, pedalCards.count - 1)) + root.cableLength
+                                drag.threshold: 4
+                                onPressed: { root.dragFrom = pedalCard.index; root.dragTo = pedalCard.index }
+                                // The others slide as the card passes their middle.
+                                onPositionChanged: if (drag.active) root.dragTo = root.slotAt(pedalCard.x)
+                                // After the drag has ended, so the card glides (its animation is off while dragging).
+                                onReleased: Qt.callLater(pedalCard.finishDrag)
+                                onCanceled: Qt.callLater(pedalCard.finishDrag)
                                 Text { anchors.centerIn: parent; text: Icons.dragHandle; color: Theme.textMuted; font.pixelSize: 18 }
                                 ToolTip.visible: containsMouse
                                 ToolTip.text: "Drag to reorder"
@@ -229,6 +363,7 @@ Item {
                             }
                             Text { text: pedalCard.pedalName.toUpperCase(); color: Theme.text; font.pixelSize: Theme.smallSize; font.bold: true; font.letterSpacing: 0.7; Layout.fillWidth: true }
                             ToggleChip {
+                                objectName: "guitarPedalOn" + pedalCard.index
                                 active: !pedalCard.isBypassed
                                 text: pedalCard.isBypassed ? "BYP" : "ON"; textSize: Theme.microSize
                                 onClicked: root.effectsModel.setBypassed(pedalCard.pedalId, !pedalCard.isBypassed)
@@ -507,13 +642,29 @@ Item {
                         nameFilters: ["WAV impulse responses (*.wav *.WAV)"]
                         onAccepted: root.effectsModel.loadCabinetIr(pedalCard.pedalId, selectedFile)
                     }
-                    DropArea {
-                        enabled: !dragArea.drag.active
-                        anchors.fill: parent
-                        keys: ["guitarsuite-pedal"]
-                        onDropped: function(drop) {
-                            if (drop.source && drop.source.index !== pedalCard.index)
-                                root.effectsModel.movePedal(drop.source.index, pedalCard.index)
+                    // Drop: one move in the chain; the card glides from where it was let go into
+                    // its slot (its x binding comes back and animates).
+                    function finishDrag() {
+                        const from = root.dragFrom, to = root.dragTo
+                        root.dragFrom = -1; root.dragTo = -1
+                        pedalCard.x = Qt.binding(function() { return root.slotX(root.visualSlot(pedalCard.index)) })
+                        if (from >= 0 && to >= 0 && from !== to) root.effectsModel.movePedal(from, to)
+                    }
+                    // Near the board's edge while dragging: the board scrolls, the card stays under the mouse.
+                    Timer {
+                        interval: 16
+                        repeat: true
+                        running: pedalCard.dragging && pedalScroll.overflowing
+                        onTriggered: {
+                            const left = pedalCard.x - pedalScroll.contentX
+                            const right = left + pedalCard.width - pedalScroll.width
+                            let step = left < 30 ? -12 : right > -30 ? 12 : 0
+                            const target = Math.max(0, Math.min(pedalScroll.contentWidth - pedalScroll.width, pedalScroll.contentX + step))
+                            step = target - pedalScroll.contentX
+                            if (step === 0) return
+                            pedalScroll.contentX = target
+                            pedalCard.x = Math.max(dragArea.drag.minimumX, Math.min(dragArea.drag.maximumX, pedalCard.x + step))
+                            root.dragTo = root.slotAt(pedalCard.x)
                         }
                     }
                 }
