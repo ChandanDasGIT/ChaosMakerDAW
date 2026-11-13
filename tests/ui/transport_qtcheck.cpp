@@ -824,9 +824,10 @@ private slots:
     void controls_use_the_shared_themed_components() {
         // Plan 4.3: menus, entries, separators, text buttons, drop-downs and sliders come from
         // frontend/common/ (ThemedMenu, ThemedMenuItem, ThemedMenuSeparator, PanelButton,
-        // ThemedComboBox, ToggleChip, ThemedSlider); nothing else re-styles Qt's plain ones.
+        // ThemedComboBox, ToggleChip, ThemedSlider, ThemedCheckBox, ThemedRadioButton, ThemedSwitch);
+        // nothing else re-styles Qt's plain ones.
         const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
-        const QRegularExpression plain(QStringLiteral("(^|[^\\w.])(Menu|MenuItem|MenuSeparator|Button|ComboBox|Slider)\\s*\\{"));
+        const QRegularExpression plain(QStringLiteral("(^|[^\\w.])(Menu|MenuItem|MenuSeparator|Button|ComboBox|Slider|CheckBox|RadioButton|Switch)\\s*\\{"));
         QStringList offenders;
         QStringList files{root+"/Main.qml"};
         QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
@@ -841,13 +842,13 @@ private slots:
                 if(plain.match(QString::fromUtf8(bytes)).hasMatch()) offenders<<QString("%1:%2").arg(rel).arg(line);
             }
         }
-        QVERIFY2(offenders.isEmpty(),qPrintable("Plain menus/buttons/drop-downs/sliders outside frontend/common/: "+offenders.join(", ")));
+        QVERIFY2(offenders.isEmpty(),qPrintable("Plain menus/buttons/drop-downs/sliders/tick boxes/radios/switches outside frontend/common/: "+offenders.join(", ")));
         // A converted entry keeps its name, shortcut text and the shared look.
         auto* save=visualObject(window->contentItem(),"fileSaveItem");
         if(!save) save=window->findChild<QObject*>("fileSaveItem");
         QVERIFY(save);
         QCOMPARE(save->property("shortcutText").toString(),QString("Ctrl+S"));
-        QCOMPARE(save->property("implicitHeight").toDouble(),30.0);
+        QCOMPARE(save->property("implicitHeight").toDouble(),26.0);   // tighter rows (restMap U8 F3)
     }
     void toggle_chips_light_up_lighten_on_hover_and_fade_when_disabled() {
         TrackListWrapper tracks; const int vocal=tracks.addVocalTrack(), synth=tracks.addInstrumentTrack();
@@ -880,7 +881,9 @@ private slots:
         // Plan 4.5: no text below Theme.microSize (9 px) anywhere in the QML sources.
         const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
         const QRegularExpression size(QStringLiteral("(pixelSize|textSize)\\s*:\\s*(\\d+)\\b"));
-        QStringList tiny;
+        // Text sizes come from the theme: a size written as a number is an icon glyph or a big
+        // readout (18 px and up), never ordinary text.
+        QStringList tiny, loose;
         QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
         QStringList files{root+"/Main.qml"};
         while(it.hasNext()) files<<it.next();
@@ -890,10 +893,15 @@ private slots:
             for(const QByteArray& bytes:file.readAll().split('\n')) {
                 ++line;
                 for(auto m=size.globalMatch(QString::fromUtf8(bytes));m.hasNext();)
-                    if(m.next().captured(2).toInt()<9) tiny<<QString("%1:%2").arg(path.mid(root.size()+1)).arg(line);
+                    {
+                        const int px=m.next().captured(2).toInt(); const QString where=QString("%1:%2").arg(path.mid(root.size()+1)).arg(line);
+                        if(px<9) tiny<<where;
+                        else if(px<18 && !where.startsWith("frontend/theme/")) loose<<where;
+                    }
             }
         }
         QVERIFY2(tiny.isEmpty(),qPrintable("Text below 9 px: "+tiny.join(", ")));
+        QVERIFY2(loose.isEmpty(),qPrintable("Text sizes not from the theme: "+loose.join(", ")));
         // Controls that only show a symbol or an abbreviation carry a spoken name.
         const auto name=[](QQuickItem* item) { return QQmlProperty::read(item,"Accessible.name",qmlContext(item)).toString(); };
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play);
@@ -1111,7 +1119,7 @@ private slots:
         QVERIFY(!tracks->project().findTrack(printGuitar)->recordDry);
         QVERIFY(tracks->project().findTrack(dryVocal)->recordDry);              // existing tracks keep theirs
     }
-    void track_card_chips_wrap_and_fit_at_the_narrowest_track_list() {
+    void track_card_chips_fit_on_one_line_at_the_narrowest_track_list() {
         TrackListWrapper tracks; const int id=tracks.addVocalTrack();
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         const qreal oldWidth=list->width();
@@ -1134,9 +1142,12 @@ private slots:
                 for(const QRectF& other:placed) QVERIFY2(!other.intersects(rect),qPrintable(where+" overlaps"));
                 placed.append(rect);
             }
-            // Mute (first) and remove share the top line; at 180 px FX drops to a second line.
-            QCOMPARE(placed[6].top(),placed[0].top());
-            QCOMPARE(placed[5].top()>placed[0].top(),width<200);
+            // The buttons stay on one line, also at 180 px; the remove cross sits above them on
+            // the name's line and the volume slider below (restMap U8 C2).
+            for(int i=1;i<6;++i) QCOMPARE(placed[i].top(),placed[0].top());
+            QVERIFY(placed[6].bottom()<=placed[0].top());
+            QVERIFY(placed[7].top()>=placed[0].bottom());
+            QCOMPARE(card->height(),64.0);
         }
     }
     void layout_sizes_are_saved_and_restored_between_sessions() {
@@ -2870,6 +2881,7 @@ private slots:
         auto* controller=EngineController::instance();
         const double bpmBefore=controller->bpm();
         TrackListWrapper tracks; tracks.setSampleRate(48000);
+        controller->attachProject(&tracks);                     // Set BPM reaches this project, as in the app
         const int audioTrack=tracks.addAudioTrack();
         auto audio=std::make_shared<AudioData>(); audio->path="loop.wav"; audio->sampleRate=48000;
         audio->channels={drumrender::electroDrums(drumrender::timed(drumrender::rock(),110.0,6,0.4),16.0)};
@@ -2940,6 +2952,12 @@ private slots:
         QCOMPARE(tracks.project().findTrack(drums)->audioClips.size(),std::size_t(1));
         QVERIFY(tracks.project().findTrack(drums)->audioClips[0].notes.size()>20);
         QCOMPARE(controller->bpm(),110.0);
+        // With "Set the project BPM" ticked the song was also slid onto the project's bars: the
+        // drum clip under it starts on a bar line, and the song moved by less than a bar.
+        QCOMPARE(tracks.project().tempo().bpm(),110.0);
+        const auto& grid=tracks.project().tempo();
+        QVERIFY(std::abs(std::remainder(grid.beatAt(tracks.project().findTrack(drums)->audioClips[0].start),grid.beatsPerBar()))<1e-3);
+        QVERIFY(double(tracks.project().findTrack(audioTrack)->audioClips[0].start)<grid.beatsPerBar()*60.0*48000/110.0);
         // Electronic: the next clip goes on a new Electronic Drums track; the choice stays.
         auto* electronic=visualItem(window->contentItem(),"drumAnalyzerElectronic"); QVERIFY(electronic);
         click(electronic);
@@ -3422,9 +3440,28 @@ private slots:
         list->setHeight(540); timeline->setX(340); timeline->setWidth(760);
         for(auto* view:{list,mixer,timeline}) { view->setProperty("trackModel",QVariant::fromValue(&tracks)); view->setVisible(true); }
         QTest::qWait(30);
+        // A new track has no colour (restMap U8 C1): no strip on the card, the mixer or the lane,
+        // and its clips in the theme's neutral grey, shaded as a track colour would be.
+        auto* theme=engine->singletonInstance<QObject*>("TransportTests","Theme"); QVERIFY(theme);
+        const QColor neutral=qvariant_cast<QObject*>(theme->property("timeline"))->property("clipNeutral").value<QColor>();
+        const auto verifyPlain=[&] {
+            QVERIFY(tracks.project().findTrack(a)->colour.empty());
+            for(const auto& name:{"trackColourAccent"+QString::number(a),"mixerColour"+QString::number(a),"timelineLaneColour"+QString::number(a)}) {
+                auto* accent=visualItem(window->contentItem(),name); QVERIFY(accent);
+                QCOMPARE(accent->property("color").value<QColor>().alpha(),0);
+            }
+            for(int clip:{first,second}) {
+                auto* block=visualItem(timeline,"clipBlock"+QString::number(clip)); QVERIFY(block);
+                QVERIFY(block->property("trackColour").toString().isEmpty());
+                QCOMPARE(block->property("color").value<QColor>(),neutral.darker(240));
+            }
+        };
+        verifyPlain();
         auto* button=visualItem(list,"trackColourButton"+QString::number(a)); QVERIFY(button); click(button);
         auto* popup=visualObject(window->contentItem(),"trackColourPopup"+QString::number(a)); QVERIFY(popup);
         QTRY_VERIFY(popup->property("visible").toBool());
+        auto* none=visualItem(window->contentItem(),"noTrackColour"+QString::number(a)); QVERIFY(none);
+        QVERIFY(!none->isEnabled());   // nothing to clear yet
         auto* choice=visualItem(window->contentItem(),"trackColourChoice"+QString::number(a)+"_8"); QVERIFY(choice); click(choice);
         QTRY_VERIFY(!popup->property("visible").toBool());
         auto verify=[&](const QString& colour) {
@@ -3440,7 +3477,7 @@ private slots:
                 QCOMPARE(block->property("color").value<QColor>(),expected.darker(240));
             }
             auto* untouched=visualItem(timeline,"clipBlock"+QString::number(other)); QVERIFY(untouched);
-            QCOMPARE(untouched->property("trackColour").value<QColor>(),QColor("#6fa8dc"));
+            QVERIFY(untouched->property("trackColour").toString().isEmpty());   // the other track stays plain
         };
         QCoreApplication::processEvents(); verify("#d97c73");
         click(button); QTRY_VERIFY(popup->property("visible").toBool());
@@ -3457,6 +3494,11 @@ private slots:
         auto* focusTarget=window->findChild<QQuickItem*>("otherFocus"); QVERIFY(focusTarget);
         focusTarget->forceActiveFocus(); QVERIFY(focusTarget->hasActiveFocus());
         QVERIFY(window->grabWindow().save("/tmp/chaosmaker-track-colours.png"));
+        // "No colour" in the popup takes the track back to plain.
+        click(button); QTRY_VERIFY(popup->property("visible").toBool());
+        QVERIFY(none->isEnabled()); click(none);
+        QTRY_VERIFY(!popup->property("visible").toBool());
+        QCoreApplication::processEvents(); verifyPlain();
         for(auto* view:{list,mixer,timeline}) { view->setVisible(false); view->setProperty("trackModel",QVariant()); }
         list->setHeight(650); timeline->setX(0); timeline->setWidth(1000);
     }
@@ -3488,15 +3530,15 @@ private slots:
         timeline->setProperty("snapMode",0);
         const QPoint vertical=block->mapToScene(QPointF(30,30)).toPoint();
         QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,vertical);
-        QTest::mouseMove(window,vertical+QPoint(0,106));
-        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,vertical+QPoint(0,106));
+        QTest::mouseMove(window,vertical+QPoint(0,64));
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,vertical+QPoint(0,64));
         QCOMPARE(tracks.project().findTrack(b)->audioClips[0].start,qint64(48000));
         QVERIFY(tracks.undo()); timeline->setProperty("snapMode",1);
         block=visualItem(timeline,"clipBlock"+QString::number(clip)); QVERIFY(block);
-        const QPoint start=block->mapToScene(QPointF(30,30)).toPoint(),end=start+QPoint(48,106);
+        const QPoint start=block->mapToScene(QPointF(30,30)).toPoint(),end=start+QPoint(48,64);
         const double originalY=block->y();
         QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start); QTest::mouseMove(window,end);
-        QCOMPARE(block->y(),originalY+106); // Preview uses the destination lane before committing.
+        QCOMPARE(block->y(),originalY+64); // Preview uses the destination lane before committing.
         QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,end);
         QCOMPARE(tracks.project().findTrack(a)->audioClips.size(),std::size_t(0));
         QCOMPARE(tracks.project().findTrack(b)->audioClips[0].id,clip);
@@ -3506,8 +3548,8 @@ private slots:
         QVERIFY(tracks.redo()); QCOMPARE(tracks.project().findTrack(b)->audioClips[0].id,clip);
         block=visualItem(timeline,"clipBlock"+QString::number(clip)); QVERIFY(block);
         const QPoint back=block->mapToScene(QPointF(30,30)).toPoint();
-        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,back); QTest::mouseMove(window,back-QPoint(0,106));
-        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,back-QPoint(0,106));
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,back); QTest::mouseMove(window,back-QPoint(0,64));
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,back-QPoint(0,64));
         QCOMPARE(tracks.project().findTrack(a)->audioClips[0].id,clip);
         QCOMPARE(tracks.project().findTrack(a)->audioClips[0].start,qint64(72000));
         QCOMPARE(tracks.project().findTrack(c)->audioClips.size(),std::size_t(0));
@@ -3658,7 +3700,7 @@ private slots:
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
         TrackListWrapper tracks; controller.attachProject(&tracks);
         const int track=tracks.addAudioTrack(); tracks.addClipAtBeat(track,0,80);
-        for(int i=0;i<5;++i)tracks.addAudioTrack();
+        for(int i=0;i<11;++i)tracks.addAudioTrack();   // more rows than fit (64 px each)
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         const auto restore=qScopeGuard([&] {
             timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
@@ -4001,7 +4043,7 @@ private slots:
         const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); });
         timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
         QTest::qWait(30);
-        const QPoint from=timeline->mapToScene(QPointF(120,70)).toPoint(),to=timeline->mapToScene(QPointF(300,235)).toPoint();
+        const QPoint from=timeline->mapToScene(QPointF(120,70)).toPoint(),to=timeline->mapToScene(QPointF(300,150)).toPoint();
         QTest::mousePress(window,Qt::LeftButton,Qt::ShiftModifier,from);
         QTest::mouseMove(window,to);
         auto* marquee=visualItem(timeline,"timelineSelection"); QVERIFY(marquee); QVERIFY(marquee->isVisible());
@@ -4088,7 +4130,7 @@ private slots:
         QTest::qWait(20);
         const auto& envelope=tracks.project().findTrack(a)->volumeEnvelope;
         auto* block=visualItem(timeline,"clipBlock"+QString::number(clipB)); QVERIFY(block);
-        QCOMPARE(block->y(),38.0+106+8);
+        QCOMPARE(block->y(),38.0+64+2);
 
         // V shows the selected track's lane under it; the rows below move down.
         QVERIFY(tracks.selectTrack(a)); timeline->forceActiveFocus();
@@ -4096,9 +4138,9 @@ private slots:
         QTest::keyClick(window,Qt::Key_V);
         QTRY_VERIFY(envelope.shown());
         auto* lane=visualItem(timeline,"volumeEnvelope"+QString::number(a)); QVERIFY(lane); QVERIFY(lane->isVisible());
-        QCOMPARE(lane->y(),38.0+106);
+        QCOMPARE(lane->y(),38.0+64);
         QCOMPARE(lane->height(),72.0);
-        QTRY_COMPARE(block->y(),38.0+106+72+8);
+        QTRY_COMPARE(block->y(),38.0+64+72+2);
         // The new lane starts with one point at the start, on the 0 dB line.
         QCOMPARE(envelope.points().size(),std::size_t(1));
         QCOMPARE(envelope.points()[0].position,qint64(0));
@@ -4175,8 +4217,8 @@ private slots:
         auto* placement=visualItem(window->contentItem(),"envelopePlacementAction"); QVERIFY(placement);
         QTRY_VERIFY(placement->isVisible()); click(placement);
         QTRY_VERIFY(envelope.overClips());
-        QTRY_COMPARE(block->y(),38.0+106+8);
-        QCOMPARE(lane->y(),38.0+8);
+        QTRY_COMPARE(block->y(),38.0+64+2);
+        QCOMPARE(lane->y(),38.0+2);
         QVERIFY(envelope.points().size()==2);   // the view change kept the points and was not an undo step
 
         // Back in its own lane: the track list leaves the same room, with the Volume header.
@@ -4187,12 +4229,12 @@ private slots:
         auto* header=visualItem(trackList,"envelopeLaneHeader"+QString::number(a)); QVERIFY(header);
         QVERIFY(header->isVisible()); QCOMPARE(header->height(),72.0);
         auto* card=visualItem(trackList,"trackColourAccent"+QString::number(b)); QVERIFY(card);
-        QCOMPARE(card->parentItem()->y(),106.0+72);
+        QCOMPARE(card->parentItem()->y(),64.0+72);
         auto* bypassChip=visualItem(trackList,"envelopeBypassButton"+QString::number(a)); QVERIFY(bypassChip);
         click(bypassChip); QTRY_VERIFY(envelope.bypassed());
         QVERIFY(tracks.toggleEnvelopeShown(a));
         QTRY_VERIFY(!header->isVisible());
-        QTRY_COMPARE(card->parentItem()->y(),106.0);
+        QTRY_COMPARE(card->parentItem()->y(),64.0);
     }
     void undo_redo_buttons_restore_deleted_clips() {
         TrackListWrapper tracks;
@@ -4885,8 +4927,13 @@ private slots:
         auto* name=visualItem(mixer,"mixerName"+id); QVERIFY(name);
         const auto readout=[&] { return pan->property("readout").toString(); };
         QCOMPARE(pan->property("value").toDouble(),0.0); QCOMPARE(readout(),QString("C"));
-        // The knob sits in the name row: it does not take height from the fader.
-        QVERIFY(std::abs(pan->mapToScene(QPointF(0,pan->height()/2)).y()-name->mapToScene(QPointF(0,name->height()/2)).y())<4);
+        // The knob sits on the top line beside the clip gain readout (restMap U8 E3), so it
+        // does not take height from the fader; the name is on its band at the bottom.
+        auto* gainText=visualItem(mixer,"mixerClipGainText"+id); QVERIFY(gainText);
+        QVERIFY(std::abs(pan->mapToScene(QPointF(0,pan->height()/2)).y()-gainText->mapToScene(QPointF(0,gainText->height()/2)).y())<4);
+        auto* fader=visualItem(mixer,"mixerClipGain"+id); QVERIFY(fader);
+        QVERIFY(pan->mapToScene(QPointF(0,pan->height())).y()<=fader->mapToScene(QPointF(0,0)).y());
+        QVERIFY(name->mapToScene(QPointF(0,0)).y()>=fader->mapToScene(QPointF(0,fader->height())).y());
         // Drag down: only this track pans left, the readout follows.
         const QPoint centre=pan->mapToScene(QPointF(pan->width()/2,pan->height()/2)).toPoint();
         QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,centre);
@@ -5076,7 +5123,10 @@ private slots:
         QTRY_COMPARE(saveDialog.count(),1);
         // Close the file dialog again so later tests start clean.
         auto* dialog=window->findChild<QObject*>("saveProjectDialog"); QVERIFY(dialog);
+        // The picker fades in and out: wait for both, or it takes the next test's clicks and keys.
+        QTRY_VERIFY(dialog->property("opened").toBool());
         QVERIFY(QMetaObject::invokeMethod(dialog,"reject"));
+        QTRY_VERIFY(!dialog->property("visible").toBool());
     }
     void transport_keys_fire_once_while_quick_settings_is_open() {
         window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window)); // keys need the active window

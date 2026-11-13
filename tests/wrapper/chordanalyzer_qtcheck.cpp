@@ -149,6 +149,23 @@ TEST(qtchordanalyzer, the_selected_song_gives_its_key_and_chords_and_fills_a_cho
     }
     CHECK(matched == clips[0].notes.size() && matched >= 16);
     CHECK(w.message().contains("clip"));
+
+    // The song lined up with the project's bars once the project is at the found tempo: the
+    // audio clip slides by less than a bar, so the bar line found in it sits on a project bar.
+    CHECK(w.hasBeat());
+    tracks.setTempo(w.bpm(), w.numerator(), w.denominator());
+    const double barSamples = tempo.beatsPerBar() * 60.0 * rate / tempo.bpm();
+    const auto audioStart = [&] { return tracks.project().findTrack(audioTrack)->audioClips.at(0).start; };
+    const std::int64_t startBefore = audioStart();
+    CHECK(w.alignSong());
+    const std::int64_t shift = audioStart() - startBefore;
+    CHECK(std::abs(double(shift)) < barSamples);
+    const double barLine = double(audioStart()) + w.result()->firstBarSeconds * rate;
+    CHECK(std::abs(std::remainder(barLine, barSamples)) < 2.0);
+    CHECK(w.putOnTrack(chordsTrack, false) == chordsTrack);
+    CHECK(w.message().contains("The song moved") == (shift != 0));
+    CHECK(w.alignSong() && audioStart() == startBefore + shift);                // lined up already
+    if (shift != 0) { CHECK(tracks.undo()); CHECK(audioStart() == startBefore); }
 }
 
 TEST(qtchordanalyzer, midi_short_and_cancelled_clips_say_why)

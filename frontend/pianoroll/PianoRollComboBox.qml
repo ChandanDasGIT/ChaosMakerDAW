@@ -16,5 +16,5 @@ ThemedComboBox {
     cornerRadius: 2
     itemHeight: 22
     implicitHeight: 22
-    font.pixelSize: 11
+    font.pixelSize: Theme.smallSize
 }

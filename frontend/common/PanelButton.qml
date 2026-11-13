@@ -3,9 +3,11 @@ import QtQuick.Controls
 
 // A plain text button inside panels (presets, cabinet IR, tuner strings, EQ, "Custom colour…").
 // Chip colours, lightens on hover; checkable buttons show their checked state in the accent.
+// `primary`: the one main action of a dialog or tool (Save, Export, Analyse ...), in the accent.
 Button {
     id: button
     property string tooltip: ""
+    property bool primary: false
     hoverEnabled: true
     implicitHeight: 26
     leftPadding: 10
@@ -16,16 +18,17 @@ Button {
 
     contentItem: Text {
         text: button.text
-        color: button.checked ? Theme.accent : button.hovered ? Theme.text : Theme.textMuted
+        color: button.checked || button.primary ? Theme.accent : button.hovered ? Theme.text : Theme.textMuted
         font.pixelSize: Theme.smallSize
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
     }
     background: Rectangle {
-        radius: 4
-        color: button.checked ? Theme.accentBg : button.down || button.hovered ? Theme.chipHover : Theme.chip
-        border.color: button.checked ? Theme.accent : button.hovered ? Theme.chipBorderHover : Theme.chipBorder
+        radius: Theme.controlRadius
+        color: button.checked || button.primary ? (button.down ? Qt.darker(Theme.accentBg, 1.2) : Theme.accentBg)
+             : button.down || button.hovered ? Theme.chipHover : Theme.chip
+        border.color: button.checked || button.primary ? Theme.accent : button.hovered ? Theme.chipBorderHover : Theme.chipBorder
     }
     ToolTip.visible: hovered && tooltip.length > 0
     ToolTip.text: tooltip

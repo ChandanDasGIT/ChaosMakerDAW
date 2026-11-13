@@ -81,6 +81,11 @@ public:
     // Where the clip can go: {id, name}; -1 a new Drums track, -2 a new Electronic Drums track,
     // then the project's drum tracks.
     Q_INVOKABLE QVariantList targets() const;
+    // Lines the analysed clip up with the project's bars: it slides by less than a bar so that
+    // the bar line found in it lands on a project bar line (one undo step). For right after the
+    // project's BPM is set to the found one, before makeClip(). False when it could not (no
+    // result, the clip gone, recording).
+    Q_INVOKABLE bool alignSong();
     // The pattern as a clip on `target` (one of targets()), under the analysed audio; its id, or
     // -1 with a message.
     Q_INVOKABLE int makeClip(int target);
@@ -112,6 +117,8 @@ private:
     QString m_grooveFolder;
     std::optional<analysis::DrumAnalysis> m_result;
     std::int64_t m_analysedStart = 0;                      // the clip's start (project samples) when analysed
+    double m_songMovedSeconds = 0.0;                       // by alignSong(), until the next message says so
+    QString songMovedText();
     std::shared_ptr<std::atomic<bool>> m_cancel;
     int m_run = 0;                                         // which analysis a finished one was
 };

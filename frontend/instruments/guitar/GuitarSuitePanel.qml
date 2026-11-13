@@ -16,7 +16,7 @@ Popup {
     focus: true
     closePolicy: Popup.CloseOnEscape
     padding: 0
-    background: Rectangle { radius: 9; color: Theme.popupBg; border.color: Theme.popupBorder }
+    background: Rectangle { radius: Theme.panelRadius; color: Theme.popupBg; border.color: Theme.popupBorder }
     contentItem: GuitarSuiteEditor {
         trackName: root.trackName
         effectsModel: root.effectsModel

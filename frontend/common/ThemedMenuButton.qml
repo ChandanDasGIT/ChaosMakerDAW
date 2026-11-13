@@ -27,11 +27,11 @@ Button {
             anchors { right: parent.right; rightMargin: 8; verticalCenter: parent.verticalCenter }
             text: Icons.menuArrow
             color: Theme.textMuted
-            font.pixelSize: 9
+            font.pixelSize: Theme.microSize
         }
     }
     background: Rectangle {
-        radius: 5
+        radius: Theme.controlRadius
         color: !control.enabled ? Theme.fieldDisabled : control.pressed || control.hovered ? Theme.fieldHover : Theme.field
         border.color: control.checked || control.visualFocus ? Theme.accent : Theme.fieldBorder
     }

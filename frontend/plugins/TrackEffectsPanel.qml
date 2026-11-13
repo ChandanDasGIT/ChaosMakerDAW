@@ -88,18 +88,24 @@ Window {
         spacing: 0
         Rectangle {
             Layout.fillWidth: true
-            implicitHeight: 66
+            implicitHeight: 44
             color: Theme.effects.header
+            // One line: the title, the recording mode in small text after it, then the buttons.
             RowLayout {
                 anchors.fill: parent
-                anchors.margins: 16
-                ColumnLayout {
+                anchors.leftMargin: 16
+                anchors.rightMargin: 8
+                spacing: 6
+                Text { text: root.trackName + " · Effects"; color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true }
+                Text {
+                    objectName: "recordModeDescription"
+                    text: panelBridge.recordModeDescription
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.captionSize
+                    elide: Text.ElideRight
                     Layout.fillWidth: true
-                    spacing: 3
-                    Text { text: root.trackName + " · Effects"; color: Theme.text; font.pixelSize: 17; font.bold: true }
-                    Text { text: panelBridge.recordModeDescription; color: Theme.textMuted; font.pixelSize: 11 }
+                    Layout.leftMargin: 6
                 }
-                Item { Layout.fillWidth: true }                        // keeps the controls together on the right
                 PanelButton {
                     objectName: "exportChainButton"
                     visible: root.trackType !== "Clip"   // clip chains do not travel as .chaosfx yet
@@ -127,7 +133,7 @@ Window {
                 }
                 CloseButton {
                     objectName: "closeTrackEffects"
-                    implicitWidth: 32; implicitHeight: 32; glyphSize: 22
+                    implicitWidth: 28; implicitHeight: 28; glyphSize: 18
                     Accessible.name: "Close effects"
                     tooltip: "Close effects"
                     onClicked: root.close()
@@ -149,15 +155,19 @@ Window {
                     spacing: 8
                     RowLayout {
                         Layout.fillWidth: true
-                        Text { text: "CHAIN"; color: Theme.textMuted; font.pixelSize: 10; font.letterSpacing: 1 }
+                        Text { text: "CHAIN"; color: Theme.textMuted; font.pixelSize: Theme.captionSize; font.letterSpacing: 1 }
                         Text { text: "top to bottom"; color: Theme.textMuted; font.pixelSize: Theme.microSize; Layout.fillWidth: true }
+                        HoverHandler { id: chainHeaderHover }
+                        ToolTip.visible: chainHeaderHover.hovered
+                        ToolTip.text: "Effects run top to bottom. Your settings stay with this track."
+                        ToolTip.delay: 450
                     }
                     Text {
                         objectName: "emptyChainHint"
                         visible: root.effects.length === 0
                         text: "No effects yet"
                         color: Theme.textMuted
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.smallSize
                     }
                     // A long chain scrolls (wheel or scroll bar; a drag moves a row) so Add FX
                     // always stays in the window.
@@ -206,7 +216,7 @@ Window {
                                     objectName: "selectEffect_" + slot.modelData.type
                                     width: parent.width
                                     height: parent.height
-                                    radius: 6
+                                    radius: Theme.panelRadius
                                     z: grip.drag.active ? 2 : 0
                                     readonly property bool selected: root.selectedEffect === slot.modelData.type
                                     color: selected ? Theme.effects.itemSelected : rowArea.containsMouse ? Theme.effects.itemHover : "transparent"
@@ -226,7 +236,7 @@ Window {
                                             objectName: "effectGrip_" + slot.modelData.type
                                             text: Icons.dragHandle
                                             color: grip.containsMouse || grip.drag.active ? Theme.text : Theme.textMuted
-                                            font.pixelSize: 14
+                                            font.pixelSize: Theme.headingSize
                                             Layout.preferredWidth: 18
                                             horizontalAlignment: Text.AlignHCenter
                                             Accessible.name: "Drag to reorder " + slot.modelData.title
@@ -258,8 +268,8 @@ Window {
                                         ColumnLayout {
                                             Layout.fillWidth: true
                                             spacing: 4
-                                            Text { text: slot.modelData.title; color: Theme.text; font.pixelSize: 12; font.bold: true }
-                                            Text { text: slot.modelData.subtitle; color: Theme.textMuted; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight }
+                                            Text { text: slot.modelData.title; color: Theme.text; font.pixelSize: Theme.bodySize; font.bold: true }
+                                            Text { text: slot.modelData.subtitle; color: Theme.textMuted; font.pixelSize: Theme.captionSize; Layout.fillWidth: true; elide: Text.ElideRight }
                                         }
                                         CloseButton {
                                             id: removeEffect
@@ -298,7 +308,7 @@ Window {
                             y: addEffectButton.height + 4
                             width: 196
                             padding: 6
-                            background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
+                            background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: Theme.panelRadius }
                             // The list scrolls when it is taller than the room under the button
                             // (the mixing plugins made it long).
                             contentItem: Flickable {
@@ -327,11 +337,11 @@ Window {
                                             addEffectPopup.close()
                                             if (model.addTrackEffect(root.trackId, type) > 0) bridge.selectEffect(type)
                                         }
-                                        background: Rectangle { radius: 5; color: parent.hovered ? Theme.effects.itemHover : "transparent" }
+                                        background: Rectangle { radius: Theme.controlRadius; color: parent.hovered ? Theme.effects.itemHover : "transparent" }
                                         contentItem: Column {
                                             spacing: 2
-                                            Text { text: modelData.title; color: Theme.text; font.pixelSize: 12; font.bold: true }
-                                            Text { text: modelData.subtitle; color: Theme.textMuted; font.pixelSize: 10 }
+                                            Text { text: modelData.title; color: Theme.text; font.pixelSize: Theme.bodySize; font.bold: true }
+                                            Text { text: modelData.subtitle; color: Theme.textMuted; font.pixelSize: Theme.captionSize }
                                         }
                                     }
                                 }
@@ -340,13 +350,6 @@ Window {
                         }
                     }
                     Item { Layout.fillHeight: true }
-                    Text {
-                        text: "Effects run top to bottom.\nYour settings stay with this track."
-                        color: Theme.textMuted
-                        font.pixelSize: 11
-                        Layout.fillWidth: true
-                        wrapMode: Text.WordWrap
-                    }
                 }
             }
             StackLayout {
@@ -490,7 +493,7 @@ Window {
                         anchors.centerIn: parent
                         text: "Add an effect to start"
                         color: Theme.textMuted
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.bodySize
                     }
                 }
             }
@@ -543,7 +546,7 @@ Window {
         width: 380
         modal: true
         padding: 14
-        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
+        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: Theme.panelRadius }
         contentItem: ColumnLayout {
             spacing: 10
             Text {
@@ -577,6 +580,7 @@ Window {
                 PanelButton { text: "Cancel"; onClicked: chainConfirm.close() }
                 PanelButton {
                     objectName: "chainImportOk"
+                    primary: true
                     text: "Replace"
                     onClicked: {
                         const result = EngineController.importEffectChain(root.trackId, chainConfirm.file)
@@ -599,7 +603,7 @@ Window {
         anchors.centerIn: parent
         width: 360
         padding: 14
-        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
+        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: Theme.panelRadius }
         contentItem: ColumnLayout {
             spacing: 10
             Text { text: chainMessage.heading; color: Theme.text; font.pixelSize: Theme.bodySize; font.bold: true }
@@ -612,7 +616,7 @@ Window {
             RowLayout {
                 Layout.fillWidth: true
                 Item { Layout.fillWidth: true }
-                PanelButton { objectName: "chainMessageOk"; text: "OK"; onClicked: chainMessage.close() }
+                PanelButton { objectName: "chainMessageOk"; primary: true; text: "OK"; onClicked: chainMessage.close() }
             }
         }
     }

@@ -51,7 +51,7 @@ QtObject {
     readonly property color rowBorder:        "#202227"
     readonly property color rowOctaveBorder:  "#424652"
     readonly property color clipInside:       "#0a283020" // faint tint over the clip's length
-    readonly property color clipOutside:      "#00000040" // darkening after the clip ends
+    readonly property color clipOutside:      "#40000000" // darkening after the clip ends
     readonly property color selectionBox:     "#2060cdff" // rubber band fill (border: Theme.accent)
 
     // ---- notes (Velocity colour mode; Track mode derives from the track colour) ----

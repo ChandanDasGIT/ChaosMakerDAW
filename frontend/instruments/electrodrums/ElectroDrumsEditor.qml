@@ -78,10 +78,10 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 3
-                Text { text: "Electronic drums"; color: Theme.text; font.pixelSize: 15; font.bold: true }
+                Text { text: "Electronic drums"; color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true }
                 Text {
                     text: "Synthesised kit: 808, 909 or Studio sounds on the drum keys"
-                    color: Theme.textMuted; font.pixelSize: 11
+                    color: Theme.textMuted; font.pixelSize: Theme.smallSize
                     Layout.fillWidth: true; elide: Text.ElideRight
                 }
             }
@@ -120,7 +120,7 @@ Item {
 
                 GridLayout {
                     Layout.fillWidth: true
-                    columns: root.width > 560 ? 3 : 1
+                    columns: root.width > 440 ? 3 : 1
                     columnSpacing: 24
                     rowSpacing: 10
 

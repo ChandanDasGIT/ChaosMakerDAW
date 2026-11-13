@@ -27,7 +27,7 @@ Popup {
         color: Theme.panelBg
         border.color: Theme.divider
         border.width: 1
-        radius: 8
+        radius: Theme.panelRadius
     }
 
     contentItem: ColumnLayout {
@@ -80,7 +80,7 @@ Popup {
                 hoverEnabled: true
                 onClicked: if (!row.current) root.trackModel.jumpToHistory(row.index)
                 background: Rectangle {
-                    radius: 4
+                    radius: Theme.controlRadius
                     color: row.current ? Theme.selectionBg : row.hovered ? Theme.controlBgHover : "transparent"
                 }
                 contentItem: Text {

@@ -30,7 +30,7 @@ Item {
             // The preset that is playing now.
             Text {
                 text: "PRESET"
-                color: Theme.textMuted; font.pixelSize: 9; font.bold: true
+                color: Theme.textMuted; font.pixelSize: Theme.microSize; font.bold: true
                 Layout.leftMargin: 10
             }
             Text {
@@ -39,7 +39,7 @@ Item {
                 text: root.effectsModel.presetName.length === 0 ? "None (your own board)"
                     : root.effectsModel.presetName + (root.effectsModel.presetEdited ? "  ·  edited" : "")
                 color: root.effectsModel.presetName.length === 0 ? Theme.textMuted : Theme.text
-                font.pixelSize: 12
+                font.pixelSize: Theme.bodySize
                 font.bold: root.effectsModel.presetName.length > 0
                 elide: Text.ElideRight
             }
@@ -47,7 +47,7 @@ Item {
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
-            Text { text: "FACTORY PRESET"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true }
+            Text { text: "FACTORY PRESET"; color: Theme.textMuted; font.pixelSize: Theme.microSize; font.bold: true }
             ThemedComboBox {
                 id: factoryPresetPicker
                 objectName: "guitarFactoryPreset"
@@ -62,7 +62,7 @@ Item {
             Text {
                 Layout.fillWidth: true
                 text: "Replaces pedals · keeps input trim and loaded cabinet"
-                color: Theme.textMuted; font.pixelSize: 10
+                color: Theme.textMuted; font.pixelSize: Theme.captionSize
                 wrapMode: Text.WordWrap
             }
         }
@@ -74,7 +74,7 @@ Item {
                 spacing: 0
                 Text {
                     text: "INPUT TRIM  " + root.effectsModel.formatTrim(root.effectsModel.inputTrimDb)
-                    color: Theme.text; font.pixelSize: 10
+                    color: Theme.text; font.pixelSize: Theme.captionSize
                 }
                 RowLayout {
                     HardwareSlider {
@@ -119,13 +119,13 @@ Item {
             Layout.fillWidth: true
             text: root.monitoring ? "Input peaks: aim near −12 dBFS on Pre-FX. If Raw input clips, lower the interface gain."
                 : "Arm this track to hear and meter its effects."
-            color: Theme.textMuted; font.pixelSize: 10
+            color: Theme.textMuted; font.pixelSize: Theme.captionSize
             wrapMode: Text.WordWrap
         }
         RowLayout {
             Layout.fillWidth: true
             spacing: 6
-            Text { text: "ADD PEDAL"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 0.7 }
+            Text { text: "ADD PEDAL"; color: Theme.textMuted; font.pixelSize: Theme.microSize; font.bold: true; font.letterSpacing: 0.7 }
             ThemedComboBox {
                 id: pedalPicker
                 Layout.preferredWidth: 170
@@ -137,7 +137,7 @@ Item {
             }
             Text {
                 text: "Scroll inside a pedal for all controls"
-                color: Theme.textMuted; font.pixelSize: 10
+                color: Theme.textMuted; font.pixelSize: Theme.captionSize
                 Layout.fillWidth: true; horizontalAlignment: Text.AlignRight
             }
         }
@@ -150,13 +150,15 @@ Item {
             contentWidth: Math.max(width, pedalCards.count * root.cardStep)
             contentHeight: height
             boundsBehavior: Flickable.StopAtBounds
-            ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
+            // More pedals than fit: the bar stays on screen, so a cut-off pedal is seen to scroll.
+            readonly property bool overflowing: contentWidth > width + 1
+            ScrollBar.horizontal: ScrollBar { id: pedalScrollBar; objectName: "guitarPedalScrollBar"; policy: pedalScroll.overflowing ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff }
             Text {
                 visible: root.effectsModel.count === 0
                 anchors.centerIn: parent
                 text: "Choose a pedal above to build your chain."
                 color: Theme.textMuted
-                font.pixelSize: 11
+                font.pixelSize: Theme.smallSize
             }
             Repeater {
                 id: pedalCards
@@ -191,8 +193,8 @@ Item {
                     x: index * root.cardStep
                     y: 4
                     width: root.cardWidth
-                    height: pedalScroll.height - 12
-                    radius: 7
+                    height: pedalScroll.height - 12 - (pedalScroll.overflowing ? pedalScrollBar.height + 2 : 0)
+                    radius: Theme.panelRadius
                     color: Theme.guitarSuite.card
                     border.color: dragArea.drag.active ? Theme.accent : Theme.guitarSuite.cardBorder
                     Drag.source: pedalCard
@@ -225,10 +227,10 @@ Item {
                                 ToolTip.text: "Drag to reorder"
                                 ToolTip.delay: 450
                             }
-                            Text { text: pedalCard.pedalName.toUpperCase(); color: Theme.text; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.7; Layout.fillWidth: true }
+                            Text { text: pedalCard.pedalName.toUpperCase(); color: Theme.text; font.pixelSize: Theme.smallSize; font.bold: true; font.letterSpacing: 0.7; Layout.fillWidth: true }
                             ToggleChip {
                                 active: !pedalCard.isBypassed
-                                text: pedalCard.isBypassed ? "BYP" : "ON"; textSize: 9
+                                text: pedalCard.isBypassed ? "BYP" : "ON"; textSize: Theme.microSize
                                 onClicked: root.effectsModel.setBypassed(pedalCard.pedalId, !pedalCard.isBypassed)
                             }
                             CloseButton {
@@ -258,7 +260,7 @@ Item {
                                     visible: pedalCard.features.pitchDelayNote
                                     text: "Shifted voices have a short processing delay. Best with clear single notes."
                                     Layout.fillWidth: true; wrapMode: Text.WordWrap
-                                    color: Theme.textMuted; font.pixelSize: 10
+                                    color: Theme.textMuted; font.pixelSize: Theme.captionSize
                                 }
                                 ColumnLayout {
                                     visible: pedalCard.features.cabinetIr
@@ -276,7 +278,7 @@ Item {
                                     }
                                     Text {
                                         text: pedalCard.resourcePath.length ? pedalCard.resourcePath.split("/").pop() : "No IR loaded · dry signal"
-                                        color: Theme.textMuted; font.pixelSize: 10
+                                        color: Theme.textMuted; font.pixelSize: Theme.captionSize
                                         Layout.fillWidth: true; elide: Text.ElideMiddle
                                     }
                                 }
@@ -298,7 +300,7 @@ Item {
                                     }
                                     Text {
                                         text: root.effectsModel.tunerReferenceText
-                                        color: Theme.textMuted; font.pixelSize: 11
+                                        color: Theme.textMuted; font.pixelSize: Theme.smallSize
                                         Layout.alignment: Qt.AlignHCenter
                                     }
                                     PanelButton {
@@ -333,13 +335,13 @@ Item {
                                     Text {
                                         text: root.effectsModel.tunerStatus(tunerDisplay.hasPitch, pedalCard.isBypassed, tunerDisplay.cents)
                                         color: tunerDisplay.inTune ? Theme.guitarSuite.inTune : Theme.text
-                                        font.pixelSize: 11
+                                        font.pixelSize: Theme.smallSize
                                         Layout.alignment: Qt.AlignHCenter
                                     }
                                     Rectangle {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 32
-                                        color: Theme.guitarSuite.tunerScale; radius: 4
+                                        color: Theme.guitarSuite.tunerScale; radius: Theme.controlRadius
                                         Rectangle {
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             width: parent.width * 0.06; height: parent.height
@@ -358,20 +360,20 @@ Item {
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Text { text: "−50 · LOW"; color: Theme.textMuted; font.pixelSize: 9 }
+                                        Text { text: "−50 · LOW"; color: Theme.textMuted; font.pixelSize: Theme.microSize }
                                         Item { Layout.fillWidth: true }
-                                        Text { text: "0"; color: Theme.textMuted; font.pixelSize: 9 }
+                                        Text { text: "0"; color: Theme.textMuted; font.pixelSize: Theme.microSize }
                                         Item { Layout.fillWidth: true }
-                                        Text { text: "HIGH · +50"; color: Theme.textMuted; font.pixelSize: 9 }
+                                        Text { text: "HIGH · +50"; color: Theme.textMuted; font.pixelSize: Theme.microSize }
                                     }
                                     Text {
                                         text: tunerDisplay.hasPitch ? root.effectsModel.formatCents(tunerDisplay.cents) : ""
-                                        color: Theme.text; font.pixelSize: 16
+                                        color: Theme.text; font.pixelSize: Theme.headingSize
                                         Layout.alignment: Qt.AlignHCenter
                                     }
                                     Text {
                                         text: tunerDisplay.hasPitch ? root.effectsModel.formatTunerFrequency(Number(tunerDisplay.reading.frequency), Number(tunerDisplay.reading.targetHz)) : ""
-                                        color: Theme.textMuted; font.pixelSize: 10
+                                        color: Theme.textMuted; font.pixelSize: Theme.captionSize
                                         Layout.alignment: Qt.AlignHCenter
                                     }
                                     Timer {
@@ -386,11 +388,11 @@ Item {
                                         }
                                     }
                                 }
-                                CheckBox {
+                                ThemedCheckBox {
                                     objectName: "tremoloSustainToggle"
                                     visible: pedalCard.features.sustainToggle
                                     text: "Sustain only"
-                                    palette.windowText: Theme.text
+                                    textSize: Theme.smallSize
                                     checked: pedalCard.parameterValue("sustain", 0) >= 0.5
                                     onClicked: root.effectsModel.setParameter(pedalCard.pedalId, "sustain", checked ? 1 : 0)
                                 }
@@ -406,14 +408,10 @@ Item {
                                     }
                                     readonly property bool synced: parameterValue("sync", 0) >= 0.5
                                     readonly property int division: Math.round(parameterValue("division", 2))
-                                    Switch {
+                                    ThemedSwitch {
                                         objectName: pedalCard.pedalType === "pedal.phaser" ? "phaserBpmSync" : "tremoloBpmSync"
                                         text: "Sync to BPM"
-                                        contentItem: Text {
-                                            text: parent.text; color: Theme.text
-                                            leftPadding: 48; font.pixelSize: 11
-                                            verticalAlignment: Text.AlignVCenter
-                                        }
+                                        textSize: Theme.smallSize
                                         checked: modulationSync.synced
                                         onClicked: root.effectsModel.setParameter(pedalCard.pedalId, "sync", checked ? 1 : 0)
                                     }
@@ -430,7 +428,7 @@ Item {
                                         wrapMode: Text.WordWrap
                                         text: root.effectsModel.syncText(modulationSync.synced, EngineController.bpm)
                                         color: Theme.textMuted
-                                        font.pixelSize: 10
+                                        font.pixelSize: Theme.captionSize
                                     }
                                 }
                                 Repeater {
@@ -452,7 +450,7 @@ Item {
                                         Text {
                                             text: controlRow.modelData.name + (controlRow.syncedOff ? " (manual)" : "")
                                             color: Theme.textMuted
-                                            font.pixelSize: 10
+                                            font.pixelSize: Theme.captionSize
                                             elide: Text.ElideRight
                                             Layout.preferredWidth: 78
                                         }
@@ -491,7 +489,7 @@ Item {
                                             objectName: pedalCard.pedalType + "." + controlRow.modelData.id + ".value"
                                             text: root.effectsModel.formatValue(parameterSlider.value, controlRow.modelData.unit)
                                             color: Theme.text
-                                            font.pixelSize: 10
+                                            font.pixelSize: Theme.captionSize
                                             font.family: Theme.monospaceFontFamily
                                             horizontalAlignment: Text.AlignRight
                                             elide: Text.ElideLeft
@@ -525,10 +523,15 @@ Item {
             Layout.fillWidth: true
             text: root.effectsModel.busy ? "Loading and preparing cabinet IR…" : root.effectsModel.lastError.length > 0
                 ? root.effectsModel.lastError
-                : "Preset file: " + root.effectsModel.presetFilePath
+                : "Preset file: " + root.effectsModel.presetFilePath.split("/").pop()
             color: root.effectsModel.lastError.length > 0 ? Theme.record : Theme.textMuted
-            font.pixelSize: 9
+            font.pixelSize: Theme.microSize
             elide: Text.ElideMiddle
+            // The whole path under the mouse.
+            HoverHandler { id: presetPathHover }
+            ToolTip.visible: presetPathHover.hovered && root.effectsModel.lastError.length === 0 && !root.effectsModel.busy
+            ToolTip.text: root.effectsModel.presetFilePath
+            ToolTip.delay: 450
         }
     }
 

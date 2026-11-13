@@ -36,7 +36,7 @@ Popup {
     padding: 14
     modal: true
     closePolicy: EngineController.exporting ? Popup.NoAutoClose : Popup.CloseOnEscape
-    background: Rectangle { color: Theme.panelBg; border.color: Theme.divider; radius: 8 }
+    background: Rectangle { color: Theme.panelBg; border.color: Theme.divider; radius: Theme.panelRadius }
 
     function baseName() {
         const name = EngineController.projectFile.toString().split("/").pop()
@@ -227,6 +227,7 @@ Popup {
             }
             PanelButton {
                 objectName: "exportStart"
+                primary: true
                 text: "Export"
                 visible: !EngineController.exporting
                 enabled: root.file.toString().length > 0

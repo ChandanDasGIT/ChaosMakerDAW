@@ -20,7 +20,7 @@ GridLayout {
     Text {
         text: "BUFFER"
         color: Theme.textMuted
-        font.pixelSize: 9
+        font.pixelSize: Theme.microSize
         font.bold: true
     }
 
@@ -40,7 +40,7 @@ GridLayout {
     Text {
         text: "OUTPUT DEVICE"
         color: Theme.textMuted
-        font.pixelSize: 9
+        font.pixelSize: Theme.microSize
         font.bold: true
     }
 
@@ -61,7 +61,7 @@ GridLayout {
     Text {
         text: "MIDI IN"
         color: Theme.textMuted
-        font.pixelSize: 9
+        font.pixelSize: Theme.microSize
         font.bold: true
     }
 

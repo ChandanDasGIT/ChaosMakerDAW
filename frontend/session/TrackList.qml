@@ -6,7 +6,7 @@ import QtQuick.Layouts
 Rectangle {
     id: root
     property var trackModel
-    property int laneHeight: 106
+    property int laneHeight: 64
     property real scrollOffset: 0
     property int dropRow: -1
     // Audio files dropped here (restMap E2): onto the card's track, or a new track per file
@@ -14,7 +14,7 @@ Rectangle {
     property var importJob: null
     signal verticalScrollRequested(real amount)
     color: Theme.panelBg
-    border.color: Theme.divider
+    border.color: Theme.panelEdge
 
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
@@ -37,7 +37,7 @@ Rectangle {
                 anchors.fill: parent
                 anchors.leftMargin: 14
                 anchors.rightMargin: 8
-                Text { text: "TRACKS"; color: Theme.textMuted; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1; Layout.fillWidth: true }
+                Text { text: "TRACKS"; color: Theme.textMuted; font.pixelSize: Theme.smallSize; font.bold: true; font.letterSpacing: 1; Layout.fillWidth: true }
                 ToolButton {
                     id: addTrackButton
                     objectName: "addTrackButton"
@@ -46,7 +46,7 @@ Rectangle {
                     implicitWidth: 28; implicitHeight: 28
                     onClicked: addTrackPopup.open()
                     contentItem: Text { text: Icons.plus; color: Theme.accent; font.pixelSize: 20; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                    background: Rectangle { radius: 4; color: parent.down ? Theme.chipHover : "transparent" }
+                    background: Rectangle { radius: Theme.controlRadius; color: parent.down ? Theme.chipHover : "transparent" }
                     ToolTip.visible: hovered
                     ToolTip.text: "Add track…"
                     ToolTip.delay: 450
@@ -80,7 +80,7 @@ Rectangle {
                     objectName: "emptyTrackHint"
                     text: "Click + to add a track, or double-click here for a Vocal track"
                     color: Theme.textMuted
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.smallSize
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
                 }
@@ -95,7 +95,8 @@ Rectangle {
                     required property string name
                     required property string kind
                     required property string trackType
-                    required property color trackColour
+                    required property string trackColour   // "" = none: the track is drawn plain
+                    readonly property bool hasColour: trackColour.length > 0
                     required property bool isSolo
                     required property bool isMuted
                     required property bool isRecordArmed
@@ -137,14 +138,16 @@ Rectangle {
                     width: trackScroll.width
                     height: root.laneHeight
                     color: isSelected ? Theme.trackList.rowSelected : (index % 2 ? Theme.trackList.rowAlt : Theme.trackList.row)
-                    border.color: isSelected ? Theme.accent : (root.dropRow === index ? Theme.accent : Theme.divider)
-                    border.width: isSelected || root.dropRow === index ? 2 : 1
+                    // Selected: the lighter background and a thin dim edge. Bright only as a drop target.
+                    border.color: root.dropRow === index ? Theme.accent : isSelected ? Theme.trackList.rowSelectedBorder : Theme.divider
+                    border.width: root.dropRow === index ? 2 : 1
                     Rectangle {
                         objectName: "trackColourAccent" + trackCard.trackId
                         anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
-                        width: isSelected ? 5 : 3
-                        // Always the track colour; selection shows through the border/background
-                        color: trackCard.trackColour
+                        width: 3
+                        // Always the track colour (nothing when it has none); selection shows
+                        // through the border / background.
+                        color: trackCard.hasColour ? trackCard.trackColour : "transparent"
                     }
 
                     MouseArea {
@@ -164,7 +167,7 @@ Rectangle {
                         Rectangle {
                             anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
                             width: 3
-                            color: trackCard.trackColour
+                            color: trackCard.hasColour ? trackCard.trackColour : "transparent"
                         }
                         MouseArea {
                             anchors.fill: parent
@@ -175,7 +178,7 @@ Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                             text: "Volume"
                             color: trackCard.envelopeBypassed ? Theme.textMuted : Theme.text
-                            font.pixelSize: 11
+                            font.pixelSize: Theme.smallSize
                         }
                         ToggleChip {
                             objectName: "envelopeBypassButton" + trackCard.trackId
@@ -189,37 +192,45 @@ Rectangle {
                         }
                     }
 
+                    // Three lines in a 64 px row: name (with the type and the remove cross), the buttons,
+                    // the volume slider.
                     ColumnLayout {
                         anchors.fill: parent
                         anchors.leftMargin: 8
-                        anchors.rightMargin: 8
-                        anchors.topMargin: 5
+                        anchors.rightMargin: 6
+                        anchors.topMargin: 4
                         anchors.bottomMargin: 4
-                        spacing: 2
-                        ColumnLayout {
+                        spacing: 3
+                        RowLayout {
                             Layout.fillWidth: true
-                            spacing: 1
+                            spacing: 4
                             Item {
+                                id: nameItem
                                 Layout.fillWidth: true
-                                implicitHeight: 22
+                                // The name goes first: the type beside it gives way when both do not fit.
+                                readonly property real wanted: Math.max(40, Math.min(20 + nameLabel.implicitWidth, trackCard.width - 60))
+                                Layout.minimumWidth: wanted
+                                implicitHeight: 18
                                 ToolButton {
                                     objectName: "trackColourButton" + trackCard.trackId
                                     anchors.left: parent.left
                                     anchors.verticalCenter: parent.verticalCenter
-                                    width: 14; height: 14
+                                    width: 12; height: 12
                                     onClicked: root.openColourPopup(trackCard)
-                                    background: Rectangle { color: trackCard.trackColour; border.color: parent.hovered ? Theme.text : Theme.trackList.swatchBorder; radius: 3 }
+                                    // An empty box while the track has no colour.
+                                    background: Rectangle { color: trackCard.hasColour ? trackCard.trackColour : "transparent"; border.color: parent.hovered ? Theme.text : Theme.trackList.swatchBorder; radius: 3 }
                                     ToolTip.visible: hovered
                                     ToolTip.text: "Choose track colour"
                                 }
                                 Text {
+                                    id: nameLabel
                                     objectName: "trackNameLabel" + trackCard.trackId
                                     anchors.fill: parent
                                     anchors.leftMargin: 20
                                     verticalAlignment: Text.AlignVCenter
                                     text: trackCard.name
                                     color: Theme.text
-                                    font.pixelSize: 12
+                                    font.pixelSize: Theme.bodySize
                                     elide: Text.ElideRight
                                     visible: !trackCard.renaming
                                 }
@@ -266,7 +277,7 @@ Rectangle {
                                     maximumLength: 256
                                     selectByMouse: true
                                     color: Theme.text
-                                    font.pixelSize: 12
+                                    font.pixelSize: Theme.bodySize
                                     padding: 2
                                     background: Rectangle { color: Theme.trackList.nameEditor; border.color: Theme.accent; radius: 3 }
                                     onEditingFinished: trackCard.finishRename(true)
@@ -276,113 +287,107 @@ Rectangle {
                                     }
                                 }
                             }
-                            Text { text: trackCard.trackType.toUpperCase(); color: Theme.textMuted; font.pixelSize: Theme.microSize; font.letterSpacing: 0.7 }
-                        }
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 2
-                            // At the narrowest track list the chips wrap onto a second, shorter line
-                            // so the card still fits its timeline lane; the remove button stays top right.
-                            Flow {
-                                id: chipFlow
-                                readonly property real oneLineWidth: muteButton.implicitWidth + soloButton.implicitWidth
-                                    + inputButton.implicitWidth + monitorButton.implicitWidth
-                                    + recordButton.implicitWidth + fxButton.implicitWidth + 5 * spacing
-                                readonly property bool wrapped: width < oneLineWidth
-                                readonly property real chipHeight: wrapped ? 18 : 24
-                                Layout.fillWidth: true
-                                Layout.alignment: Qt.AlignTop
-                                Layout.preferredHeight: implicitHeight
-                                spacing: 2
-                                ToggleChip {
-                                    id: muteButton
-                                    objectName: "trackMuteButton" + trackCard.trackId
-                                    active: trackCard.isMuted
-                                    activeBg: Theme.muteBg; activeBorder: Theme.muteBorder; activeText: Theme.muteText
-                                    text: "M"; implicitWidth: 22; implicitHeight: chipFlow.chipHeight
-                                    onClicked: root.trackModel.setMuted(trackCard.trackId, !active)
-                                    tooltip: active ? "Mute enabled" : "Mute disabled"
-                                }
-                                ToggleChip {
-                                    id: soloButton
-                                    objectName: "trackSoloButton" + trackCard.trackId
-                                    active: trackCard.isSolo
-                                    activeBg: Theme.soloBg; activeBorder: Theme.soloBorder; activeText: Theme.soloText
-                                    text: "S"; implicitWidth: 22; implicitHeight: chipFlow.chipHeight
-                                    onClicked: root.trackModel.setSolo(trackCard.trackId, !active)
-                                    tooltip: active ? "Solo enabled" : "Solo disabled"
-                                }
-                                ToggleChip {
-                                    id: inputButton
-                                    objectName: "trackInputButton" + trackCard.trackId
-                                    // Lit (accent text and border) once an input is chosen; still lightens on hover.
-                                    // Instrument tracks without an audio input show the shared MIDI input.
-                                    readonly property string shownInput: trackCard.hasLiveInput ? trackCard.inputPort
-                                                                                                : EngineController.connectedMidiPort
-                                    active: shownInput.length > 0
-                                    activeBg: hovered ? Theme.chipHover : Theme.chip
-                                    hoverHighlight: true
-                                    text: "IN"; textSize: Theme.microSize
-                                    implicitWidth: 26; implicitHeight: chipFlow.chipHeight
-                                    onClicked: root.openInputPopup(trackCard)
-                                    tooltip: shownInput.length > 0 ? shownInput
-                                             : trackCard.hasLiveInput ? "Choose this track's input" : "Choose the MIDI input"
-                                }
-                                ToggleChip {
-                                    id: monitorButton
-                                    objectName: "trackMonitorButton" + trackCard.trackId
-                                    active: trackCard.monitorEnabled
-                                    enabled: trackCard.canMonitor
-                                    implicitWidth: 26; implicitHeight: chipFlow.chipHeight
-                                    text: "MON"; textSize: Theme.microSize
-                                    onClicked: root.trackModel.setMonitorEnabled(trackCard.trackId, !active)
-                                    tooltip: trackCard.hasLiveInput
-                                             ? (active ? "Disable live input monitoring" : "Monitor this track's input without arming recording")
-                                             : (active ? "Stop playing this instrument from MIDI" : "Play this instrument live from your MIDI keyboard")
-                                }
-                                ToggleChip {
-                                    id: recordButton
-                                    objectName: "trackRecordButton" + trackCard.trackId
-                                    active: trackCard.isRecordArmed
-                                    activeBg: Theme.recordBg; activeBorder: Theme.record; activeText: Theme.textStrong
-                                    implicitWidth: 50; implicitHeight: chipFlow.chipHeight
-                                    text: active ? "REC ON" : "REC OFF"; textSize: Theme.microSize
-                                    onClicked: root.trackModel.setRecordArmed(trackCard.trackId, !active)
-                                    tooltip: active ? "Recording armed" : "Arm track for recording"
-                                }
-                                ToggleChip {
-                                    id: fxButton
-                                    objectName: "trackFxButton" + trackCard.trackId
-                                    hoverHighlight: true
-                                    text: "FX"; textSize: 9
-                                    implicitWidth: 28; implicitHeight: chipFlow.chipHeight
-                                    onClicked: root.openEffects(trackCard)
-                                    tooltip: "Browse track effects"
-                                }
+                            Text {
+                                objectName: "trackTypeLabel" + trackCard.trackId
+                                text: trackCard.trackType.toUpperCase()
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.microSize; font.letterSpacing: 0.7
+                                elide: Text.ElideRight
+                                // What the name leaves of the line (card margins 14, the cross 18, gaps 8).
+                                Layout.maximumWidth: Math.max(0, Math.min(trackCard.width * 0.4, trackCard.width - 40 - nameItem.wanted))
                             }
                             CloseButton {
                                 id: closeTrackButton
-                                Layout.alignment: Qt.AlignTop
                                 objectName: "trackRemoveButton" + trackCard.trackId
                                 destructive: true
-                                glyphSize: 17
-                                implicitWidth: 20; implicitHeight: 24
+                                glyphSize: 14
+                                implicitWidth: 18; implicitHeight: 18
                                 Accessible.name: "Remove track"
                                 tooltip: "Remove track"
                                 onClicked: root.requestRemoveTrack(trackCard.trackId, trackCard.name, trackCard.clips ? trackCard.clips.length : 0)
                             }
                         }
-
+                        // One line of buttons, also at the narrowest track list.
+                        Row {
+                            id: chipFlow
+                            readonly property real chipHeight: 20
+                            Layout.fillWidth: true
+                            spacing: 2
+                            ToggleChip {
+                                id: muteButton
+                                objectName: "trackMuteButton" + trackCard.trackId
+                                active: trackCard.isMuted
+                                activeBg: Theme.muteBg; activeBorder: Theme.muteBorder; activeText: Theme.muteText
+                                text: "M"; plain: true; implicitWidth: 22; implicitHeight: chipFlow.chipHeight
+                                onClicked: root.trackModel.setMuted(trackCard.trackId, !active)
+                                tooltip: active ? "Mute enabled" : "Mute disabled"
+                            }
+                            ToggleChip {
+                                id: soloButton
+                                objectName: "trackSoloButton" + trackCard.trackId
+                                active: trackCard.isSolo
+                                activeBg: Theme.soloBg; activeBorder: Theme.soloBorder; activeText: Theme.soloText
+                                text: "S"; plain: true; implicitWidth: 22; implicitHeight: chipFlow.chipHeight
+                                onClicked: root.trackModel.setSolo(trackCard.trackId, !active)
+                                tooltip: active ? "Solo enabled" : "Solo disabled"
+                            }
+                            ToggleChip {
+                                id: inputButton
+                                objectName: "trackInputButton" + trackCard.trackId
+                                // Lit (accent text and border) once an input is chosen; still lightens on hover.
+                                // Instrument tracks without an audio input show the shared MIDI input.
+                                readonly property string shownInput: trackCard.hasLiveInput ? trackCard.inputPort
+                                                                                            : EngineController.connectedMidiPort
+                                active: shownInput.length > 0
+                                activeBg: hovered ? Theme.chipHover : Theme.chip
+                                hoverHighlight: true
+                                text: "IN"; textSize: Theme.microSize; plain: true
+                                implicitWidth: 24; implicitHeight: chipFlow.chipHeight
+                                onClicked: root.openInputPopup(trackCard)
+                                tooltip: shownInput.length > 0 ? shownInput
+                                         : trackCard.hasLiveInput ? "Choose this track's input" : "Choose the MIDI input"
+                            }
+                            ToggleChip {
+                                id: monitorButton
+                                objectName: "trackMonitorButton" + trackCard.trackId
+                                active: trackCard.monitorEnabled
+                                enabled: trackCard.canMonitor
+                                implicitWidth: 30; implicitHeight: chipFlow.chipHeight
+                                text: "MON"; textSize: Theme.microSize; plain: true
+                                onClicked: root.trackModel.setMonitorEnabled(trackCard.trackId, !active)
+                                tooltip: trackCard.hasLiveInput
+                                         ? (active ? "Disable live input monitoring" : "Monitor this track's input without arming recording")
+                                         : (active ? "Stop playing this instrument from MIDI" : "Play this instrument live from your MIDI keyboard")
+                            }
+                            ToggleChip {
+                                id: recordButton
+                                objectName: "trackRecordButton" + trackCard.trackId
+                                active: trackCard.isRecordArmed
+                                activeBg: Theme.recordBg; activeBorder: Theme.record; activeText: Theme.textStrong
+                                implicitWidth: 30; implicitHeight: chipFlow.chipHeight
+                                text: "REC"; textSize: Theme.microSize; plain: true
+                                onClicked: root.trackModel.setRecordArmed(trackCard.trackId, !active)
+                                tooltip: active ? "Recording armed" : "Arm track for recording"
+                            }
+                            ToggleChip {
+                                id: fxButton
+                                objectName: "trackFxButton" + trackCard.trackId
+                                hoverHighlight: true
+                                text: "FX"; textSize: Theme.microSize; plain: true
+                                implicitWidth: 24; implicitHeight: chipFlow.chipHeight
+                                onClicked: root.openEffects(trackCard)
+                                tooltip: "Browse track effects"
+                            }
+                        }
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 5
-                            Text { text: "VOL"; color: Theme.textMuted; font.pixelSize: Theme.microSize; font.bold: true; Layout.preferredWidth: 24 }
                             ThemedSlider {
                                 id: volumeSlider
                                 objectName: "trackVolume" + trackCard.trackId
-                                tint: trackCard.trackColour
+                                tint: trackCard.hasColour ? trackCard.trackColour : "transparent"
                                 Layout.fillWidth: true
+                                Layout.preferredHeight: 12
                                 from: 0; to: 2; value: trackCard.volume
                                 onMoved: root.trackModel.setVolume(trackCard.trackId, value)
                                 TapHandler {
@@ -394,7 +399,7 @@ Rectangle {
                                 ToolTip.text: "Track volume / monitor gain " + Math.round(value * 100) + "%; double-click for 0 dB"
                                 ToolTip.delay: 450
                             }
-                            Text { text: Math.round(volumeSlider.value * 100) + "%"; color: Theme.textMuted; font.pixelSize: 9; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 29 }
+                            Text { text: Math.round(volumeSlider.value * 100) + "%"; color: Theme.textMuted; font.pixelSize: Theme.microSize; horizontalAlignment: Text.AlignRight; Layout.preferredWidth: 29 }
                         }
                     }
 
@@ -435,7 +440,7 @@ Rectangle {
         id: colourPopup
         property Item card: null
         readonly property int trackId: card ? card.trackId : -1
-        readonly property string trackColour: card ? card.trackColour.toString() : ""
+        readonly property string trackColour: card ? card.trackColour : ""
         onCardChanged: if (!card) close()
         objectName: "trackColourPopup" + trackId
         parent: Overlay.overlay
@@ -443,10 +448,10 @@ Rectangle {
         padding: 12
         x: card ? Math.max(8, Math.min(parent.width - width - 8, card.mapToItem(parent, 0, 0).x)) : 0
         y: card ? Math.max(8, Math.min(parent.height - height - 8, card.mapToItem(parent, 0, 28).y)) : 0
-        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
+        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: Theme.panelRadius }
         contentItem: Column {
             spacing: 10
-            Text { text: "Track colour"; color: Theme.text; font.pixelSize: 12 }
+            Text { text: "Track colour"; color: Theme.text; font.pixelSize: Theme.bodySize }
             Grid {
                 columns: 6
                 spacing: 7
@@ -456,7 +461,7 @@ Rectangle {
                         required property int index
                         required property string modelData
                         objectName: "trackColourChoice" + colourPopup.trackId + "_" + index
-                        width: 28; height: 28; radius: 4
+                        width: 28; height: 28; radius: Theme.controlRadius
                         color: modelData
                         border.width: colourPopup.trackColour === modelData ? 2 : 1
                         border.color: colourPopup.trackColour === modelData ? Theme.text : Theme.trackList.swatchChoiceBorder
@@ -470,14 +475,27 @@ Rectangle {
                     }
                 }
             }
-            PanelButton {
-                objectName: "customTrackColour" + colourPopup.trackId
-                text: "Custom colour…"
-                onClicked: {
-                    colourDialog.card = colourPopup.card
-                    colourPopup.close()
-                    colourDialog.selectedColor = colourDialog.card.trackColour
-                    colourDialog.open()
+            Row {
+                spacing: 6
+                PanelButton {
+                    objectName: "customTrackColour" + colourPopup.trackId
+                    text: "Custom colour…"
+                    onClicked: {
+                        colourDialog.card = colourPopup.card
+                        colourPopup.close()
+                        colourDialog.selectedColor = colourDialog.card.hasColour ? colourDialog.card.trackColour : Theme.trackColors[0]
+                        colourDialog.open()
+                    }
+                }
+                // Back to a plain track, as a new one is.
+                PanelButton {
+                    objectName: "noTrackColour" + colourPopup.trackId
+                    text: "No colour"
+                    enabled: colourPopup.trackColour.length > 0
+                    onClicked: {
+                        root.trackModel.clearTrackColour(colourPopup.trackId)
+                        colourPopup.close()
+                    }
                 }
             }
         }
@@ -534,27 +552,27 @@ Rectangle {
         height: Math.min(Math.min(340, Overlay.overlay.height - 16),
                          Math.max(150, (midi ? 120 : 100) + choices.length * 34))
         padding: 0
-        background: Rectangle { radius: 8; color: Theme.popupBg; border.color: Theme.popupBorder }
+        background: Rectangle { radius: Theme.panelRadius; color: Theme.popupBg; border.color: Theme.popupBorder }
         contentItem: ColumnLayout {
             anchors.fill: parent
             anchors.margins: 10
             spacing: 6
             Text {
                 text: inputPopup.trackName + (inputPopup.midi ? " · MIDI input" : " · Input")
-                color: Theme.text; font.pixelSize: 12; font.bold: true
+                color: Theme.text; font.pixelSize: Theme.bodySize; font.bold: true
                 Layout.fillWidth: true; elide: Text.ElideRight
             }
             Text {
                 visible: inputPopup.midi
                 text: "One MIDI input for all instrument tracks. MON or REC picks which tracks play it."
-                color: Theme.textMuted; font.pixelSize: 10
+                color: Theme.textMuted; font.pixelSize: Theme.captionSize
                 Layout.fillWidth: true; wrapMode: Text.WordWrap
             }
             Rectangle {
                 objectName: inputPopup.midi ? "midiInputOff" : "defaultInput"
                 Layout.fillWidth: true
                 height: 32
-                radius: 5
+                radius: Theme.controlRadius
                 color: defaultInputArea.containsMouse ? Theme.trackList.optionHover : Theme.trackList.option
                 border.color: (inputPopup.midi ? EngineController.connectedMidiPort.length === 0
                                                : inputPopup.inputPort.length === 0)
@@ -565,7 +583,7 @@ Rectangle {
                     verticalAlignment: Text.AlignVCenter
                     text: inputPopup.midi ? "No MIDI input" : "Use default input"
                     color: Theme.text
-                    font.pixelSize: 10
+                    font.pixelSize: Theme.captionSize
                 }
                 MouseArea {
                     id: defaultInputArea
@@ -592,7 +610,7 @@ Rectangle {
                     text: inputPopup.midi ? "No MIDI devices found. Switch the keyboard on, then open this again."
                                           : "No physical input devices found"
                     color: Theme.textMuted
-                    font.pixelSize: 10
+                    font.pixelSize: Theme.captionSize
                     verticalAlignment: Text.AlignVCenter
                     leftPadding: 8
                 }
@@ -607,7 +625,7 @@ Rectangle {
                             objectName: (inputPopup.midi ? "midiInput" : "audioInput") + index
                             width: inputRows.width
                             height: 34
-                            radius: 5
+                            radius: Theme.controlRadius
                             color: inputRowArea.containsMouse ? Theme.trackList.optionHover : "transparent"
                             border.color: (inputPopup.midi ? EngineController.connectedMidiPort === modelData
                                                            : inputPopup.inputPort === EngineController.inputPortForDevice(index))
@@ -618,7 +636,7 @@ Rectangle {
                                 anchors.rightMargin: 8
                                 text: modelData
                                 color: Theme.text
-                                font.pixelSize: 10
+                                font.pixelSize: Theme.captionSize
                                 verticalAlignment: Text.AlignVCenter
                                 elide: Text.ElideMiddle
                             }
@@ -684,7 +702,8 @@ Rectangle {
         x: (parent.width - width) / 2
         y: (parent.height - height) / 2
         width: 330
-        height: addTrackStage === "instrument" ? 382 : 222
+        // As tall as its rows need (three kinds, two drum kits), up to the long instrument list.
+        height: Math.min(382, 36 + addTrackHeader.height + 10 + addTrackChoices.count * 50 - 10)
         modal: true
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
@@ -692,7 +711,7 @@ Rectangle {
         property var group: null                            // the group choice "variant" lists
         padding: 0
         onClosed: { addTrackStage = "kind"; group = null }
-        background: Rectangle { radius: 10; color: Theme.popupBg; border.color: Theme.popupBorder }
+        background: Rectangle { radius: Theme.panelRadius; color: Theme.popupBg; border.color: Theme.popupBorder }
 
         contentItem: Column {
             anchors.fill: parent
@@ -711,7 +730,7 @@ Rectangle {
                     Accessible.name: addTrackPopup.addTrackStage === "variant" ? "Back to instruments" : "Back to track types"
                     onClicked: addTrackPopup.addTrackStage = addTrackPopup.addTrackStage === "variant" ? "instrument" : "kind"
                     contentItem: Text { text: Icons.back; color: Theme.text; font.pixelSize: 21; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                    background: Rectangle { radius: 5; color: parent.hovered ? Theme.trackList.backHover : "transparent" }
+                    background: Rectangle { radius: Theme.controlRadius; color: parent.hovered ? Theme.trackList.backHover : "transparent" }
                 }
                 Column {
                     spacing: 3
@@ -719,13 +738,13 @@ Rectangle {
                         text: addTrackPopup.addTrackStage === "kind" ? "Create a track"
                             : addTrackPopup.addTrackStage === "variant" ? "Choose " + addTrackPopup.group.name.toLowerCase()
                             : "Choose an instrument"
-                        color: Theme.text; font.pixelSize: 16; font.bold: true
+                        color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true
                     }
                     Text {
                         text: addTrackPopup.addTrackStage === "kind" ? "Select the kind of track to add."
                             : addTrackPopup.addTrackStage === "variant" ? "Select the kind of " + addTrackPopup.group.name.toLowerCase() + "."
                             : "Select the instrument type."
-                        color: Theme.textMuted; font.pixelSize: 11
+                        color: Theme.textMuted; font.pixelSize: Theme.smallSize
                     }
                 }
             }
@@ -747,7 +766,7 @@ Rectangle {
                     objectName: "trackChoice_" + modelData.id
                     width: ListView.view.width - addTrackScroll.width - 6   // clear of the scrollbar
                     height: 40
-                    radius: 6
+                    radius: Theme.panelRadius
                     color: choiceArea.containsMouse ? Theme.trackList.optionHover : Theme.trackList.option
                     border.color: choiceArea.containsMouse ? Theme.accent : Theme.trackList.optionBorder
                     Item {
@@ -757,7 +776,7 @@ Rectangle {
                         Text {
                             text: modelData.name
                             color: Theme.text
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.bodySize
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
                         }

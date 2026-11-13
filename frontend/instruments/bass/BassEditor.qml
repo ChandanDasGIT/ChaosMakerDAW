@@ -84,12 +84,12 @@ Item {
                 Layout.minimumWidth: 40                    // the title gives way to the preset buttons
                 spacing: 3
                 Text {
-                    text: "Bass Guitar"; color: Theme.text; font.pixelSize: 15; font.bold: true
+                    text: "Bass Guitar"; color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true
                     Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight
                 }
                 Text {
                     text: "Four modelled strings (E A D G, 24 frets) through neck and bridge pickups"
-                    color: Theme.textMuted; font.pixelSize: 11
+                    color: Theme.textMuted; font.pixelSize: Theme.smallSize
                     Layout.fillWidth: true; elide: Text.ElideRight
                 }
             }
@@ -157,7 +157,7 @@ Item {
                 id: body
                 x: 16; y: 16
                 width: parent.width - 32
-                columns: root.width > 900 ? 4 : root.width > 560 ? 2 : 1
+                columns: root.width > 900 ? 4 : root.width > 440 ? 2 : 1
                 columnSpacing: 28
                 rowSpacing: 18
 
@@ -291,7 +291,7 @@ Item {
         width: 340
         modal: true
         padding: 14
-        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
+        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: Theme.panelRadius }
         function ask(mode, name) {
             nameDialog.mode = mode
             nameDialog.original = name
@@ -326,10 +326,10 @@ Item {
                 maximumLength: 48
                 selectByMouse: true
                 color: Theme.text
-                font.pixelSize: 12
+                font.pixelSize: Theme.bodySize
                 placeholderText: "Preset name"
                 placeholderTextColor: Theme.textDisabled
-                background: Rectangle { color: Theme.field; border.color: nameField.activeFocus ? Theme.accent : Theme.fieldBorder; radius: 3 }
+                background: Rectangle { color: Theme.field; border.color: nameField.activeFocus ? Theme.accent : Theme.fieldBorder; radius: Theme.controlRadius }
                 onTextEdited: nameDialog.confirmReplace = false
                 onAccepted: nameDialog.accept()
                 Keys.onEscapePressed: nameDialog.close()
@@ -369,7 +369,7 @@ Item {
         width: 320
         modal: true
         padding: 14
-        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
+        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: Theme.panelRadius }
         contentItem: ColumnLayout {
             spacing: 10
             Text {

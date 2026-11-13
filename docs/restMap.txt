@@ -26,15 +26,16 @@ NEXT UP (2026-11-12), the user's order, easiest first:
           their buttons; "Ripple editing" in the Edit menu has a white-outlined box; Settings >
           Keyboard shortcuts… opens the shortcut editor; the TAP chip moved to Options >
           Tap tempo…, a popup with a tap pad (Space / T tap), the BPM and "Back to".
-          Known: the UI test transport_keys_fire_once_while_quick_settings_is_open fails after
-          the File > New / Save As tests (fails without these changes too; passes alone).
+          The UI test transport_keys_fire_once_while_quick_settings_is_open failed after the
+          Save As test (not File > New): FIXED 2026-11-13, see G16.
           MIDI routing left as is by the user: with nothing armed, keys reach a track only
           when it is the only instrument track.
   5. G20  Drum pattern analyzer: DONE 2026-11-13 (committed), see G20 below. Better on drum
           stems after measuring on real playing; a whole song is not accurate (that needs a
           stem splitter: laterGator L7).
-  6. G22  BPM analyzer (split from G21 by the user: chords and BPM are separate tools); reuses
-          G20's beat tracker.
+  6. G22  BPM analyzer: DROPPED 2026-11-13 by the user (the drum and chord analyzers already
+          find and set the BPM and time signature). Done instead: the song is lined up with the
+          project's bars when an analyzer sets the BPM, see G22 below.
   7. G21  Chord analyzer: DONE 2026-11-13 (uncommitted; the user took it before G22), see G21
           below. Right on rendered test songs; on the user's real songs the result is not
           checked (no trusted charts) and looks unsure: the user judges by ear.
@@ -44,7 +45,10 @@ NEXT UP (2026-11-12), the user's order, easiest first:
      2026-11-12; Tap tempo… lives there too).
   9. U7   Every tool opens as a window of its own, like the virtual MIDI: DONE 2026-11-13
           (uncommitted), see U7 below.
- 10. U6   Guitar FX panel UI, at the very end (ask the user what they want first).
+ 10. U8   UI polish, groups A to I (the user, 2026-11-13: "at least presentable"): A to I
+          DONE (uncommitted) but H4 (= U6, ask the user first), see U8 below.
+ 11. U6   Guitar FX panel UI, at the very end (ask the user what they want first); it is
+          group H4 of U8.
   Everything the user chose to do later (G12 tempo / meter changes, C3b, C8, B1-B9 checks, F4,
   H1-H3 and the smaller "later" ideas L1-L6) is in docs/laterGator.txt.
   Done and committed up to 2026-11-12: G1-G11, G13-G18, C11, C3c's cache clean-up, R2, import /
@@ -523,7 +527,14 @@ Done items stay further down as the record.
         65 keyboard / menu UI tests run offscreen: all pass except two that fail only after
         ctrl_shift_s_opens_save_as (decimal_bpm_and_decimal_comma_commit_on_enter,
         desk_faders_have_a_slot_ticks_and_a_metal_cap; both pass alone). That order dependence is
-        older than G16 (it fails with the old ProjectActions.qml too): open, not fixed.
+        older than G16 (it fails with the old ProjectActions.qml too).
+        FIXED 2026-11-13: a test fault only, the app was right. ctrl_shift_s_opens_save_as
+        cancelled the file picker and returned while it was still on screen (it fades out), so
+        the next test's first click or key went to the picker (also
+        transport_keys_fire_once_while_quick_settings_is_open and
+        default_record_mode_is_a_preference_and_new_tracks_follow_it, noted under C6 / G11).
+        The test now waits for the picker to open, cancels it and waits until it is gone. A
+        cancel during the fade-in is not lost (checked). Run in that order: all pass.
         App log empty (empty profile, and a profile with changed and cleared keys).
 [x] G17 Tap tempo. DONE 2026-11-11 (uncommitted). A TAP chip beside the BPM box and Shift+T
         (plain T plays a note with the typing keyboard on). backend/tempo/taptempo: the average
@@ -668,10 +679,29 @@ Done items stay further down as the record.
         Known limits: one steady tempo per clip (a drifting live take gets an average); 2/4 reads
         as 4/4; odd meters (7/8) are a best guess; toms and cymbals are not told apart; real
         songs untested here - the user's ears decide.
-[ ] G22 BPM analyzer (split out of G21 by the user, 2026-11-12: "chord and bpm are separate
-        things"): from a song, the BPM, the beat grid and the time signature into the project.
-        A Tools entry of its own; reuses G20's analysis (backend/analysis beattracker,
-        meterdetect).
+[-] G22 BPM analyzer. DROPPED 2026-11-13 (the user): the drum analyzer (with Half / Double) and
+        the chord analyzer already find the BPM and time signature and set them on the project;
+        a third tool would run the same beat tracker. The user also did not want a plain "Set
+        BPM" button. What was missing, and is DONE 2026-11-13 (uncommitted):
+        The song is lined up with the project's bars. The project's bar grid always starts at
+        time 0 and cannot be shifted (TempoMap and about 20 places assume it), so the user chose
+        to move the song instead of the grid: with "Set the project BPM" ticked, Make clip
+        (drum) and Put on track (chord) first slide the analysed clip by less than a bar, so the
+        bar line found in it lands on the nearest project bar line (a bar later when that would
+        put the clip before 0). The clip then made sits under it. One undo step ("Move clip");
+        the message says "The song moved 0.21 s later to sit on the bars."; the tick's tooltip
+        says so too. No new control.
+        - backend TrackList::alignClipToBars(trackId, clipId, barLine) -> samples moved.
+        - TrackListWrapper::alignClipToBars; DrumAnalyzerWrapper / ChordAnalyzerWrapper
+          alignSong() (the clip where it is now + the result's firstBarSeconds), called from
+          DrumAnalyzerDialog.qml / ChordAnalyzerDialog.qml after the BPM and meter are set.
+        Limits, told to the user: only as right as the found tempo (right on about 3 of 4
+        drum recordings, untested on whole songs); a wrong tempo drifts off within bars; a
+        wrong downbeat leaves the song a beat off (nudge by hand); a drifting live take lines
+        up on average only. Not checked on the user's real songs.
+        Tests: backendtests tracklist a_clip_slides_by_less_than_a_bar_onto_the_projects_bar_
+        lines; wrappertests qtdrumanalyzer / qtchordanalyzer; transport_ui drum_pattern_
+        analyzer_* (the drum clip starts on a bar line).
 [x] G21 Chord analyzer. DONE 2026-11-13 (uncommitted). The user: from a whole song (not short
         clips), find the key and the chords; "no false hope". Hand-written, no downloads.
         - backend/analysis/chromagram: the 12 note names every 50 ms from a 0.18 s window
@@ -881,10 +911,105 @@ the piano) and is reused here.
           open inside the tool's own window.
         - Unchanged: a tool reads the selected clip when it is opened; with the window left
           open, choose Tools > … again to take a newly selected clip.
-        - G22 (BPM analyzer): build it as a ToolWindow from the start.
+        - A new tool: build it as a ToolWindow from the start.
         Tests (transporttests): tap_tempo_sets_the_bpm_from_the_tools_window_and_shift_t,
         drum_pattern_analyzer_*, chord_analyzer_* (each checks the
         tool is a Qt.Tool window apart from the main one, Escape closes it, it fits its content).
+
+[ ] U8  UI polish (the user, 2026-11-13). Model: Reaper (local-reference/ref_ss); the dark theme
+        and blue accent stay; no behaviour changes except C1. One group per step, each with
+        before / after pictures (tools/uishots -> renders/ui/<name>/, git-ignored; offscreen,
+        throwaway settings) and the user's go-ahead. The findings list the user approved:
+        [x] A  DONE 2026-11-13 (uncommitted). Six faults: yellow clip edges (alpha written
+               last in TimelineColors trimHandle; same mistake in PianoRollColors clipOutside),
+               empty mixer hint covered, status strip cut off (one line now), Preferences off
+               the window (scrolls), add-track list cut, pedal board without a scroll hint.
+        [x] B  DONE 2026-11-13 (uncommitted). Foundations:
+               B1 Text sizes all from Theme: micro 9, caption 10, small 11, body 13, heading 15
+                  (new). 12 became 13; 14, 16, 17 became 15. Numbers stay only for icon glyphs
+                  and big readouts (18 px and up) and inside the drawn instrument pictures.
+               B2 Theme.controlRadius 4 (buttons, chips, fields) and Theme.panelRadius 6
+                  (cards, popups, dialogs; were 6 to 10). Small marks (2-3 px) and circles as
+                  before. Theme.spaceXs / Sm / Md / Lg (4 / 8 / 12 / 16) exist but are NOT
+                  applied yet: each view takes them when its group redoes its layout.
+               B3 Greys in three levels: arrange area darkest (windowBg #161616, lanes #1c1c1c
+                  / #191919), bars in the middle, track rows (#2a2a2a / #272727) and mixer
+                  strips (#282828 / #252525, master #2c2c2c) lightest; Theme.panelEdge (#0c0c0c)
+                  on the borders of the top bar, track panel, transport and mixer and on the two
+                  splitters. panelBg stays #202020 (popups, dialogs). Not touched: the FX
+                  window's and the piano roll's own palettes (groups H and G).
+               B4 frontend/common/ThemedCheckBox, ThemedRadioButton, ThemedSwitch replace the
+                  stock ones (Preferences, the analyzers, GuitarSuite, mixing plugins, noise
+                  reduction).
+               Tests (transporttests): controls_use_the_shared_themed_components also bans
+               plain CheckBox / RadioButton / Switch outside frontend/common/;
+               text_is_never_tiny_* also bans a text size below 18 written as a number.
+               uishots: each plugin picture now selects its own effect. Still wrong there:
+               50-file-picker shows the "Save changes?" dialog (fix in group I).
+        [x] C  DONE 2026-11-13 (uncommitted). Tracks and timeline:
+               C1 A new track has no colour (Track::colour empty): no strip on the card, lane
+                  or mixer, an empty colour box, white sliders, clips in Theme.timeline.
+                  clipNeutral. The colour popup has "No colour" (TrackList / Project
+                  clearTrackColour, TrackListWrapper::clearTrackColour; like setting a colour,
+                  not an undo step). Saved colours are kept; a track without one is saved
+                  without the entry, so a file with no colour entries (a very old one too)
+                  opens plain (it used to get the automatic palette).
+               C2 Rows 64 px (were 106; TrackLayout's default too). Card: name line with the
+                  type and the remove cross, one line of buttons (also at 180 px, they no
+                  longer wrap), a thin volume slider with the percentage. "VOL" is gone and
+                  "REC OFF / REC ON" is "REC" (red when armed).
+               C3 Track buttons are ToggleChip `plain`: no outline at rest.
+               C4 Selected track: the rowSelected background and a thin rowSelectedBorder
+                  (was a 2 px accent outline); the accent outline only marks a drop target.
+               C5 Clips: a name bar across the top (clipBarHeight 16) in the clip's colour,
+                  brighter when selected; waveform / notes below; clips fill the lane but
+                  for 2 px above and 3 px below (Timeline clipTop / clipBottom / clipHeight).
+               C6 Ruler: bar numbers at body size in rulerLabel, grid ticks along its bottom.
+               Tests: backendtests tracklist catalog_creation_...; wrappertests
+               qttrackcolours; transporttests track_colour_picker_... (plain first, "No
+               colour" last), track_card_chips_fit_on_one_line_at_the_narrowest_track_list
+               (renamed from ..._wrap_and_fit_...), and the tests that had 106 px in them.
+               App start-up checks: run with QT_FORCE_STDERR_LOGGING=1, or Qt logs to the
+               journal and the log looks empty even when the window failed to load.
+        [x] D  DONE 2026-11-13 (uncommitted). Transport bar 46 px (was 72): flat buttons
+               (outline only when on), the time and bars.beats in one dark readout panel
+               (18 px, transportReadout), then BPM, SIG, the metronome button and KEYS right
+               after it with small labels beside the fields (was far right, labels above).
+        [x] E  DONE 2026-11-13 (uncommitted). Mixer strips: clip gain and pan on the top line;
+               fader, a dB scale (0 / -12 / -24 / -48) and thin IN / OUT meters (14 px,
+               segmented every 3 px) take the full height; CLIP, M, S (plain) on one line;
+               the name on a band at the bottom (track colour dimmed, MixerColors.nameBand
+               when none; mixerColour is a 2 px line on it). Master the same, 132 px (was
+               124), MASTER on its band, flat M / FX / CLR. Test changed: mixer_pan_knob_...
+               (the knob is on the gain line now, not the name's).
+        [x] F  DONE 2026-11-13 (uncommitted). Menu buttons: no arrows, even padding, one weight
+               (File was bold); Mixer / Piano Roll as two plain tabs with an accent line under
+               the shown one; menu rows 26 px (were 30), shortcut text right-aligned.
+        [x] G  DONE 2026-11-13 (uncommitted). Piano roll: the magnet is a drawn one-colour icon
+               (frontend/icons/MagnetIcon.qml, was a red emoji), quantise text at the tool
+               size; bottom bar labels GRID / NOTES / COLOR / ZOOM / ROWS small and close to
+               their controls with gaps between groups; readouts' and buttons' corners from
+               the theme; readout text never below 9 px.
+        [x] H  H1-H3 DONE 2026-11-13 (uncommitted). FX window header one 44 px line (was 66):
+               title, the recording mode in small text after it, the buttons, a smaller
+               cross. Instrument pages (drum kit, piano, harmonium, electronic drums, bass,
+               synth) go to two columns from 440 px (was 560), so the FX window shows two at
+               its normal size. Desk fader caps smaller and lighter (faderCapBottom #9a9da4,
+               shadow #55000000). "Effects run top to bottom..." is the CHAIN header's
+               tooltip; GuitarSuite shows the preset's file name, the whole path as tooltip.
+        [ ] H4 The guitar FX panel (= U6): ask the user what they want first.
+        [x] I  DONE 2026-11-13 (uncommitted). Preferences 860 px wide in two columns (audio and
+               recording left; chords, timeline, piano roll, shortcuts right), one column
+               under 700 px; ThemedCheckBox / ThemedRadioButton `wrap` for long labels.
+               PanelButton `primary` (the accent): Save / OK in every ThemedDialog, Export,
+               Assign, the file picker's Open / Save, Replace, Make clip, Put on track,
+               Save groove, Analyse until there is a result. One button height (26). Tool
+               windows' padding Theme.spaceLg. uishots: 49-unsaved-changes, then Discard, so
+               50-file-picker shows the picker.
+               Not done (was "also open"): raw device messages in the status strip; their
+               wording belongs in the wrapper (ask the user).
+               Tests: the whole transporttests passes (176) after all of D to I;
+               icons_live_only_in_icons_qml_... needed MagnetIcon listed in Icons.qml.
 
 -- At the end (the user, 2026-11-10)
 [ ] U6  A better UI for the guitar FX panel (GuitarSuite: pedal cards, amp, cabinet, tuner).

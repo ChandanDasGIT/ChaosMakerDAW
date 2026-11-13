@@ -18,11 +18,11 @@ ColumnLayout {
     spacing: 4
     RowLayout {
         Layout.fillWidth: true
-        Text { text: root.label; color: Theme.textMuted; font.pixelSize: 9; Layout.fillWidth: true }
+        Text { text: root.label; color: Theme.textMuted; font.pixelSize: Theme.microSize; Layout.fillWidth: true }
         Text {
             text: root.levelText
             color: root.clipped ? Theme.record : Theme.text
-            font.pixelSize: 9
+            font.pixelSize: Theme.microSize
         }
     }
     Rectangle {

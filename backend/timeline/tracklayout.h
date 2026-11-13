@@ -9,7 +9,7 @@
 class TrackLayout {
 public:
     // trackHeight: a track's own part; envelopeHeight: an envelope lane under it.
-    explicit TrackLayout(double trackHeight = 106.0, double envelopeHeight = 72.0);
+    explicit TrackLayout(double trackHeight = 64.0, double envelopeHeight = 72.0);
     // One flag per row, in row order: true when the row shows its envelope lane under it.
     void setRows(std::vector<bool> envelopeLanes);
     // Heights <= 0 or nonfinite are ignored (the old value stays).

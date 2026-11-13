@@ -168,7 +168,7 @@ Item {
         editor.updateSelection(x / beatWidth, rowCoordinate(y), Math.abs(x - selectionStartX) > 2)
     }
     function finishSelection() {
-        editor.finishSelection(8 / laneHeight, 10 / laneHeight, 1 / laneHeight)
+        editor.finishSelection(clipTop / laneHeight, clipBottom / laneHeight, 1 / laneHeight)
     }
     property real selectionStartX: 0
     property real selectionEndX: 0
@@ -176,7 +176,13 @@ Item {
     property real selectionEndY: 0
     property var trackModel: null
     property int laneCount: 5
-    property int laneHeight: 106
+    property int laneHeight: 64
+    // A clip fills its lane but for a thin gap above and below; its name sits on a bar across
+    // the top, the waveform or notes below it.
+    readonly property int clipTop: 2
+    readonly property int clipBottom: 3
+    readonly property int clipHeight: laneHeight - clipTop - clipBottom
+    readonly property int clipBarHeight: 16
     property int envelopeLaneHeight: 72   // a volume lane under its track (restMap G6)
     property int rulerHeight: 38
     // Rows can be taller than laneHeight when a volume lane is shown under the track; the
@@ -558,10 +564,10 @@ Item {
                 height: scroll.contentHeight
                 Rectangle { width: 1; height: parent.height; color: Theme.timeline.rulerBarLine }
                 Text {
-                    x: 8; y: 11
+                    x: 7; y: 9
                     text: editor.barLabel(root.firstVisibleBar + index * root.barLabelStride)
-                    color: Theme.textMuted
-                    font.pixelSize: 11
+                    color: Theme.timeline.rulerLabel
+                    font.pixelSize: Theme.bodySize
                 }
             }
         }
@@ -579,17 +585,29 @@ Item {
             }
         }
 
+        // Beat ticks along the bottom of the ruler (the bar lines run through it already).
+        Repeater {
+            model: root.visibleBeatCount
+            delegate: Rectangle {
+                readonly property real beatNumber: root.firstVisibleBeat + index * root.beatGridStride
+                visible: !editor.isBarLine(beatNumber * root.gridStepBeats, editor.beatsPerBar)
+                x: beatNumber * root.gridUnitWidth
+                y: root.rulerHeight - height
+                width: 1; height: 6
+                color: Theme.timeline.rulerBarLine
+            }
+        }
         // Draw beat dividers over the lane backgrounds so every track shows the grid.
         Repeater {
             model: root.trackModel
             delegate: Rectangle {
                 required property int index
                 required property int trackId
-                required property color trackColour
+                required property string trackColour   // "" = none
                 objectName: "timelineLaneColour" + trackId
                 x: 0; y: root.rulerHeight + root.rowTop(index)
                 width: 3; height: root.rowHeight(index)
-                color: trackColour
+                color: trackColour.length > 0 ? trackColour : "transparent"
                 z: 2
             }
         }
@@ -618,7 +636,9 @@ Item {
                 required property real lengthBeats
                 required property string label
                 required property bool effectsPrinted
-                required property color trackColour
+                required property string trackColour   // "" = none: the clip is drawn in the neutral grey
+                readonly property color baseColour: trackColour.length > 0 ? trackColour : Theme.timeline.clipNeutral
+                readonly property bool isSelected: preview.selected ?? false
                 required property bool isRecorded
                 required property var notes
                 required property bool reversed
@@ -636,34 +656,43 @@ Item {
                 objectName: "clipBlock" + clipId
                 readonly property var preview: editor.previews[String(clipId)] ?? ({})
                 x: (preview.startBeat ?? startBeat) * root.beatWidth + 4
-                y: root.rulerHeight + root.rowTop(preview.laneIndex ?? laneIndex) + 8
+                y: root.rulerHeight + root.rowTop(preview.laneIndex ?? laneIndex) + root.clipTop
                 width: Math.max(4, (preview.lengthBeats ?? lengthBeats) * root.beatWidth - 8)
-                height: root.laneHeight - 18
-                radius: 4
-                color: Qt.darker(trackColour, 2.4)
-                border.color: (preview.selected ?? false) ? Theme.accent : trackColour
-                border.width: (preview.selected ?? false) ? 2 : 1
+                height: root.clipHeight
+                radius: Theme.controlRadius
+                color: Qt.darker(baseColour, 2.4)
+                border.color: isSelected ? Theme.accent : baseColour
+                border.width: isSelected ? 2 : 1
                 z: 3
+                // The name bar: the clip's colour, brighter while the clip is selected.
+                Rectangle {
+                    objectName: "clipNameBar" + clipItem.clipId
+                    x: clipItem.border.width; y: clipItem.border.width
+                    width: Math.max(0, clipItem.width - 2 * clipItem.border.width)
+                    height: root.clipBarHeight - clipItem.border.width
+                    color: clipItem.isSelected ? Qt.darker(clipItem.baseColour, 1.15) : Qt.darker(clipItem.baseColour, 1.6)
+                }
                 Text {
-                    anchors.left: parent.left; anchors.leftMargin: 10
-                    anchors.top: parent.top; anchors.topMargin: 8
+                    anchors.left: parent.left; anchors.leftMargin: 12
+                    y: 0; height: root.clipBarHeight
+                    verticalAlignment: Text.AlignVCenter
                     text: label + (clipItem.effectsPrinted ? "" : " · Dry") + (clipItem.reversed ? " · Reversed" : "")
                           + (clipItem.polarityInverted ? " · Ø" : "")
-                          + (clipItem.takeCount > 1 ? " · Take " + (clipItem.activeTake + 1) + "/" + clipItem.takeCount : ""); color: Theme.timeline.clipLabel; font.pixelSize: 11
+                          + (clipItem.takeCount > 1 ? " · Take " + (clipItem.activeTake + 1) + "/" + clipItem.takeCount : ""); color: Theme.timeline.clipLabel; font.pixelSize: Theme.captionSize
                     elide: Text.ElideRight
-                    width: Math.max(0, parent.width - 20)
+                    width: Math.max(0, parent.width - 24 - (clipItem.hasEffects ? 28 : 0))
                 }
                 // Clip effects badge (restMap R2): click it to open them.
                 Rectangle {
                     objectName: "clipEffectsBadge" + clipItem.clipId
                     visible: clipItem.hasEffects
                     anchors.right: parent.right; anchors.rightMargin: 12
-                    anchors.top: parent.top; anchors.topMargin: 6
-                    width: 24; height: 15; radius: 3
+                    anchors.top: parent.top; anchors.topMargin: 2
+                    width: 24; height: 13; radius: 3
                     color: Theme.accentBg
                     border.color: Theme.accent
                     z: 2
-                    Text { anchors.centerIn: parent; text: "FX"; color: Theme.accent; font.pixelSize: 9; font.bold: true }
+                    Text { anchors.centerIn: parent; text: "FX"; color: Theme.accent; font.pixelSize: Theme.microSize; font.bold: true }
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
@@ -683,9 +712,9 @@ Item {
                     readonly property bool onScreen: clipItem.x < scroll.contentX + scroll.width
                                                      && clipItem.x + clipItem.width > scroll.contentX
                     x: Math.max(0, Math.floor((scroll.contentX - clipItem.x) / step) * step)
-                    y: 30
+                    y: root.clipBarHeight + 2
                     width: onScreen ? Math.max(0, Math.min(clipItem.width - x, 2 * step)) : 0
-                    height: Math.max(0, clipItem.height - 38)
+                    height: Math.max(0, clipItem.height - root.clipBarHeight - 4)
                     property var peaks: width > 0 && root.trackModel
                         ? root.trackModel.clipWaveform(clipItem.trackId, clipItem.clipId, Math.ceil(width),
                             x / clipItem.width, Math.min(1, (x + width) / clipItem.width)) : []
@@ -752,14 +781,14 @@ Item {
                     objectName: "clipNotes" + clipItem.clipId
                     visible: !clipItem.isRecorded && clipItem.notes.length > 0
                     x: Math.max(0, scroll.contentX - clipItem.x)
-                    y: 26
+                    y: root.clipBarHeight + 2
                     width: visible ? Math.max(0, Math.min(clipItem.width - x, scroll.width)) : 0
-                    height: Math.max(0, clipItem.height - 30)
+                    height: Math.max(0, clipItem.height - root.clipBarHeight - 5)
                     // Left-edge trim previews keep notes fixed in time; moves carry them along.
                     readonly property real trimShift: root.editOperation === "trimStart"
                         ? (clipItem.preview.startBeat ?? clipItem.startBeat) - clipItem.startBeat : 0
                     readonly property real visibleLength: clipItem.preview.lengthBeats ?? clipItem.lengthBeats
-                    readonly property color noteColour: Qt.lighter(clipItem.trackColour, 1.7)
+                    readonly property color noteColour: Qt.lighter(clipItem.baseColour, 1.7)
                     onPaint: {
                         const ctx = getContext("2d")
                         ctx.clearRect(0, 0, width, height)
@@ -1071,9 +1100,9 @@ Item {
                 viewX: scroll.contentX
                 viewWidth: scroll.width
                 x: 0
-                y: root.rulerHeight + root.rowTop(index) + (envelopeOverClips ? 8 : root.laneHeight)
+                y: root.rulerHeight + root.rowTop(index) + (envelopeOverClips ? root.clipTop : root.laneHeight)
                 width: root.contentWidth
-                height: envelopeOverClips ? root.laneHeight - 18 : root.envelopeLaneHeight
+                height: envelopeOverClips ? root.clipHeight : root.envelopeLaneHeight
                 z: envelopeOverClips ? 3.5 : 2.5
                 onMenuRequested: (id, x, y) => {
                     envelopeMenu.lane = envelopeLane
@@ -1097,20 +1126,20 @@ Item {
             objectName: "recordingPreview" + modelData
             visible: !!root.trackModel
             x: root.transport.recordingStartBeats * root.beatWidth
-            y: root.rulerHeight + root.rowTop(root.trackModel ? root.trackModel.indexOfTrack(modelData) : 0) + 8
+            y: root.rulerHeight + root.rowTop(root.trackModel ? root.trackModel.indexOfTrack(modelData) : 0) + root.clipTop
             width: Math.max(2, root.playhead - x)
-            height: root.laneHeight - 18
-            color: Theme.recordActiveBg; border.color: Theme.record; radius: 4; z: 3
-            Text { anchors.left: parent.left; anchors.leftMargin: 8; anchors.top: parent.top; anchors.topMargin: 8; text: "Recording…"; color: Theme.text }
+            height: root.clipHeight
+            color: Theme.recordActiveBg; border.color: Theme.record; radius: Theme.controlRadius; z: 3
+            Text { anchors.left: parent.left; anchors.leftMargin: 8; y: 0; height: root.clipBarHeight; verticalAlignment: Text.AlignVCenter; text: "Recording…"; color: Theme.text; font.pixelSize: Theme.captionSize }
             // The take's waveform as it is recorded (live, like Reaper's), laid out like a clip's.
             // Only the visible part is fetched and painted; it refreshes as the box grows.
             Canvas {
                 id: liveWaveform
                 objectName: "recordingWaveform" + recordingBox.modelData
                 x: Math.max(0, scroll.contentX - recordingBox.x)
-                y: 30
+                y: root.clipBarHeight + 2
                 width: Math.max(0, Math.min(recordingBox.width, scroll.contentX + scroll.width - recordingBox.x) - x)
-                height: Math.max(0, recordingBox.height - 38)
+                height: Math.max(0, recordingBox.height - root.clipBarHeight - 4)
                 property var peaks: width >= 1 && recordingBox.width > 0
                     ? root.transport.recordingWaveform(recordingBox.modelData, Math.ceil(width),
                                                        x / recordingBox.width, Math.min(1, (x + width) / recordingBox.width))

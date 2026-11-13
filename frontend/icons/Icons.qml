@@ -8,6 +8,7 @@ import QtQuick
 //
 // Drawn icons (shapes, not text) live next to this file in frontend/icons/:
 //   MetronomeIcon.qml   metronome (transport bar, Metronome & Snap button)
+//   MagnetIcon.qml      magnet (piano roll snap to grid)
 QtObject {
     // ---- transport ----
     readonly property string goToStart:   "|\u25C0"      // |◀
@@ -33,7 +34,7 @@ QtObject {
     readonly property string pointer:     "\u2316"       // ⌖ select
     readonly property string pencil:      "\u270E"       // ✎ draw
     readonly property string eraser:      "\u232B"       // ⌫ erase
-    readonly property string snap:        "\uD83E\uDDF2" // magnet (U+1F9F2, written as a surrogate pair)
+    readonly property string snap:        "\uD83E\uDDF2" // magnet (U+1F9F2); the piano roll draws MagnetIcon.qml instead
     readonly property string quantize:    "\u21E5"       // ⇥ (shown as "⇥Q")
     readonly property string undo:        "\u21B6"       // ↶
     readonly property string redo:        "\u21B7"       // ↷

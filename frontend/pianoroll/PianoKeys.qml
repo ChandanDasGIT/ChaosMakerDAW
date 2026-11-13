@@ -77,7 +77,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.noteLabel(keyRow.note)
                         color: keyRow.isC ? Theme.pianoRoll.whiteKeyLabelC : Theme.pianoRoll.whiteKeyLabel
-                        font.pixelSize: keyRow.isC ? 11 : 10
+                        font.pixelSize: keyRow.isC ? Theme.smallSize : Theme.captionSize
                         font.bold: keyRow.isC
                     }
                 }
@@ -106,7 +106,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.noteLabel(keyRow.note)
                         color: Theme.pianoRoll.blackKeyLabel
-                        font.pixelSize: 9
+                        font.pixelSize: Theme.microSize
                         font.bold: false
                     }
 

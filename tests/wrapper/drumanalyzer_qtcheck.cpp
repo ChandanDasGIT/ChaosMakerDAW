@@ -154,6 +154,30 @@ TEST(qtdrumanalyzer, the_selected_clip_gives_tempo_meter_and_a_pattern_clip_in_t
     // Bar 1 lies on a found bar line: the clip's first beat is the loop's first downbeat.
     const auto* made = tracks.project().findTrack(drums)->audioClips.data() + 1;
     CHECK(std::abs(tracks.project().tempo().beatAt(made->start) - (2.0 + LoopStart) * perSecond) < 0.03 * perSecond);
+
+    // The song lined up with the project's bars (the project is at the found tempo): the audio
+    // clip slides by less than a bar, and the next clip made starts on a project bar line.
+    const auto& tempo = tracks.project().tempo();
+    const double barSamples = tempo.beatsPerBar() * 60.0 * tempo.sampleRate() / tempo.bpm();
+    const auto audioStart = [&] { return tracks.project().findTrack(audioTrack)->audioClips.at(0).start; };
+    const std::int64_t startBefore = audioStart();
+    const std::int64_t madeStart = made->start;            // `made` goes stale once another clip is added
+    CHECK(std::abs(std::remainder(tempo.beatAt(madeStart), tempo.beatsPerBar())) > 0.02);       // off the bars so far
+    CHECK(w.alignSong());
+    const std::int64_t shift = audioStart() - startBefore;
+    CHECK(shift != 0 && std::abs(double(shift)) < barSamples);
+    const int third = w.makeClip(drums);
+    CHECK(third > 0 && w.message().contains("The song moved") && w.message().contains("to sit on the bars"));
+    const auto& aligned = tracks.project().findTrack(drums)->audioClips.back();
+    CHECK(std::abs(std::remainder(tempo.beatAt(aligned.start), tempo.beatsPerBar())) < 1e-3);
+    // Its hits are still under the audio's: both moved together.
+    CHECK(std::abs(double(aligned.start - madeStart - shift)) < 2.0);
+    // Again: nothing more to move, and the message does not say it did.
+    CHECK(w.alignSong() && audioStart() == startBefore + shift);
+    CHECK(w.makeClip(drums) > 0 && !w.message().contains("The song moved"));
+    // The move is undoable: the clips made after it go first, then the song is back.
+    CHECK(tracks.undo() && tracks.undo() && tracks.undo());
+    CHECK(audioStart() == startBefore);
 }
 
 TEST(qtdrumanalyzer, the_typical_bars_become_a_groove_and_a_taken_name_is_refused)

@@ -357,6 +357,13 @@ TrackList::Change TrackList::renameTrack(int id, const std::string& name)
     if (track->name == *value) return {true, false};
     return result(m_project.setTrackName(id, *value));
 }
+TrackList::Change TrackList::clearTrackColour(int id)
+{
+    const auto* track = m_project.findTrack(id);
+    if (!track) return {};
+    if (track->colour.empty()) return {true, false};
+    return result(m_project.clearTrackColour(id));
+}
 TrackList::Change TrackList::setTrackColour(int id, const std::string& colour)
 {
     auto value = cleaned(colour, false);
@@ -842,6 +849,20 @@ bool TrackList::moveClipAtBeat(int trackId, int clipId, double startBeat) {
     if (!m_recordingTracks.empty() || !std::isfinite(samples) || samples < 0 || samples >= double(INT64_MAX / 4)) return false;
     if (!m_project.moveAudioClip(trackId, clipId, std::llround(samples))) return false;
      return true;
+}
+
+std::optional<std::int64_t> TrackList::alignClipToBars(int trackId, int clipId, std::int64_t barLine)
+{
+    const auto& tempo = m_project.tempo();
+    const double bar = tempo.beatsPerBar() * 60.0 * tempo.sampleRate() / tempo.bpm();
+    const AudioClip* clip = findClip(trackId, clipId);
+    if (!m_recordingTracks.empty() || !clip || !std::isfinite(bar) || bar < 1.0) return std::nullopt;
+    if (barLine <= -(INT64_MAX / 4) || barLine >= INT64_MAX / 4) return std::nullopt;
+    double shift = std::round(double(barLine) / bar) * bar - double(barLine);
+    if (double(clip->start) + shift < 0.0) shift += bar;
+    const std::int64_t by = std::llround(shift);
+    if (!m_project.moveAudioClip(trackId, clipId, clip->start + by)) return std::nullopt;
+    return by;
 }
 
 bool TrackList::resizeClipAtBeat(int trackId, int clipId, double lengthBeats)

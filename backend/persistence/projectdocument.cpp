@@ -110,7 +110,7 @@ std::string ProjectDocument::serialize(const Project& project,
 
         json trackObj;
         trackObj["name"] = track->name;
-        trackObj["colour"] = track->colour;
+        if (!track->colour.empty()) trackObj["colour"] = track->colour;   // none: the entry is left out
         trackObj["type"] = track->type;
         trackObj["instrument"] = (track->kind == TrackKind::Instrument);
         trackObj["solo"] = track->solo;

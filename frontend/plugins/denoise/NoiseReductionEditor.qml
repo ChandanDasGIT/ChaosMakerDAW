@@ -44,11 +44,11 @@ Item {
             spacing: 8
             Text {
                 text: "NOISE REDUCTION"
-                color: Theme.text; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.7
+                color: Theme.text; font.pixelSize: Theme.smallSize; font.bold: true; font.letterSpacing: 0.7
             }
             Text {
                 text: root.trackName
-                color: Theme.textMuted; font.pixelSize: 10
+                color: Theme.textMuted; font.pixelSize: Theme.captionSize
                 elide: Text.ElideRight
                 Layout.fillWidth: true
             }
@@ -56,12 +56,12 @@ Item {
                 objectName: "denoiseReduction"
                 visible: noise.hasProfile && !fx.bypassed
                 text: "-" + fx.reductionDb.toFixed(1) + " dB"
-                color: Theme.textMuted; font.pixelSize: 10; font.family: Theme.monospaceFontFamily
+                color: Theme.textMuted; font.pixelSize: Theme.captionSize; font.family: Theme.monospaceFontFamily
             }
             ToggleChip {
                 objectName: "denoiseBypass"
                 active: !fx.bypassed
-                text: fx.bypassed ? "BYP" : "ON"; textSize: 9
+                text: fx.bypassed ? "BYP" : "ON"; textSize: Theme.microSize
                 implicitWidth: 34; implicitHeight: 22
                 onClicked: fx.bypassed = !fx.bypassed
                 tooltip: fx.bypassed ? "Bypassed: the sound passes through unchanged" : "Bypass this effect"
@@ -74,7 +74,7 @@ Item {
             Layout.fillHeight: true
             Layout.minimumHeight: 120
             color: Theme.chaosEq.background
-            radius: 4
+            radius: Theme.controlRadius
             Item {
                 id: plot
                 anchors.fill: parent
@@ -98,7 +98,7 @@ Item {
                         const w = plot.width, h = plot.height
                         const freqs = noise.frequencies
                         ctx.lineWidth = 1
-                        ctx.font = "10px sans-serif"
+                        ctx.font = Theme.captionSize + "px sans-serif"
                         const labels = {20: "20", 50: "50", 100: "100", 200: "200", 500: "500", 1000: "1k",
                                         2000: "2k", 5000: "5k", 10000: "10k", 20000: "20k"}
                         for (const hz of [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]) {
@@ -158,7 +158,7 @@ Item {
                         required property var modelData
                         spacing: 4
                         Rectangle { width: 10; height: 2; anchors.verticalCenter: parent.verticalCenter; color: modelData.colour }
-                        Text { text: modelData.name; color: Theme.chaosEq.gridLabel; font.pixelSize: 10 }
+                        Text { text: modelData.name; color: Theme.chaosEq.gridLabel; font.pixelSize: Theme.captionSize }
                     }
                 }
             }
@@ -167,7 +167,7 @@ Item {
                 visible: !noise.hasProfile
                 text: "No noise learned yet"
                 color: Theme.chaosEq.gridLabel
-                font.pixelSize: 12
+                font.pixelSize: Theme.bodySize
             }
         }
 
@@ -197,7 +197,7 @@ Item {
                     : noise.hasProfile ? "Noise learned. Set Reduction to taste; turn on Hear removed noise to check no voice is taken."
                     : "Select a part with only noise (before the singing or between phrases) on the timeline, then Learn."
                 color: noise.message.length > 0 ? Theme.muteText : Theme.textMuted
-                font.pixelSize: 10
+                font.pixelSize: Theme.captionSize
                 wrapMode: Text.WordWrap
             }
         }
@@ -220,7 +220,7 @@ Item {
                     Text {
                         text: controlRow.modelData.name
                         color: Theme.textMuted
-                        font.pixelSize: 10
+                        font.pixelSize: Theme.captionSize
                         elide: Text.ElideRight
                         Layout.preferredWidth: 110
                     }
@@ -251,7 +251,7 @@ Item {
                         value: controlRow.modelValue
                         when: !parameterSlider.pressed
                     }
-                    Switch {
+                    ThemedSwitch {
                         objectName: "denoise." + controlRow.modelData.id + ".switch"
                         visible: controlRow.modelData.kind === "switch"
                         Layout.fillWidth: true
@@ -262,7 +262,7 @@ Item {
                         visible: controlRow.modelData.kind === "slider"
                         text: fx.formatValue(controlRow.modelData.id, parameterSlider.value)
                         color: Theme.text
-                        font.pixelSize: 10
+                        font.pixelSize: Theme.captionSize
                         font.family: Theme.monospaceFontFamily
                         horizontalAlignment: Text.AlignRight
                         Layout.preferredWidth: 56

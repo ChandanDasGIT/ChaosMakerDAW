@@ -653,8 +653,10 @@ TEST(qttrackcolours, project_and_session_roundtrip_support_legacy_files_and_reje
     const auto file=QUrl::fromLocalFile(storage.dir.path()+"/colours.chaos");
     CHECK(controller.saveProject(file)); CHECK(!controller.projectDirty());
     CHECK(!tracks.setTrackColour(a,"broken")); CHECK(!controller.projectDirty());
-    CHECK(tracks.setTrackColour(a,QString::fromStdString(tracks.project().findTrack(a)->colour))); CHECK(!controller.projectDirty());
+    // New tracks have no colour; clearing one that has none changes nothing.
+    CHECK(tracks.project().findTrack(a)->colour.empty()); CHECK(tracks.clearTrackColour(a)); CHECK(!controller.projectDirty());
     CHECK(tracks.setTrackColour(a,"#123456")); CHECK(tracks.setTrackColour(b,"#fedcba")); CHECK(controller.projectDirty());
+    CHECK(tracks.setTrackColour(a,"#123456"));
     CHECK(controller.saveProject()); CHECK(!controller.projectDirty());
     TrackListWrapper session; QString error; CHECK(session.restoreSessionState(tracks.sessionState(),error));
     CHECK(session.project().findTrack(session.trackIdAt(0))->colour=="#123456");
@@ -675,9 +677,22 @@ TEST(qttrackcolours, project_and_session_roundtrip_support_legacy_files_and_reje
     const auto legacy=QUrl::fromLocalFile(storage.dir.path()+"/legacy.chaos");
     { QFile output(legacy.toLocalFile()); CHECK(output.open(QIODevice::WriteOnly)); output.write(QJsonDocument(document).toJson()); }
     CHECK(controller.openProject(legacy)); CHECK(tracks.count()==2 && tracks.clips().size()==1);
-    CHECK(tracks.project().findTrack(tracks.trackIdAt(0))->colour=="#58b7b1");
-    CHECK(tracks.project().findTrack(tracks.trackIdAt(1))->colour=="#6fa8dc");
-    CHECK(!controller.projectDirty()); controller.shutdownSession();
+    // A file without colours (an old one, or tracks that have none) opens with plain tracks.
+    CHECK(tracks.project().findTrack(tracks.trackIdAt(0))->colour.empty());
+    CHECK(tracks.project().findTrack(tracks.trackIdAt(1))->colour.empty());
+    CHECK(!controller.projectDirty());
+    // A cleared colour is saved as none, in the project file and in the session state.
+    CHECK(tracks.setTrackColour(tracks.trackIdAt(0),"#123456")); CHECK(tracks.clearTrackColour(tracks.trackIdAt(0)));
+    CHECK(tracks.clips()[0].toMap()["trackColour"].toString().isEmpty());
+    CHECK(tracks.setTrackColour(tracks.trackIdAt(1),"#fedcba"));
+    const auto plain=QUrl::fromLocalFile(storage.dir.path()+"/plain.chaos");
+    CHECK(controller.saveProject(plain)); CHECK(controller.newProject()); CHECK(controller.openProject(plain));
+    CHECK(tracks.project().findTrack(tracks.trackIdAt(0))->colour.empty());
+    CHECK(tracks.project().findTrack(tracks.trackIdAt(1))->colour=="#fedcba");
+    TrackListWrapper again; CHECK(again.restoreSessionState(tracks.sessionState(),error));
+    CHECK(again.project().findTrack(again.trackIdAt(0))->colour.empty());
+    CHECK(again.project().findTrack(again.trackIdAt(1))->colour=="#fedcba");
+    controller.shutdownSession();
 }
 
 TEST(qtmidirecording, armed_instrument_track_records_midi_into_timeline_clip) {

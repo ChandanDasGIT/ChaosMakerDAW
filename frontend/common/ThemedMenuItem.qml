@@ -9,7 +9,7 @@ MenuItem {
     property string shortcutText: ""
     // A checkable entry drawn as a white-outlined box (ticked when on), so it is seen off too.
     property bool boxed: false
-    implicitHeight: 30
+    implicitHeight: 26
     leftPadding: Theme.margin
     rightPadding: Theme.margin
     indicator: Item {}
@@ -56,10 +56,12 @@ MenuItem {
             color: Theme.textMuted
             font.pixelSize: Theme.captionSize
             font.family: Theme.monospaceFontFamily
+            horizontalAlignment: Text.AlignRight
+            Layout.leftMargin: 16
         }
     }
     background: Rectangle {
         color: root.highlighted ? Theme.tooltipBg : "transparent"
-        radius: 4
+        radius: Theme.controlRadius
     }
 }

@@ -37,8 +37,10 @@ Rectangle {
             objectName: "statusMessage"
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignVCenter
-            text: EngineController.transportMessage.length ? EngineController.transportMessage
-                  : "Engine " + EngineController.version + "  ·  " + EngineController.status
+            // One line: a message with line breaks (a device error) would run out of the strip.
+            text: (EngineController.transportMessage.length ? EngineController.transportMessage
+                   : "Engine " + EngineController.version + "  ·  " + EngineController.status).replace(/\s*\n\s*/g, " · ")
+            maximumLineCount: 1
             elide: Text.ElideMiddle
             color: Theme.textMuted
             font.pixelSize: Theme.bodySize

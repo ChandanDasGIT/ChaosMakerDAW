@@ -145,7 +145,7 @@ Item {
                     height: 22
                     color: Theme.pianoRoll.toolStrip
                     border.color: Theme.pianoRoll.panelBorder
-                    radius: 3
+                    radius: Theme.controlRadius
 
                     Text {
                         anchors.fill: parent
@@ -153,7 +153,7 @@ Item {
                         anchors.rightMargin: 6
                         text: "Velocity"
                         color: Theme.pianoRoll.laneValueText
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.smallSize
                         verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
                     }
@@ -395,7 +395,7 @@ Item {
                         anchors.centerIn: parent
                         text: velocityMouse.label
                         color: Theme.pianoRoll.noteSelectedEdge
-                        font.pixelSize: 10
+                        font.pixelSize: Theme.captionSize
                     }
                 }
             }

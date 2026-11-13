@@ -92,7 +92,7 @@ Item {
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
-            Text { text: root.trackName + " · CHAOS EQ"; color: Theme.text; font.pixelSize: 14; font.bold: true; Layout.fillWidth: true }
+            Text { text: root.trackName + " · CHAOS EQ"; color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true; Layout.fillWidth: true }
             Text {
                 objectName: "chaosEqBandCount"
                 text: bridge.bandCount + " / " + bridge.maxBands + " bands"
@@ -134,7 +134,7 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 color: Theme.chaosEq.background
-                radius: 6
+                radius: Theme.panelRadius
                 clip: true
 
                 Item {
@@ -176,7 +176,7 @@ Item {
                             const w = width, h = plot.plotHeight
                             const freqs = plot.frequencies
                             ctx.lineWidth = 1
-                            ctx.font = "10px sans-serif"
+                            ctx.font = Theme.captionSize + "px sans-serif"
 
                             // Frequency grid and labels.
                             const lines = [20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900,
@@ -364,7 +364,7 @@ Item {
                 Layout.preferredWidth: 240
                 Layout.fillHeight: true
                 color: Theme.chaosEq.inspectorBg
-                radius: 6
+                radius: Theme.panelRadius
 
                 ColumnLayout {
                     anchors.fill: parent

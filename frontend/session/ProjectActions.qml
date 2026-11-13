@@ -52,7 +52,7 @@ RowLayout {
         width: 420
         padding: 12
         closePolicy: Popup.CloseOnEscape
-        background: Rectangle { color: Theme.panelBg; border.color: Theme.divider; radius: 8 }
+        background: Rectangle { color: Theme.panelBg; border.color: Theme.divider; radius: Theme.panelRadius }
         contentItem: ColumnLayout {
             spacing: 8
             Text {
@@ -201,27 +201,22 @@ RowLayout {
         id: fileMenuButton
         objectName: "fileMenuButton"
         text: "File"
-        implicitHeight: 32
+        implicitHeight: 30
         checked: fileMenu.visible
         onClicked: fileMenu.visible ? fileMenu.close() : fileMenu.open()
+        leftPadding: 10
+        rightPadding: 10
         contentItem: RowLayout {
             spacing: 4
             Text {
                 text: "File"
                 color: fileMenuButton.down || fileMenuButton.checked ? Theme.accent : Theme.text
                 font.pixelSize: Theme.bodySize
-                font.bold: true
-                verticalAlignment: Text.AlignVCenter
-            }
-            Text {
-                text: Icons.menuArrow
-                color: fileMenuButton.down || fileMenuButton.checked ? Theme.accent : Theme.textMuted
-                font.pixelSize: 10
                 verticalAlignment: Text.AlignVCenter
             }
         }
         background: Rectangle {
-            radius: 4
+            radius: Theme.controlRadius
             color: fileMenuButton.down || fileMenuButton.checked ? Theme.controlBgActive : fileMenuButton.hovered ? Theme.controlBgHover : "transparent"
             border.color: fileMenuButton.checked ? Theme.divider : "transparent"
         }

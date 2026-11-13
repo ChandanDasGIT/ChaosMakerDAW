@@ -54,12 +54,12 @@ ToolWindow {
 
             Text {
                 text: "Tap tempo"
-                color: Theme.text; font.pixelSize: 16; font.bold: true
+                color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true
             }
             Text {
                 Layout.fillWidth: true
                 text: "Click the pad in time with the music, or press Space or T."
-                color: Theme.textMuted; font.pixelSize: 11
+                color: Theme.textMuted; font.pixelSize: Theme.smallSize
                 wrapMode: Text.WordWrap
             }
 
@@ -68,7 +68,7 @@ ToolWindow {
                 objectName: "tapTempoPad"
                 Layout.fillWidth: true
                 Layout.preferredHeight: 150
-                radius: 10
+                radius: Theme.panelRadius
                 color: Theme.cardBgAlt
                 border.color: padArea.containsMouse ? Theme.accent : Theme.divider
                 border.width: 1
@@ -96,7 +96,7 @@ ToolWindow {
                     Text {
                         Layout.alignment: Qt.AlignHCenter
                         text: "BPM"
-                        color: Theme.textMuted; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1
+                        color: Theme.textMuted; font.pixelSize: Theme.smallSize; font.bold: true; font.letterSpacing: 1
                     }
                     Text {
                         objectName: "tapTempoStatus"
@@ -105,7 +105,7 @@ ToolWindow {
                             : root.tapCount <= 1 ? "Keep tapping…"
                             : root.tapCount + " taps"
                         color: root.paused ? Theme.textMuted : Theme.accent
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.bodySize
                     }
                 }
                 MouseArea {

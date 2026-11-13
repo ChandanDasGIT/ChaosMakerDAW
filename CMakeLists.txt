@@ -198,12 +198,12 @@ if(DAW_BUILD_APP)
                       frontend/icons/Icons.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
                       frontend/window/EditMenu.qml frontend/window/UndoHistory.qml frontend/window/ViewMenu.qml frontend/window/ToolsMenu.qml frontend/window/TapTempoDialog.qml frontend/tools/DrumAnalyzerDialog.qml frontend/tools/ChordAnalyzerDialog.qml frontend/window/PanelTabs.qml
                       frontend/window/StatusStrip.qml
-                      frontend/common/ThemedMenuItem.qml frontend/common/ThemedMenu.qml frontend/common/ThemedMenuSeparator.qml frontend/common/ToggleChip.qml frontend/common/PanelButton.qml frontend/common/ThemedComboBox.qml frontend/common/CloseButton.qml frontend/common/ThemedSlider.qml frontend/common/HardwareSlider.qml frontend/common/ThemedDialog.qml frontend/common/ThemedMenuButton.qml frontend/common/ToolWindow.qml
+                      frontend/common/ThemedMenuItem.qml frontend/common/ThemedMenu.qml frontend/common/ThemedMenuSeparator.qml frontend/common/ToggleChip.qml frontend/common/PanelButton.qml frontend/common/ThemedComboBox.qml frontend/common/CloseButton.qml frontend/common/ThemedSlider.qml frontend/common/HardwareSlider.qml frontend/common/ThemedDialog.qml frontend/common/ThemedMenuButton.qml frontend/common/ToolWindow.qml frontend/common/ThemedCheckBox.qml frontend/common/ThemedRadioButton.qml frontend/common/ThemedSwitch.qml
                       frontend/engine/PlaybackControls.qml
                       frontend/session/ProjectActions.qml frontend/session/ExportDialog.qml frontend/dialogs/FilePicker.qml frontend/audiodevice/DeviceSettings.qml
                       frontend/settings/AppSettings.qml frontend/settings/QuickSettings.qml frontend/settings/ShortcutEditor.qml
                       frontend/tempo/TempoEditor.qml frontend/tempo/MeterEditor.qml
-                      frontend/icons/MetronomeIcon.qml
+                      frontend/icons/MetronomeIcon.qml frontend/icons/MagnetIcon.qml
                       frontend/instruments/guitar/GuitarSuitePanel.qml
                       frontend/instruments/guitar/GuitarSuiteEditor.qml
                       frontend/instruments/harmonium/HarmoniumEditor.qml
@@ -232,12 +232,21 @@ if(DAW_BUILD_APP)
         target_link_libraries(transporttests PRIVATE Qt6::Quick Qt6::Test Qt6::Concurrent dawengine)
         add_test(NAME transport_ui COMMAND transporttests)
         set_tests_properties(transport_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;PIPEWIRE_REMOTE=codex-test-no-server;PULSE_SERVER=unix:/tmp/chaosmaker-test-no-server")
+
+        # uishots: pictures of the app's views, offscreen with throwaway settings (UI work).
+        qt_add_executable(uishots tools/uishots/uishots.cpp)
+        qt_add_qml_module(uishots URI UiShots
+            QML_FILES Main.qml ${FRONTEND_QML}
+            SOURCES ${WRAPPER_SOURCES})
+        target_include_directories(uishots PRIVATE "${CMAKE_CURRENT_LIST_DIR}" ${WRAPPER_DIRS})
+        target_compile_definitions(uishots PRIVATE CHAOSMAKER_SOURCE_DIR="${CMAKE_CURRENT_LIST_DIR}")
+        target_link_libraries(uishots PRIVATE Qt6::Quick Qt6::Test Qt6::Concurrent dawengine)
     endif()
 endif()
 
 # The two factory chains are embedded in every executable that uses GuitarSuiteModel.
 if(DAW_BUILD_APP)
-    foreach(preset_target appChaosMaker wrappertests transporttests)
+    foreach(preset_target appChaosMaker wrappertests transporttests uishots)
         if(TARGET ${preset_target})
             qt_add_resources(${preset_target} guitarsuite_factory_presets
                 PREFIX "/GuitarSuitePresets"

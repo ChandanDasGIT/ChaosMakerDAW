@@ -43,10 +43,10 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 3
-                Text { text: "Chords"; color: Theme.text; font.pixelSize: 15; font.bold: true }
+                Text { text: "Chords"; color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true }
                 Text {
                     text: "Press a strip: it plays at the project's tempo until you press another, or the same one again"
-                    color: Theme.textMuted; font.pixelSize: 11
+                    color: Theme.textMuted; font.pixelSize: Theme.smallSize
                     Layout.fillWidth: true; elide: Text.ElideRight
                 }
             }
@@ -140,7 +140,7 @@ Item {
                 SectionTitle { text: "VOLUME" }
                 ToggleChip {
                     objectName: "chordsDynamicsEven"
-                    text: "Same"; textSize: 11; leftPadding: 10; rightPadding: 10; implicitHeight: 28
+                    text: "Same"; textSize: Theme.smallSize; leftPadding: 10; rightPadding: 10; implicitHeight: 28
                     hoverHighlight: true
                     active: bridge.dynamics === 0
                     tooltip: "Every note of every chord at the same volume"
@@ -148,7 +148,7 @@ Item {
                 }
                 ToggleChip {
                     objectName: "chordsDynamicsTop"
-                    text: "Top note"; textSize: 11; leftPadding: 10; rightPadding: 10; implicitHeight: 28
+                    text: "Top note"; textSize: Theme.smallSize; leftPadding: 10; rightPadding: 10; implicitHeight: 28
                     hoverHighlight: true
                     active: bridge.dynamics === 1
                     tooltip: "The chord's highest note louder, on every chord (in arpeggios, every note of that name)"
@@ -156,7 +156,7 @@ Item {
                 }
                 ToggleChip {
                     objectName: "chordsDynamicsMeter"
-                    text: "Meter accents"; textSize: 11; leftPadding: 10; rightPadding: 10; implicitHeight: 28
+                    text: "Meter accents"; textSize: Theme.smallSize; leftPadding: 10; rightPadding: 10; implicitHeight: 28
                     hoverHighlight: true
                     active: bridge.dynamics === 2
                     tooltip: "By the time signature: the bar's first beat loudest, then each group's first beat, the other beats, and the off-beats softest"
@@ -164,7 +164,7 @@ Item {
                 }
                 ToggleChip {
                     objectName: "chordsBassWithChords"
-                    text: "Bass with chords"; textSize: 11; leftPadding: 10; rightPadding: 10; implicitHeight: 28
+                    text: "Bass with chords"; textSize: Theme.smallSize; leftPadding: 10; rightPadding: 10; implicitHeight: 28
                     hoverHighlight: true
                     active: bridge.bassWithChords
                     tooltip: bridge.bassWithChords ? "On: a chord (or its name) plays its bass part too. Click for the right hand only"
@@ -186,14 +186,14 @@ Item {
                 }
                 ToggleChip {
                     objectName: "chordsKeyMajor"
-                    text: "Major"; textSize: 11; leftPadding: 10; rightPadding: 10; implicitHeight: 28
+                    text: "Major"; textSize: Theme.smallSize; leftPadding: 10; rightPadding: 10; implicitHeight: 28
                     hoverHighlight: true
                     active: !bridge.keyMinor
                     onClicked: bridge.setKey(bridge.keyTonic, false)
                 }
                 ToggleChip {
                     objectName: "chordsKeyMinor"
-                    text: "Minor"; textSize: 11; leftPadding: 10; rightPadding: 10; implicitHeight: 28
+                    text: "Minor"; textSize: Theme.smallSize; leftPadding: 10; rightPadding: 10; implicitHeight: 28
                     hoverHighlight: true
                     active: bridge.keyMinor
                     onClicked: bridge.setKey(bridge.keyTonic, true)
@@ -263,7 +263,7 @@ Item {
         width: 420
         modal: true
         padding: 14
-        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
+        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: Theme.panelRadius }
         function edit(strip) {
             root.editing = strip
             chordField.text = bridge.chords[strip]
@@ -287,10 +287,10 @@ Item {
                 maximumLength: 16
                 selectByMouse: true
                 color: Theme.text
-                font.pixelSize: 13
+                font.pixelSize: Theme.bodySize
                 placeholderText: "A chord: C, Am7, G/B, F#m7b5, Dsus4 … (empty: no chord)"
                 placeholderTextColor: Theme.textDisabled
-                background: Rectangle { color: Theme.field; border.color: chordField.activeFocus ? Theme.accent : Theme.fieldBorder; radius: 3 }
+                background: Rectangle { color: Theme.field; border.color: chordField.activeFocus ? Theme.accent : Theme.fieldBorder; radius: Theme.controlRadius }
                 onAccepted: chordDialog.accept()
                 Keys.onEscapePressed: chordDialog.close()
             }
@@ -300,7 +300,7 @@ Item {
                 Item { Layout.fillWidth: true }
                 ToggleChip {
                     objectName: "chordEditSeventh"
-                    text: "7th"; textSize: 11; leftPadding: 10; rightPadding: 10; implicitHeight: 26
+                    text: "7th"; textSize: Theme.smallSize; leftPadding: 10; rightPadding: 10; implicitHeight: 26
                     hoverHighlight: true
                     active: chordDialog.seventh
                     tooltip: "Four-note chords (maj7, m7, 7, m7b5)"

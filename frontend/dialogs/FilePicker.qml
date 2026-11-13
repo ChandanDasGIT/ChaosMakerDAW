@@ -175,7 +175,7 @@ Popup {
 
     background: Rectangle {
         color: Theme.panelBg
-        radius: 8
+        radius: Theme.panelRadius
         border.color: Theme.divider
     }
 
@@ -339,7 +339,7 @@ Popup {
                     Rectangle {
                         Layout.fillWidth: true
                         implicitHeight: 28
-                        radius: 4
+                        radius: Theme.controlRadius
                         color: Theme.field
                         border.color: Theme.fieldBorder
                         clip: true
@@ -459,7 +459,7 @@ Popup {
                         objectName: "filePickerRow_" + fileName
                         width: ListView.view.width
                         height: 30
-                        radius: 4
+                        radius: Theme.controlRadius
                         color: picked ? Theme.selectionBg
                              : rowMouse.containsMouse ? Theme.hoverOverlay
                              : ListView.isCurrentItem && list.activeFocus ? Theme.controlBg : "transparent"
@@ -559,7 +559,7 @@ Popup {
                 onAccepted: root.accept()
                 Keys.onEscapePressed: root.reject()
                 background: Rectangle {
-                    radius: 4
+                    radius: Theme.controlRadius
                     color: nameField.hovered || nameField.activeFocus ? Theme.fieldHover : Theme.field
                     border.color: nameField.activeFocus ? Theme.accent : Theme.fieldBorder
                 }
@@ -568,7 +568,6 @@ Popup {
             PanelButton {
                 objectName: "filePickerCancel"
                 text: "Cancel"
-                implicitHeight: 28
                 onClicked: root.reject()
             }
 
@@ -576,9 +575,7 @@ Popup {
                 objectName: "filePickerAccept"
                 visible: root.fileMode !== FilePicker.OpenFile
                 enabled: root.saveMode ? root.saveName.length > 0 : root.chosen.length > 0
-                implicitHeight: 28
-                checkable: false
-                checked: true   // the accent: the main action
+                primary: true   // the main action
                 text: root.nameTaken ? "Replace"
                     : root.manyMode && root.chosen.length > 1 ? root.acceptLabel + " " + root.chosen.length + " files"
                     : root.acceptLabel
@@ -597,7 +594,7 @@ Popup {
 
         Layout.fillWidth: true
         implicitHeight: 32
-        radius: 4
+        radius: Theme.controlRadius
         color: current ? Theme.accentBg : placeMouse.containsMouse ? Theme.hoverOverlay : "transparent"
 
         MouseArea {

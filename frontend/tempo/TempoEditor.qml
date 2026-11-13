@@ -10,8 +10,8 @@ Rectangle {
     // Tap tempo (restMap G17): from the second tap, the BPM follows the taps.
     function tap() { editor.tap() }
     implicitWidth: 124
-    implicitHeight: 29
-    radius: 6
+    implicitHeight: 26
+    radius: Theme.controlRadius
     color: Theme.transport.field
     border.color: field.activeFocus && !editor.acceptableInput ? Theme.record
                   : field.activeFocus ? Theme.accent : Theme.transport.fieldBorder
@@ -32,7 +32,7 @@ Rectangle {
             Accessible.name: "Decrease BPM"
             onClicked: editor.adjust(-1)
             contentItem: Text { text: Icons.minus; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-            background: Rectangle { color: parent.down ? Theme.transport.stepPressed : parent.hovered ? Theme.transport.stepHover : "transparent"; radius: 4 }
+            background: Rectangle { color: parent.down ? Theme.transport.stepPressed : parent.hovered ? Theme.transport.stepHover : "transparent"; radius: Theme.controlRadius }
             ToolTip.visible: hovered; ToolTip.text: "Decrease BPM by 1"
         }
         TextField {
@@ -43,7 +43,7 @@ Rectangle {
             text: editor.text
             onTextEdited: editor.text = text
             color: Theme.text
-            font.pixelSize: 12; font.bold: true
+            font.pixelSize: Theme.bodySize; font.bold: true
             horizontalAlignment: TextInput.AlignHCenter
             verticalAlignment: TextInput.AlignVCenter
             selectByMouse: true
@@ -68,7 +68,7 @@ Rectangle {
             Accessible.name: "Increase BPM"
             onClicked: editor.adjust(1)
             contentItem: Text { text: Icons.plus; color: Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-            background: Rectangle { color: parent.down ? Theme.transport.stepPressed : parent.hovered ? Theme.transport.stepHover : "transparent"; radius: 4 }
+            background: Rectangle { color: parent.down ? Theme.transport.stepPressed : parent.hovered ? Theme.transport.stepHover : "transparent"; radius: Theme.controlRadius }
             ToolTip.visible: hovered; ToolTip.text: "Increase BPM by 1"
         }
     }

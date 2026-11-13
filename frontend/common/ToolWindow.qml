@@ -11,7 +11,7 @@ Window {
     id: root
     default property alias content: body.data
     property bool busy: false
-    property int padding: 18
+    property int padding: Theme.spaceLg
     signal aboutToShow()                                    // before each showing
     signal opened()                                         // after it, with the keyboard here
     signal closed()

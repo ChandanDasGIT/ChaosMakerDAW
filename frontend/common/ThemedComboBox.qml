@@ -47,7 +47,7 @@ ComboBox {
         y: (control.height - height) / 2
         text: Icons.menuArrow
         color: control.arrowColour
-        font.pixelSize: 9
+        font.pixelSize: Theme.microSize
     }
 
     delegate: ItemDelegate {
@@ -68,7 +68,7 @@ ComboBox {
         }
         background: Rectangle {
             color: entry.highlighted ? control.itemHighlight : "transparent"
-            radius: 3
+            radius: Theme.controlRadius
         }
     }
 
