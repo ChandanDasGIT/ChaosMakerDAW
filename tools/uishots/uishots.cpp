@@ -292,7 +292,22 @@ int main(int argc, char* argv[])
                                                   {demo.bass, "23-fx-bass"}, {demo.piano, "24-fx-piano"}, {demo.synth, "25-fx-synth"} };
     for (const auto& [track, name] : pages) {
         if (click("trackFxButton" + QString::number(track))) shots.takeOthers(name);
-        if (track == demo.guitar && click("applyGuitarFactoryPreset")) shots.takeOthers("20-fx-guitar-preset");
+        if (track == demo.guitar && click("applyGuitarFactoryPreset")) {
+            shots.takeOthers("20-fx-guitar-preset");
+            // The whole chain in a wide window, the second pedal bypassed (its arc shows).
+            if (auto* board = find("guitarPedal1")) {
+                QQuickWindow* fx = board->window();
+                const int oldWidth = fx->width();
+                fx->setWidth(2200);
+                QTest::qWait(300);
+                click("guitarPedalOn1");
+                QTest::qWait(200);
+                shots.save(fx, "20-fx-guitar-chain");
+                click("guitarPedalOn1");
+                fx->setWidth(oldWidth);
+                QTest::qWait(150);
+            }
+        }
         shots.closeOthers();
     }
     // Mixing plugins on the vocal.

@@ -531,6 +531,122 @@ private slots:
         QVERIFY(board->property("visible").toBool());
         QVERIFY(QMetaObject::invokeMethod(board,"close"));
     }
+    // restMap U8 H4: the board is the signal chain. Adds Amp and Phaser, takes them out again.
+    void guitar_board_shows_the_signal_chain_with_jacks_cables_bands_and_bypass_arcs() {
+        auto* model=qobject_cast<GuitarSuiteModel*>(EngineController::instance()->guitarSuite());QVERIFY(model);
+        QVERIFY(model->addPedal("Amp"));QVERIFY(model->addPedal("Phaser"));
+        const int n=model->count();
+        const int amp=model->data(model->index(n-2),GuitarSuiteModel::PedalIdRole).toInt();
+        const int phaser=model->data(model->index(n-1),GuitarSuiteModel::PedalIdRole).toInt();
+        auto* board=window->findChild<QObject*>("guitarSuitePanel");QVERIFY(board);
+        const auto restore=qScopeGuard([&] { QMetaObject::invokeMethod(board,"close"); model->removePedal(phaser); model->removePedal(amp); });
+        QVERIFY(QMetaObject::invokeMethod(board,"open"));QTRY_VERIFY(board->property("visible").toBool());
+        QTest::qWait(300);
+        auto* root=window->contentItem();
+        // IN, a cable before every pedal and one after the last, OUT after it.
+        QVERIFY(visualItem(root,"guitarChainIn"));
+        for(int i=0;i<=n;++i) QVERIFY2(visualItem(root,"guitarChainCable"+QString::number(i)),qPrintable(QString::number(i)));
+        QVERIFY(!visualItem(root,"guitarChainCable"+QString::number(n+1)));
+        auto* out=visualItem(root,"guitarChainOut");QVERIFY(out);
+        auto* last=visualItem(root,"guitarPedal"+QString::number(n-1));QVERIFY(last);
+        QVERIFY(out->x()>last->x()+last->width());
+        // The amp has its band; the phaser (a plain pedal) has none.
+        QVERIFY(visualItem(root,"guitarPedalBand"+QString::number(amp))->isVisible());
+        QVERIFY(!visualItem(root,"guitarPedalBand"+QString::number(phaser))->isVisible());
+        // Bypassed: the dashed arc over it shows; back on, it goes.
+        auto* arc=visualItem(root,"guitarBypassArc"+QString::number(phaser));QVERIFY(arc);
+        QVERIFY(!arc->isVisible());
+        QVERIFY(model->setBypassed(phaser,true));QTRY_VERIFY(arc->isVisible());
+        QVERIFY(model->setBypassed(phaser,false));QTRY_VERIFY(!arc->isVisible());
+        // The chain bar: IN, one chip per pedal in the chain's order, OUT.
+        QVERIFY(visualItem(root,"guitarChainBarIn"));QVERIFY(visualItem(root,"guitarChainBarOut"));
+        for(int i=0;i<n;++i) {
+            auto* chip=visualItem(root,"guitarChainChip"+QString::number(i));QVERIFY(chip);
+            QCOMPARE(chip->property("pedalName").toString(),model->data(model->index(i),GuitarSuiteModel::PedalNameRole).toString());
+        }
+    }
+    // Dragging a pedal's grip: the others slide aside during the drag, one move on release, and
+    // the card glides into its new slot.
+    void dragging_a_pedal_slides_the_others_aside_and_moves_it_once() {
+        auto* model=qobject_cast<GuitarSuiteModel*>(EngineController::instance()->guitarSuite());QVERIFY(model);
+        QList<int> added;   // every pedal this test adds is taken out again
+        const auto addPedal=[&](const char* name) { if(model->addPedal(name)) added<<model->data(model->index(model->count()-1),GuitarSuiteModel::PedalIdRole).toInt(); };
+        while(model->count()<2) addPedal("Phaser");
+        addPedal("Phaser");
+        const int first=model->data(model->index(0),GuitarSuiteModel::PedalIdRole).toInt();
+        const int second=model->data(model->index(1),GuitarSuiteModel::PedalIdRole).toInt();
+        auto* board=window->findChild<QObject*>("guitarSuitePanel");QVERIFY(board);
+        const auto restore=qScopeGuard([&] {
+            QMetaObject::invokeMethod(board,"close");
+            const int row=[&]{ for(int r=0;r<model->count();++r) if(model->data(model->index(r),GuitarSuiteModel::PedalIdRole).toInt()==first) return r; return -1; }();
+            if(row>0) model->movePedal(row,0);
+            for(int id:added) model->removePedal(id);
+        });
+        QVERIFY(QMetaObject::invokeMethod(board,"open"));QTRY_VERIFY(board->property("visible").toBool());
+        QTest::qWait(300);
+        auto* root=window->contentItem();
+        auto* dragged=visualItem(root,"guitarPedal0");auto* other=visualItem(root,"guitarPedal1");QVERIFY(dragged);QVERIFY(other);
+        auto* grip=visualItem(root,"guitarPedalGrip0");QVERIFY(grip);
+        const double slot0=dragged->x(), step=other->x()-dragged->x();QVERIFY(step>200);
+        QSignalSpy moves(model,&QAbstractItemModel::rowsMoved);
+        const QPoint start=grip->mapToScene(QPointF(grip->width()/2,grip->height()/2)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
+        for(int dx=10;dx<=int(step*0.75);dx+=20) QTest::mouseMove(window,start+QPoint(dx,0),5);
+        const QPoint end=start+QPoint(int(step*0.75),0);
+        QTest::mouseMove(window,end,5);
+        // Mid-drag: the second pedal has slid into the first slot; nothing has moved yet.
+        QTRY_COMPARE(other->x(),slot0);
+        QCOMPARE(moves.count(),0);
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,end);
+        QTRY_COMPARE(moves.count(),1);                        // the drop finishes just after the release
+        QCOMPARE(model->data(model->index(0),GuitarSuiteModel::PedalIdRole).toInt(),second);
+        QCOMPARE(model->data(model->index(1),GuitarSuiteModel::PedalIdRole).toInt(),first);
+        // The dropped card glides into its new slot (animated, not set at once).
+        QVERIFY(std::abs(dragged->x()-(slot0+step))>1);
+        QTRY_COMPARE(dragged->x(),slot0+step);
+        QCOMPARE(other->x(),slot0);
+    }
+    // The chain bar: drag a chip to move a pedal (one move), click one to bring it into view.
+    void chain_bar_chips_move_pedals_and_bring_them_into_view() {
+        auto* model=qobject_cast<GuitarSuiteModel*>(EngineController::instance()->guitarSuite());QVERIFY(model);
+        QList<int> added;   // every pedal this test adds is taken out again
+        const auto addPedal=[&](const char* name) { if(model->addPedal(name)) added<<model->data(model->index(model->count()-1),GuitarSuiteModel::PedalIdRole).toInt(); };
+        while(model->count()<2) addPedal("Phaser");
+        addPedal("Phaser"); addPedal("Tremolo");
+        const int first=model->data(model->index(0),GuitarSuiteModel::PedalIdRole).toInt();
+        const int second=model->data(model->index(1),GuitarSuiteModel::PedalIdRole).toInt();
+        auto* board=window->findChild<QObject*>("guitarSuitePanel");QVERIFY(board);
+        const auto restore=qScopeGuard([&] {
+            QMetaObject::invokeMethod(board,"close");
+            const int row=[&]{ for(int r=0;r<model->count();++r) if(model->data(model->index(r),GuitarSuiteModel::PedalIdRole).toInt()==first) return r; return -1; }();
+            if(row>0) model->movePedal(row,0);
+            for(int id:added) model->removePedal(id);
+        });
+        QVERIFY(QMetaObject::invokeMethod(board,"open"));QTRY_VERIFY(board->property("visible").toBool());
+        QTest::qWait(300);
+        auto* root=window->contentItem();
+        auto* chip0=visualItem(root,"guitarChainChip0");auto* chip1=visualItem(root,"guitarChainChip1");QVERIFY(chip0);QVERIFY(chip1);
+        const double slot0=chip0->x(), step=chip1->x()-chip0->x();QVERIFY(step>20);
+        QSignalSpy moves(model,&QAbstractItemModel::rowsMoved);
+        const QPoint start=chip0->mapToScene(QPointF(chip0->width()/2,chip0->height()/2)).toPoint(), end=start+QPoint(int(step*0.8),0);
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,start);
+        for(int dx=6;dx<=int(step*0.8);dx+=6) QTest::mouseMove(window,start+QPoint(dx,0),5);
+        QTest::mouseMove(window,end,5);
+        QTRY_COMPARE(chip1->x(),slot0);                       // the next chip slides aside
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,end);
+        QTRY_COMPARE(moves.count(),1);                        // the drop finishes just after the release
+        QCOMPARE(model->data(model->index(0),GuitarSuiteModel::PedalIdRole).toInt(),second);
+        QTRY_COMPARE(chip0->x(),slot0+step);
+        // A click on the last chip scrolls the board to that pedal.
+        auto* scroll=visualItem(root,"guitarPedal0")->parentItem()->parentItem();QVERIFY(scroll);
+        const int lastRow=model->count()-1;
+        auto* lastChip=visualItem(root,"guitarChainChip"+QString::number(lastRow));QVERIFY(lastChip);
+        auto* lastCard=visualItem(root,"guitarPedal"+QString::number(lastRow));QVERIFY(lastCard);
+        click(lastChip);
+        QCOMPARE(moves.count(),1);                             // a click moves nothing
+        QTRY_VERIFY(lastCard->x()-scroll->property("contentX").toDouble()>=0);
+        QTRY_VERIFY(lastCard->x()-scroll->property("contentX").toDouble()<scroll->width());
+    }
     void phaser_sync_controls_update_the_actual_pedal_parameter() {
         auto* model=qobject_cast<GuitarSuiteModel*>(EngineController::instance()->guitarSuite());QVERIFY(model);
         QVERIFY(model->addPedal("Phaser"));const int row=model->count()-1;

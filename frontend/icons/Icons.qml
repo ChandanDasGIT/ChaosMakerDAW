@@ -22,6 +22,8 @@ QtObject {
 
     // ---- menus and common buttons ----
     readonly property string menuArrow:   "\u25BE"       // ▾ opens a menu or list
+    readonly property string signalFlow:  "\u25B6"       // ▶ arrow head on a guitar chain cable
+    readonly property string chainArrow:  "\u2192"       // → between chips in the guitar chain bar
     readonly property string submenu:     "\u203A"       // › menu item with a submenu
     readonly property string back:        "\u2039"       // ‹ back to the previous page
     readonly property string check:       "\u2713"       // ✓ ticked menu item
