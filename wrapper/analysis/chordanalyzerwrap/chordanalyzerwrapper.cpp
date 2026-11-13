@@ -200,6 +200,32 @@ QVariantList ChordAnalyzerWrapper::targets() const
     return list;
 }
 
+bool ChordAnalyzerWrapper::alignSong()
+{
+    if (!m_result || !m_model || m_busy || !m_result->hasBeat) return false;
+    // Where the clip is now: it may have been moved since it was analysed.
+    for (const auto& track : m_model->project().tracks())
+        for (const auto& c : track->audioClips) {
+            if (c.id != m_clipId) continue;
+            const double rate = m_model->project().tempo().sampleRate();
+            const auto barLine = c.start + std::int64_t(std::llround(m_result->firstBarSeconds * rate));
+            const auto moved = m_model->alignClipToBars(track->id, c.id, barLine);
+            if (!moved) return false;
+            m_analysedStart = c.start;
+            m_songMovedSeconds += double(*moved) / rate;
+            return true;
+        }
+    return false;
+}
+
+QString ChordAnalyzerWrapper::songMovedText()
+{
+    const double by = m_songMovedSeconds;
+    m_songMovedSeconds = 0.0;
+    if (std::abs(by) < 0.0005) return {};
+    return QStringLiteral(" The song moved %1 s %2 to sit on the bars.").arg(std::abs(by), 0, 'f', 2).arg(by > 0 ? QStringLiteral("later") : QStringLiteral("earlier"));
+}
+
 int ChordAnalyzerWrapper::putOnTrack(int target, bool withClip)
 {
     if (!m_result || !m_model || m_busy) { setMessage(QStringLiteral("Analyse a clip first.")); return -1; }
@@ -221,7 +247,8 @@ int ChordAnalyzerWrapper::putOnTrack(int target, bool withClip)
     m_model->setChords(trackId, settings);
     const int left = int(common.size()) - int(settings.chords.size());
     const QString leftOut = left > 0 ? QStringLiteral(" %1 less played chord%2 did not fit.").arg(left).arg(left == 1 ? "" : "s") : QString();
-    if (!withClip) { setMessage(QStringLiteral("The chords are on the track's strips.") + leftOut); return trackId; }
+    const QString moved = songMovedText();
+    if (!withClip) { setMessage(QStringLiteral("The chords are on the track's strips.") + leftOut + moved); return trackId; }
 
     // The clip: each chord's strip held for as long as the chord sounds, at its real time under
     // the project's tempo now.
@@ -245,12 +272,12 @@ int ChordAnalyzerWrapper::putOnTrack(int target, bool withClip)
         notes.push_back(note);
         last = to;
     }
-    if (notes.empty()) { setMessage(QStringLiteral("The chords are on the strips; no clip could be made.") + leftOut); return trackId; }
+    if (notes.empty()) { setMessage(QStringLiteral("The chords are on the strips; no clip could be made.") + leftOut + moved); return trackId; }
     if (m_model->addPatternClipAtBeat(trackId, first, last - first, std::move(notes)) < 0) {
         setMessage(QStringLiteral("The chords are on the strips; the clip could not be made (not while recording)."));
         return trackId;
     }
-    setMessage(QStringLiteral("The chords are on the strips, with a clip that plays them.") + leftOut);
+    setMessage(QStringLiteral("The chords are on the strips, with a clip that plays them.") + leftOut + moved);
     return trackId;
 }
 

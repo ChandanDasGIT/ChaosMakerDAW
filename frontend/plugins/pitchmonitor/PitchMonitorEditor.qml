@@ -121,11 +121,11 @@ Item {
             spacing: 8
             Text {
                 text: "PITCH MONITOR"
-                color: Theme.text; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.7
+                color: Theme.text; font.pixelSize: Theme.smallSize; font.bold: true; font.letterSpacing: 0.7
             }
             Text {
                 text: root.trackName
-                color: Theme.textMuted; font.pixelSize: 10
+                color: Theme.textMuted; font.pixelSize: Theme.captionSize
                 elide: Text.ElideRight
                 Layout.fillWidth: true
             }
@@ -133,12 +133,12 @@ Item {
                 objectName: "pitchAnalysing"
                 visible: monitor.analysing
                 text: "Reading the recording..."
-                color: Theme.textMuted; font.pixelSize: 10
+                color: Theme.textMuted; font.pixelSize: Theme.captionSize
             }
             ToggleChip {
                 objectName: "pitchBypass"
                 active: !fx.bypassed
-                text: fx.bypassed ? "BYP" : "ON"; textSize: 9
+                text: fx.bypassed ? "BYP" : "ON"; textSize: Theme.microSize
                 implicitWidth: 34; implicitHeight: 22
                 onClicked: fx.bypassed = !fx.bypassed
                 tooltip: fx.bypassed ? "Off: no pitch is measured" : "Turn the pitch monitor off"
@@ -149,7 +149,7 @@ Item {
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
-            Text { text: "Key"; color: Theme.textMuted; font.pixelSize: 10 }
+            Text { text: "Key"; color: Theme.textMuted; font.pixelSize: Theme.captionSize }
             ThemedComboBox {
                 objectName: "pitchKey"
                 model: monitor.tonicNames
@@ -178,14 +178,14 @@ Item {
                 objectName: "pitchCents"
                 text: monitor.hasPitch ? (monitor.cents >= 0 ? "+" : "−") + Math.abs(Math.round(monitor.cents)) + " ¢" : ""
                 color: root.centsColour(monitor.cents)
-                font.pixelSize: 13; font.family: Theme.monospaceFontFamily
+                font.pixelSize: Theme.bodySize; font.family: Theme.monospaceFontFamily
                 Layout.preferredWidth: 58
             }
             Item { Layout.fillWidth: true }
             ToggleChip {
                 objectName: "pitchFollow"
                 active: root.follow
-                text: "Follow"; textSize: 9
+                text: "Follow"; textSize: Theme.microSize
                 implicitWidth: 52; implicitHeight: 22
                 onClicked: root.follow = !root.follow
                 tooltip: "Keep the playhead in view while the song plays"
@@ -198,7 +198,7 @@ Item {
             Layout.fillHeight: true
             Layout.minimumHeight: 160
             color: Theme.pianoRoll.background
-            radius: 4
+            radius: Theme.controlRadius
             clip: true
 
             Item {
@@ -224,7 +224,7 @@ Item {
                         ctx.reset()
                         const w = width, h = height, left = plot.keysWidth, top = plot.rulerHeight
                         const lane = plot.laneHeight
-                        ctx.font = "10px sans-serif"
+                        ctx.font = Theme.captionSize + "px sans-serif"
                         const black = (note) => [1, 3, 6, 8, 10].indexOf(((note % 12) + 12) % 12) >= 0
                         const chromatic = monitor.scale === 5
                         const hit = monitor.hasPitch ? monitor.note : -1000
@@ -270,7 +270,7 @@ Item {
                         }
                         ctx.fillStyle = String(Theme.pianoRoll.background)
                         ctx.fillRect(0, 0, left, top)
-                        ctx.font = "10px sans-serif"
+                        ctx.font = Theme.captionSize + "px sans-serif"
                         // Bars and beats, bar numbers in the ruler.
                         ctx.fillStyle = String(Theme.pianoRoll.ruler)
                         ctx.fillRect(left, 0, w - left, top)
@@ -361,7 +361,7 @@ Item {
                 wrapMode: Text.WordWrap
                 text: "No pitch yet. Record or sing with monitoring on; recorded audio on this track shows here."
                 color: Theme.chaosEq.gridLabel
-                font.pixelSize: 12
+                font.pixelSize: Theme.bodySize
             }
         }
 
@@ -372,7 +372,7 @@ Item {
                   ? "Pick the song's key to measure against its notes. Works on one voice or one melody line; a full mix jumps around."
                   : "Measured against " + monitor.keyName + ". Green: on the note · amber: a little off · red: far off. Wheel scrolls, Ctrl+wheel zooms, Shift+wheel moves the notes."
             color: Theme.textMuted
-            font.pixelSize: 10
+            font.pixelSize: Theme.captionSize
             wrapMode: Text.WordWrap
         }
     }

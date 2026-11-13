@@ -75,10 +75,10 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 3
-                Text { text: "Grand piano"; color: Theme.text; font.pixelSize: 15; font.bold: true }
+                Text { text: "Grand piano"; color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true }
                 Text {
                     text: "Concert grand, four dynamic layers, sustain pedal with string resonance"
-                    color: Theme.textMuted; font.pixelSize: 11
+                    color: Theme.textMuted; font.pixelSize: Theme.smallSize
                     Layout.fillWidth: true; elide: Text.ElideRight
                 }
             }
@@ -128,7 +128,7 @@ Item {
 
                 GridLayout {
                     Layout.fillWidth: true
-                    columns: root.width > 560 ? 2 : 1
+                    columns: root.width > 440 ? 2 : 1
                     columnSpacing: 24
                     rowSpacing: 10
 

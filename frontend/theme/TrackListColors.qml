@@ -4,9 +4,10 @@ import QtQuick
 // Use it through the Theme singleton: Theme.trackList.rowSelected, ...
 QtObject {
     // ---- track rows ----
-    readonly property color row:               "#252525"
-    readonly property color rowAlt:            "#222222"   // every other row
+    readonly property color row:               "#2a2a2a"
+    readonly property color rowAlt:            "#272727"   // every other row
     readonly property color rowSelected:       "#2a343d"
+    readonly property color rowSelectedBorder: "#3f5a6e"   // its thin edge
     readonly property color nameEditor:        "#292e36"   // inline rename field
 
     // ---- track colour swatches ----

@@ -76,8 +76,8 @@ Slider {
         opacity: control.enabled ? 1 : 0.4
 
         // Upright on a horizontal slider, lying flat across a vertical fader.
-        readonly property real capLength: control.horizontal ? 10 : 24
-        readonly property real capDepth: control.horizontal ? 20 : 12
+        readonly property real capLength: control.horizontal ? 8 : 22
+        readonly property real capDepth: control.horizontal ? 16 : 11
 
         Rectangle {   // soft shadow under the cap
             anchors.centerIn: cap

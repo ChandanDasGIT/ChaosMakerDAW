@@ -28,7 +28,7 @@ Item {
         readonly property bool lit: bridge && bridge.activeStrip === stripIndex
                                     && (bass ? bridge.activeBass || bridge.bassWithChords   // the chord plays its bass too
                                              : !bridge.activeBass && bridge.activeZone === zone)
-        radius: 6
+        radius: Theme.panelRadius
         opacity: empty ? 0.4 : 1
         color: lit ? Theme.accentBg : touch.pressed ? Theme.controlBgActive
              : touch.containsMouse ? Theme.controlBgHover : Theme.cardBgAlt
@@ -80,7 +80,7 @@ Item {
                     objectName: "chordStripName" + strip.index
                     width: parent.width
                     height: 34
-                    radius: 5
+                    radius: Theme.controlRadius
                     color: nameArea.containsMouse ? Theme.chipHover : Theme.chip
                     border.color: nameArea.containsMouse ? Theme.chipBorderHover : Theme.chipBorder
                     Text {
@@ -92,7 +92,7 @@ Item {
                         elide: Text.ElideRight
                         text: strip.empty ? "+" : strip.chord
                         color: strip.empty ? Theme.textMuted : Theme.text
-                        font.pixelSize: 15
+                        font.pixelSize: Theme.headingSize
                         font.bold: true
                     }
                     MouseArea {
@@ -119,13 +119,13 @@ Item {
                         anchors.rightMargin: 3
                         width: 22
                         height: parent.height - 6
-                        radius: 4
+                        radius: Theme.controlRadius
                         color: caretArea.containsMouse ? Theme.controlBgHover : "transparent"
                         Text {
                             anchors.centerIn: parent
                             text: "\u25BE"
                             color: caretArea.containsMouse ? Theme.text : Theme.textMuted
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.bodySize
                         }
                         MouseArea {
                             id: caretArea

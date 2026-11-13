@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 RowLayout {
     id: root
-    spacing: 8
+    spacing: 2
 
     property var transport: EngineController
     property bool playing: root.transport ? root.transport.playing : false
@@ -81,25 +81,25 @@ RowLayout {
                                          : command === "punch" ? root.punching : false
             text: glyph
             Accessible.name: hintText
-            Layout.preferredWidth: index < 2 ? 42 : 36
-            Layout.preferredHeight: 36
+            Layout.preferredWidth: 32
+            Layout.preferredHeight: 30
             contentItem: Text {
                 text: transportButton.glyph
                 color: index === 2 ? Theme.record : (transportButton.active ? Theme.accent : (transportButton.hovered ? Theme.text : Theme.textMuted))
-                font.pixelSize: index === 2 ? 18 : 12
+                font.pixelSize: index === 2 ? 20 : 14
                 font.bold: true
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }
             background: Rectangle {
-                radius: 6
+                radius: Theme.controlRadius
                 color: index === 2 && transportButton.active ? Theme.recordActiveBg
                      : transportButton.down ? Theme.transport.buttonPressed
                      : transportButton.active ? Theme.accentBg
-                     : transportButton.hovered ? Theme.transport.buttonHover : Theme.transport.button
+                     : transportButton.hovered ? Theme.transport.buttonHover : "transparent"
+                // Flat: an outline only while the button is on.
                 border.color: index === 2 && transportButton.active ? Theme.record
-                            : transportButton.active ? Theme.accent
-                            : transportButton.hovered ? Theme.transport.buttonBorderHover : Theme.transport.buttonBorder
+                            : transportButton.active ? Theme.accent : "transparent"
             }
             onClicked: playbackBridge.transportAction(command)
             ToolTip.visible: hovered
@@ -108,36 +108,44 @@ RowLayout {
         }
     }
 
+    // The readout: the time and the musical position side by side in one dark panel.
     Rectangle {
-        Layout.preferredWidth: 1
-        Layout.preferredHeight: 34
-        color: Theme.divider
-        Layout.leftMargin: 8
-        Layout.rightMargin: 8
-    }
-
-    // Transport clock, formatted by the backend (PlaybackControls::formatTime)
-    Text {
-        objectName: "transportClock"
-        text: playbackBridge.formatTime(root.transport ? root.transport.positionSeconds : 0)
-        color: Theme.text
-        font.pixelSize: 15
-        font.family: "monospace"
-    }
-
-    // Musical position (bars.beats.hundredths) in the transport's meter, formatted by the backend
-    Text {
-        objectName: "transportBarsBeats"
+        objectName: "transportReadout"
         Layout.leftMargin: 10
-        text: root.transport ? playbackBridge.formatBarsBeats(root.transport.positionBeats,
-                                                              root.transport.numerator,
-                                                              root.transport.denominator)
-                             : playbackBridge.formatBarsBeats(0, 4, 4)
-        color: Theme.accent
-        font.pixelSize: 15
-        font.family: "monospace"
-        ToolTip.visible: barsBeatsHover.hovered
-        ToolTip.text: "Position in bars.beats"
-        HoverHandler { id: barsBeatsHover }
+        Layout.preferredHeight: 32
+        Layout.preferredWidth: readoutRow.implicitWidth + 24
+        radius: Theme.controlRadius
+        color: Theme.transport.field
+        border.color: Theme.transport.fieldBorder
+        Row {
+            id: readoutRow
+            anchors.centerIn: parent
+            spacing: 12
+            // Transport clock, formatted by the backend (PlaybackControls::formatTime)
+            Text {
+                objectName: "transportClock"
+                anchors.verticalCenter: parent.verticalCenter
+                text: playbackBridge.formatTime(root.transport ? root.transport.positionSeconds : 0)
+                color: Theme.text
+                font.pixelSize: 18
+                font.family: "monospace"
+            }
+            Rectangle { width: 1; height: 18; anchors.verticalCenter: parent.verticalCenter; color: Theme.transport.fieldBorder }
+            // Musical position (bars.beats.hundredths) in the transport's meter, formatted by the backend
+            Text {
+                objectName: "transportBarsBeats"
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.transport ? playbackBridge.formatBarsBeats(root.transport.positionBeats,
+                                                                      root.transport.numerator,
+                                                                      root.transport.denominator)
+                                     : playbackBridge.formatBarsBeats(0, 4, 4)
+                color: Theme.accent
+                font.pixelSize: 18
+                font.family: "monospace"
+                ToolTip.visible: barsBeatsHover.hovered
+                ToolTip.text: "Position in bars.beats"
+                HoverHandler { id: barsBeatsHover }
+            }
+        }
     }
 }

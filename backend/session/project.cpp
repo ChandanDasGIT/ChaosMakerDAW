@@ -35,8 +35,6 @@ Track& Project::addTrack(TrackKind kind, const std::string& name, const std::str
 {
     auto track = std::make_unique<Track>();
     track->id = m_nextId++;
-    static constexpr const char* colours[]{"#58b7b1", "#6fa8dc", "#b18bd9", "#de849c", "#e2a565", "#d8c16b", "#86bd83", "#9babb7"};
-    track->colour = colours[(track->id - 1) % std::size(colours)];
     track->kind = kind;
     track->name = name;
     track->type = type.empty() ? (kind == TrackKind::Instrument ? "Instrument" : "Audio") : type;
@@ -177,6 +175,14 @@ bool Project::setTrackName(int id, const std::string& name)
     auto* track = findTrack(id);
     if (!track || name.empty() || track->name == name) return false;
     track->name = name;
+    return true;
+}
+
+bool Project::clearTrackColour(int id)
+{
+    auto* track = findTrack(id);
+    if (!track) return false;
+    track->colour.clear();
     return true;
 }
 

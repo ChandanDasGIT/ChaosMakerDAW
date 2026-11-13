@@ -13,8 +13,10 @@ ToolButton {
     property color idleBg: Theme.chip
     property color idleBorder: Theme.chipBorder
     property bool hoverHighlight: false
-    property int textSize: 10
-    property real cornerRadius: 4
+    // Plain (track cards): no outline at rest, so only a chip that is on stands out.
+    property bool plain: false
+    property int textSize: Theme.captionSize
+    property real cornerRadius: Theme.controlRadius
     property string tooltip: ""
 
     hoverEnabled: true
@@ -34,7 +36,7 @@ ToolButton {
     background: Rectangle {
         radius: chip.cornerRadius
         color: chip.active ? chip.activeBg : chip.lit ? Theme.chipHover : chip.idleBg
-        border.color: chip.active ? chip.activeBorder : chip.lit ? Theme.chipBorderHover : chip.idleBorder
+        border.color: chip.active ? chip.activeBorder : chip.lit ? Theme.chipBorderHover : chip.plain ? "transparent" : chip.idleBorder
     }
     // Screen readers: the tooltip says what the chip is and its state ("Mute enabled").
     Accessible.name: tooltip.length > 0 ? tooltip : text

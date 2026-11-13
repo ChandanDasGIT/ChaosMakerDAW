@@ -35,18 +35,18 @@ Item {
             spacing: 8
             Text {
                 text: fx.title.toUpperCase()
-                color: Theme.text; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.7
+                color: Theme.text; font.pixelSize: Theme.smallSize; font.bold: true; font.letterSpacing: 0.7
             }
             Text {
                 text: root.trackName
-                color: Theme.textMuted; font.pixelSize: 10
+                color: Theme.textMuted; font.pixelSize: Theme.captionSize
                 elide: Text.ElideRight
                 Layout.fillWidth: true
             }
             ToggleChip {
                 objectName: "mixEffectBypass"
                 active: !fx.bypassed
-                text: fx.bypassed ? "BYP" : "ON"; textSize: 9
+                text: fx.bypassed ? "BYP" : "ON"; textSize: Theme.microSize
                 implicitWidth: 34; implicitHeight: 22
                 onClicked: fx.bypassed = !fx.bypassed
                 tooltip: fx.bypassed ? "Bypassed: the track passes through unchanged" : "Bypass this effect"
@@ -55,7 +55,7 @@ Item {
         Text {
             Layout.fillWidth: true
             text: "Double-click a slider for its default"
-            color: Theme.textMuted; font.pixelSize: 10
+            color: Theme.textMuted; font.pixelSize: Theme.captionSize
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.divider }
         Flickable {
@@ -80,7 +80,7 @@ Item {
                     y: 4
                     width: root.cardWidth
                     height: cardScroll.height - 12
-                    radius: 7
+                    radius: Theme.panelRadius
                     color: Theme.guitarSuite.card
                     border.color: Theme.guitarSuite.cardBorder
                     ColumnLayout {
@@ -89,7 +89,7 @@ Item {
                         spacing: 7
                         Text {
                             text: card.modelData.title.toUpperCase()
-                            color: Theme.text; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.7
+                            color: Theme.text; font.pixelSize: Theme.smallSize; font.bold: true; font.letterSpacing: 0.7
                             Layout.preferredHeight: 26
                             verticalAlignment: Text.AlignVCenter
                         }
@@ -119,7 +119,7 @@ Item {
                                         Text {
                                             text: controlRow.modelData.name
                                             color: Theme.textMuted
-                                            font.pixelSize: 10
+                                            font.pixelSize: Theme.captionSize
                                             elide: Text.ElideRight
                                             Layout.preferredWidth: 78
                                         }
@@ -160,7 +160,7 @@ Item {
                                             currentIndex: Math.round(controlRow.modelValue)
                                             onActivated: index => fx.setValue(controlRow.modelData.id, index)
                                         }
-                                        Switch {
+                                        ThemedSwitch {
                                             objectName: root.effectType + "." + controlRow.modelData.id + ".switch"
                                             visible: controlRow.modelData.kind === "switch"
                                             Layout.fillWidth: true
@@ -173,7 +173,7 @@ Item {
                                             text: fx.formatValue(controlRow.modelData.id,
                                                                  controlRow.modelData.kind === "slider" ? parameterSlider.value : controlRow.modelValue)
                                             color: Theme.text
-                                            font.pixelSize: 10
+                                            font.pixelSize: Theme.captionSize
                                             font.family: Theme.monospaceFontFamily
                                             horizontalAlignment: Text.AlignRight
                                             elide: Text.ElideLeft
@@ -195,7 +195,7 @@ Item {
                 y: 4
                 width: root.cardWidth
                 height: cardScroll.height - 12
-                radius: 7
+                radius: Theme.panelRadius
                 color: Theme.guitarSuite.card
                 border.color: Theme.guitarSuite.cardBorder
                 ColumnLayout {
@@ -204,7 +204,7 @@ Item {
                     spacing: 7
                     Text {
                         text: "GAIN REDUCTION"
-                        color: Theme.text; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.7
+                        color: Theme.text; font.pixelSize: Theme.smallSize; font.bold: true; font.letterSpacing: 0.7
                         Layout.preferredHeight: 26
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -238,7 +238,7 @@ Item {
                         wrapMode: Text.WordWrap
                         text: root.active ? "How far the track is being turned down right now."
                                           : ""
-                        color: Theme.textMuted; font.pixelSize: 10
+                        color: Theme.textMuted; font.pixelSize: Theme.captionSize
                     }
                     Item { Layout.fillHeight: true }
                 }

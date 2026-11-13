@@ -3,7 +3,7 @@ import QtQuick
 // The transport bar's own colours: its background, the transport buttons and the BPM and
 // time signature fields. Use it through the Theme singleton: Theme.transport.button, ...
 QtObject {
-    readonly property color bar:              "#242424"
+    readonly property color bar:              "#262626"
 
     // ---- transport buttons (lit: Theme.accentBg / Theme.recordActiveBg) ----
     readonly property color button:           "#2b2d32"

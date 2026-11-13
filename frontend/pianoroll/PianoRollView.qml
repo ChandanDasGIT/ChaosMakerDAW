@@ -47,10 +47,10 @@ Item {
         property string label
         property string tip
         signal clicked()
-        width: 18; height: 18; radius: 2
+        width: 18; height: 18; radius: Theme.controlRadius
         color: zoomHover.containsMouse ? Theme.pianoRoll.smallButtonHover : Theme.pianoRoll.smallButton
         border.color: Theme.pianoRoll.buttonBorder
-        Text { anchors.centerIn: parent; text: zoomButton.label; color: Theme.pianoRoll.buttonText; font.pixelSize: 12 }
+        Text { anchors.centerIn: parent; text: zoomButton.label; color: Theme.pianoRoll.buttonText; font.pixelSize: Theme.bodySize }
         Accessible.role: Accessible.Button
         Accessible.name: zoomButton.tip
         MouseArea {
@@ -312,7 +312,7 @@ Item {
                 Text {
                     text: root.clipLabel
                     color: Theme.pianoRoll.textMuted
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.smallSize
                 }
 
                 CloseButton {
@@ -342,7 +342,7 @@ Item {
                     width: 24; height: 22; radius: 2
                     color: root.activeTool === "pointer" ? Theme.pianoRoll.toolButtonActive : tool1Hover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: root.activeTool === "pointer" ? Theme.accent : Theme.pianoRoll.buttonBorder
-                    Text { anchors.centerIn: parent; text: Icons.pointer; color: Theme.pianoRoll.text; font.pixelSize: 13 }
+                    Text { anchors.centerIn: parent; text: Icons.pointer; color: Theme.pianoRoll.text; font.pixelSize: Theme.bodySize }
                     Accessible.role: Accessible.Button; Accessible.name: "Select tool"
                     MouseArea { id: tool1Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "pointer" }
                     ToolTip.visible: tool1Hover.containsMouse; ToolTip.text: "Select (Pointer) · drag on empty grid to box-select, Shift adds"
@@ -352,7 +352,7 @@ Item {
                     width: 24; height: 22; radius: 2
                     color: root.activeTool === "pencil" ? Theme.pianoRoll.toolButtonActive : tool2Hover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: root.activeTool === "pencil" ? Theme.accent : Theme.pianoRoll.buttonBorder
-                    Text { anchors.centerIn: parent; text: Icons.pencil; color: Theme.pianoRoll.text; font.pixelSize: 13 }
+                    Text { anchors.centerIn: parent; text: Icons.pencil; color: Theme.pianoRoll.text; font.pixelSize: Theme.bodySize }
                     Accessible.role: Accessible.Button; Accessible.name: "Draw tool"
                     MouseArea { id: tool2Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "pencil" }
                     ToolTip.visible: tool2Hover.containsMouse; ToolTip.text: "Draw (Pencil)"
@@ -362,7 +362,7 @@ Item {
                     width: 24; height: 22; radius: 2
                     color: root.activeTool === "eraser" ? Theme.pianoRoll.toolButtonActive : tool3Hover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: root.activeTool === "eraser" ? Theme.accent : Theme.pianoRoll.buttonBorder
-                    Text { anchors.centerIn: parent; text: Icons.eraser; color: Theme.pianoRoll.text; font.pixelSize: 13 }
+                    Text { anchors.centerIn: parent; text: Icons.eraser; color: Theme.pianoRoll.text; font.pixelSize: Theme.bodySize }
                     Accessible.role: Accessible.Button; Accessible.name: "Erase tool"
                     MouseArea { id: tool3Hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.activeTool = "eraser" }
                     ToolTip.visible: tool3Hover.containsMouse; ToolTip.text: "Erase"
@@ -375,7 +375,7 @@ Item {
                     width: 24; height: 22; radius: 2
                     color: root.snapEnabled ? Theme.pianoRoll.toolButtonActive : snapHover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: root.snapEnabled ? Theme.accent : Theme.pianoRoll.buttonBorder
-                    Text { anchors.centerIn: parent; text: Icons.snap; color: Theme.pianoRoll.text; font.pixelSize: 11 }
+                    MagnetIcon { anchors.centerIn: parent; width: 14; height: 14; color: Theme.pianoRoll.text }
                     Accessible.role: Accessible.Button; Accessible.name: "Snap to grid"
                     MouseArea { id: snapHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.snapEnabled = !root.snapEnabled }
                     ToolTip.visible: snapHover.containsMouse
@@ -389,7 +389,7 @@ Item {
                     opacity: enabled ? 1 : 0.4
                     color: qHover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: Theme.pianoRoll.buttonBorder
-                    Text { anchors.centerIn: parent; text: Icons.quantize + "Q"; color: Theme.pianoRoll.text; font.pixelSize: 10; font.bold: true }
+                    Text { anchors.centerIn: parent; text: Icons.quantize + "Q"; color: Theme.pianoRoll.text; font.pixelSize: Theme.smallSize }
                     Accessible.role: Accessible.Button; Accessible.name: "Quantize"
                     MouseArea { id: qHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.quantizeNotes() }
                     ToolTip.visible: qHover.containsMouse
@@ -404,7 +404,7 @@ Item {
                     opacity: enabled ? 1 : 0.4
                     color: undoHover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: Theme.pianoRoll.buttonBorder
-                    Text { anchors.centerIn: parent; text: Icons.undo; color: Theme.pianoRoll.text; font.pixelSize: 13 }
+                    Text { anchors.centerIn: parent; text: Icons.undo; color: Theme.pianoRoll.text; font.pixelSize: Theme.bodySize }
                     Accessible.role: Accessible.Button; Accessible.name: "Undo"
                     MouseArea { id: undoHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.trackModel.undo() }
                     ToolTip.visible: undoHover.containsMouse; ToolTip.text: "Undo" + (Shortcuts.texts["edit.undo"] ? " (" + Shortcuts.texts["edit.undo"] + ")" : "")
@@ -417,7 +417,7 @@ Item {
                     opacity: enabled ? 1 : 0.4
                     color: redoHover.containsMouse ? Theme.pianoRoll.toolButtonHover : Theme.pianoRoll.toolButton
                     border.color: Theme.pianoRoll.buttonBorder
-                    Text { anchors.centerIn: parent; text: Icons.redo; color: Theme.pianoRoll.text; font.pixelSize: 13 }
+                    Text { anchors.centerIn: parent; text: Icons.redo; color: Theme.pianoRoll.text; font.pixelSize: Theme.bodySize }
                     Accessible.role: Accessible.Button; Accessible.name: "Redo"
                     MouseArea { id: redoHover; anchors.fill: parent; hoverEnabled: true; onClicked: root.trackModel.redo() }
                     ToolTip.visible: redoHover.containsMouse; ToolTip.text: "Redo" + (Shortcuts.texts["edit.redo"] ? " (" + Shortcuts.texts["edit.redo"] + ")" : "")
@@ -455,7 +455,7 @@ Item {
                             required property var modelData
                             width: 40
                             height: 18
-                            radius: 2
+                            radius: Theme.controlRadius
                             color: Theme.pianoRoll.readoutBox
                             border.color: Theme.pianoRoll.readoutBorder
 
@@ -465,12 +465,12 @@ Item {
                                 anchors.rightMargin: 2
                                 text: modelData.text
                                 color: Theme.pianoRoll.text
-                                font.pixelSize: 10
+                                font.pixelSize: Theme.captionSize
                                 font.family: "monospace"
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 fontSizeMode: Text.HorizontalFit
-                                minimumPixelSize: 7
+                                minimumPixelSize: Theme.microSize
                             }
 
                             HoverHandler { id: readoutHover }
@@ -534,7 +534,7 @@ Item {
                                 visible: isMajorBar || parent.width >= 24
                                 text: pianoRollBackend.tickLabel(index, root.beatsInBar)
                                 color: isMajorBar ? Theme.pianoRoll.text : Theme.pianoRoll.rulerLabelMinor
-                                font.pixelSize: isMajorBar ? 11 : 9
+                                font.pixelSize: isMajorBar ? Theme.smallSize : Theme.microSize
                                 font.bold: isMajorBar
                             }
                         }
@@ -656,7 +656,7 @@ Item {
                         active: true
                         contentItem: Rectangle {
                             implicitWidth: 10
-                            radius: 4
+                            radius: Theme.controlRadius
                             color: vScrollBar.pressed ? Theme.pianoRoll.scrollHandlePressed : (vScrollBar.hovered ? Theme.pianoRoll.scrollHandleHover : Theme.pianoRoll.scrollHandle)
                         }
                         background: Rectangle {
@@ -671,7 +671,7 @@ Item {
                         active: true
                         contentItem: Rectangle {
                             implicitHeight: 8
-                            radius: 4
+                            radius: Theme.controlRadius
                             color: hScrollBar.pressed ? Theme.pianoRoll.scrollHandlePressed : (hScrollBar.hovered ? Theme.pianoRoll.scrollHandleHover : Theme.pianoRoll.scrollHandle)
                         }
                         background: Rectangle {
@@ -831,7 +831,7 @@ Item {
                                 visible: root.keyHeight >= 9
                                 text: pianoRollBackend.noteName(noteCard.visualPitch)
                                 color: Theme.pianoRoll.noteName
-                                font.pixelSize: 10
+                                font.pixelSize: Theme.captionSize
                                 elide: Text.ElideRight
                             }
 
@@ -1190,7 +1190,7 @@ Item {
                                 anchors.centerIn: parent
                                 text: modelData.text
                                 color: Theme.pianoRoll.buttonText
-                                font.pixelSize: 10
+                                font.pixelSize: Theme.captionSize
                             }
 
                             MouseArea {
@@ -1205,9 +1205,10 @@ Item {
                     }
                 }
 
-                Rectangle { width: 1; height: 16; color: Theme.pianoRoll.separator }
+                Rectangle { width: 1; height: 16; color: Theme.pianoRoll.separator; Layout.leftMargin: 6; Layout.rightMargin: 6 }
 
-                Text { text: "Grid:"; color: Theme.pianoRoll.label; font.pixelSize: 11 }
+                // Groups: a small label and its controls close together, wider gaps between groups.
+                Text { text: "GRID"; color: Theme.pianoRoll.label; font.pixelSize: Theme.microSize; font.bold: true; font.letterSpacing: 1 }
                 PianoRollComboBox {
                     implicitWidth: 70
                     implicitHeight: 22
@@ -1225,7 +1226,7 @@ Item {
                     onCurrentTextChanged: pianoRollBackend.gridStyle = currentText
                 }
 
-                Text { text: "Notes:"; color: Theme.pianoRoll.label; font.pixelSize: 11 }
+                Text { text: "NOTES"; color: Theme.pianoRoll.label; font.pixelSize: Theme.microSize; font.bold: true; font.letterSpacing: 1; Layout.leftMargin: 12 }
                 PianoRollComboBox {
                     objectName: "pianoRollNoteLength"
                     implicitWidth: 70
@@ -1237,7 +1238,7 @@ Item {
                     ToolTip.text: "Length of newly drawn notes (Grid = the Grid division)"
                 }
 
-                Text { text: "Color:"; color: Theme.pianoRoll.label; font.pixelSize: 11 }
+                Text { text: "COLOR"; color: Theme.pianoRoll.label; font.pixelSize: Theme.microSize; font.bold: true; font.letterSpacing: 1; Layout.leftMargin: 12 }
                 PianoRollComboBox {
                     objectName: "pianoRollColorMode"
                     implicitWidth: 80
@@ -1254,7 +1255,7 @@ Item {
                 // Zoom: time (also Ctrl+wheel) and row height (also Ctrl+Shift+wheel)
                 Row {
                     spacing: 2
-                    Text { text: "Zoom:"; color: Theme.pianoRoll.label; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
+                    Text { text: "ZOOM"; color: Theme.pianoRoll.label; font.pixelSize: Theme.microSize; font.bold: true; font.letterSpacing: 1; anchors.verticalCenter: parent.verticalCenter; rightPadding: 4 }
                     ZoomButton {
                         objectName: "pianoRollZoomOut"
                         label: Icons.minus; tip: "Zoom out in time · Ctrl+wheel"
@@ -1265,8 +1266,8 @@ Item {
                         label: Icons.plus; tip: "Zoom in on time · Ctrl+wheel"
                         onClicked: root.pixelsPerBeat = Math.min(root.maxPixelsPerBeat, root.pixelsPerBeat + 16)
                     }
-                    Item { width: 6; height: 1 }
-                    Text { text: "Rows:"; color: Theme.pianoRoll.label; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
+                    Item { width: 14; height: 1 }
+                    Text { text: "ROWS"; color: Theme.pianoRoll.label; font.pixelSize: Theme.microSize; font.bold: true; font.letterSpacing: 1; anchors.verticalCenter: parent.verticalCenter; rightPadding: 4 }
                     ZoomButton {
                         objectName: "pianoRollRowsShorter"
                         label: Icons.minus; tip: "Shorter rows (Ctrl+Shift+wheel, or Ctrl+wheel over the keys)"

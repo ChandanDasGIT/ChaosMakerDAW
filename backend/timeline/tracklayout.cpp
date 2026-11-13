@@ -4,7 +4,7 @@
 #include <cmath>
 
 TrackLayout::TrackLayout(double trackHeight, double envelopeHeight)
-    : m_trackHeight(std::isfinite(trackHeight) && trackHeight > 0 ? trackHeight : 106.0),
+    : m_trackHeight(std::isfinite(trackHeight) && trackHeight > 0 ? trackHeight : 64.0),
       m_envelopeHeight(std::isfinite(envelopeHeight) && envelopeHeight > 0 ? envelopeHeight : 72.0)
 {
     rebuild();

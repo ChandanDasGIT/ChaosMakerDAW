@@ -134,6 +134,7 @@ public:
     bool moveTrack(int id, int row);
     Change renameTrack(int id, const std::string& name);
     Change setTrackColour(int id, const std::string& colour);
+    Change clearTrackColour(int id);   // a new track has no colour; this goes back to that
     Change setSolo(int id, bool enabled);
     Change setMuted(int id, bool enabled);
     Change setRecordArmed(int id, bool enabled);
@@ -200,6 +201,12 @@ public:
     bool mergeSelectedClips(const std::vector<int>& ids);
     bool mergeClips(int trackId, int first, int second);
     bool moveClipAtBeat(int trackId, int clipId, double start);
+    // Lines a clip's music up with the project's bars: `barLine` is where a bar of the music
+    // starts now, in project samples (it may lie before the clip, or before 0). The clip slides
+    // by less than a bar, to the nearest project bar line, or a bar later when that would put
+    // it before 0. One undo step ("Move clip"). The samples it moved by (0: it was lined up
+    // already); nothing for a bad clip or while recording.
+    std::optional<std::int64_t> alignClipToBars(int trackId, int clipId, std::int64_t barLine);
     bool resizeClipAtBeat(int trackId, int clipId, double length);
     // continueEdit: part of an ongoing fader drag; see Project::setClipGain.
     Change setClipGain(int trackId, int clipId, double gainDb, bool continueEdit = false);

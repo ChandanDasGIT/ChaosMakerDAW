@@ -9,6 +9,6 @@ Menu {
     background: Rectangle {
         color: Theme.panelBg
         border.color: Theme.divider
-        radius: 6
+        radius: Theme.panelRadius
     }
 }

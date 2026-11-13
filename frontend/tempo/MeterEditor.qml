@@ -9,8 +9,8 @@ Rectangle {
     signal numeratorEdited(int value)
     signal denominatorEdited(int value)
     implicitWidth: 87
-    implicitHeight: 29
-    radius: 6
+    implicitHeight: 26
+    radius: Theme.controlRadius
     color: Theme.transport.field
     border.color: Theme.transport.fieldBorder
 
@@ -20,10 +20,10 @@ Rectangle {
         TextField {
             id: numeratorField
             objectName: "meterNumerator"
-            width: 32; height: 23
+            width: 32; height: 20
             text: String(root.numerator)
             color: Theme.text
-            font.pixelSize: 12; font.bold: true
+            font.pixelSize: Theme.bodySize; font.bold: true
             horizontalAlignment: TextInput.AlignHCenter
             verticalAlignment: TextInput.AlignVCenter
             selectByMouse: true
@@ -31,7 +31,7 @@ Rectangle {
             validator: IntValidator { bottom: 1; top: 2147483647 }
             Accessible.name: "Time signature numerator"
             background: Rectangle {
-                radius: 5
+                radius: Theme.controlRadius
                 color: numeratorField.activeFocus ? Theme.transport.fieldFocus : "transparent"
                 border.color: numeratorField.activeFocus ? Theme.accent : "transparent"
             }
@@ -42,14 +42,14 @@ Rectangle {
                     text = String(root.numerator)
             }
         }
-        Text { text: "/"; anchors.verticalCenter: parent.verticalCenter; color: Theme.transport.separatorText; font.pixelSize: 13 }
+        Text { text: "/"; anchors.verticalCenter: parent.verticalCenter; color: Theme.transport.separatorText; font.pixelSize: Theme.bodySize }
         TextField {
             id: denominatorField
             objectName: "meterDenominator"
-            width: 32; height: 23
+            width: 32; height: 20
             text: String(root.denominator)
             color: Theme.text
-            font.pixelSize: 12; font.bold: true
+            font.pixelSize: Theme.bodySize; font.bold: true
             horizontalAlignment: TextInput.AlignHCenter
             verticalAlignment: TextInput.AlignVCenter
             selectByMouse: true
@@ -57,7 +57,7 @@ Rectangle {
             validator: IntValidator { bottom: 1; top: 2147483647 }
             Accessible.name: "Time signature denominator"
             background: Rectangle {
-                radius: 5
+                radius: Theme.controlRadius
                 color: denominatorField.activeFocus ? Theme.transport.fieldFocus : "transparent"
                 border.color: denominatorField.activeFocus ? Theme.accent : "transparent"
             }

@@ -95,11 +95,11 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 3
-                Text { text: "Harmonium"; color: Theme.text; font.pixelSize: 15; font.bold: true }
+                Text { text: "Harmonium"; color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true }
                 Text {
                     text: root.indian ? "Hand harmonium: bass, male and female reeds, drones"
                                       : "Reed organ: stops in feet, steady foot bellows"
-                    color: Theme.textMuted; font.pixelSize: 11
+                    color: Theme.textMuted; font.pixelSize: Theme.smallSize
                     Layout.fillWidth: true; elide: Text.ElideRight
                 }
             }
@@ -164,7 +164,7 @@ Item {
                 // ---- Bellows and tone, two columns
                 GridLayout {
                     Layout.fillWidth: true
-                    columns: root.width > 560 ? 2 : 1
+                    columns: root.width > 440 ? 2 : 1
                     columnSpacing: 24
                     rowSpacing: 10
 

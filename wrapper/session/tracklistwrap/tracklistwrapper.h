@@ -165,6 +165,7 @@ public:
     Q_INVOKABLE bool moveTrack(int trackId, int destinationRow);
     Q_INVOKABLE bool renameTrack(int trackId, const QString& name);
     Q_INVOKABLE bool setTrackColour(int trackId, const QString& colour);
+    Q_INVOKABLE bool clearTrackColour(int trackId);
     Q_INVOKABLE int indexOfTrack(int trackId) const { return rowForTrackId(trackId); }
     Q_INVOKABLE int trackIdAt(int row) const;
     Q_INVOKABLE bool setSolo(int trackId, bool enabled);
@@ -271,6 +272,8 @@ public:
     Q_INVOKABLE bool mergeSelectedClips(const QVariantList& ids);
     Q_INVOKABLE bool mergeClips(int trackId, int first, int second);
     Q_INVOKABLE bool moveClipAtBeat(int trackId, int clipId, double startBeat);
+    // TrackList::alignClipToBars: the clip slid onto the project's bar lines (the analyzers).
+    std::optional<std::int64_t> alignClipToBars(int trackId, int clipId, std::int64_t barLine);
     Q_INVOKABLE bool resizeClipAtBeat(int trackId, int clipId, double lengthBeats);
     Q_INVOKABLE bool removeAudioClip(int trackId, int clipId);
     bool hasClipboard() const { return m_state.hasClipboard(); }

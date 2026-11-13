@@ -21,9 +21,14 @@ TEST(tracklist, catalog_creation_and_unicode_name_colour_rules_preserve_identity
     CHECK(!tracks.renameTrack(vocal, "Lead voix — रात 🎤").changed);
     for (const auto& name : {std::string(), std::string("  "), std::string("two\nlines"), std::string(257, 'x')})
         CHECK(!tracks.renameTrack(vocal, name).accepted);
+    // A new track has no colour; the user sets one and can clear it again (not undo steps).
+    CHECK(tracks.project().findTrack(vocal)->colour.empty() && tracks.project().findTrack(guitar)->colour.empty());
+    CHECK(tracks.clearTrackColour(vocal).accepted && !tracks.clearTrackColour(vocal).changed);
     CHECK(tracks.setTrackColour(vocal, "  #A1B2C3 ").accepted);
     CHECK(tracks.project().findTrack(vocal)->colour == "#a1b2c3");
     CHECK(!tracks.setTrackColour(vocal, "#zz0011").accepted);
+    CHECK(tracks.clearTrackColour(vocal).changed); CHECK(tracks.project().findTrack(vocal)->colour.empty());
+    CHECK(!tracks.clearTrackColour(-1).accepted);
     CHECK(tracks.undo()); CHECK(tracks.project().findTrack(vocal)->audioClips.empty());
     CHECK(tracks.redo()); CHECK(tracks.project().findTrack(vocal)->audioClips[0].id == clip);
     CHECK(tracks.project().findTrack(vocal)->type == "Vocal");
@@ -275,6 +280,57 @@ TEST(tracklist, a_clip_gain_drag_is_one_undo_step)
     CHECK(tracks.setClipGain(t, a, -2.0, true).changed);
     CHECK(tracks.undo());                                     // undoes only the -2 step
     CHECK_NEAR(tracks.findClip(t, a)->gainDb, -1.0, 1e-6);
+}
+
+TEST(tracklist, a_clip_slides_by_less_than_a_bar_onto_the_projects_bar_lines)
+{
+    TrackList tracks;
+    CHECK(tracks.setTempo(120.0, 4, 4));
+    const double rate = tracks.project().tempo().sampleRate();
+    const auto bar = std::int64_t(std::llround(4 * 60.0 * rate / 120.0));          // 2 s
+    const int t = tracks.addAudioTrack();
+    const int song = tracks.addClipAtBeat(t, 8, 32);                               // starts on bar 3
+    const std::int64_t start = tracks.findClip(t, song)->start;
+    CHECK(start == 2 * bar);
+
+    // A bar of the music starts a little after a project bar line: the clip slides back by that much.
+    auto moved = tracks.alignClipToBars(t, song, 3 * bar + 4000);
+    CHECK(moved.has_value() && *moved == -4000);
+    CHECK(tracks.findClip(t, song)->start == start - 4000);
+    // One undo step.
+    CHECK(tracks.undo());
+    CHECK(tracks.findClip(t, song)->start == start);
+    // A little before a bar line: forward. The bar line may lie before the clip itself.
+    moved = tracks.alignClipToBars(t, song, bar - 6000);
+    CHECK(moved.has_value() && *moved == 6000);
+    CHECK(tracks.findClip(t, song)->start == start + 6000);
+    // Lined up already: nothing moves, and nothing new to undo.
+    moved = tracks.alignClipToBars(t, song, 5 * bar);
+    CHECK(moved.has_value() && *moved == 0);
+    CHECK(tracks.undo());
+    CHECK(tracks.findClip(t, song)->start == start);
+
+    // A clip at the very start cannot slide back before 0: it goes a bar later instead.
+    const int first = tracks.addClipAtBeat(t, 0, 4);
+    moved = tracks.alignClipToBars(t, first, 10000);
+    CHECK(moved.has_value() && *moved == bar - 10000);
+    CHECK(tracks.findClip(t, first)->start == bar - 10000);
+    // A bar line of the music before 0 (the song starts mid-bar).
+    CHECK(tracks.undo());
+    moved = tracks.alignClipToBars(t, first, -20000);
+    CHECK(moved.has_value() && *moved == 20000);
+
+    // The bar follows the project's meter and tempo: 3/4 at 90 BPM.
+    CHECK(tracks.setTempo(90.0, 3, 4));
+    const auto waltzBar = std::int64_t(std::llround(3 * 60.0 * rate / 90.0));
+    const std::int64_t before = tracks.findClip(t, song)->start;
+    moved = tracks.alignClipToBars(t, song, 2 * waltzBar + 500);
+    CHECK(moved.has_value() && *moved == -500);
+    CHECK(tracks.findClip(t, song)->start == before - 500);
+
+    // No such clip or track: refused.
+    CHECK(!tracks.alignClipToBars(t, 99999, 0).has_value());
+    CHECK(!tracks.alignClipToBars(99999, song, 0).has_value());
 }
 
 TEST(tracklist, removing_a_track_can_be_undone_and_redone)

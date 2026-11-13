@@ -87,7 +87,7 @@ ColumnLayout {
                         required property var modelData
                         objectName: "groove_" + modelData.name
                         text: modelData.name + (modelData.factory ? "" : "  ·  yours")
-                        textSize: 11
+                        textSize: Theme.smallSize
                         leftPadding: 10; rightPadding: 10
                         implicitHeight: 28
                         hoverHighlight: true
@@ -185,7 +185,7 @@ ColumnLayout {
         width: 340
         modal: true
         padding: 14
-        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
+        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: Theme.panelRadius }
         function ask(mode, name) {
             nameDialog.mode = mode
             nameDialog.original = name
@@ -226,10 +226,10 @@ ColumnLayout {
                 maximumLength: 48
                 selectByMouse: true
                 color: Theme.text
-                font.pixelSize: 12
+                font.pixelSize: Theme.bodySize
                 placeholderText: "Groove name"
                 placeholderTextColor: Theme.textDisabled
-                background: Rectangle { color: Theme.field; border.color: nameField.activeFocus ? Theme.accent : Theme.fieldBorder; radius: 3 }
+                background: Rectangle { color: Theme.field; border.color: nameField.activeFocus ? Theme.accent : Theme.fieldBorder; radius: Theme.controlRadius }
                 onTextEdited: nameDialog.confirmReplace = false
                 onAccepted: nameDialog.accept()
                 Keys.onEscapePressed: nameDialog.close()
@@ -269,7 +269,7 @@ ColumnLayout {
         width: 320
         modal: true
         padding: 14
-        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: 6 }
+        background: Rectangle { color: Theme.popupBg; border.color: Theme.popupBorder; radius: Theme.panelRadius }
         contentItem: ColumnLayout {
             spacing: 10
             Text {

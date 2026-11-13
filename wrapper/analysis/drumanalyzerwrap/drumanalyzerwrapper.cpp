@@ -211,6 +211,32 @@ QVariantList DrumAnalyzerWrapper::targets() const
     return list;
 }
 
+bool DrumAnalyzerWrapper::alignSong()
+{
+    if (!m_result || !m_model || m_busy) return false;
+    // Where the clip is now: it may have been moved since it was analysed.
+    for (const auto& track : m_model->project().tracks())
+        for (const auto& c : track->audioClips) {
+            if (c.id != m_clipId) continue;
+            const double rate = m_model->project().tempo().sampleRate();
+            const auto barLine = c.start + std::int64_t(std::llround(m_result->pattern.firstBarSeconds * rate));
+            const auto moved = m_model->alignClipToBars(track->id, c.id, barLine);
+            if (!moved) return false;
+            m_analysedStart = c.start;
+            m_songMovedSeconds += double(*moved) / rate;
+            return true;
+        }
+    return false;
+}
+
+QString DrumAnalyzerWrapper::songMovedText()
+{
+    const double by = m_songMovedSeconds;
+    m_songMovedSeconds = 0.0;
+    if (std::abs(by) < 0.0005) return {};
+    return QStringLiteral(" The song moved %1 s %2 to sit on the bars.").arg(std::abs(by), 0, 'f', 2).arg(by > 0 ? QStringLiteral("later") : QStringLiteral("earlier"));
+}
+
 int DrumAnalyzerWrapper::makeClip(int target)
 {
     if (!m_result || !m_model || m_busy) { setMessage(QStringLiteral("Analyse a clip first.")); return -1; }
@@ -255,7 +281,7 @@ int DrumAnalyzerWrapper::makeClip(int target)
     }
     const int id = m_model->addPatternClipAtBeat(trackId, start, length, std::move(notes));
     if (id < 0) { setMessage(QStringLiteral("The clip could not be made (not while recording).")); return -1; }
-    setMessage(QStringLiteral("The pattern is on the track."));
+    setMessage(QStringLiteral("The pattern is on the track.") + songMovedText());
     return id;
 }
 

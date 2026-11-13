@@ -156,7 +156,7 @@ Window {
                 id: trackSplitter
                 Layout.fillHeight: true
                 Layout.preferredWidth: 4
-                color: trackSplitterHover.hovered || trackSplitterMouse.pressed ? Theme.accent : Theme.divider
+                color: trackSplitterHover.hovered || trackSplitterMouse.pressed ? Theme.accent : Theme.panelEdge
                 HoverHandler { id: trackSplitterHover; cursorShape: Qt.SplitHCursor }
                 MouseArea {
                     id: trackSplitterMouse
@@ -226,7 +226,7 @@ Window {
             visible: window.mixerVisible
             Layout.fillWidth: true
             Layout.preferredHeight: 4
-            color: mixerSplitterHover.hovered || mixerSplitterMouse.pressed ? Theme.accent : Theme.divider
+            color: mixerSplitterHover.hovered || mixerSplitterMouse.pressed ? Theme.accent : Theme.panelEdge
             HoverHandler { id: mixerSplitterHover; cursorShape: Qt.SplitVCursor }
             MouseArea {
                 id: mixerSplitterMouse

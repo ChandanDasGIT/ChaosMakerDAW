@@ -5,9 +5,12 @@ import QtQuick
 // Theme.accent, ...; area palettes are sub-objects: Theme.pianoRoll.toolButton, ...
 QtObject {
     // ---- surfaces ----
-    readonly property color windowBg:      "#191919"
+    // Three clear levels: the arrange area is the darkest, bars and popups sit in the middle,
+    // the track panel and mixer strips are the lightest. Big areas are parted by panelEdge.
+    readonly property color windowBg:      "#161616"
     readonly property color panelBg:       "#202020"
-    readonly property color panelHeaderBg: "#252525"
+    readonly property color panelHeaderBg: "#2e2e2e"
+    readonly property color panelEdge:     "#0c0c0c"   // the thin dark line between big areas
     readonly property color cardBg:        "#222222"
     readonly property color cardBgAlt:     "#272727"
     readonly property color divider:       "#333333"
@@ -70,9 +73,9 @@ QtObject {
     readonly property color faderSlotEdge:   "#3a3c42"   // its lit lower / right bevel
     readonly property color faderTick:       "#55585f"   // scale ticks beside the slot
     readonly property color faderCapTop:     "#d9dbe0"   // the metal cap, light end
-    readonly property color faderCapBottom:  "#7d8088"   // ... dark end
+    readonly property color faderCapBottom:  "#9a9da4"   // ... dark end
     readonly property color faderCapEdge:    "#2a2b30"   // the cap's outline
-    readonly property color faderCapShadow:  "#99000000" // soft shadow under the cap
+    readonly property color faderCapShadow:  "#55000000" // soft shadow under the cap
     readonly property color faderCapLine:    "#ffffff"   // indicator line across the cap (accent while dragged)
 
     // ---- popups ----
@@ -96,13 +99,23 @@ QtObject {
     readonly property ChaosEqColors chaosEq: ChaosEqColors {}
 
     // ---- sizes ----
+    // Text: every text uses one of these (icon glyphs and the two big readouts keep their own).
     readonly property int microSize:   9    // the smallest text allowed (tiny labels, chips)
     readonly property int captionSize: 10
     readonly property int smallSize:   11
     readonly property int bodySize:    13
+    readonly property int headingSize: 15   // panel, page and dialog headings
     readonly property int titleSize:   28
     readonly property int stripHeight: 28
     readonly property int margin:      10
+    // Corners: one for controls (buttons, chips, fields), one for panels, cards, popups, dialogs.
+    readonly property int controlRadius: 4
+    readonly property int panelRadius:   6
+    // Spacing steps for gaps and padding.
+    readonly property int spaceXs: 4
+    readonly property int spaceSm: 8
+    readonly property int spaceMd: 12
+    readonly property int spaceLg: 16
 
     // ---- typography ----
     readonly property string monospaceFontFamily: "Consolas, 'Cascadia Code', 'Fira Code', 'DejaVu Sans Mono', monospace"

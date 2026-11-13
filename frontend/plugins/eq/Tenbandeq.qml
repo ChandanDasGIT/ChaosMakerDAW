@@ -19,8 +19,8 @@ Item {
         spacing: 10
         RowLayout {
             Layout.fillWidth: true
-            Text { text: root.trackName + " · EQUALIZER"; color: Theme.text; font.pixelSize: 14; font.bold: true; Layout.fillWidth: true }
-            Text { text: eqBridge.bandDescriptors.length + " bands  ·  ±" + eqBridge.maxGain + " dB"; color: Theme.textMuted; font.pixelSize: 10 }
+            Text { text: root.trackName + " · EQUALIZER"; color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true; Layout.fillWidth: true }
+            Text { text: eqBridge.bandDescriptors.length + " bands  ·  ±" + eqBridge.maxGain + " dB"; color: Theme.textMuted; font.pixelSize: Theme.captionSize }
             PanelButton {
                 text: "Reset"
                 onClicked: root.trackModel.resetTrackEq(root.trackId)
@@ -36,7 +36,7 @@ Item {
         Text {
             visible: text.length > 0
             text: root.trackModel ? root.trackModel.eqPresetError : ""
-            color: Theme.record; font.pixelSize: 10
+            color: Theme.record; font.pixelSize: Theme.captionSize
             Layout.fillWidth: true; wrapMode: Text.WordWrap
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.divider }
@@ -55,7 +55,7 @@ Item {
                     Text {
                         text: eqBridge.formatGain(Number(root.eqBands[index] || 0))
                         color: Math.abs(Number(root.eqBands[index] || 0)) > 0.01 ? Theme.accent : Theme.textMuted
-                        font.pixelSize: 9
+                        font.pixelSize: Theme.microSize
                         horizontalAlignment: Text.AlignHCenter
                         Layout.fillWidth: true
                     }
@@ -69,11 +69,11 @@ Item {
                         value: Number(root.eqBands[index] || 0)
                         onMoved: root.trackModel.setEqBand(root.trackId, index, value)
                     }
-                    Text { text: modelData.shortLabel; color: Theme.textMuted; font.pixelSize: 9; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                    Text { text: modelData.shortLabel; color: Theme.textMuted; font.pixelSize: Theme.microSize; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                 }
             }
         }
-        Text { text: "Frequency (Hz)"; color: Theme.textMuted; font.pixelSize: 9; Layout.alignment: Qt.AlignHCenter }
+        Text { text: "Frequency (Hz)"; color: Theme.textMuted; font.pixelSize: Theme.microSize; Layout.alignment: Qt.AlignHCenter }
     }
 
     FilePicker {

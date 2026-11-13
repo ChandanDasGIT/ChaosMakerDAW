@@ -20,9 +20,11 @@ ToolButton {
 
     objectName: "editMenuButton"
     text: "Edit"
-    implicitHeight: 32
+    implicitHeight: 30
     checked: editMenu.visible
     onClicked: editMenu.visible ? editMenu.close() : editMenu.open()
+    leftPadding: 10
+    rightPadding: 10
     contentItem: RowLayout {
         spacing: 4
         Text {
@@ -31,15 +33,9 @@ ToolButton {
             font.pixelSize: Theme.bodySize
             verticalAlignment: Text.AlignVCenter
         }
-        Text {
-            text: Icons.menuArrow
-            color: root.down || root.checked ? Theme.accent : Theme.textMuted
-            font.pixelSize: 10
-            verticalAlignment: Text.AlignVCenter
-        }
     }
     background: Rectangle {
-        radius: 4
+        radius: Theme.controlRadius
         color: root.down || root.checked ? Theme.controlBgActive : root.hovered ? Theme.controlBgHover : "transparent"
         border.color: root.checked ? Theme.divider : "transparent"
     }

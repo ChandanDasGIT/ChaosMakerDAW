@@ -80,6 +80,11 @@ public:
     Q_INVOKABLE void cancel();
     // Where the chords can go: {id, name}; -1 a new Chords track, then the project's Chords tracks.
     Q_INVOKABLE QVariantList targets() const;
+    // Lines the analysed clip up with the project's bars: it slides by less than a bar so that
+    // the bar line found in it lands on a project bar line (one undo step). For right after the
+    // project's BPM is set to the found one, before putOnTrack(). False when it could not (no
+    // result or no beat found, the clip gone, recording).
+    Q_INVOKABLE bool alignSong();
     // The (up to eight) most played chords onto `target`'s strips, with the key; `withClip`: also
     // a clip under the analysed audio that presses the strips as the song goes. The track's id,
     // or -1 with a message.
@@ -112,6 +117,8 @@ private:
     QString m_message;
     std::optional<analysis::ChordAnalysis> m_result;
     std::int64_t m_analysedStart = 0;                      // the clip's start (project samples) when analysed
+    double m_songMovedSeconds = 0.0;                       // by alignSong(), until the next message says so
+    QString songMovedText();
     std::shared_ptr<std::atomic<bool>> m_cancel;
     int m_run = 0;                                         // which analysis a finished one was
 };

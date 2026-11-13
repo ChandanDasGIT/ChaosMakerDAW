@@ -67,7 +67,7 @@ Popup {
         color: Theme.panelBg
         border.color: Theme.divider
         border.width: 1
-        radius: 8
+        radius: Theme.panelRadius
     }
 
     contentItem: ColumnLayout {
@@ -198,6 +198,7 @@ Popup {
             }
             PanelButton {
                 objectName: "shortcutAssign"
+                primary: true
                 visible: root.pendingConflicts.length > 0
                 text: "Assign"
                 tooltip: "Use this key here; the other action is left with none"

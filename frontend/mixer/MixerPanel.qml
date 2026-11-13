@@ -14,7 +14,7 @@ Rectangle {
     }
 
     color: Theme.mixer.background
-    border.color: Theme.divider
+    border.color: Theme.panelEdge
 
     RowLayout {
         anchors.fill: parent
@@ -25,7 +25,7 @@ Rectangle {
         Rectangle {
             id: masterStrip
             objectName: "mixerMasterStrip"
-            property real masterChannelWidth: 124
+            property real masterChannelWidth: 132
             Layout.fillHeight: true
             Layout.preferredWidth: masterChannelWidth
             color: Theme.mixer.master
@@ -40,27 +40,12 @@ Rectangle {
                 }
             }
 
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                height: 3
-                color: Theme.accent
-            }
-
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 8
+                anchors.leftMargin: 6
+                anchors.rightMargin: 6
+                anchors.topMargin: 6
                 spacing: 4
-
-                Text {
-                    text: "MASTER"
-                    color: Theme.accent
-                    font.pixelSize: Theme.smallSize
-                    font.bold: true
-                    font.letterSpacing: 1
-                    Layout.alignment: Qt.AlignHCenter
-                }
 
                 Text {
                     objectName: "mixerMasterVolumeText"
@@ -113,7 +98,7 @@ Rectangle {
                     Item {
                         id: masterScale
                         Layout.fillHeight: true
-                        Layout.preferredWidth: 20
+                        Layout.fillWidth: true
                         Repeater {
                             model: [0, -6, -12, -24, -48, -60]
                             delegate: Text {
@@ -135,7 +120,8 @@ Rectangle {
                         objectName: "mixerMasterMeter"
                         label: "OUT"
                         Layout.fillHeight: true
-                        Layout.fillWidth: true
+                        Layout.preferredWidth: 20
+                        Layout.fillWidth: false
                         leftDb: EngineController.monitorLevels.leftDb ?? -120
                         rightDb: EngineController.monitorLevels.rightDb ?? -120
                         leftClipped: EngineController.monitorLevels.leftClip ?? false
@@ -146,27 +132,27 @@ Rectangle {
 
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
-                    spacing: 6
+                    spacing: 2
 
                     ToolButton {
                         id: masterMuteBtn
                         objectName: "mixerMasterMute"
                         property bool active: panelWrapper.masterMuted
                         text: "M"
-                        implicitWidth: 32; implicitHeight: 22
+                        implicitWidth: 28; implicitHeight: 20
                         onClicked: panelWrapper.setMasterMuted(!active)
                         contentItem: Text {
                             text: parent.text
                             color: parent.active ? Theme.muteText : Theme.textMuted
-                            font.pixelSize: 10
+                            font.pixelSize: Theme.captionSize
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
                         background: Rectangle {
-                            color: parent.active ? Theme.muteBg : Theme.controlBg
-                            border.color: parent.active ? Theme.muteBorder : Theme.controlBorder
-                            radius: 3
+                            color: parent.active ? Theme.muteBg : parent.hovered ? Theme.chipHover : Theme.chip
+                            border.color: parent.active ? Theme.muteBorder : "transparent"
+                            radius: Theme.controlRadius
                         }
                         ToolTip.visible: hovered
                         ToolTip.text: panelWrapper.formatMasterMuteTooltip(active)
@@ -176,21 +162,21 @@ Rectangle {
                         objectName: "mixerMasterFx"
                         text: "FX"
                         implicitWidth: 30
-                        implicitHeight: 22
+                        implicitHeight: 20
                         enabled: !!root.trackModel
                         onClicked: masterEffects.open()
                         contentItem: Text {
                             text: parent.text
                             color: root.trackModel && root.trackModel.masterEffects.length > 0 ? Theme.accent : Theme.textMuted
-                            font.pixelSize: 9
+                            font.pixelSize: Theme.microSize
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
                         background: Rectangle {
-                            radius: 3
-                            color: parent.down ? Theme.controlBgActive : parent.hovered ? Theme.controlBgHover : Theme.controlBg
-                            border.color: root.trackModel && root.trackModel.masterEffects.length > 0 ? Theme.accent : Theme.controlBorder
+                            radius: Theme.controlRadius
+                            color: parent.down ? Theme.controlBgActive : parent.hovered ? Theme.chipHover : Theme.chip
+                            border.color: root.trackModel && root.trackModel.masterEffects.length > 0 ? Theme.accent : "transparent"
                         }
                         ToolTip.visible: hovered
                         ToolTip.text: "Effects on the whole mix (master)"
@@ -199,23 +185,43 @@ Rectangle {
                     ToolButton {
                         text: "CLR"
                         implicitWidth: 34
-                        implicitHeight: 22
+                        implicitHeight: 20
                         onClicked: EngineController.clearMonitorClips()
                         contentItem: Text {
                             text: parent.text
                             color: (EngineController.monitorLevels.leftClip || EngineController.monitorLevels.rightClip) ? Theme.meterClip : Theme.textMuted
-                            font.pixelSize: 9
+                            font.pixelSize: Theme.microSize
                             font.bold: true
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
                         background: Rectangle {
-                            radius: 3
-                            color: parent.down ? Theme.controlBgActive : parent.hovered ? Theme.controlBgHover : Theme.controlBg
-                            border.color: Theme.controlBorder
+                            radius: Theme.controlRadius
+                            color: parent.down ? Theme.controlBgActive : parent.hovered ? Theme.chipHover : Theme.chip
+                            border.color: "transparent"
                         }
                         ToolTip.visible: hovered
                         ToolTip.text: "Clear master clip indicators"
+                    }
+                }
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: -6
+                    Layout.rightMargin: -6
+                    Layout.preferredHeight: 22
+                    color: Theme.mixer.nameBand
+                    Rectangle {
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                        height: 2
+                        color: Theme.accent
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        text: "MASTER"
+                        color: Theme.accent
+                        font.pixelSize: Theme.captionSize
+                        font.bold: true
+                        font.letterSpacing: 1
                     }
                 }
             }
@@ -271,11 +277,13 @@ Rectangle {
             flickableDirection: Flickable.HorizontalFlick
 
             Text {
-                anchors.centerIn: parent
+                // Centred in the visible area: a Flickable's content has no width while empty.
+                x: Math.round((mixerScroll.width - width) / 2)
+                y: Math.round((mixerScroll.height - height) / 2)
                 visible: root.stripCount === 0
                 text: "Add a track to show its mixer controls"
                 color: Theme.textMuted
-                font.pixelSize: 12
+                font.pixelSize: Theme.bodySize
             }
 
             Row {
@@ -290,7 +298,7 @@ Rectangle {
                         required property int index
                         required property int trackId
                         required property string name
-                        required property color trackColour
+                        required property string trackColour   // "" = none
                         required property bool isMuted
                         required property bool isSolo
                         required property real volume
@@ -325,31 +333,27 @@ Rectangle {
                                 }
                             }
                         }
-                        Rectangle {
-                            objectName: "mixerColour" + strip.trackId
-                            anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
-                            height: 3
-                            color: strip.trackColour
-                        }
-
+                        // Top to bottom: clip gain and pan, the fader with its meters (the full
+                        // height), CLIP / M / S, and the name on a band in the track colour.
                         ColumnLayout {
                             anchors.fill: parent
-                            anchors.margins: 10
-                            spacing: 6
+                            anchors.leftMargin: 6
+                            anchors.rightMargin: 6
+                            anchors.topMargin: 6
+                            spacing: 4
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: 4
                                 Text {
-                                    objectName: "mixerName" + strip.trackId
-                                    text: strip.name
-                                    color: Theme.text
+                                    objectName: "mixerClipGainText" + strip.trackId
+                                    text: strip.hasClip ? panelWrapper.formatClipGain(clipGainSlider.value) : "—"
+                                    color: strip.hasClip ? Theme.text : Theme.textMuted
                                     font.pixelSize: Theme.captionSize
-                                    font.bold: true
+                                    font.family: Theme.monospaceFontFamily
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                 }
-                                // Track pan knob (in the name row so the fader keeps its height):
-                                // drag up/down, double-click to centre; value in the tooltip.
+                                // Track pan knob: drag up/down, double-click to centre; value in the tooltip.
                                 Dial {
                                     id: panKnob
                                     objectName: "mixerPan" + strip.trackId
@@ -393,24 +397,16 @@ Rectangle {
                                     when: !panKnob.pressed
                                 }
                             }
-                            Text {
-                                objectName: "mixerClipGainText" + strip.trackId
-                                text: strip.hasClip ? panelWrapper.formatClipGain(clipGainSlider.value) : "—"
-                                color: strip.hasClip ? Theme.text : Theme.textMuted
-                                font.pixelSize: Theme.captionSize
-                                font.family: Theme.monospaceFontFamily
-                                Layout.alignment: Qt.AlignHCenter
-                            }
                             RowLayout {
                                 Layout.fillHeight: true
                                 Layout.fillWidth: true
-                                spacing: 4
+                                spacing: 3
                                 // Channel fader: gain of the selected clip on this track (or its first
                                 // clip). Track volume lives in the track list.
                                 ThemedSlider {
                                     id: clipGainSlider
                                     objectName: "mixerClipGain" + strip.trackId
-                                    tint: strip.trackColour
+                                    tint: strip.trackColour.length > 0 ? strip.trackColour : "transparent"
                                     Layout.fillHeight: true
                                     Layout.preferredWidth: 24
                                     Layout.alignment: Qt.AlignHCenter
@@ -449,11 +445,34 @@ Rectangle {
                                     value: strip.targetClipGain
                                     when: !clipGainSlider.pressed
                                 }
+                                // dB scale, each mark at its real height on the meters beside it.
+                                Item {
+                                    id: stripScale
+                                    Layout.fillHeight: true
+                                    Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
+                                    Repeater {
+                                        model: [0, -12, -24, -48]
+                                        delegate: Text {
+                                            required property int modelData
+                                            text: String(modelData)
+                                            color: Theme.textMuted
+                                            font.pixelSize: Theme.microSize
+                                            font.family: Theme.monospaceFontFamily
+                                            width: stripScale.width
+                                            horizontalAlignment: Text.AlignRight
+                                            visible: stripScale.width >= 12
+                                            y: inputMeter.barItem.y + (1 - inputMeter.normalizedFor(modelData)) * inputMeter.barItem.height - height / 2
+                                        }
+                                    }
+                                }
                                 StereoLevelMeter {
+                                    id: inputMeter
                                     objectName: "mixerInput" + strip.trackId
                                     label: "IN"
                                     Layout.fillHeight: true
-                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 14
+                                    Layout.fillWidth: false
                                     leftDb: strip.levels.inputLeftDb ?? -120
                                     rightDb: strip.levels.inputRightDb ?? -120
                                     leftClipped: strip.levels.inputLeftClip ?? false
@@ -464,7 +483,8 @@ Rectangle {
                                     objectName: "mixerOutput" + strip.trackId
                                     label: "OUT"
                                     Layout.fillHeight: true
-                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 14
+                                    Layout.fillWidth: false
                                     leftDb: strip.levels.outputLeftDb ?? -120
                                     rightDb: strip.levels.outputRightDb ?? -120
                                     leftClipped: strip.levels.outputLeftClip ?? false
@@ -472,26 +492,25 @@ Rectangle {
                                     onClearClipsRequested: EngineController.clearTrackClips(strip.trackId)
                                 }
                             }
-                            // Names the fader above it: this strip's fader is clip gain
-                            Text {
-                                objectName: "mixerClipLabel" + strip.trackId
-                                text: "CLIP"
-                                color: Theme.textMuted
-                                font.pixelSize: Theme.microSize
-                                font.bold: true
-                                horizontalAlignment: Text.AlignHCenter
-                                Layout.preferredWidth: clipGainSlider.width
-                                Layout.alignment: Qt.AlignLeft
-                                Layout.leftMargin: clipGainSlider.x
-                            }
                             RowLayout {
-                                Layout.alignment: Qt.AlignHCenter
-                                spacing: 4
+                                Layout.fillWidth: true
+                                spacing: 2
+                                // Names the fader above it: this strip's fader is clip gain
+                                Text {
+                                    objectName: "mixerClipLabel" + strip.trackId
+                                    text: "CLIP"
+                                    color: Theme.textMuted
+                                    font.pixelSize: Theme.microSize
+                                    font.bold: true
+                                    horizontalAlignment: Text.AlignHCenter
+                                    Layout.preferredWidth: clipGainSlider.width
+                                }
+                                Item { Layout.fillWidth: true }
                                 ToggleChip {
                                     objectName: "mixerMute" + strip.trackId
                                     active: strip.isMuted
                                     activeBg: Theme.muteBg; activeBorder: Theme.muteBorder; activeText: Theme.muteText
-                                    text: "M"; implicitWidth: 30; implicitHeight: 24
+                                    text: "M"; plain: true; implicitWidth: 24; implicitHeight: 20
                                     onClicked: root.trackModel ? root.trackModel.setMuted(strip.trackId, !active) : panelWrapper.setMuted(strip.trackId, !active)
                                     tooltip: panelWrapper.formatMuteTooltip(active)
                                 }
@@ -499,9 +518,35 @@ Rectangle {
                                     objectName: "mixerSolo" + strip.trackId
                                     active: strip.isSolo
                                     activeBg: Theme.soloBg; activeBorder: Theme.soloBorder; activeText: Theme.soloText
-                                    text: "S"; implicitWidth: 30; implicitHeight: 24
+                                    text: "S"; plain: true; implicitWidth: 24; implicitHeight: 20
                                     onClicked: root.trackModel ? root.trackModel.setSolo(strip.trackId, !active) : panelWrapper.setSolo(strip.trackId, !active)
                                     tooltip: panelWrapper.formatSoloTooltip(active)
+                                }
+                            }
+                            // The name band: the track colour, dimmed; grey for a track without one.
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.leftMargin: -6
+                                Layout.rightMargin: -6
+                                Layout.preferredHeight: 22
+                                color: strip.trackColour.length > 0 ? Qt.darker(strip.trackColour, 2.2) : Theme.mixer.nameBand
+                                Rectangle {
+                                    objectName: "mixerColour" + strip.trackId
+                                    anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                                    height: 2
+                                    color: strip.trackColour.length > 0 ? strip.trackColour : "transparent"
+                                }
+                                Text {
+                                    objectName: "mixerName" + strip.trackId
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 6; anchors.rightMargin: 6
+                                    text: strip.name
+                                    color: Theme.text
+                                    font.pixelSize: Theme.captionSize
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
                                 }
                             }
                         }

@@ -552,6 +552,13 @@ bool TrackListWrapper::renameTrack(int id, const QString& name)
     return change.accepted;
 }
 
+bool TrackListWrapper::clearTrackColour(int id)
+{
+    const auto change = m_state.clearTrackColour(id);
+    if (change.changed) { const auto idx = index(rowForTrackId(id)); emit dataChanged(idx, idx, {ColourRole}); emit clipsChanged(); }
+    return change.accepted;
+}
+
 bool TrackListWrapper::setTrackColour(int id, const QString& colour)
 {
     const auto change = m_state.setTrackColour(id, colour.toStdString());
@@ -1056,6 +1063,13 @@ bool TrackListWrapper::moveClipAtBeat(int id, int clip, double start)
     notifyClipEdit(id); return true;
 }
 
+std::optional<std::int64_t> TrackListWrapper::alignClipToBars(int id, int clip, std::int64_t barLine)
+{
+    const auto moved = m_state.alignClipToBars(id, clip, barLine);
+    if (moved && *moved != 0) notifyClipEdit(id);
+    return moved;
+}
+
 bool TrackListWrapper::resizeClipAtBeat(int id, int clip, double length)
 {
     if (!m_state.resizeClipAtBeat(id, clip, length)) return false;
@@ -1358,8 +1372,10 @@ bool TrackListWrapper::restoreSessionState(const QJsonObject& state, QString& er
         auto& track = candidate.addTrack(item["instrument"].toBool() ? TrackKind::Instrument : TrackKind::Audio,
             item["name"].toString().toStdString(), item["type"].toString().toStdString());
         track.recordDry = item["recordDry"].toBool(track.type=="Audio");
+        // An empty colour is a track without one (as a new track is).
         if (item.contains("colour") && (!item["colour"].isString()
-            || !candidate.setTrackColour(track.id, item["colour"].toString().toStdString()))) {
+            || (!item["colour"].toString().isEmpty()
+                && !candidate.setTrackColour(track.id, item["colour"].toString().toStdString())))) {
             error = "Invalid track colour."; return false;
         }
         track.solo = item["solo"].toBool(); track.muted = item["muted"].toBool();

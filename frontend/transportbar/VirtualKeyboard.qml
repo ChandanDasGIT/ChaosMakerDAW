@@ -171,7 +171,7 @@ Window {
                         anchors.bottomMargin: 4
                         anchors.horizontalCenter: parent.horizontalCenter
                         color: Theme.pianoRoll.whiteKeyLabel
-                        font.pixelSize: 9
+                        font.pixelSize: Theme.microSize
                     }
                 }
             }

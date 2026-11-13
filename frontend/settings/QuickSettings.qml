@@ -40,7 +40,7 @@ Item {
             }
         }
         background: Rectangle {
-            radius: 6
+            radius: Theme.panelRadius
             color: quickSettingsPopup.visible ? Theme.accentBg : parent.hovered ? Theme.transport.buttonHover : Theme.transport.button
             border.color: quickSettingsPopup.visible ? Theme.accent : Theme.transport.buttonBorder
         }
@@ -84,7 +84,7 @@ Item {
         }
 
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
-        background: Rectangle { radius: 8; color: Theme.panelBg; border.color: Theme.divider }
+        background: Rectangle { radius: Theme.panelRadius; color: Theme.panelBg; border.color: Theme.divider }
 
         contentItem: ColumnLayout {
             id: contentLayout
@@ -92,7 +92,7 @@ Item {
 
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: "Metronome & Snap"; color: Theme.text; font.pixelSize: 15; font.bold: true; Layout.fillWidth: true }
+                Text { text: "Metronome & Snap"; color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true; Layout.fillWidth: true }
                 CloseButton {
                     objectName: "closeQuickSettings"
                     implicitWidth: 28; implicitHeight: 24; glyphSize: 18
@@ -104,7 +104,7 @@ Item {
 
             ColumnLayout {
                 spacing: 3
-                Text { text: "METRONOME"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
+                Text { text: "METRONOME"; color: Theme.textMuted; font.pixelSize: Theme.microSize; font.bold: true; font.letterSpacing: 1 }
                 RowLayout {
                     spacing: 5
                     ToggleChip {
@@ -128,14 +128,14 @@ Item {
                         ToolTip.text: "Metronome volume " + Math.round(value * 100) + "%"
                         Accessible.name: "Metronome volume"
                     }
-                    Text { text: Math.round(root.transport.metronomeVolume * 100) + "%"; color: Theme.textMuted; font.pixelSize: 10; Layout.preferredWidth: 30 }
+                    Text { text: Math.round(root.transport.metronomeVolume * 100) + "%"; color: Theme.textMuted; font.pixelSize: Theme.captionSize; Layout.preferredWidth: 30 }
                     ToggleChip {
                         objectName: "countInToggle"
                         active: root.transport.countInEnabled
                         enabled: !root.transport.takeBusy
                         idleBg: Theme.transport.button; idleBorder: Theme.transport.buttonBorder; cornerRadius: 5
                         Layout.preferredWidth: 48; Layout.preferredHeight: 29
-                        text: root.transport.countingIn ? "IN " + root.transport.countInBeatsRemaining : "COUNT"; textSize: 9
+                        text: root.transport.countingIn ? "IN " + root.transport.countInBeatsRemaining : "COUNT"; textSize: Theme.microSize
                         onClicked: root.transport.countInEnabled = !active
                         tooltip: "One-bar recording count-in/pre-roll; uses the metronome volume"
                         Accessible.name: "Recording count-in"
@@ -146,7 +146,7 @@ Item {
             ColumnLayout {
                 spacing: 3
                 Layout.fillWidth: true
-                Text { text: "SNAP GRID"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
+                Text { text: "SNAP GRID"; color: Theme.textMuted; font.pixelSize: Theme.microSize; font.bold: true; font.letterSpacing: 1 }
                 ThemedComboBox {
                     id: snapGrid
                     objectName: "snapGridSelector"
@@ -161,7 +161,7 @@ Item {
                     active: root.ripple
                     idleBg: Theme.transport.button; idleBorder: Theme.textStrong; cornerRadius: 5   // white outline: easy to spot
                     Layout.preferredWidth: 58; Layout.preferredHeight: 29
-                    text: "RIPPLE"; textSize: 9
+                    text: "RIPPLE"; textSize: Theme.microSize
                     onClicked: root.rippleEdited(!active)
                     tooltip: active ? "Ripple on: deleting closes the gap, pasting and duplicating make room (all tracks)"
                                     : "Ripple off: deleting leaves a gap, pasting goes over what is there"

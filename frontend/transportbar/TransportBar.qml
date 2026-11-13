@@ -29,15 +29,15 @@ Rectangle {
     // a pause over 2 s starts a new count.
     readonly property int tapCount: tempoEditor.tapCount
     function tapTempo() { if (!(root.transport && root.transport.countingIn)) tempoEditor.tap() }
-    height: 72
+    height: 46
     color: Theme.transport.bar
-    border.color: Theme.divider
+    border.color: Theme.panelEdge
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 16
-        anchors.rightMargin: 16
-        spacing: 8
+        anchors.leftMargin: 10
+        anchors.rightMargin: 10
+        spacing: 4
 
         PlaybackControls {
             id: playbackControls
@@ -47,8 +47,6 @@ Rectangle {
             repeating: root.repeating
             onTransportAction: action => root.transportAction(action)
         }
-
-        Item { Layout.fillWidth: true }
 
         // KEYS: the computer keyboard and the floating on-screen piano play the monitored or
         // armed instrument tracks. One switch for both; closing the piano turns KEYS off too.
@@ -64,17 +62,58 @@ Rectangle {
             keyShift: root.trackModel ? root.trackModel.selectedKeyShift : 0
             onVisibleChanged: if (!visible) typingKeys.enabled = false
         }
-        ColumnLayout {
-            spacing: 2
-            Text { text: "KEYS"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
+        // Tempo, time signature and the metronome sit right after the readout; KEYS follows.
+        RowLayout {
+            spacing: 6
+            Layout.leftMargin: 10
+            enabled: !(root.transport && root.transport.countingIn)
+            Text { text: "BPM"; color: Theme.textMuted; font.pixelSize: Theme.microSize; font.bold: true; font.letterSpacing: 1 }
+            TempoEditor {
+                id: tempoEditor
+                Layout.preferredWidth: 112
+                Layout.preferredHeight: 26
+                value: root.bpm
+                onValueEdited: value => root.bpmEdited(value)
+            }
+        }
+        RowLayout {
+            spacing: 6
+            Layout.leftMargin: 6
+            enabled: !(root.transport && root.transport.countingIn)
+            Text { text: "SIG"; color: Theme.textMuted; font.pixelSize: Theme.microSize; font.bold: true; font.letterSpacing: 1 }
+            MeterEditor {
+                Layout.preferredWidth: 84
+                Layout.preferredHeight: 26
+                numerator: root.timeSignature
+                denominator: root.timeSignatureDenominator
+                onNumeratorEdited: value => root.numeratorEdited(value)
+                onDenominatorEdited: value => root.denominatorEdited(value)
+            }
+        }
+        QuickSettings {
+            id: quickSettings
+            Layout.leftMargin: 2
+            Layout.preferredWidth: 30
+            Layout.preferredHeight: 26
+            transport: root.transport
+            snapMode: root.snapMode
+            onSnapModeEdited: value => root.snapModeEdited(value)
+            ripple: root.ripple
+            onRippleEdited: on => root.rippleEdited(on)
+            onTransportAction: action => root.transportAction(action)
+        }
+        RowLayout {
+            spacing: 6
+            Layout.leftMargin: 6
+            Text { text: "KEYS"; color: Theme.textMuted; font.pixelSize: Theme.microSize; font.bold: true; font.letterSpacing: 1 }
             ToggleChip {
                 objectName: "typingKeyboardButton"
-                Layout.preferredHeight: 29
+                Layout.preferredHeight: 26
                 implicitWidth: 64
                 active: typingKeys.enabled
                 hoverHighlight: true
                 textSize: Theme.smallSize
-                cornerRadius: 5
+                cornerRadius: Theme.controlRadius
                 text: typingKeys.enabled ? "Sa = " + typingKeys.saNote : "Off"
                 onClicked: {
                     const on = !typingKeys.enabled
@@ -93,52 +132,7 @@ Rectangle {
             }
         }
 
-        ColumnLayout {
-            spacing: 2
-            enabled: !(root.transport && root.transport.countingIn)
-            Text { text: "BPM"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
-            RowLayout {
-                spacing: 4
-                TempoEditor {
-                    id: tempoEditor
-                    Layout.preferredWidth: 124
-                    Layout.preferredHeight: 29
-                    value: root.bpm
-                    onValueEdited: value => root.bpmEdited(value)
-                }
-            }
-        }
-
-        ColumnLayout {
-            spacing: 2
-            enabled: !(root.transport && root.transport.countingIn)
-            Text { text: "TIME SIG"; color: Theme.textMuted; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1 }
-            MeterEditor {
-                Layout.preferredWidth: 87
-                Layout.preferredHeight: 29
-                numerator: root.timeSignature
-                denominator: root.timeSignatureDenominator
-                onNumeratorEdited: value => root.numeratorEdited(value)
-                onDenominatorEdited: value => root.denominatorEdited(value)
-            }
-        }
-
-        ColumnLayout {
-            spacing: 2
-            // Empty label row so the button lines up with the BPM and time signature fields.
-            Text { text: " "; font.pixelSize: 9 }
-            QuickSettings {
-                id: quickSettings
-                Layout.preferredWidth: 34
-                Layout.preferredHeight: 29
-                transport: root.transport
-                snapMode: root.snapMode
-                onSnapModeEdited: value => root.snapModeEdited(value)
-                ripple: root.ripple
-                onRippleEdited: on => root.rippleEdited(on)
-                onTransportAction: action => root.transportAction(action)
-            }
-        }
+        Item { Layout.fillWidth: true }
     }
 
     // Shift+T taps the tempo (plain T plays a note when the typing keyboard is on).

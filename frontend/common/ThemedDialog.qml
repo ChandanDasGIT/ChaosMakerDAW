@@ -6,7 +6,7 @@ import QtQuick.Controls
 Dialog {
     id: dialog
     modal: true
-    background: Rectangle { color: Theme.panelBg; border.color: Theme.divider; radius: 8 }
+    background: Rectangle { color: Theme.panelBg; border.color: Theme.divider; radius: Theme.panelRadius }
     palette.windowText: Theme.text
     palette.text: Theme.text
 
@@ -32,6 +32,7 @@ Dialog {
         padding: 12
         spacing: 6
         background: Rectangle { color: "transparent" }
-        delegate: PanelButton { implicitHeight: 28 }
+        // One size for every button; the accepting one (Save, OK) is the primary one.
+        delegate: PanelButton { primary: DialogButtonBox.buttonRole === DialogButtonBox.AcceptRole }
     }
 }

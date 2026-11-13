@@ -34,12 +34,12 @@ Rectangle {
 
     height: 48
     color: Theme.panelBg
-    border.color: Theme.divider
+    border.color: Theme.panelEdge
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 10
+        anchors.leftMargin: 6
         anchors.rightMargin: 10
-        spacing: 6
+        spacing: 0
 
         ProjectActions {
             id: projectActions
@@ -76,6 +76,7 @@ Rectangle {
         }
         PanelTabs {
             id: panelTabs
+            Layout.leftMargin: 16
             mixerShown: root.mixerShown
             pianoRollShown: root.pianoRollShown
             pianoRollAvailable: root.pianoRollAvailable

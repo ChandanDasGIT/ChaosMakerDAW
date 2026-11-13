@@ -60,6 +60,16 @@ ColumnLayout {
                 }
             }
         }
+        // Segments: a thin dark line every 3 px across both sides.
+        Repeater {
+            model: Math.max(0, Math.floor(bar.height / 3))
+            delegate: Rectangle {
+                required property int index
+                y: bar.height - (index + 1) * 3
+                width: bar.width; height: 1
+                color: Theme.meterBackdrop
+            }
+        }
         HoverHandler { id: hover }
         TapHandler { onTapped: root.clearClipsRequested() }
         ToolTip.visible: hover.hovered

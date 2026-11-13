@@ -49,14 +49,14 @@ ToolWindow {
         ColumnLayout {
             spacing: 3
             Layout.fillWidth: true
-            Text { text: "Drum pattern analyzer"; color: Theme.text; font.pixelSize: 16; font.bold: true }
+            Text { text: "Drum pattern analyzer"; color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true }
             Text {
                 objectName: "drumAnalyzerClip"
                 Layout.fillWidth: true
                 text: bridge.unavailableReason.length > 0 ? bridge.unavailableReason
                     : "Clip: " + (bridge.clipLabel.length > 0 ? bridge.clipLabel : "audio clip")
                 color: bridge.unavailableReason.length > 0 ? Theme.textMuted : Theme.text
-                font.pixelSize: 12
+                font.pixelSize: Theme.bodySize
                 elide: Text.ElideRight
             }
         }
@@ -67,6 +67,7 @@ ToolWindow {
             spacing: 8
             PanelButton {
                 objectName: "drumAnalyzerAnalyse"
+                primary: !bridge.hasResult   // the main action until there is a result
                 text: bridge.hasResult ? "Analyse again" : "Analyse"
                 enabled: !bridge.busy && bridge.unavailableReason.length === 0
                 onClicked: bridge.analyse()
@@ -92,7 +93,7 @@ ToolWindow {
             visible: text.length > 0
             text: bridge.message
             color: Theme.textMuted
-            font.pixelSize: 11
+            font.pixelSize: Theme.smallSize
             wrapMode: Text.WordWrap
         }
 
@@ -105,11 +106,11 @@ ToolWindow {
 
             RowLayout {
                 spacing: 8
-                Text { text: "Tempo"; color: Theme.textMuted; font.pixelSize: 12 }
+                Text { text: "Tempo"; color: Theme.textMuted; font.pixelSize: Theme.bodySize }
                 Text {
                     objectName: "drumAnalyzerBpm"
                     text: (Math.round(bridge.bpm * 10) / 10) + " BPM"
-                    color: Theme.text; font.pixelSize: 14; font.bold: true
+                    color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true
                 }
                 PanelButton {
                     objectName: "drumAnalyzerHalve"
@@ -124,17 +125,17 @@ ToolWindow {
                     onClicked: bridge.retempo(2)
                 }
                 Item { width: 12 }
-                Text { text: "Time signature"; color: Theme.textMuted; font.pixelSize: 12 }
+                Text { text: "Time signature"; color: Theme.textMuted; font.pixelSize: Theme.bodySize }
                 Text {
                     objectName: "drumAnalyzerMeter"
                     text: bridge.numerator + "/" + bridge.denominator
-                    color: Theme.text; font.pixelSize: 14; font.bold: true
+                    color: Theme.text; font.pixelSize: Theme.headingSize; font.bold: true
                 }
             }
             Text {
                 objectName: "drumAnalyzerCounts"
                 text: bridge.bars + " bars · " + bridge.kicks + " kicks · " + bridge.snares + " snares · " + bridge.hats + " hi-hats"
-                color: Theme.textMuted; font.pixelSize: 11
+                color: Theme.textMuted; font.pixelSize: Theme.smallSize
             }
 
             // The first two bars.
@@ -142,7 +143,7 @@ ToolWindow {
                 objectName: "drumAnalyzerPreview"
                 Layout.fillWidth: true
                 Layout.preferredHeight: 3 * 18 + 10
-                radius: 6
+                radius: Theme.panelRadius
                 color: Theme.cardBgAlt
                 border.color: Theme.divider
                 Item {
@@ -158,7 +159,7 @@ ToolWindow {
                             x: 0; y: index * 18
                             height: 18
                             text: root.rowNames[index]
-                            color: Theme.textMuted; font.pixelSize: 10
+                            color: Theme.textMuted; font.pixelSize: Theme.captionSize
                             verticalAlignment: Text.AlignVCenter
                         }
                     }
@@ -190,7 +191,7 @@ ToolWindow {
             RowLayout {
                 spacing: 8
                 Layout.fillWidth: true
-                Text { text: "Put on a new"; color: Theme.textMuted; font.pixelSize: 12 }
+                Text { text: "Put on a new"; color: Theme.textMuted; font.pixelSize: Theme.bodySize }
                 PanelButton {
                     objectName: "drumAnalyzerAcoustic"
                     text: "Acoustic"
@@ -209,7 +210,7 @@ ToolWindow {
                     visible: targetBox.visible
                     text: "drum track, or on"
                     color: Theme.textMuted
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.bodySize
                 }
                 ThemedComboBox {
                     id: targetBox
@@ -227,36 +228,39 @@ ToolWindow {
                     visible: !targetBox.visible
                     text: "drum track"
                     color: Theme.textMuted
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.bodySize
                 }
                 Item { visible: !targetBox.visible; Layout.fillWidth: true }
             }
             RowLayout {
                 spacing: 14
-                CheckBox {
+                ThemedCheckBox {
                     id: setBpm
                     objectName: "drumAnalyzerSetBpm"
                     checked: true
                     text: "Set the project BPM to " + (Math.round(bridge.bpm * 10) / 10)
-                    palette.windowText: Theme.text
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 450
+                    ToolTip.text: "Also slides the song by less than a bar, so its bars sit on the project's bar lines"
                 }
-                CheckBox {
+                ThemedCheckBox {
                     id: setMeter
                     objectName: "drumAnalyzerSetMeter"
                     checked: true
                     text: "Set the time signature to " + bridge.numerator + "/" + bridge.denominator
-                    palette.windowText: Theme.text
                 }
             }
             RowLayout {
                 spacing: 8
                 PanelButton {
                     objectName: "drumAnalyzerMakeClip"
+                    primary: true
                     text: "Make clip"
                     tooltip: "Put the pattern on the chosen drum track, under the analysed audio"
                     onClicked: {
                         if (setBpm.checked) EngineController.bpm = bridge.bpm
                         if (setMeter.checked) EngineController.setMeter(bridge.numerator, bridge.denominator)
+                        if (setBpm.checked) bridge.alignSong()     // the song onto the bars of that tempo
                         if (bridge.makeClip(root.target) >= 0) root.refreshTargets()
                     }
                 }
@@ -285,12 +289,13 @@ ToolWindow {
                     maximumLength: 48
                     color: Theme.text
                     placeholderText: "Groove name"
-                    background: Rectangle { radius: 5; color: Theme.field; border.color: grooveName.activeFocus ? Theme.accent : Theme.fieldBorder }
+                    background: Rectangle { radius: Theme.controlRadius; color: Theme.field; border.color: grooveName.activeFocus ? Theme.accent : Theme.fieldBorder }
                     onAccepted: saveGrooveButton.clicked()
                 }
                 PanelButton {
                     id: saveGrooveButton
                     objectName: "drumAnalyzerSaveGrooveConfirm"
+                    primary: true
                     text: "Save"
                     onClicked: if (bridge.saveGroove(grooveName.text)) groovePanel.visible = false
                 }
