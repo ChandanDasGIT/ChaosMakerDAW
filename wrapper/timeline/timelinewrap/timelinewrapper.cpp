@@ -134,3 +134,10 @@ void TimelineWrapper::finishSelection(double top, double bottom, double padding)
     if (m_tracks) m_tracks->setSelectedClipId(m_timeline.selectedClipId());
     emit stateChanged();
 }
+void TimelineWrapper::finishSelectionPixels(double top, double bottom, double padding)
+{
+    const auto range = m_timeline.finishSelectionPixels(top, bottom, padding);
+    if (range) emit repeatRangeRequested(range->start, range->end);
+    if (m_tracks) m_tracks->setSelectedClipId(m_timeline.selectedClipId());
+    emit stateChanged();
+}

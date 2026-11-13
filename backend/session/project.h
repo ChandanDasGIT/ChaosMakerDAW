@@ -77,6 +77,10 @@ struct Track : EffectState {
     float volume = 1.0f;
     float pan = 0.0f; // -1 left .. 0 centre .. +1 right (panlaw::balance)
     float stripWidth = 108.0f; // mixer strip width in px (mixer::defaultStripWidth, clamped by mixer::clampStripWidth)
+    // Timeline heights in px (restMap U9): the track's own row and its volume envelope lane
+    // (trackheight::defaultTrack / defaultEnvelope, clamped by trackheight::clampTrack / clampEnvelope).
+    float rowHeight = 64.0f;
+    float envelopeHeight = 72.0f;
     // Harmonium tracks: stops, bellows, drones... (the harmonium instrument).
     harmonium::Settings harmonium;
     // Drums tracks: room, part levels, tuning, character (the acoustic drum kit).
@@ -143,6 +147,9 @@ public:
     bool setTrackVolume(int id, float volume);
     bool setTrackPan(int id, float pan);
     bool setTrackStripWidth(int id, float width);
+    // Timeline heights (restMap U9), clamped by trackheight::clampTrack / clampEnvelope.
+    bool setTrackRowHeight(int id, float height);
+    bool setTrackEnvelopeHeight(int id, float height);
     bool setTrackEqBand(int id, int band, float gainDb);
     // Not undoable, like the 10-band EQ. The settings are sanitised for the project rate.
     bool setTrackChaosEq(int id, const chaoseq::Settings& settings);

@@ -406,6 +406,27 @@ TEST(tracklist, set_strip_width_clamps_to_the_mixer_limits)
     CHECK(!tracks.setStripWidth(id + 50, 120.0).accepted);
 }
 
+TEST(tracklist, timeline_heights_clamp_never_below_the_default_track_height)
+{
+    TrackList tracks;
+    const int id = tracks.addAudioTrack();
+    const auto* track = tracks.project().findTrack(id);
+    CHECK(track->rowHeight == 64.0f && track->envelopeHeight == 72.0f);
+    const auto taller = tracks.setRowHeight(id, 150.0);
+    CHECK(taller.accepted && taller.changed);
+    CHECK(track->rowHeight == 150.0f);
+    CHECK(!tracks.setRowHeight(id, 150.0).changed);
+    CHECK(tracks.setRowHeight(id, 10.0).changed);
+    CHECK(track->rowHeight == 64.0f);              // the default is the least
+    CHECK(tracks.setRowHeight(id, 9000.0).changed);
+    CHECK(track->rowHeight == 400.0f);
+    CHECK(tracks.setEnvelopeHeight(id, 10.0).changed);
+    CHECK(track->envelopeHeight == 40.0f);
+    CHECK(!tracks.setRowHeight(id, std::numeric_limits<double>::quiet_NaN()).accepted);
+    CHECK(!tracks.setEnvelopeHeight(id + 50, 100.0).accepted);
+    CHECK(!tracks.canUndo());                       // view state: not an undo step
+}
+
 TEST(tracklist, new_tracks_follow_the_default_record_mode_and_loaded_tracks_keep_theirs)
 {
     TrackList tracks;

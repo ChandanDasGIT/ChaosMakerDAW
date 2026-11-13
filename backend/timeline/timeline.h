@@ -96,6 +96,9 @@ public:
     void updateSelection(double beat, double lane, bool dragged);
     // Insets/padding are normalized lane geometry supplied by the presentation layer.
     std::optional<RepeatRange> finishSelection(double topInset, double bottomInset, double padding);
+    // The same with the insets and padding in pixels (restMap U9): each lane turns them into
+    // its own fraction from its track's height, so a tall track is not trimmed more.
+    std::optional<RepeatRange> finishSelectionPixels(double topInset, double bottomInset, double padding);
     void acceptRepeatRange(bool accepted);
     void cancelSelection();
     bool selecting() const { return m_selecting; }
@@ -110,6 +113,9 @@ public:
 
 private:
     TrackList* m_tracks = nullptr;
+    // A lane's height in pixels: its track's row height (restMap U9), the default past the rows.
+    double laneHeightPixels(int lane) const;
+    std::optional<RepeatRange> finishSelectionWith(double topPx, double bottomPx, double paddingPx, bool pixels);
     int m_snapMode = 1, m_numerator = 4, m_denominator = 4;
     double m_bpm = 120;
     bool m_busy = false, m_loading = false, m_recording = false;

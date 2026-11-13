@@ -95,16 +95,13 @@ TrackListWrapper::TrackListWrapper(QObject* parent)
 
 void TrackListWrapper::syncLayout()
 {
-    std::vector<bool> lanes;
-    lanes.reserve(m_project.tracks().size());
+    std::vector<TrackLayout::Row> rows;
+    rows.reserve(m_project.tracks().size());
     for (const auto& track : m_project.tracks())
-        lanes.push_back(track->volumeEnvelope.shown() && !track->volumeEnvelope.overClips());
-    if (lanes.size() == static_cast<std::size_t>(m_layout.count())) {
-        bool same = true;
-        for (int i = 0; i < m_layout.count() && same; ++i) same = lanes[std::size_t(i)] == m_layout.hasEnvelopeLane(i);
-        if (same) return;
-    }
-    m_layout.setRows(std::move(lanes));
+        rows.push_back({track->volumeEnvelope.shown() && !track->volumeEnvelope.overClips(),
+                        track->rowHeight, track->envelopeHeight});   // restMap U9
+    if (rows == m_layout.rows()) return;
+    m_layout.setRowSpecs(std::move(rows));
     emit layoutChanged();
 }
 
@@ -120,6 +117,20 @@ void TrackListWrapper::setEnvelopeLaneHeight(double height)
     if (height == m_layout.envelopeHeight()) return;
     m_layout.setEnvelopeHeight(height);
     emit layoutChanged();
+}
+
+QVariantList TrackListWrapper::trackHeights() const
+{
+    QVariantList result;
+    for (int row = 0; row < m_layout.count(); ++row) result.append(m_layout.trackHeightOf(row));
+    return result;
+}
+
+QVariantList TrackListWrapper::envelopeHeights() const
+{
+    QVariantList result;
+    for (int row = 0; row < m_layout.count(); ++row) result.append(m_layout.envelopeHeightOf(row));
+    return result;
 }
 
 QVariantList TrackListWrapper::rowTops() const
@@ -299,6 +310,10 @@ QVariant TrackListWrapper::data(const QModelIndex& index, int role) const
         return track.pan;
     case StripWidthRole:
         return track.stripWidth;
+    case TrackHeightRole:
+        return track.rowHeight;
+    case EnvelopeHeightRole:
+        return track.envelopeHeight;
     case EqBandsRole: {
         QVariantList bands;
         for (float gain : track.eqGainDb)
@@ -377,6 +392,8 @@ QHash<int, QByteArray> TrackListWrapper::roleNames() const
         {VolumeRole, "volume"},
         {PanRole, "pan"},
         {StripWidthRole, "stripWidth"},
+        {TrackHeightRole, "trackHeight"},
+        {EnvelopeHeightRole, "envelopeHeight"},
         {ClipsRole, "clips"},
         {EqBandsRole, "eqBands"},
         {EffectsRole, "effects"},
@@ -889,6 +906,16 @@ bool TrackListWrapper::setStripWidth(int id, double value)
     return notifyTrackChanged(id, StripWidthRole, m_state.setStripWidth(id, value));
 }
 
+bool TrackListWrapper::setTrackHeight(int id, double value)
+{
+    return notifyTrackChanged(id, TrackHeightRole, m_state.setRowHeight(id, value));
+}
+
+bool TrackListWrapper::setTrackEnvelopeHeight(int id, double value)
+{
+    return notifyTrackChanged(id, EnvelopeHeightRole, m_state.setEnvelopeHeight(id, value));
+}
+
 bool TrackListWrapper::setMasterVolume(double value)
 {
     const auto change = m_state.setMasterVolume(value);
@@ -1342,6 +1369,7 @@ QJsonObject TrackListWrapper::sessionState() const
             {"colour", QString::fromStdString(track->colour)},
             {"type", QString::fromStdString(track->type)}, {"instrument", track->kind == TrackKind::Instrument},
             {"solo", track->solo}, {"muted", track->muted}, {"volume", track->volume}, {"pan", track->pan}, {"stripWidth", track->stripWidth},
+            {"rowHeight", track->rowHeight}, {"envelopeHeight", track->envelopeHeight},
             {"input", QString::fromStdString(track->inputPort)}, {"recordDry", track->recordDry}, {"eq", eq}, {"clips", clips}});
     }
     const auto& tempo = m_project.tempo();
@@ -1383,12 +1411,18 @@ bool TrackListWrapper::restoreSessionState(const QJsonObject& state, QString& er
         // Sessions saved before pan existed restore centred.
         track.pan = float(item["pan"].toDouble(0));
         track.stripWidth = float(item["stripWidth"].toDouble(Track{}.stripWidth));
+        track.rowHeight = float(item["rowHeight"].toDouble(Track{}.rowHeight));   // restMap U9
+        track.envelopeHeight = float(item["envelopeHeight"].toDouble(Track{}.envelopeHeight));
         track.inputPort = item["input"].toString().toStdString();
         const auto eq = item["eq"].toArray();
         if (track.volume < 0 || track.volume > 2 || (item.contains("pan") && !item["pan"].isDouble())
             || !std::isfinite(track.pan) || track.pan < -1 || track.pan > 1
             || (item.contains("stripWidth") && !item["stripWidth"].isDouble())
             || track.stripWidth < mixer::minStripWidth || track.stripWidth > mixer::maxStripWidth
+            || (item.contains("rowHeight") && !item["rowHeight"].isDouble())
+            || (item.contains("envelopeHeight") && !item["envelopeHeight"].isDouble())
+            || track.rowHeight < trackheight::minTrack || track.rowHeight > trackheight::maxTrack
+            || track.envelopeHeight < trackheight::minEnvelope || track.envelopeHeight > trackheight::maxEnvelope
             || eq.size() != 10 || !item["clips"].isArray()) {
             error = "Invalid track controls."; return false;
         }

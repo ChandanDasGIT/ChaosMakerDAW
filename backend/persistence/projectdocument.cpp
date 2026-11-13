@@ -10,6 +10,7 @@
 #include "synthjson.h"
 #include "bassjson.h"
 #include "mixer/mixerpanel.h"
+#include "timeline/tracklayout.h"
 #include "recording/takerecorder.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
@@ -118,6 +119,8 @@ std::string ProjectDocument::serialize(const Project& project,
         trackObj["volume"] = track->volume;
         trackObj["pan"] = track->pan;
         trackObj["stripWidth"] = track->stripWidth;
+        trackObj["rowHeight"] = track->rowHeight;             // restMap U9
+        trackObj["envelopeHeight"] = track->envelopeHeight;
         trackObj["input"] = track->inputPort;
         trackObj["recordDry"] = track->recordDry;
         trackObj["eq"] = eqJson;
@@ -305,6 +308,14 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             return false;
         }
         track.stripWidth = item.value("stripWidth", Track{}.stripWidth);
+        // Optional (restMap U9): older projects keep the default timeline heights.
+        for (const char* key : {"rowHeight", "envelopeHeight"})
+            if (item.contains(key) && !item[key].is_number()) {
+                error = "Invalid track controls.";
+                return false;
+            }
+        track.rowHeight = item.value("rowHeight", Track{}.rowHeight);
+        track.envelopeHeight = item.value("envelopeHeight", Track{}.envelopeHeight);
         track.inputPort = item.value("input", "");
 
         if (!item.contains("eq") || !item["eq"].is_array() || item["eq"].size() != 10
@@ -312,6 +323,10 @@ bool ProjectDocument::deserialize(std::string_view jsonStr,
             || !std::isfinite(track.pan) || track.pan < -1.0f || track.pan > 1.0f
             || !std::isfinite(track.stripWidth) || track.stripWidth < mixer::minStripWidth
             || track.stripWidth > mixer::maxStripWidth
+            || !std::isfinite(track.rowHeight) || track.rowHeight < trackheight::minTrack
+            || track.rowHeight > trackheight::maxTrack
+            || !std::isfinite(track.envelopeHeight) || track.envelopeHeight < trackheight::minEnvelope
+            || track.envelopeHeight > trackheight::maxEnvelope
             || !item.contains("clips") || !item["clips"].is_array()) {
             error = "Invalid track controls.";
             return false;

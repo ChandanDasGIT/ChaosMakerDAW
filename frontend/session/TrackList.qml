@@ -113,6 +113,8 @@ Rectangle {
                     required property bool envelopeShown
                     required property bool envelopeOverClips
                     required property bool envelopeBypassed
+                    required property real trackHeight      // restMap U9: dragged on the timeline
+                    required property real envelopeHeight
                     property bool renaming: false
                     readonly property bool isSelected: !!root.trackModel && root.trackModel.selectedTrackId === trackCard.trackId
 
@@ -136,7 +138,7 @@ Rectangle {
                     y: root.trackModel && index >= 0 && index < root.trackModel.rowTops.length
                        ? root.trackModel.rowTops[index] : Math.max(0, index) * root.laneHeight
                     width: trackScroll.width
-                    height: root.laneHeight
+                    height: trackCard.trackHeight
                     color: isSelected ? Theme.trackList.rowSelected : (index % 2 ? Theme.trackList.rowAlt : Theme.trackList.row)
                     // Selected: the lighter background and a thin dim edge. Bright only as a drop target.
                     border.color: root.dropRow === index ? Theme.accent : isSelected ? Theme.trackList.rowSelectedBorder : Theme.divider
@@ -161,7 +163,7 @@ Rectangle {
                         visible: trackCard.envelopeShown && !trackCard.envelopeOverClips
                         y: trackCard.height
                         width: trackCard.width
-                        height: root.trackModel ? root.trackModel.envelopeLaneHeight : 72
+                        height: trackCard.envelopeHeight
                         color: trackCard.color
                         border.color: Theme.divider
                         Rectangle {
@@ -194,12 +196,13 @@ Rectangle {
 
                     // Three lines in a 64 px row: name (with the type and the remove cross), the buttons,
                     // the volume slider.
+                    // A taller track (restMap U9) keeps them at the top, as in a 64 px row.
                     ColumnLayout {
-                        anchors.fill: parent
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                        height: root.laneHeight - 8
                         anchors.leftMargin: 8
                         anchors.rightMargin: 6
                         anchors.topMargin: 4
-                        anchors.bottomMargin: 4
                         spacing: 3
                         RowLayout {
                             Layout.fillWidth: true
@@ -377,6 +380,16 @@ Rectangle {
                                 implicitWidth: 24; implicitHeight: chipFlow.chipHeight
                                 onClicked: root.openEffects(trackCard)
                                 tooltip: "Browse track effects"
+                            }
+                            ToggleChip {
+                                id: envelopeButton
+                                objectName: "trackEnvelopeButton" + trackCard.trackId
+                                active: trackCard.envelopeShown
+                                hoverHighlight: true
+                                text: "V"; textSize: Theme.microSize; plain: true
+                                implicitWidth: 22; implicitHeight: chipFlow.chipHeight
+                                onClicked: root.trackModel.toggleEnvelopeShown(trackCard.trackId)
+                                tooltip: active ? "Hide the volume envelope" : "Show the volume envelope"
                             }
                         }
                         RowLayout {

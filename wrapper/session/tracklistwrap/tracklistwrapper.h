@@ -57,6 +57,14 @@ class TrackListWrapper : public QAbstractListModel {
     Q_PROPERTY(double envelopeLaneHeight READ envelopeLaneHeight WRITE setEnvelopeLaneHeight NOTIFY layoutChanged)
     Q_PROPERTY(QVariantList rowTops READ rowTops NOTIFY layoutChanged)
     Q_PROPERTY(double layoutHeight READ layoutHeight NOTIFY layoutChanged)
+    // Each row's own heights (restMap U9), count values each: the track part and its envelope lane.
+    Q_PROPERTY(QVariantList trackHeights READ trackHeights NOTIFY layoutChanged)
+    Q_PROPERTY(QVariantList envelopeHeights READ envelopeHeights NOTIFY layoutChanged)
+    // The limits a drag can reach (backend trackheight); the default track height is the least.
+    Q_PROPERTY(double minTrackHeight READ minTrackHeight CONSTANT)
+    Q_PROPERTY(double maxTrackHeight READ maxTrackHeight CONSTANT)
+    Q_PROPERTY(double minEnvelopeHeight READ minEnvelopeHeight CONSTANT)
+    Q_PROPERTY(double maxEnvelopeHeight READ maxEnvelopeHeight CONSTANT)
     // The envelope's level (0..1) of 0 dB, where a new envelope's line sits.
     Q_PROPERTY(double envelopeUnityLevel READ envelopeUnityLevel CONSTANT)
     // The curve shapes a point can have, in menu order: [{id, name}] (restMap G6b).
@@ -83,6 +91,8 @@ public:
         ColourRole,
         PanRole,
         StripWidthRole,
+        TrackHeightRole,      // timeline heights in px (restMap U9)
+        EnvelopeHeightRole,
         EffectsRole,  // insert effects in chain order: [{id, type, title, subtitle, removable}] (plan 6.1)
         // Volume envelope (restMap G6). Points: [{beat, level, shape}] in time order, level
         // 0..1, shape an id from envelopeShapes (the curve to the next point).
@@ -232,6 +242,10 @@ public:
     Q_INVOKABLE bool setPan(int trackId, double pan);
     // Mixer strip width in px (clamped by the backend); saved with the project.
     Q_INVOKABLE bool setStripWidth(int trackId, double width);
+    // Timeline heights in px (restMap U9), clamped by the backend; saved with the project, not
+    // undo steps.
+    Q_INVOKABLE bool setTrackHeight(int trackId, double height);
+    Q_INVOKABLE bool setTrackEnvelopeHeight(int trackId, double height);
     double masterVolume() const { return m_state.masterVolume(); }
     Q_INVOKABLE bool setMasterVolume(double volume);
     Q_INVOKABLE void resetMasterVolume();
@@ -317,6 +331,12 @@ public:
     void setEnvelopeLaneHeight(double height);
     QVariantList rowTops() const;
     double layoutHeight() const { return m_layout.totalHeight(); }
+    QVariantList trackHeights() const;
+    QVariantList envelopeHeights() const;
+    double minTrackHeight() const { return trackheight::minTrack; }
+    double maxTrackHeight() const { return trackheight::maxTrack; }
+    double minEnvelopeHeight() const { return trackheight::minEnvelope; }
+    double maxEnvelopeHeight() const { return trackheight::maxEnvelope; }
     // Pointer y (from the top of the first row) -> row, its envelope lane included; past the
     // rows it continues at trackRowHeight steps.
     Q_INVOKABLE int rowAtY(double y) const { return m_layout.rowAt(y); }
