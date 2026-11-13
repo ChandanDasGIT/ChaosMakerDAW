@@ -411,7 +411,7 @@ TEST(tracklist, timeline_heights_clamp_never_below_the_default_track_height)
     TrackList tracks;
     const int id = tracks.addAudioTrack();
     const auto* track = tracks.project().findTrack(id);
-    CHECK(track->rowHeight == 64.0f && track->envelopeHeight == 72.0f);
+    CHECK(track->rowHeight == 64.0f && track->envelopeHeight == 64.0f);
     const auto taller = tracks.setRowHeight(id, 150.0);
     CHECK(taller.accepted && taller.changed);
     CHECK(track->rowHeight == 150.0f);

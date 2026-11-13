@@ -16,6 +16,43 @@ Rectangle {
     color: Theme.panelBg
     border.color: Theme.panelEdge
 
+    // A 4 px strip on a card's (or Volume header's) bottom edge: drag it to set that height
+    // (restMap U9, the same setters and limits as the timeline's edges).
+    component EdgeDrag: Item {
+        id: edge
+        property real currentHeight: 0
+        property var apply: function(height) {}
+        property real startY: 0
+        property real startHeight: 0
+        readonly property bool active: edgeMouse.containsMouse || edgeMouse.pressed
+        anchors.left: parent.left; anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: 4
+        z: 5
+        Rectangle {
+            anchors.left: parent.left; anchors.right: parent.right
+            anchors.bottom: parent.bottom; anchors.bottomMargin: 1
+            height: 2
+            visible: edge.active
+            color: Theme.accent
+        }
+        MouseArea {
+            id: edgeMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            preventStealing: true
+            cursorShape: Qt.SizeVerCursor
+            onPressed: mouse => {
+                edge.startY = mapToItem(null, mouse.x, mouse.y).y
+                edge.startHeight = edge.currentHeight
+            }
+            onPositionChanged: mouse => {
+                if (!pressed) return
+                edge.apply(edge.startHeight + mapToItem(null, mouse.x, mouse.y).y - edge.startY)
+            }
+        }
+    }
+
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         blocking: true
@@ -113,7 +150,7 @@ Rectangle {
                     required property bool envelopeShown
                     required property bool envelopeOverClips
                     required property bool envelopeBypassed
-                    required property real trackHeight      // restMap U9: dragged on the timeline
+                    required property real trackHeight      // restMap U9: dragged on the timeline or here
                     required property real envelopeHeight
                     property bool renaming: false
                     readonly property bool isSelected: !!root.trackModel && root.trackModel.selectedTrackId === trackCard.trackId
@@ -157,6 +194,12 @@ Rectangle {
                         onPressed: if (root.trackModel) root.trackModel.selectTrack(trackCard.trackId)
                     }
 
+                    EdgeDrag {
+                        objectName: "trackListResizeHandle" + trackCard.trackId
+                        currentHeight: trackCard.trackHeight
+                        apply: function(height) { root.trackModel.setTrackHeight(trackCard.trackId, height) }
+                    }
+
                     // The volume lane's header, beside the lane in the timeline (restMap G6).
                     Rectangle {
                         objectName: "envelopeLaneHeader" + trackCard.trackId
@@ -191,6 +234,11 @@ Rectangle {
                             implicitWidth: 50; implicitHeight: 22
                             onClicked: root.trackModel.setEnvelopeBypassed(trackCard.trackId, !active)
                             tooltip: active ? "Envelope bypassed: the track plays at its fader level" : "Bypass the volume envelope"
+                        }
+                        EdgeDrag {
+                            objectName: "trackListEnvelopeResizeHandle" + trackCard.trackId
+                            currentHeight: trackCard.envelopeHeight
+                            apply: function(height) { root.trackModel.setTrackEnvelopeHeight(trackCard.trackId, height) }
                         }
                     }
 

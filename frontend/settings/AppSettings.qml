@@ -15,6 +15,12 @@ ToolButton {
     readonly property alias pianoRollPresentation: appSettingsBridge.pianoRollPresentation
     // The app's one AppSettingsWrapper, for settings the window uses directly (layout sizes).
     readonly property alias bridge: appSettingsBridge
+    // Opens Preferences at the top (Audio & MIDI), e.g. from the top bar's device line.
+    function openPreferences() {
+        settingsMenu.close()
+        preferencesScroll.contentY = 0
+        preferencesPopup.open()
+    }
 
     AppSettingsWrapper {
         id: appSettingsBridge
