@@ -66,6 +66,8 @@ jobs:
             [ "$status" = 124 ] || { echo "$label stopped by itself (exit $status)" >&2; exit 1; }
             [ ! -s "$RUNNER_TEMP/$label.log" ] || { echo "$label wrote to its log" >&2; exit 1; }
           }
+          # (libjack locks its shared memory, as audio setups allow; the runner's default limit is too small)
+          sudo prlimit --pid $$ --memlock=unlimited:unlimited
           jackd --no-realtime -d dummy > "$RUNNER_TEMP/jackd.log" 2>&1 &
           sleep 3
           kill -0 $! || { cat "$RUNNER_TEMP/jackd.log"; echo "The JACK server did not start" >&2; exit 1; }
