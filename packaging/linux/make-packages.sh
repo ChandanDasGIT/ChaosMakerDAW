@@ -13,6 +13,7 @@
 # Needs: the Qt the build used (qmake6 / qmake on PATH, or QMAKE=/path/to/qmake), curl,
 #        rpm or dpkg (to find the licences of the bundled libraries).
 set -euo pipefail
+trap 'echo "make-packages.sh: line $LINENO failed: $BASH_COMMAND" >&2' ERR
 
 build="$(cd "$1" && pwd)"
 mkdir -p "$2"
@@ -146,9 +147,18 @@ rm -rf "$licenses"
 mkdir -p "$licenses"
 cp "$project/LICENSE" "$licenses/ChaosMaker-GPL-3.0.txt"
 owner() { # <file> -> its package, or nothing
-    if command -v rpm >/dev/null 2>&1; then rpm -qf --qf '%{NAME}\n' "$1" 2>/dev/null | head -1
-    elif command -v dpkg >/dev/null 2>&1; then dpkg -S "$1" 2>/dev/null | head -1 | cut -d: -f1
+    if command -v rpm >/dev/null 2>&1; then
+        rpm -qf --qf '%{NAME}\n' "$1" 2>/dev/null | head -1 || true
+    elif command -v dpkg >/dev/null 2>&1; then
+        # dpkg knows a file by the path its package installed it to: on merged-/usr systems
+        # that is often /lib/... while the file resolves to /usr/lib/...
+        local path pkg
+        for path in "$1" "${1/#\/usr\/lib\//\/lib\/}"; do
+            pkg="$(dpkg -S "$path" 2>/dev/null | grep -v '^diversion' | head -1 | cut -d: -f1 | cut -d, -f1 || true)"
+            if [ -n "$pkg" ]; then printf '%s\n' "$pkg"; return 0; fi
+        done
     fi
+    return 0
 }
 copyLicence() { # <package>: its licence files into licenses/<package>/
     local pkg="$1" dest="$licenses/$1" f
@@ -195,7 +205,9 @@ done < "$sources"
 if [ "$qtNoPackage" = 1 ]; then
     qtLicences="$(cd "$qtPrefix/../.." 2>/dev/null && pwd)/Licenses"
     [ -d "$qtLicences" ] || qtLicences="$qtPrefix/Licenses"
-    if [ -d "$qtLicences" ]; then cp -r "$qtLicences" "$licenses/Qt"; else missing+=("Qt licences ($qtPrefix)"); fi
+    # (Qt installed by aqtinstall has no Licenses folder: Qt's licence texts kept here instead)
+    [ -d "$qtLicences" ] || qtLicences="$here/licenses/Qt"
+    cp -r "$qtLicences" "$licenses/Qt"
 fi
 if [ "${#missing[@]}" -gt 0 ]; then
     printf 'No licence found for:\n' >&2
@@ -215,6 +227,7 @@ export QML2_IMPORT_PATH="$HERE/usr/qml"
 exec "$HERE/usr/bin/appChaosMaker" "$@"
 EOF
 chmod +x "$appdir/AppRun"
+[ -e "$appdir/.DirIcon" ] || ln -s "$id.svg" "$appdir/.DirIcon" # (older linuxdeploy leaves it out)
 
 # ------------------------------------------------------------------ the AppImage
 appImage="ChaosMaker-$version-x86_64.AppImage"
