@@ -31,7 +31,7 @@ jobs:
       - name: Build tools and libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cmake ninja-build g++ pkg-config \
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jackd2 cmake ninja-build g++ pkg-config \
             libjack-jackd2-dev nlohmann-json3-dev libgl1-mesa-dev libegl1-mesa-dev libxkbcommon-dev \
             libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 \
@@ -54,7 +54,8 @@ jobs:
       - name: Make the packages
         run: QMAKE="$QT_ROOT_DIR/bin/qmake" packaging/linux/make-packages.sh build-release packages
 
-      # Both packages must start and stay up, with nothing in their log; no display, no sound card.
+      # Both packages must start and stay up, with nothing in their log; no display, no sound card
+      # (a JACK server with its dummy driver stands in for the sound server).
       - name: Check the packages
         run: |
           check() { # <label> <command...>
@@ -65,6 +66,9 @@ jobs:
             [ "$status" = 124 ] || { echo "$label stopped by itself (exit $status)" >&2; exit 1; }
             [ ! -s "$RUNNER_TEMP/$label.log" ] || { echo "$label wrote to its log" >&2; exit 1; }
           }
+          jackd --no-realtime -d dummy > "$RUNNER_TEMP/jackd.log" 2>&1 &
+          sleep 3
+          kill -0 $! || { cat "$RUNNER_TEMP/jackd.log"; echo "The JACK server did not start" >&2; exit 1; }
           export HOME="$RUNNER_TEMP/home" XDG_DATA_HOME="$RUNNER_TEMP/home/.local/share"
           export XDG_CONFIG_HOME="$RUNNER_TEMP/home/.config" XDG_CACHE_HOME="$RUNNER_TEMP/home/.cache"
           export QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1
