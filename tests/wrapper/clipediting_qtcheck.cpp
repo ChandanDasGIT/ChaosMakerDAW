@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 #include "common/engine/audioengine.h"
 
 TEST(qtclipediting, delete_resize_undo_redo_preserve_audio_ids_and_other_tracks) {

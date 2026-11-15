@@ -1,8 +1,8 @@
 #include "testkit.h"
 #include "analysis/drumrender.h"
 #include "common/groovePanel/groovestore.h"
-#include "wrapper/topBar/toolsMenu/drumAnalyzer/drumAnalyzerWrap.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/topBar/toolsMenu/drumAnalyzerWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 
 #include <QCoreApplication>
 #include <QDir>

@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/plugins/mixFx/compressor/mixcompressor.h"
+#include "common/trackEffectsPanel/plugins/mixFx/mixcompressor.h"
 #include "common/dsp/gaincomputer.h"
 
 #include <cmath>

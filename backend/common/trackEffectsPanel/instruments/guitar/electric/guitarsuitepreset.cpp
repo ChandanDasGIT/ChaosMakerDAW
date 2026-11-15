@@ -1,7 +1,7 @@
 #include "guitarsuitepreset.h"
 
 #include "common/trackEffectsPanel/instruments/guitar/electric/pedalregistry.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/cabinet/cabinet.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/cabinet.h"
 
 #include <nlohmann/json.hpp>
 #include <algorithm>

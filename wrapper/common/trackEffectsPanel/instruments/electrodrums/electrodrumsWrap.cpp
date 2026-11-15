@@ -2,7 +2,7 @@
 #include "common/trackEffectsPanel/instruments/electrodrums/electrodrums.h"
 #include "common/trackEffectsPanel/instruments/electrodrums/electromap.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 
 #include <QVariantMap>
 

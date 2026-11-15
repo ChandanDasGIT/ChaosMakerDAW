@@ -2,7 +2,7 @@
 
 #include "common/transport/musicalgrid.h"
 #include "timeline/timeline.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 #include <QObject>
 #include <QPointer>
 #include <QtQml/qqmlregistration.h>

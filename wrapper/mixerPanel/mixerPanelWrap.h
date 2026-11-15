@@ -3,7 +3,7 @@
 #include <QObject>
 #include <QVariantList>
 #include <qqmlregistration.h>
-#include "common/mixer/mixerpanel.h"
+#include "common/mixerpanel.h"
 
 class TrackListModelWrap;
 

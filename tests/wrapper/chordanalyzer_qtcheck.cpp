@@ -1,8 +1,8 @@
 #include "testkit.h"
 #include "analysis/chordrender.h"
 #include "common/chordPlayer/chordplayer.h"
-#include "wrapper/topBar/toolsMenu/chordAnalyzer/chordAnalyzerWrap.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/topBar/toolsMenu/chordAnalyzerWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>

@@ -4,7 +4,7 @@
 #include "common/processor/processor.h"
 #include "common/transport/tempomap.h"
 #include "common/dsp/trackmeters.h"
-#include "timeline/volumeEnvelopeLane/volumeenvelope.h"
+#include "timeline/volumeenvelope.h"
 
 #include <algorithm>
 #include <cmath>

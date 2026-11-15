@@ -9,7 +9,7 @@
 #include "common/trackEffectsPanel/instruments/harmonium/harmoniumjson.h"
 #include "common/trackEffectsPanel/instruments/synth/synthjson.h"
 #include "common/trackEffectsPanel/instruments/guitar/bass/bassjson.h"
-#include "common/mixer/mixerpanel.h"
+#include "common/mixerpanel.h"
 #include "trackList/tracklayout.h"
 #include "common/recording/takerecorder.h"
 #include <nlohmann/json.hpp>

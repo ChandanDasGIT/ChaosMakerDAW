@@ -1,7 +1,7 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
 #include "wrapper/common/trackEffectsPanel/instruments/electrodrums/electrodrumsWrap.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
 #include "common/trackEffectsPanel/instruments/electrodrums/electrodrums.h"
 

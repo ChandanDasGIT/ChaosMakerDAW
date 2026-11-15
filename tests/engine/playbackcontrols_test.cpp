@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "transportBar/playbackControls/playbackcontrols.h"
+#include "transportBar/playbackcontrols.h"
 #include "common/core/valueformat.h"
 
 #include <cmath>

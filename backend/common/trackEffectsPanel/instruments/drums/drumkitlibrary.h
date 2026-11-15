@@ -16,8 +16,7 @@ class Sampler;
 
 // The acoustic drum kit's samples, read once and shared by every Drums track.
 //
-// The kit is found in $CHAOSMAKER_SAMPLE_KITS, or else in resources/sample-kits up to three
-// folders above the program. Loading and every rebuild for new settings run on one background
+// The kit is found under samplekits::folder() (common/instruments/samplekits.h). Loading and every rebuild for new settings run on one background
 // thread; finished zones go to the track's sampler with Sampler::stageZones().
 //
 // Samples no track plays any more (another room, a removed Drums track) are dropped from the

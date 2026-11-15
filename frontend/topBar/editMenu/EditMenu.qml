@@ -41,7 +41,7 @@ ToolButton {
 
     // Opened from the menu below (restMap G16).
     function openUndoHistory() { undoHistory.open() }
-    UndoHistory {
+    EditHistoryWindow {
         id: undoHistory
         trackModel: root.trackModel
     }

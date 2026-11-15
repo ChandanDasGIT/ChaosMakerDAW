@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/shortcuts/shortcutmap.h"
+#include "common/shortcutmap.h"
 
 #include <set>
 

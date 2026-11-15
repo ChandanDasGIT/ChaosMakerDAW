@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 #include "wrapper/pianoRoll/pianoRollWrap.h"
 
 

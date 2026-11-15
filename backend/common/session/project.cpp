@@ -1,7 +1,7 @@
 #include "project.h"
 #include <utility>
 #include "common/dsp/panlaw.h"
-#include "common/mixer/mixerpanel.h"
+#include "common/mixerpanel.h"
 #include "trackList/tracklayout.h"
 #include "common/instruments/instrumentcatalog.h"
 

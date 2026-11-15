@@ -3,7 +3,7 @@
 #include "common/trackEffectsPanel/instruments/drums/drumkitlibrary.h"
 #include "common/trackEffectsPanel/instruments/drums/drummap.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 
 #include <QVariantMap>
 

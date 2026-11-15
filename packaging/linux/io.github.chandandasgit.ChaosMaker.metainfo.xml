@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.chandandasgit.ChaosMaker</id>
+  <name>Chaos Maker</name>
+  <summary>Record, arrange and mix music with instruments, MIDI and guitar effects</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <developer id="io.github.chandandasgit">
+    <name>Chandan Das</name>
+  </developer>
+  <description>
+    <p>
+      A multitrack digital audio workstation with its own instruments and effects.
+    </p>
+    <ul>
+      <li>Record audio tracks and arrange clips on the timeline</li>
+      <li>Piano roll for MIDI, an on-screen piano and the computer keyboard as a keyboard</li>
+      <li>Drum kit, electronic drums, grand piano, harmonium, synth and bass guitar</li>
+      <li>A guitar pedalboard with a tuner, amp and cabinet</li>
+      <li>Mixer, equalizers and mix effects on every track</li>
+      <li>Export the song as WAV or MP3</li>
+    </ul>
+    <p>
+      Needs JACK (or PipeWire's JACK support) and a 64-bit processor with AVX2.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.chandandasgit.ChaosMaker.desktop</launchable>
+  <url type="homepage">https://github.com/ChandanDasGIT/ChaosMakerDAW</url>
+  <url type="bugtracker">https://github.com/ChandanDasGIT/ChaosMakerDAW/issues</url>
+  <url type="vcs-browser">https://github.com/ChandanDasGIT/ChaosMakerDAW</url>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Audio</category>
+  </categories>
+  <provides>
+    <binary>appChaosMaker</binary>
+  </provides>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1" date="2026-11-15">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

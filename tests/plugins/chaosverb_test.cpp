@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/plugins/mixFx/chaosVerb/chaosverb.h"
+#include "common/trackEffectsPanel/plugins/mixFx/chaosverb.h"
 
 #include <cmath>
 #include <random>

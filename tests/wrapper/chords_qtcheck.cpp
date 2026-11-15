@@ -1,11 +1,11 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
 #include "wrapper/common/trackEffectsPanel/plugins/chordPlayer/chordPlayerWrap.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 #include "wrapper/topBar/appSettings/appSettingsWrap.h"
 #include "wrapper/pianoRoll/pianoRollWrap.h"
 #include "common/audiodevice/audiodevice.h"
-#include "common/instruments/chords/chordsinstrument.h"
+#include "common/instruments/chordsinstrument.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>

@@ -8,7 +8,7 @@
 #include "common/trackEffectsPanel/instruments/guitar/bass/basssettings.h"
 #include "common/trackEffectsPanel/plugins/chaosEq/chaoseqsettings.h"
 #include "common/chordPlayer/chordsettings.h"
-#include "common/mixEffect/mixfxspec.h"
+#include "common/mixfxspec.h"
 
 #include <map>
 

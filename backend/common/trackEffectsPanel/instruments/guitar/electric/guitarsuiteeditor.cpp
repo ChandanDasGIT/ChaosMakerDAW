@@ -1,7 +1,7 @@
 #include "guitarsuiteeditor.h"
 
 #include "common/trackEffectsPanel/instruments/guitar/electric/impulsewav.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/cabinet/cabinet.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/cabinet.h"
 #include "common/trackEffectsPanel/instruments/guitar/electric/guitarsuite.h"
 #include "common/trackEffectsPanel/instruments/guitar/electric/pedalregistry.h"
 #include "common/trackEffectsPanel/instruments/guitar/electric/tuner/tuner.h"

@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/plugins/mixFx/reverb/roomreverb.h"
+#include "common/trackEffectsPanel/plugins/mixFx/roomreverb.h"
 #include "common/dsp/gaincomputer.h"
 
 #include <cmath>

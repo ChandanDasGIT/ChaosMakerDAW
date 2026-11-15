@@ -1,5 +1,5 @@
 #include "common/instruments/instrumentfactory.h"
-#include "common/instruments/chords/chordsinstrument.h"
+#include "common/instruments/chordsinstrument.h"
 #include "common/trackEffectsPanel/instruments/drums/drumkit.h"
 #include "common/trackEffectsPanel/instruments/electrodrums/electrodrums.h"
 #include "common/trackEffectsPanel/instruments/harmonium/harmonium.h"
@@ -7,7 +7,7 @@
 #include "common/trackEffectsPanel/instruments/synth/synth.h"
 #include "common/trackEffectsPanel/instruments/guitar/bass/bassguitar.h"
 #include "common/instruments/instrumentcatalog.h"
-#include "common/instruments/testsynth/testsynth.h"
+#include "common/instruments/testsynth.h"
 
 std::shared_ptr<Processor> createInstrument(std::string_view typeId)
 {

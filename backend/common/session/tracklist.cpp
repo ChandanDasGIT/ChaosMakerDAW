@@ -1,7 +1,7 @@
 #include "tracklist.h"
-#include "common/trackEffectsPanel/plugins/denoise/denoise.h"
+#include "common/trackEffectsPanel/plugins/denoise.h"
 #include "common/dsp/panlaw.h"
-#include "common/mixer/mixerpanel.h"
+#include "common/mixerpanel.h"
 #include "trackList/tracklayout.h"
 #include "common/instruments/instrumentcatalog.h"
 

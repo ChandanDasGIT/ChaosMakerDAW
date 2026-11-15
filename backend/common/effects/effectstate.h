@@ -2,7 +2,7 @@
 
 #include "common/trackEffectsPanel/plugins/chaosEq/chaoseqsettings.h"
 #include "common/effects/effectchain.h"
-#include "common/mixEffect/mixfxspec.h"
+#include "common/mixfxspec.h"
 
 #include <array>
 #include <string>

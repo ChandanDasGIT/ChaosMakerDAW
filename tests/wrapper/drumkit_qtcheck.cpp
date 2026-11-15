@@ -1,7 +1,7 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
 #include "wrapper/common/trackEffectsPanel/instruments/drums/drumsWrap.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
 #include "common/trackEffectsPanel/instruments/drums/drumkit.h"
 

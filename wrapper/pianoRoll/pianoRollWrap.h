@@ -10,7 +10,7 @@
 #include "pianoRoll/pianorollgrid.h"
 #include "common/midi/notenames.h"
 #include "pianoRollNoteModel.h"
-#include "wrapper/common/trackList/trackListModelWrap.h" // full type needed by Q_PROPERTY
+#include "wrapper/common/trackListModelWrap.h" // full type needed by Q_PROPERTY
 
 // Adapts PianoRollPattern (editing state + selection) to QML. When bound to a clip through
 // trackList/trackId/clipId, the clip's notes are loaded from the document, every committed

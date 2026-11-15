@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/levelMeter/levelmeter.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/levelmeter.h"
 #include "mixerPanel/stereoLevelMeter/stereolevelmeter.h"
 
 TEST(levelmeter, initial_state_and_configuration)

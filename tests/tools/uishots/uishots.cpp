@@ -24,7 +24,7 @@
 #include "common/core/audiodata.h"
 #include "common/midi/midinote.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 
 namespace {
 

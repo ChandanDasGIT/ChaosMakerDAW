@@ -36,7 +36,7 @@
 #include "common/analysis/hpss.h"
 #include "topBar/toolsMenu/drumAnalyzer/kitshapes.h"
 #include "common/analysis/spectrogram.h"
-#include "topBar/projectActions/importExport/audioimport.h"
+#include "topBar/projectActions/audioimport.h"
 
 #include <algorithm>
 #include <cmath>

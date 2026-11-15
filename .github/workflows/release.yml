@@ -1,0 +1,101 @@
+# Builds the Linux packages (AppImage and tarball) on Ubuntu 24.04, so they run on systems as new
+# as that, checks that both start, and publishes them as a GitHub release.
+#   A version tag (v0.1, ...): build, check, publish (the tag must match project(... VERSION ...)).
+#   By hand (Actions > Release > Run workflow): build and check only; the packages are kept as
+#   the run's artifact for a week.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: The tag matches the version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(sed -n 's/^project(ChaosMaker VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          if [ "v$version" != "${GITHUB_REF_NAME%%-*}" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match version $version in CMakeLists.txt" >&2
+            exit 1
+          fi
+
+      - name: Build tools and libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++ pkg-config \
+            libjack-jackd2-dev nlohmann-json3-dev libgl1-mesa-dev libegl1-mesa-dev libxkbcommon-dev \
+            libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 \
+            libwayland-client0 libwayland-cursor0 libwayland-egl1 libfontconfig1 libfreetype6 \
+            libdbus-1-3 xz-utils curl file
+
+      # Ubuntu 24.04 has Qt 6.4; the app needs 6.10. This action installs Qt's own binaries
+      # (through aqtinstall, which can't read Qt 6.11's download layout yet: 6.10.3 until it can).
+      - name: Qt 6.10
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          cache: true
+
+      - name: Build the app
+        run: |
+          cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+          cmake --build build-release --target appChaosMaker
+
+      - name: Make the packages
+        run: QMAKE="$QT_ROOT_DIR/bin/qmake" packaging/linux/make-packages.sh build-release packages
+
+      # Both packages must start and stay up, with nothing in their log; no display, no sound card.
+      - name: Check the packages
+        run: |
+          check() { # <label> <command...>
+            local label="$1"; shift
+            local status=0
+            timeout 15 "$@" > "$RUNNER_TEMP/$label.log" 2>&1 || status=$?
+            cat "$RUNNER_TEMP/$label.log"
+            [ "$status" = 124 ] || { echo "$label stopped by itself (exit $status)" >&2; exit 1; }
+            [ ! -s "$RUNNER_TEMP/$label.log" ] || { echo "$label wrote to its log" >&2; exit 1; }
+          }
+          export HOME="$RUNNER_TEMP/home" XDG_DATA_HOME="$RUNNER_TEMP/home/.local/share"
+          export XDG_CONFIG_HOME="$RUNNER_TEMP/home/.config" XDG_CACHE_HOME="$RUNNER_TEMP/home/.cache"
+          export QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1
+          mkdir -p "$HOME" "$RUNNER_TEMP/unpacked"
+          tar -xJf packages/ChaosMaker-*-linux-x86_64.tar.xz -C "$RUNNER_TEMP/unpacked"
+          "$RUNNER_TEMP"/unpacked/ChaosMaker-*/install-app.sh --no-kits
+          check tarball "$HOME/.local/bin/ChaosMaker"
+          check appimage packages/ChaosMaker-*-x86_64.AppImage
+
+      - name: Keep the packages (run by hand)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: chaosmaker-linux
+          path: |
+            packages/*.AppImage
+            packages/*.tar.xz
+            packages/get-sample-kits.sh
+            packages/SHA256SUMS.txt
+          retention-days: 7
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" $prerelease --latest --title "Chaos Maker ${GITHUB_REF_NAME#v}" \
+            --notes "Linux packages for x86_64 (64-bit, with AVX2). Needs JACK or PipeWire's JACK support.
+          - AppImage: make it executable and run it; then run get-sample-kits.sh once for the drum kit and piano.
+          - Tarball: unpack it and run ./install-app.sh (it installs the sample kits too).
+          SHA256SUMS.txt holds the checksums." \
+            packages/*.AppImage packages/*.tar.xz packages/get-sample-kits.sh packages/SHA256SUMS.txt

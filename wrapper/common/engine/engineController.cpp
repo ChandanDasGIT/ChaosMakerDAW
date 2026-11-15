@@ -15,7 +15,7 @@
 #include "common/trackEffectsPanel/instruments/synth/synth.h"
 #include "common/trackEffectsPanel/instruments/guitar/bass/bassguitar.h"
 #include "common/trackEffectsPanel/instruments/piano/piano.h"
-#include "common/instruments/chords/chordsinstrument.h"
+#include "common/instruments/chordsinstrument.h"
 #include "common/persistence/projectdocument.h"
 #include "common/persistence/effectchainjson.h"
 #include "common/effects/effectchain.h"

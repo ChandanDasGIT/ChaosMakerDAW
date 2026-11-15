@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "timeline/volumeEnvelopeLane/volumeenvelope.h"
+#include "timeline/volumeenvelope.h"
 
 #include <cmath>
 #include <limits>

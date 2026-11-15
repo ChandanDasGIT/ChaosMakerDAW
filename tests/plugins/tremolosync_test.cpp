@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/tremolo/tremolo.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/tremolo.h"
 #include "common/engine/audioengine.h"
 #include <limits>
 

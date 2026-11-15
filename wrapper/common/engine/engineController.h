@@ -9,7 +9,7 @@
 #include <memory>
 #include <map>
 #include <QPointer>
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 class TakeRecorder;
 struct RecordingGroup;
 #include "common/recording/recordingcontroller.h"

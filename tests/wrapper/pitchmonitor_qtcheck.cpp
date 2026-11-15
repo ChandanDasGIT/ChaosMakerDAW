@@ -1,9 +1,9 @@
 #include "testkit.h"
-#include "wrapper/common/trackEffectsPanel/plugins/pitchMonitor/pitchMonitorWrap.h"
+#include "wrapper/common/trackEffectsPanel/plugins/pitchMonitorWrap.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
-#include "common/mixEffect/mixfxspec.h"
+#include "common/mixfxspec.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>

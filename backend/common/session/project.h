@@ -14,8 +14,8 @@
 #include "common/trackEffectsPanel/instruments/synth/synthsettings.h"
 #include "common/trackEffectsPanel/instruments/guitar/bass/basssettings.h"
 #include "common/chordPlayer/chordsettings.h"
-#include "timeline/volumeEnvelopeLane/volumeenvelope.h"
-#include "common/mixEffect/mixfxspec.h"
+#include "timeline/volumeenvelope.h"
+#include "common/mixfxspec.h"
 #include "common/effects/effectstate.h"
 #include "common/session/cliptakes.h"
 

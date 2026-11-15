@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "wrapper/common/shortcuts/shortcutsWrap.h"
+#include "wrapper/common/shortcutsWrap.h"
 
 #include <QCoreApplication>
 #include <QSettings>

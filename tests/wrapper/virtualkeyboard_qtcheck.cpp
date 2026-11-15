@@ -1,7 +1,7 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/transportBar/virtualKeyboard/virtualKeyboardWrap.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/transportBar/virtualKeyboardWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
 
 #include <QCoreApplication>

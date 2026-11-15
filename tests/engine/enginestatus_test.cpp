@@ -1,7 +1,7 @@
 #include "testkit.h"
 #include "common/engine/enginestatus.h"
-#include "statusStrip/statusstrip.h"
-#include "topBar/deviceLine/deviceline.h"
+#include "statusstrip.h"
+#include "topBar/deviceline.h"
 #include "common/engine/audioengine.h"
 #include <limits>
 

@@ -1,6 +1,6 @@
 #include "effectchain.h"
 #include "common/instruments/instrumentcatalog.h"
-#include "common/mixEffect/mixfxspec.h"
+#include "common/mixfxspec.h"
 
 #include <algorithm>
 #include <array>

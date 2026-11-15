@@ -1,6 +1,6 @@
 #include "common/engine/snapshotbuilder.h"
 #include "common/session/tracklist.h"
-#include "common/instruments/chords/chordsinstrument.h"
+#include "common/instruments/chordsinstrument.h"
 #include "common/trackEffectsPanel/instruments/drums/drumkit.h"
 #include "common/trackEffectsPanel/instruments/electrodrums/electrodrums.h"
 #include "common/trackEffectsPanel/instruments/harmonium/harmonium.h"

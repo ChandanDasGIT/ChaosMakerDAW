@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "topBar/projectActions/importExport/audioimport.h"
+#include "topBar/projectActions/audioimport.h"
 #include "common/audiofile/wavreader.h"
 #include "common/audiofile/wavwriter.h"
 #include "common/recording/takerecorder.h"

@@ -1,5 +1,5 @@
 #include "bassWrap.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 #include "common/trackEffectsPanel/instruments/guitar/bass/bassvaluetext.h"
 
 #include <QStandardPaths>

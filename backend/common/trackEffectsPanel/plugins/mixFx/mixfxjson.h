@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/mixEffect/mixfxspec.h"
+#include "common/mixfxspec.h"
 
 #include <nlohmann/json.hpp>
 

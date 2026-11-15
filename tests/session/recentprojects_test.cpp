@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "topBar/projectActions/recentProjects/recentprojects.h"
+#include "topBar/projectActions/recentprojects.h"
 
 #include <filesystem>
 #include <fstream>

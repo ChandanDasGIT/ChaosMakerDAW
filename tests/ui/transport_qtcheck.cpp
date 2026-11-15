@@ -1,9 +1,9 @@
 #include <QtTest>
 #include <QStyleHints>
-#include "common/mixEffect/mixfxspec.h"
+#include "common/mixfxspec.h"
 #include "wrapper/common/engine/engineController.h"
 #include "wrapper/topBar/appSettings/appSettingsWrap.h"
-#include "wrapper/common/shortcuts/shortcutsWrap.h"
+#include "wrapper/common/shortcutsWrap.h"
 #include "wrapper/common/trackEffectsPanel/instruments/guitar/electric/electricWrap.h"
 #include "common/trackEffectsPanel/instruments/synth/synthpresets.h"
 #include "common/trackEffectsPanel/instruments/guitar/bass/basspresets.h"
@@ -986,7 +986,7 @@ private slots:
         while(it.hasNext()) files<<it.next();
         for(const QString& path:files) {
             const QString rel=path.mid(root.size()+1);
-            if(rel.startsWith("frontend/common/")&&!rel.startsWith("frontend/common/trackEffectsPanel/")&&!rel.startsWith("frontend/common/groovePanel/")&&!rel.startsWith("frontend/common/filePicker/")) continue;
+            if(rel.startsWith("frontend/common/")&&!rel.startsWith("frontend/common/trackEffectsPanel/")&&rel!="frontend/common/FilePicker.qml"&&rel!="frontend/common/GroovePanel.qml"&&rel!="frontend/common/NameDialog.qml") continue;
             QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
             int line=0;
             for(const QByteArray& bytes:file.readAll().split('\n')) {
@@ -1795,7 +1795,7 @@ private slots:
         QStringList files{root+"/Main.qml"}; while(it.hasNext()) files<<it.next();
         for(const QString& path:files) {
             const QString rel=path.mid(root.size()+1);
-            if(rel=="frontend/common/closeButton/CloseButton.qml"||rel=="frontend/icons/Icons.qml") continue;
+            if(rel=="frontend/common/CloseButton.qml"||rel=="frontend/icons/Icons.qml") continue;
             QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
             if(file.readAll().contains("Icons.close")) offenders<<rel;
         }
@@ -1902,7 +1902,7 @@ private slots:
         QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
         while(it.hasNext()) {
             const QString path=it.next(), rel=path.mid(root.size()+1);
-            if(!rel.startsWith("frontend/common/trackEffectsPanel/")&&!rel.startsWith("frontend/common/groovePanel/")&&rel!="frontend/transportBar/quickSettings/QuickSettings.qml") continue;
+            if(!rel.startsWith("frontend/common/trackEffectsPanel/")&&rel!="frontend/common/GroovePanel.qml"&&rel!="frontend/transportBar/QuickSettings.qml") continue;
             QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
             if(file.readAll().contains("ThemedSlider")) offenders<<rel;
         }

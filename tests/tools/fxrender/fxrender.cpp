@@ -20,7 +20,7 @@
 
 #include "common/dsp/fft.h"
 #include "common/trackEffectsPanel/instruments/guitar/electric/impulsewav.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/cabinet/cabinet.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/cabinet.h"
 #include "common/trackEffectsPanel/instruments/guitar/electric/pedalregistry.h"
 #include "common/trackEffectsPanel/plugins/mixFx/mixfxfactory.h"
 #include "common/processor/processor.h"

@@ -1,9 +1,9 @@
 #include "chordPlayerWrap.h"
-#include "common/instruments/chords/chordsinstrument.h"
+#include "common/instruments/chordsinstrument.h"
 #include "common/trackEffectsPanel/plugins/chordPlayer/chordrender.h"
 #include "wrapper/topBar/appSettings/appSettingsWrap.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 
 #include <QVariantMap>
 

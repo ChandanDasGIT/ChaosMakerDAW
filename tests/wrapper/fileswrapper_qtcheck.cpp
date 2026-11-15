@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "wrapper/common/filePicker/filePickerWrap.h"
+#include "wrapper/common/filePickerWrap.h"
 
 #include <QDir>
 #include <QFile>

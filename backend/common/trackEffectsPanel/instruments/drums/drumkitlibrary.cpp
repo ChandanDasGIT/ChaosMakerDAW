@@ -1,5 +1,7 @@
 #include "common/trackEffectsPanel/instruments/drums/drumkitlibrary.h"
 
+#include "common/instruments/samplekits.h"
+
 #include "common/trackEffectsPanel/instruments/drums/drummap.h"
 #include "common/instruments/sampler/sampler.h"
 
@@ -16,18 +18,8 @@ namespace fs = std::filesystem;
 
 std::string findKitFolder()
 {
-    if (const char* env = std::getenv("CHAOSMAKER_SAMPLE_KITS"); env && *env)
-        return (fs::path(env) / KitFolderName).string();
-    std::error_code error;
-    const fs::path exe = fs::read_symlink("/proc/self/exe", error);
-    if (error) return {};
-    fs::path dir = exe.parent_path();
-    for (int up = 0; up < 4 && !dir.empty(); ++up) {
-        if (fs::is_directory(dir / "resources/sample-kits", error)) return (dir / "resources/sample-kits" / KitFolderName).string();
-        if (dir == dir.root_path()) break;
-        dir = dir.parent_path();
-    }
-    return {};
+    const auto kits = samplekits::folder();
+    return kits.empty() ? std::string() : (fs::path(kits) / KitFolderName).string();
 }
 
 namespace {
@@ -192,7 +184,7 @@ bool Library::loadKit()
         std::lock_guard lock(m_mutex);
         m_state = State::Missing;
         m_message = m_folder.empty()
-            ? "Drum kit not found: put Gogodze Phu Vol II in resources/sample-kits/" + std::string(KitFolderName)
+            ? "Drum kit not found: put Gogodze Phu Vol II in " + samplekits::userFolder() + "/" + std::string(KitFolderName)
             : "Drum kit not found at " + program.string();
         return false;
     }

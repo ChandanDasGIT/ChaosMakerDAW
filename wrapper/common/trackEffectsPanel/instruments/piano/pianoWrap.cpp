@@ -1,10 +1,10 @@
 #include "pianoWrap.h"
-#include "common/instruments/chords/chordsinstrument.h"
+#include "common/instruments/chordsinstrument.h"
 #include "common/trackEffectsPanel/instruments/piano/piano.h"
 #include "common/trackEffectsPanel/instruments/piano/pianolibrary.h"
 #include "common/midi/notenames.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 
 PianoWrap::PianoWrap(QObject* parent)
     : QObject(parent)

@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "transportBar/typingKey/typingkeyboard.h"
+#include "transportBar/typingkeyboard.h"
 
 #include <array>
 #include <string>

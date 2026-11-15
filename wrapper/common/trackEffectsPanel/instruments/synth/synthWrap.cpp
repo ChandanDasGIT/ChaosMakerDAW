@@ -1,6 +1,6 @@
 #include "synthWrap.h"
 #include "common/dsp/tempodivision.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 #include "common/trackEffectsPanel/instruments/synth/synthvaluetext.h"
 
 #include <QStandardPaths>

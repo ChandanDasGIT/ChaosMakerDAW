@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/instruments/testsynth/testsynth.h"
+#include "common/instruments/testsynth.h"
 
 #include <cmath>
 #include <vector>

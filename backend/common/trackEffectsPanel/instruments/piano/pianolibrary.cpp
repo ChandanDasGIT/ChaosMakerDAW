@@ -1,5 +1,7 @@
 #include "common/trackEffectsPanel/instruments/piano/pianolibrary.h"
 
+#include "common/instruments/samplekits.h"
+
 #include "common/instruments/sampler/sampler.h"
 
 #include <algorithm>
@@ -12,18 +14,8 @@ namespace fs = std::filesystem;
 
 std::string findFolder()
 {
-    if (const char* env = std::getenv("CHAOSMAKER_SAMPLE_KITS"); env && *env)
-        return (fs::path(env) / FolderName).string();
-    std::error_code error;
-    const fs::path exe = fs::read_symlink("/proc/self/exe", error);
-    if (error) return {};
-    fs::path dir = exe.parent_path();
-    for (int up = 0; up < 4 && !dir.empty(); ++up) {
-        if (fs::is_directory(dir / "resources/sample-kits", error)) return (dir / "resources/sample-kits" / FolderName).string();
-        if (dir == dir.root_path()) break;
-        dir = dir.parent_path();
-    }
-    return {};
+    const auto kits = samplekits::folder();
+    return kits.empty() ? std::string() : (fs::path(kits) / FolderName).string();
 }
 
 std::vector<SampleZone> buildZones(const sfz::Document& map, const Settings& in,
@@ -116,7 +108,7 @@ bool Library::loadMap()
         std::lock_guard lock(m_mutex);
         m_state = State::Missing;
         m_message = m_folder.empty()
-            ? "Piano not found: put Splendid Grand Piano in resources/sample-kits/" + std::string(FolderName)
+            ? "Piano not found: put Splendid Grand Piano in " + samplekits::userFolder() + "/" + std::string(FolderName)
             : "Piano not found at " + program.string();
         return false;
     }

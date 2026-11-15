@@ -1,5 +1,5 @@
 #include "harmoniumWrap.h"
-#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/trackListModelWrap.h"
 
 #include <QVariantMap>
 

@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Chaos Maker
+GenericName=Digital Audio Workstation
+Comment=Record, arrange and mix music with instruments, MIDI and guitar effects
+Exec=appChaosMaker
+Icon=io.github.chandandasgit.ChaosMaker
+Terminal=false
+Categories=AudioVideo;Audio;Midi;Recorder;Sequencer;
+Keywords=daw;music;audio;midi;recording;mixer;piano roll;drums;guitar;
+StartupNotify=true
+StartupWMClass=appChaosMaker
+SingleMainWindow=true

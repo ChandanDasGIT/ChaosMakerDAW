@@ -1,10 +1,10 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackEffectsPanel/plugins/chaosEq/chaosEqWrap.h"
+#include "wrapper/common/trackEffectsPanel/plugins/chaosEqWrap.h"
 #include "wrapper/common/trackEffectsPanel/instruments/guitar/electric/electricWrap.h"
 #include "common/audiodevice/audiodevice.h"
 #include "common/recording/takerecorder.h"
-#include "common/instruments/testsynth/testsynth.h"
+#include "common/instruments/testsynth.h"
 #include <QCoreApplication>
 #include <QSettings>
 #include <QTemporaryDir>

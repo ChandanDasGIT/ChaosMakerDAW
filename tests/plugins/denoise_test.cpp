@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/plugins/denoise/denoise.h"
+#include "common/trackEffectsPanel/plugins/denoise.h"
 #include "common/trackEffectsPanel/plugins/mixFx/mixfxjson.h"
 
 #include <cmath>
