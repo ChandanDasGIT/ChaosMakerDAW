@@ -18,6 +18,8 @@
 #include "common/mixfxspec.h"
 #include "common/effects/effectstate.h"
 #include "common/session/cliptakes.h"
+#include "common/mixerpanel.h"
+#include "trackList/tracklayout.h"
 
 #include <cstdint>
 #include <array>
@@ -76,11 +78,11 @@ struct Track : EffectState {
     std::string inputPort;
     float volume = 1.0f;
     float pan = 0.0f; // -1 left .. 0 centre .. +1 right (panlaw::balance)
-    float stripWidth = 108.0f; // mixer strip width in px (mixer::defaultStripWidth, clamped by mixer::clampStripWidth)
-    // Timeline heights in px (restMap U9): the track's own row and its volume envelope lane
-    // (trackheight::defaultTrack / defaultEnvelope, clamped by trackheight::clampTrack / clampEnvelope).
-    float rowHeight = 64.0f;
-    float envelopeHeight = 64.0f;
+    float stripWidth = static_cast<float>(mixer::defaultStripWidth); // px, clamped by mixer::clampStripWidth
+    // Timeline heights in px: the track's own row and its volume envelope lane
+    // (clamped by trackheight::clampTrack / clampEnvelope).
+    float rowHeight = static_cast<float>(trackheight::defaultTrack);
+    float envelopeHeight = static_cast<float>(trackheight::defaultEnvelope);
     // Harmonium tracks: stops, bellows, drones... (the harmonium instrument).
     harmonium::Settings harmonium;
     // Drums tracks: room, part levels, tuning, character (the acoustic drum kit).

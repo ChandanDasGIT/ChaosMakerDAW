@@ -269,8 +269,6 @@ bool Project::setTrackPan(int id, float pan)
     return true;
 }
 
-static_assert(Track{}.stripWidth == mixer::defaultStripWidth, "Track strip width default must match the mixer");
-
 bool Project::setTrackStripWidth(int id, float width)
 {
     auto* track = findTrack(id);
@@ -279,9 +277,6 @@ bool Project::setTrackStripWidth(int id, float width)
     track->stripWidth = static_cast<float>(mixer::clampStripWidth(width));
     return true;
 }
-
-static_assert(Track{}.rowHeight == trackheight::defaultTrack, "Track row height default must match the timeline");
-static_assert(Track{}.envelopeHeight == trackheight::defaultEnvelope, "Track envelope height default must match the timeline");
 
 bool Project::setTrackRowHeight(int id, float height)
 {
