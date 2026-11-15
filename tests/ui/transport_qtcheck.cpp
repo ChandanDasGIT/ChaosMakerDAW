@@ -3501,11 +3501,12 @@ private slots:
         QTRY_VERIFY(!popup->property("visible").toBool());
         QCOMPARE(popup->property("addTrackStage").toString(), QString("kind"));
 
-        // The instrument list is longer than the popup: the wheel scrolls it to the last choice.
+        // The instrument list (guitars and drums grouped) fits the popup: every choice is in view,
+        // the scroll bar still shows, and the wheel leaves the last choice fully visible.
         click(add); QTest::qWait(20);
         instrument = visualItem(window->contentItem(), "trackChoice_Instrument"); QVERIFY(instrument); click(instrument); QTest::qWait(20);
         auto* choices = qobject_cast<QQuickItem*>(visualObject(window->contentItem(), "addTrackChoices")); QVERIFY(choices);
-        QVERIFY(choices->property("contentHeight").toDouble() > choices->height());
+        QVERIFY(choices->property("contentHeight").toDouble() <= choices->height());
         auto* scrollBar=visualItem(window->contentItem(),"addTrackScrollBar"); QVERIFY(scrollBar);
         QVERIFY(scrollBar->isVisible() && scrollBar->opacity()>0.99);                           // always shown
         const double barLeft=scrollBar->mapToItem(choices,QPointF(0,0)).x();
@@ -3520,13 +3521,23 @@ private slots:
             QTest::qWait(30);
         }
         QTRY_VERIFY(choices->property("atYEnd").toBool());
-        auto* bassChoice = visualItem(window->contentItem(), "trackChoice_Bass Guitar"); QVERIFY(bassChoice);
-        const QRectF bassInList = bassChoice->mapRectToItem(choices, QRectF(0, 0, bassChoice->width(), bassChoice->height()));
-        QVERIFY(bassInList.top() >= 0 && bassInList.bottom() <= choices->height());   // fully in view
+        auto* lastChoice = visualItem(window->contentItem(), "trackChoice_Synth"); QVERIFY(lastChoice);
+        const QRectF lastInList = lastChoice->mapRectToItem(choices, QRectF(0, 0, lastChoice->width(), lastChoice->height()));
+        QVERIFY(lastInList.top() >= 0 && lastInList.bottom() <= choices->height());   // fully in view
         QTRY_VERIFY(!choices->property("moving").toBool());                       // a press stops a glide
-        click(bassChoice);
+        click(lastChoice);
         QTRY_COMPARE(tracks.count(), 4);
-        QCOMPARE(tracks.project().tracks()[3]->type, std::string("Bass Guitar"));
+        QCOMPARE(tracks.project().tracks()[3]->type, std::string("Synth"));
+        QTRY_VERIFY(!popup->property("visible").toBool());
+
+        // The bass guitar is a guitar: Guitar > Bass, not a choice of its own.
+        click(add); QTest::qWait(20);
+        instrument = visualItem(window->contentItem(), "trackChoice_Instrument"); QVERIFY(instrument); click(instrument); QTest::qWait(20);
+        QVERIFY(!visualItem(window->contentItem(), "trackChoice_Bass Guitar"));
+        guitar = visualItem(window->contentItem(), "trackChoice_group:Guitar"); QVERIFY(guitar); click(guitar); QTest::qWait(20);
+        auto* bass = visualItem(window->contentItem(), "trackChoice_Bass Guitar"); QVERIFY(bass); click(bass);
+        QTRY_COMPARE(tracks.count(), 5);
+        QCOMPARE(tracks.project().tracks()[4]->type, std::string("Bass Guitar"));
         QTRY_VERIFY(!popup->property("visible").toBool());
     }
     void track_names_edit_inline_commit_cancel_and_update_mixer_and_fx() {

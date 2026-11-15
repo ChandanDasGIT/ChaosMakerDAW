@@ -56,7 +56,7 @@ TEST(instrumentcatalog, instruments_with_controls_name_their_fx_page)
     CHECK(instrumentcatalog::find("Synth")->page == "synth");
     CHECK(!instrumentcatalog::find("Synth")->ownKind && instrumentcatalog::find("Synth")->group.empty());
     CHECK(instrumentcatalog::find("Bass Guitar")->page == "bassguitar");
-    CHECK(!instrumentcatalog::find("Bass Guitar")->ownKind && instrumentcatalog::find("Bass Guitar")->group.empty());
+    CHECK(!instrumentcatalog::find("Bass Guitar")->ownKind && instrumentcatalog::find("Bass Guitar")->group == "Guitar");
     CHECK(instrumentcatalog::find("Piano")->page == "piano");
     CHECK(instrumentcatalog::find("Strings")->page.empty());
     // The Chords track: its strips, then the grand piano it plays through; listed on its own.
@@ -88,6 +88,7 @@ TEST(instrumentcatalog, guitars_and_drums_are_grouped_by_kind)
     };
     CHECK(kind("Acoustic Guitar") == (std::pair<std::string_view, std::string_view>{"Guitar", "Acoustic"}));
     CHECK(kind("Electric Guitar") == (std::pair<std::string_view, std::string_view>{"Guitar", "Electric"}));
+    CHECK(kind("Bass Guitar") == (std::pair<std::string_view, std::string_view>{"Guitar", "Bass"}));
     CHECK(kind("Drums") == (std::pair<std::string_view, std::string_view>{"Drums", "Acoustic"}));
     CHECK(kind("Electronic Drums") == (std::pair<std::string_view, std::string_view>{"Drums", "Electronic"}));
     for (const char* id : {"Piano", "Strings", "Harmonium"})

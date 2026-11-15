@@ -386,7 +386,7 @@ ChaosMaker/
 │   │   │       │   ├── tuner.h/.cpp                            // tuner pedal: detects pitch, leaves the sound alone
 │   │   │       │   ├── tunerstate.h/.cpp                       // tuner reading: note, cents, freshness
 │   │   │       │   └── tunertext.h/.cpp                        // tuner texts
-│   │   │       ├── guitardefinition.h/.cpp                     // the guitar instrument variants
+│   │   │       ├── guitardefinition.h/.cpp                     // the Acoustic and Electric Guitar entries (both play through GuitarSuite)
 │   │   │       ├── guitarsuite.h/.cpp                          // realtime pedal chain container
 │   │   │       ├── guitarsuiteeditor.h/.cpp                    // chain editing: add, remove, move, bypass, parameters, input trim
 │   │   │       ├── guitarsuitepreset.h/.cpp                    // preset files: parse, write, build slots
