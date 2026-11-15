@@ -146,10 +146,16 @@ licenses="$appdir/licenses"
 rm -rf "$licenses"
 mkdir -p "$licenses"
 cp "$project/LICENSE" "$licenses/ChaosMaker-GPL-3.0.txt"
+# The system's own package manager (Ubuntu can have rpm installed too, with an empty database)
+pm=""
+if [ -s /var/lib/dpkg/status ] && command -v dpkg >/dev/null 2>&1; then pm=dpkg
+elif command -v rpm >/dev/null 2>&1; then pm=rpm
+fi
 owner() { # <file> -> its package, or nothing
-    if command -v rpm >/dev/null 2>&1; then
-        rpm -qf --qf '%{NAME}\n' "$1" 2>/dev/null | head -1 || true
-    elif command -v dpkg >/dev/null 2>&1; then
+    if [ "$pm" = rpm ]; then
+        local name
+        if name="$(rpm -qf --qf '%{NAME}\n' "$1" 2>/dev/null)"; then printf '%s\n' "${name%%$'\n'*}"; fi
+    elif [ "$pm" = dpkg ]; then
         # dpkg knows a file by the path its package installed it to: on merged-/usr systems
         # that is often /lib/... while the file resolves to /usr/lib/...
         local path pkg
@@ -164,7 +170,7 @@ copyLicence() { # <package>: its licence files into licenses/<package>/
     local pkg="$1" dest="$licenses/$1" f
     [ -d "$dest" ] && return 0
     mkdir -p "$dest"
-    if command -v rpm >/dev/null 2>&1; then
+    if [ "$pm" = rpm ]; then
         while IFS= read -r f; do [ -f "$f" ] && cp "$f" "$dest/"; done < <(rpm -qL "$pkg" 2>/dev/null)
         if [ -z "$(ls -A "$dest")" ]; then
             # A sub-package (qt6-qtbase-gui): the licence ships with a package of the same source
@@ -179,7 +185,7 @@ copyLicence() { # <package>: its licence files into licenses/<package>/
             while IFS= read -r f; do [ -f "$f" ] && cp "$f" "$dest/"; done \
                 < <(rpm -qd "$pkg" 2>/dev/null | grep -i -E '/(copying|license|licence|copyright)[^/]*$')
         fi
-    elif [ -f "/usr/share/doc/$pkg/copyright" ]; then
+    elif [ "$pm" = dpkg ] && [ -f "/usr/share/doc/$pkg/copyright" ]; then
         cp "/usr/share/doc/$pkg/copyright" "$dest/"
     fi
     # Packages that ship no licence file at all: the text kept in packaging/linux/licenses/
