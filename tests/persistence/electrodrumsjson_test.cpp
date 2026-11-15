@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/instruments/electrodrums/electrodrumsjson.h"
+#include "instruments/drums/electronic/electrodrumsjson.h"
 #include "common/persistence/projectdocument.h"
 
 #include <functional>

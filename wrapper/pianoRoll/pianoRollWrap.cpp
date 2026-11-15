@@ -4,7 +4,7 @@
 #include <cmath>
 
 #include "common/core/valueformat.h"
-#include "common/instruments/instrumentcatalog.h"
+#include "instruments/common/instrumentcatalog.h"
 #include "common/transport/tempomap.h"
 #include "pianoRoll/notedrag.h"
 

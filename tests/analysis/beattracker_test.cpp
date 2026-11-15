@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "common/analysis/beattracker.h"
-#include "common/analysis/hpss.h"
-#include "common/analysis/onsets.h"
-#include "common/analysis/spectrogram.h"
+#include "topBar/toolsMenu/common/beattracker.h"
+#include "topBar/toolsMenu/common/hpss.h"
+#include "topBar/toolsMenu/common/onsets.h"
+#include "topBar/toolsMenu/common/spectrogram.h"
 #include "drumrender.h"
 
 #include <cmath>

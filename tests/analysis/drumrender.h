@@ -3,12 +3,12 @@
 // kits, alone or in a "song" with the Synth's chords and the Bass Guitar's line, so a test
 // knows exactly where every hit is.
 
-#include "common/trackEffectsPanel/instruments/guitar/bass/bassguitar.h"
-#include "common/trackEffectsPanel/instruments/drums/drumkit.h"
-#include "common/trackEffectsPanel/instruments/drums/drumkitlibrary.h"
-#include "common/trackEffectsPanel/instruments/electrodrums/electrodrums.h"
-#include "common/trackEffectsPanel/instruments/synth/synth.h"
-#include "common/trackEffectsPanel/instruments/synth/synthpresets.h"
+#include "instruments/guitar/bass/bassguitar.h"
+#include "instruments/drums/acoustic/drumkit.h"
+#include "instruments/drums/acoustic/drumkitlibrary.h"
+#include "instruments/drums/electronic/electrodrums.h"
+#include "instruments/synth/synth.h"
+#include "instruments/synth/synthpresets.h"
 #include "common/processor/processor.h"
 
 #include <algorithm>

@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "common/instruments/sampler/sampler.h"
-#include "common/instruments/sfz/sfzloader.h"
+#include "instruments/common/sampler/sampler.h"
+#include "instruments/common/sfz/sfzloader.h"
 
 #include <cstdint>
 #include <cstdio>

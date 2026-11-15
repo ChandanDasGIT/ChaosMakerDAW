@@ -1,10 +1,10 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackEffectsPanel/instruments/synth/synthWrap.h"
+#include "wrapper/instruments/synth/synthWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
-#include "common/trackEffectsPanel/instruments/synth/synth.h"
-#include "common/trackEffectsPanel/instruments/synth/synthpresets.h"
+#include "instruments/synth/synth.h"
+#include "instruments/synth/synthpresets.h"
 
 #include <QCoreApplication>
 #include <QDir>

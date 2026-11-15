@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "analysis/drumrender.h"
-#include "common/groovePanel/groovestore.h"
+#include "instruments/drums/groovePanel/groovestore.h"
 #include "wrapper/topBar/toolsMenu/drumAnalyzerWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
 

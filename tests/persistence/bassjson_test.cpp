@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/instruments/guitar/bass/bassjson.h"
+#include "instruments/guitar/bass/bassjson.h"
 #include "common/persistence/effectchainjson.h"
 #include "common/persistence/projectdocument.h"
-#include "common/effects/effectchain.h"
+#include "common/trackEffectsPanel/effectchain.h"
 #include "common/session/tracklist.h"
 
 #include <functional>

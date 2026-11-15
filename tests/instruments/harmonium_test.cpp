@@ -1,10 +1,10 @@
 #include "testkit.h"
 #include "common/dsp/fft.h"
 #include "common/engine/snapshotbuilder.h"
-#include "common/trackEffectsPanel/instruments/harmonium/harmonium.h"
-#include "common/instruments/instrumentfactory.h"
+#include "instruments/harmonium/harmonium.h"
+#include "instruments/common/instrumentfactory.h"
 #include "common/session/project.h"
-#include "common/trackEffectsPanel/instruments/harmonium/reedwave.h"
+#include "instruments/harmonium/reedwave.h"
 
 #include <algorithm>
 #include <cmath>

@@ -1,5 +1,5 @@
 #include "trackeffectspanel.h"
-#include "common/effects/effectchain.h"
+#include "common/trackEffectsPanel/effectchain.h"
 
 #include <algorithm>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/mixfxspec.h"
+#include "common/trackEffectsPanel/plugins/mixFx/mixfxspec.h"
 
 #include <nlohmann/json.hpp>
 

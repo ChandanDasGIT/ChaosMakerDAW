@@ -19,9 +19,9 @@
 // silent parts. Use it to compare renders with a reference recording.
 
 #include "common/dsp/fft.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/impulsewav.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/cabinet.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedalregistry.h"
+#include "instruments/guitar/electric/impulsewav.h"
+#include "instruments/guitar/electric/pedals/cabinet.h"
+#include "instruments/guitar/electric/pedalregistry.h"
 #include "common/trackEffectsPanel/plugins/mixFx/mixfxfactory.h"
 #include "common/processor/processor.h"
 

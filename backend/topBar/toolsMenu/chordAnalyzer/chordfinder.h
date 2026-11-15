@@ -1,10 +1,10 @@
 #pragma once
 
-#include "common/analysis/beattracker.h"
+#include "topBar/toolsMenu/common/beattracker.h"
 #include "topBar/toolsMenu/chordAnalyzer/chromagram.h"
-#include "common/analysis/meterdetect.h"
-#include "common/analysis/progress.h"
-#include "common/chordPlayer/chordsymbol.h"
+#include "topBar/toolsMenu/common/meterdetect.h"
+#include "topBar/toolsMenu/common/progress.h"
+#include "instruments/chords/chordsymbol.h"
 
 #include <optional>
 #include <string>

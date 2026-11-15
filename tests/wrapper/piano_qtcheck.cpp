@@ -1,9 +1,9 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackEffectsPanel/instruments/piano/pianoWrap.h"
+#include "wrapper/instruments/piano/pianoWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
-#include "common/trackEffectsPanel/instruments/piano/piano.h"
+#include "instruments/piano/piano.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>

@@ -46,7 +46,7 @@ public:
 
     QString chordZoneMapping() const { return QString::fromStdString(m_settings.chordZoneMapping()); }
     void setChordZoneMapping(const QString& mapping);
-    // The stored choice, for wrappers that act on it at the moment (ChordPlayerWrap's presses).
+    // The stored choice, for wrappers that act on it at the moment (ChordsWrap's presses).
     static QString storedChordZoneMapping();
 
     QString defaultProjectDirectory() const;

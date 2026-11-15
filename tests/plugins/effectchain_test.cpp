@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/effects/effectchain.h"
+#include "common/trackEffectsPanel/effectchain.h"
 #include "common/session/project.h"
 
 #include <string>

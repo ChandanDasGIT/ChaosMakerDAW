@@ -1,9 +1,9 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackEffectsPanel/instruments/drums/drumsWrap.h"
+#include "wrapper/instruments/drums/acoustic/acousticWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
-#include "common/trackEffectsPanel/instruments/drums/drumkit.h"
+#include "instruments/drums/acoustic/drumkit.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -93,7 +93,7 @@ TEST(qtdrumkit, wrapper_edits_the_track_and_follows_other_panels)
     CHECK(tracks.drumKit(id) != nullptr);
     CHECK(tracks.drumKit(piano) == nullptr);
 
-    DrumsWrap a, b;
+    AcousticWrap a, b;
     a.setTrackModel(&tracks); a.setTrackId(id);
     b.setTrackModel(&tracks); b.setTrackId(id);
     CHECK(a.valid());
@@ -119,7 +119,7 @@ TEST(qtdrumkit, wrapper_edits_the_track_and_follows_other_panels)
     CHECK(*tracks.drumKit(id) == drumkit::Settings{});
     CHECK(a.rooms().size() == 3);
 
-    DrumsWrap other;                                        // not a Drums track
+    AcousticWrap other;                                        // not a Drums track
     other.setTrackModel(&tracks); other.setTrackId(piano);
     CHECK(!other.valid());
     other.setKick(-3.0);
@@ -139,7 +139,7 @@ TEST(qtdrumkit, drums_track_plays_the_kit_and_edits_reach_it)
     if (!instrument || instrument->typeId() != "drumkit") return;
     const auto& kit = static_cast<const DrumKit&>(*instrument);
 
-    DrumsWrap page;
+    AcousticWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id);
     page.setRoom("close");
     page.setHihat(-4.0);
@@ -171,14 +171,14 @@ TEST(qtdrumkit, the_picture_plays_parts_and_sees_every_hit)
     const int id = tracks.addInstrumentTrackOfType("Drums");
     tick(); keyboard->play(2);
 
-    DrumsWrap page;
+    AcousticWrap page;
     CHECK(page.partKeys().value("kick").toInt() == 60 && page.partKeys().value("hihatOpen").toInt() == 70);
     CHECK(page.partKeys().size() == 13);
     CHECK(page.partName(62) == "Snare" && page.partName(73).isEmpty());
     page.setTrackModel(&tracks); page.setTrackId(id);
     QList<QPair<int, int>> hits, played;
-    QObject::connect(&page, &DrumsWrap::hit, &page, [&hits](int key, int velocity) { hits.append({key, velocity}); });
-    QObject::connect(&page, &DrumsWrap::played, &page, [&played](int key, int velocity) { played.append({key, velocity}); });
+    QObject::connect(&page, &AcousticWrap::hit, &page, [&hits](int key, int velocity) { hits.append({key, velocity}); });
+    QObject::connect(&page, &AcousticWrap::played, &page, [&played](int key, int velocity) { played.append({key, velocity}); });
 
     page.play(62, 90);                                           // no engine yet: nothing
     CHECK(played.isEmpty());

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/analysis/progress.h"
-#include "common/analysis/spectrogram.h"
+#include "topBar/toolsMenu/common/progress.h"
+#include "topBar/toolsMenu/common/spectrogram.h"
 
 #include <array>
 #include <vector>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/effects/effectstate.h"
+#include "common/trackEffectsPanel/effectstate.h"
 
 #include <nlohmann/json.hpp>
 

@@ -1,148 +1,716 @@
 This is the architecture of ChaosMaker
 
-The three layers: frontend/ (QML) talks to wrapper/ (Qt C++), and wrapper/ talks to backend/ (plain C++).
-Left out: build*/ (generated).
+The three tiers: frontend/ (QML) uses wrapper/ (Qt C++ classes registered for QML), and wrapper/
+uses backend/ (C++20 with no Qt includes). Folder paths follow the UI: for example topBar/appSettings/
+is in all three tiers, and every instrument has its own folder under instruments/ in all three.
+Each tier also has a common/ folder.
+Left out: build*/ (generated), 2bDel/ (working notes), .gitkeep placeholders.
 
 ChaosMaker/
-├── backend/                                // pure C++20 engine, no Qt: built as static library, dawengine
-│   ├── audiodevice/                        // sound card abstraction and device configuration
-│   │   ├── audiodevice.h                   // AudioDevice and AudioCallback
-│   │   ├── jackaudiodevice.h/.cpp          // JACK backend client and port negotiation
-│   │   └── devicesettings.h/.cpp           // pure C++ device enumeration, valid buffer sizes, port routing
-│   ├── core/                               // basic types and string formatting
-│   │   ├── audiodata.h                     // decoded immutable audio buffer
-│   │   ├── audioview.h                     // non-owning channel/frame audio view
-│   │   ├── valueformat.h/.cpp              // pure C++ numeric, unit and playback-position formatting
-│   │   ├── version.h/.cpp                  // engine version constant
-│   ├── dsp/                                // shared signal processing, scaling, and metering
-│   │   ├── levelscale.h/.cpp               // finite gain/dB conversions, normalization, and peak decay
-│   │   ├── levelmeter.h/.cpp               // pure C++ meter state, peak decay and threshold classifications
-│   │   ├── stereolevelmeter.h/.cpp         // pure C++ stereo meter state and reset logic
-│   │   ├── peakmeter.h                     // realtime atomic peak capture
-│   │   └── trackmeters.h                   // per-track meter state
-│   ├── engine/                             // realtime audio callback and transport
-│   │   ├── audioengine.h/.cpp              // AudioEngine: top-level realtime processor
-│   │   ├── enginecommands.h                // EngineCommand and EngineEvent
-│   │   ├── enginesnapshot.h                // flat read-only arrangement snapshot
-│   │   ├── playbackcontrols.h/.cpp         // pure C++ transport state machine, loop ranges, position conversions
-│   │   └── snapshotbuilder.h/.cpp          // off-thread EngineSnapshot compilation and routing
-│   ├── instruments/                        // instrument catalog and definitions
-│   │   ├── instrumentcatalog.h/.cpp        // registered instrument IDs, names, and capabilities
-│   │   └── guitar/                         // guitar domain backend
-│   │       ├── guitardefinition.h/.cpp     // guitar type names and live input/effect capabilities
-│   │       ├── guitarsuiteeditor.h/.cpp    // pedal chain manager, slots, bypass, and reordering
-│   │       ├── audiofile/impulsewav.h/.cpp // cabinet IR WAV decoding and resampling
-│   │       ├── dsp/                        // pedal controls, delay lines, oversamplers, FFT, pitch
-│   │       ├── plugins/                    // GuitarSuite container and pedal processors
-│   │       │   ├── guitarsuite/pedalregistry.h/.cpp // pure C++ pedal factory catalog
-│   │       │   └── tuner/tunerstate.h/.cpp // off-thread tuner state, freshness, and guidance
-│   │       └── presets/guitarsuitepreset.h/.cpp // pure C++ preset schema, JSON IO, and validation
-│   ├── mixer/                              // mixer backend
-│   │   └── mixerpanel.h/.cpp               // pure C++ track mixer calculations, volume, pan, and mute/solo
-│   ├── persistence/                        // document serialization
-│   │   └── projectdocument.h/.cpp          // pure C++ session JSON serialization, schema validation, atomic file IO
-│   ├── plugins/                            // track-level plugin systems
-│   │   ├── eq/
-│   │   │   ├── eqpresets.h                 // factory EQ gain curves
-│   │   │   ├── eqpresetstore.h/.cpp        // pure C++ preset IO, JSON parsing, validation
-│   │   │   └── tenbandeq.h/.cpp            // 10-band EQ filters, descriptors, and gain metadata
-│   │   └── trackeffectspanel.h/.cpp        // track effect eligibility, chain models, and slot management
-│   ├── processor/                          // plugin base interfaces
-│   │   ├── parameter.h                     // thread-safe atomic parameter
-│   │   ├── processor.h                     // Processor and ProcessContext
-│   │   ├── smoother.h                      // linear parameter ramp smoothing
-│   │   └── trackinput.h                    // live track input trim and live EQ stage
-│   ├── recording/                          // capture orchestration
-│   │   ├── recordingcontroller.h/.cpp      // take lifecycle, recording groups, dry/printed routing, take finalization
-│   │   ├── recordinggroup.h                // routing handoff to realtime engine
-│   │   └── takerecorder.h/.cpp             // background capture thread, circular buffers, WAV writer
-│   ├── rt/                                 // lock-free realtime primitives
-│   │   ├── rtaudioring.h                   // bounded realtime audio FIFO
-│   │   ├── rtqueue.h                       // single-producer / single-consumer ring buffer
-│   │   ├── rtsafe.h                        // RT_SAFE annotation and denormal flush guard
-│   │   └── snapshotslot.h                  // atomic snapshot publish and retirement
-│   ├── session/                            // document & session state
-│   │   ├── project.h/.cpp                  // Project, Track, AudioClip, and atomic undo history
-│   │   ├── projectsession.h/.cpp           // session ownership, dirty tracking, autosave policy, restore candidate
-│   │   ├── projectactions.h/.cpp           // action/dialog state machine (New, Open, Save, Save As, Close)
-│   │   └── tracklist.h/.cpp                // track collection, live monitoring routing, media management
-│   ├── settings/                           // application & quick settings
-│   │   ├── appsettings.h/.cpp              // startup preferences, autosave intervals, pure C++ INI storage
-│   │   └── quicksettings.h/.cpp            // buffer size choices, snap grid modes, formatted status strings
-│   ├── tempo/
-│   │   └── tempoeditor.h/.cpp              // tempo editing rules, boundaries, and typing validation
-│   ├── timeline/                           // arrangement calculations
-│   │   ├── timeline.h/.cpp                 // clip placement, snapping, multi-selection, trimming, move history
-│   │   └── clipwaveform.h/.cpp             // clip-to-source sample window validation and waveform peak caching
-│   └── transport/
-│       └── tempomap.h                      // beat-to-sample and sample-to-beat conversions
-├── wrapper/                                // Qt 6 C++: thin bridges connecting backend to QML (no domain logic)
-│   ├── audiodevice/devicesettingswrap/     // DeviceSettingsWrapper (device list, buffer sizes, routing)
-│   ├── dsp/
-│   │   ├── levelmeterwrap/                 // LevelMeterWrapper (meter snapshot polling and reset delivery)
-│   │   └── stereolevelmeterwrap/           // StereoLevelMeterWrapper (stereo channel meter adapter)
-│   ├── engine/
-│   │   ├── audioenginewrap/                // AudioEngineWrapper (mirrors AudioEngine, engine lifecycle)
-│   │   └── playbackcontrolswrap/           // PlaybackControlsWrapper (transport actions, position updates)
-│   ├── instruments/guitar/guitarsuiteeditorwrap/ // GuitarSuiteEditorWrapper (pedalboard model, preset adapter)
-│   ├── mixer/mixerpanelwrap/               // MixerPanelWrapper (volume/pan/fader property adaptation)
-│   ├── plugins/
-│   │   ├── eq/tenbandeqwrap/               // TenBandEqWrapper (10-band EQ property adaptation)
-│   │   └── trackeffectspanelwrap/          // TrackEffectsPanelWrapper (track FX slot adaptation)
-│   ├── recording/recordingcontrollerwrap/  // RecordingControllerWrapper (take notifications and state bridge)
-│   ├── session/
-│   │   ├── projectactionswrap/             // ProjectActionsWrapper (native dialog state machine bridge)
-│   │   ├── projectsessionwrap/             // ProjectSessionWrapper (document dirty/path signals)
-│   │   └── tracklistwrap/                  // TrackListWrapper (QAbstractListModel adapter for tracks)
-│   ├── settings/
-│   │   ├── appsettingswrap/                // AppSettingsWrapper (QSettings platform bridge)
-│   │   └── quicksettingswrap/              // QuickSettingsWrapper (time signature, snap grid bridge)
-│   ├── tempo/tempoeditorwrap/              // TempoEditorWrapper (tempo input adapter)
-│   └── timeline/timelinewrap/              // TimelineWrapper (selection, snap, and viewport adapter)
-├── frontend/                               // QML only: presentation, visual controls, styling, user interactions
-│   ├── audiodevice/DeviceSettings.qml      // buffer size and audio device selection UI
-│   ├── dsp/
-│   │   ├── LevelMeter.qml                  // single-channel level meter display
-│   │   └── StereoLevelMeter.qml            // stereo dual-channel level meter
-│   ├── engine/PlaybackControls.qml         // transport buttons (play, stop, record, repeat) and time display
-│   ├── instruments/guitar/
-│   │   ├── GuitarSuiteEditor.qml           // pedalboard editor, pedal slots, controls, presets
-│   │   └── GuitarSuitePanel.qml            // pedalboard container panel
-│   ├── mixer/MixerPanel.qml                // track channel strips, volume faders, pan sliders, meters
-│   ├── pianoroll/
-│   │   ├── PianoKeys.qml                   // vertical interactive piano keyboard (MIDI notes 0-127)
-│   │   ├── PianoRollView.qml               // piano roll editor: toolbar, ruler, note grid, demonstrative notes
-│   │   └── VelocityLane.qml                // collapsible bottom note velocity lane
-│   ├── plugins/
-│   │   ├── eq/Tenbandeq.qml                // 10-band graphic equalizer sliders and preset manager
-│   │   └── TrackEffectsPanel.qml           // track FX slot list and selector
-│   ├── session/
-│   │   ├── ProjectActions.qml              // New/Open/Save/Save As actions and confirmation dialogs
-│   │   └── TrackList.qml                   // track header cards, arm/mute/solo buttons, color picker
-│   ├── settings/
-│   │   ├── AppSettings.qml                 // application preferences menu
-│   │   └── QuickSettings.qml               // quick transport settings popup (meter, snap, count-in)
-│   ├── tempo/TempoEditor.qml               // interactive tempo editor with input validation
-│   ├── timeline/Timeline.qml               // arrangement lanes, audio clips, waveform display, playhead
-│   ├── transportbar/TransportBar.qml       // bottom transport bar composing PlaybackControls & QuickSettings
-│   ├── window/
-│   │   ├── StatusStrip.qml                 // bottom status notification bar
-│   │   └── TopBar.qml                      // top bar composing ProjectActions, AppSettings, DeviceSettings
-│   ├── Icons.qml                           // vector icon repository singleton
-│   └── Theme.qml                           // visual design system singleton (colors, paddings, fonts)
-└── tests/                                  // unit and integration tests
-    ├── audiodevice/                        // devicesettings tests
-    ├── core/                               // valueformat tests
-    ├── dsp/                                // levelscale and levelmeter tests
-    ├── engine/                             // playbackcontrols, snapshotbuilder tests
-    ├── instruments/                        // catalog, tuner, and guitar pedal tests
-    ├── mixer/                              // mixerpanel tests
-    ├── persistence/                        // projectdocument serialization tests
-    ├── plugins/                            // tenbandeq, eqpresetstore, trackeffectspanel tests
-    ├── recording/                          // recordingcontroller tests
-    ├── session/                            // project, tracklist, projectsession, projectactions tests
-    ├── settings/                           // quicksettings and appsettings tests
-    ├── tempo/                              // tempoeditor tests
-    ├── timeline/                           // timeline and clipwaveform tests
-    ├── ui/                                 // end-to-end UI interaction tests
-    └── wrapper/                            // focused Qt wrapper integration tests
+├── frontend/                                                   // QML: the views
+│   ├── common/                                                 // common QML parts
+│   │   ├── themed/                                             // Qt Quick controls redrawn in the app's colours
+│   │   │   ├── ThemedCheckBox.qml                              // tick box: dark box, accent tick when on
+│   │   │   ├── ThemedComboBox.qml                              // drop-down box with a themed face, arrow and list
+│   │   │   ├── ThemedDialog.qml                                // dialog on the dark panel with PanelButton-style buttons
+│   │   │   ├── ThemedMenu.qml                                  // menu in the panel frame
+│   │   │   ├── ThemedMenuButton.qml                            // button that opens a menu, styled like ThemedComboBox
+│   │   │   ├── ThemedMenuItem.qml                              // menu entry: label, shortcut text, tick column, submenu arrow
+│   │   │   ├── ThemedMenuSeparator.qml                         // thin divider between menu groups
+│   │   │   ├── ThemedRadioButton.qml                           // radio button: dark ring, accent dot when chosen
+│   │   │   ├── ThemedSlider.qml                                // slider: filled track, handle grows under the mouse
+│   │   │   └── ThemedSwitch.qml                                // on / off switch with optional label
+│   │   ├── trackEffectsPanel/                                  // a track's FX window and the effect pages
+│   │   │   ├── plugins/                                        // insert effects' pages
+│   │   │   │   ├── ChaosEqEditor.qml                           // Chaos EQ: draggable band curve over the live spectrum, band controls
+│   │   │   │   ├── MixEffectEditor.qml                         // one page for compressor, de-esser, reverb, Chaos Verb, delay, limiter, saturation, gate
+│   │   │   │   ├── NoiseReductionEditor.qml                    // learned noise curve, live in / out spectrum, controls, Learn
+│   │   │   │   ├── PitchMonitorEditor.qml                      // recorded pitch over the song on note lanes, by bars
+│   │   │   │   └── Tenbandeq.qml                               // 10-band EQ page: band sliders, reset, factory presets, save / load custom
+│   │   │   └── TrackEffectsPanel.qml                           // floating FX window: the track's effect list and the chosen page
+│   │   ├── CloseButton.qml                                     // the cross that closes a panel or removes something
+│   │   ├── FilePicker.qml                                      // the app's own file chooser, inside the main window
+│   │   ├── HardwareSlider.qml                                  // slider drawn like a mixing desk fader
+│   │   ├── NameDialog.qml                                      // names a preset or groove: save new, rename, replace
+│   │   ├── PanelButton.qml                                     // plain text button inside panels
+│   │   ├── ToggleChip.qml                                      // small chip button: M / S / IN / MON / REC / FX, CLICK / COUNT
+│   │   └── ToolWindow.qml                                      // a Tools-menu tool as its own floating window
+│   ├── icons/                                                  // every icon of the app
+│   │   ├── Icons.qml                                           // singleton: icon code points by name
+│   │   ├── MagnetIcon.qml                                      // horseshoe magnet line drawing (snap to grid)
+│   │   └── MetronomeIcon.qml                                   // metronome line drawing
+│   ├── instruments/                                            // every instrument, one folder each
+│   │   ├── chords/                                             // Chords track
+│   │   │   ├── ChordsEditor.qml                                // autoplay, key, ready-made progressions, then the strips
+│   │   │   └── ChordStrips.qml                                 // the eight chord strips: name, chord picker, play zones
+│   │   ├── drums/                                              // drums: grooves for both kits
+│   │   │   ├── acoustic/                                       // acoustic drum kit
+│   │   │   │   ├── DrumKitEditor.qml                           // kit page: drawn kit, room, part levels, tuning, character controls, grooves
+│   │   │   │   └── DrumKitPicture.qml                          // the kit drawn from the front; click a piece to play it
+│   │   │   ├── electronic/                                     // electronic drum kit
+│   │   │   │   ├── ElectroDrumsEditor.qml                      // kit page: drawn drum machine, picked drum's tune / decay / level, kit volume, grooves
+│   │   │   │   └── ElectroDrumsPicture.qml                     // drum machine seen from above: display, style buttons, knob, 16 pads
+│   │   │   └── GroovePanel.qml                                 // "Grooves" section of both drum pages: pick, bars, add to track
+│   │   ├── guitar/                                             // guitar types: electric, bass
+│   │   │   ├── bass/                                           // bass guitar
+│   │   │   │   └── BassEditor.qml                              // bass page: presets, style, strings, pickups, tone, playing
+│   │   │   └── electric/                                       // electric guitar (GuitarSuite pedalboard)
+│   │   │       ├── GuitarSuiteEditor.qml                       // pedalboard: presets, input trim, level meters, add pedal, pedal cards, chain bar
+│   │   │       ├── LevelMeter.qml                              // one labelled level meter with its dB reading
+│   │   │       ├── SignalChainBar.qml                          // IN, a chip per pedal, OUT; click to show, drag to reorder
+│   │   │       └── Tuner.qml                                   // tuner pedal display: string choice, note, needle, cents
+│   │   ├── harmonium/                                          // harmonium
+│   │   │   └── HarmoniumEditor.qml                             // harmonium page: style, stops, bellows, tone, scale changer, drones
+│   │   ├── piano/                                              // grand piano
+│   │   │   ├── PianoEditor.qml                                 // piano page: drawn piano, tone, pedal and level settings, scale changer
+│   │   │   └── PianoPicture.qml                                // grand piano from above: 88 keys, strings, sustain pedal
+│   │   └── synth/                                              // subtractive synth
+│   │       └── SynthEditor.qml                                 // synth page: presets, oscillators, filter, envelopes, LFO
+│   ├── mixerPanel/                                             // the mixer
+│   │   ├── MixerPanel.qml                                      // master strip pinned left, then track strips: volume, pan, clip gain, M / S, meters
+│   │   └── StereoLevelMeter.qml                                // stereo meter bar; a click clears its clip indicators
+│   ├── pianoRoll/                                              // the piano roll
+│   │   ├── PianoKeys.qml                                       // vertical keys for MIDI 0-127 with note names, or drum part names
+│   │   ├── PianoRollComboBox.qml                               // the piano roll's compact blue-grey drop-down
+│   │   ├── PianoRollView.qml                                   // title bar, toolbar, ruler, note grid, keys, velocity lane, zoom buttons
+│   │   └── VelocityLane.qml                                    // velocity stalks under the notes; drag to edit; resizable
+│   ├── theme/                                                  // every colour and size of the app
+│   │   ├── ChaosEqColors.qml                                   // Chaos EQ display colours (Theme.chaosEq)
+│   │   ├── EffectsColors.qml                                   // FX panel colours (Theme.effects)
+│   │   ├── GuitarSuiteColors.qml                               // pedalboard colours (Theme.guitarSuite)
+│   │   ├── MixerColors.qml                                     // mixer colours (Theme.mixer)
+│   │   ├── PianoRollColors.qml                                 // piano roll's cooler blue-grey palette (Theme.pianoRoll)
+│   │   ├── Theme.qml                                           // singleton: shared colours and sizes, area palettes as sub-objects
+│   │   ├── TimelineColors.qml                                  // timeline colours (Theme.timeline)
+│   │   ├── TrackListColors.qml                                 // track list colours (Theme.trackList)
+│   │   └── TransportColors.qml                                 // transport bar colours (Theme.transport)
+│   ├── timeline/                                               // the arrangement
+│   │   ├── Timeline.qml                                        // ruler, lanes, clips, fades, takes, clip effects, envelopes, drops, clip edits
+│   │   └── VolumeEnvelopeLane.qml                              // a track's volume envelope: line, area, draggable points
+│   ├── topBar/                                                 // the bar along the top
+│   │   ├── appSettings/                                        // Preferences
+│   │   │   ├── AppSettings.qml                                 // Preferences: devices, recording, latency, chords, timeline, piano roll, shortcuts
+│   │   │   ├── DeviceSettings.qml                              // audio and MIDI device pickers
+│   │   │   └── ShortcutEditor.qml                              // keyboard shortcuts editor
+│   │   ├── editMenu/                                           // Edit menu
+│   │   │   ├── EditHistoryWindow.qml                           // undo history list; click a row to undo / redo up to it
+│   │   │   └── EditMenu.qml                                    // undo / redo, history, clip edits
+│   │   ├── projectActions/                                     // File menu
+│   │   │   ├── ImportExport.qml                                // audio import (menu and file drops) and the export request
+│   │   │   ├── ProjectActions.qml                              // File menu: new, open, recent, save, import, export, dialogs
+│   │   │   └── RecentProjects.qml                              // File > Open Recent submenu
+│   │   ├── toolsMenu/                                          // Tools menu and its tool windows
+│   │   │   ├── ChordAnalyzerDialog.qml                         // chord analyzer: key and chords of a clip, onto a Chords track
+│   │   │   ├── DrumAnalyzerDialog.qml                          // drum pattern analyzer: BPM, meter, kick / snare / hi-hat hits
+│   │   │   ├── TapTempoDialog.qml                              // tap tempo window: tap pad, resulting BPM, undo
+│   │   │   └── ToolsMenu.qml                                   // Tools menu entries
+│   │   ├── DeviceLine.qml                                      // audio device readout at the far right; opens audio settings
+│   │   ├── PanelTabs.qml                                       // Mixer / Piano Roll tabs for the bottom panel
+│   │   ├── TopBar.qml                                          // File / Edit / View / Tools menus, Preferences, panel tabs, device line
+│   │   └── ViewMenu.qml                                        // View menu: which panels are on screen
+│   ├── transportBar/                                           // the bar along the bottom
+│   │   ├── MeterEditor.qml                                     // time signature field (numerator / denominator)
+│   │   ├── PlaybackControls.qml                                // go to start, skip, record, play, pause, stop, repeat, punch; time and bars.beats
+│   │   ├── QuickSettings.qml                                   // Metronome & Snap popup: click and volume, count-in, snap grid, ripple
+│   │   ├── TempoEditor.qml                                     // BPM field with -1 / +1 buttons and tap
+│   │   ├── TransportBar.qml                                    // playback controls, on-screen piano, BPM, time signature, quick settings, KEYS
+│   │   ├── TypingKey.qml                                       // KEYS switch: computer keyboard plays instruments
+│   │   └── VirtualKeyboard.qml                                 // floating on-screen piano (virtual MIDI) for every instrument
+│   ├── ExportDialog.qml                                        // export: range, format, tail, normalise, file, progress
+│   ├── StatusStrip.qml                                         // bottom status line: engine message, sample rate, buffer, xruns
+│   └── TrackList.qml                                           // track cards: name, colour, M / S / IN / MON / REC / FX, volume; volume lane headers; drops
+├── wrapper/                                                    // Qt C++: classes that expose the backend to QML
+│   ├── common/                                                 // common bridges
+│   │   ├── engine/                                             // the engine in QML
+│   │   │   ├── audioEngineWrap.h/.cpp                          // base of EngineController: engine start / stop, device connections, buffer size, monitor levels
+│   │   │   └── engineController.h/.cpp                         // EngineController singleton: transport, recording, metronome, project, devices, MIDI, effects
+│   │   ├── trackEffectsPanel/                                  // the FX window and the effect pages
+│   │   │   ├── plugins/                                        // insert effects' pages
+│   │   │   │   ├── chaosEqWrap.h/.cpp                          // Chaos EQ bands, display curves, live spectrum
+│   │   │   │   ├── denoiseWrap.h/.cpp                          // Noise Reduction: learned noise curve, before / after spectra, learn / forget
+│   │   │   │   ├── mixEffectWrap.h/.cpp                        // one mixing plugin's cards, values and gain-reduction meter
+│   │   │   │   ├── pitchMonitorWrap.h/.cpp                     // Pitch Monitor: recorded pitch line, live pitch, readout
+│   │   │   │   └── tenbandeqWrap.h/.cpp                        // 10-band EQ band list, preset names, gain limits and text
+│   │   │   └── trackEffectsPanelWrap.h/.cpp                    // the track's chain, which pages its type has, which effect is shown
+│   │   ├── filePickerWrap.h/.cpp                               // Files singleton: folders and paths for FilePicker.qml
+│   │   ├── keyboardPlayWrap.h/.cpp                             // notes from an on-screen keyboard
+│   │   ├── nameDialogWrap.h/.cpp                               // the name dialog's rules
+│   │   ├── shortcutsWrap.h/.cpp                                // Shortcuts singleton: every action's key and text
+│   │   ├── trackListModelWrap.h/.cpp                           // tracks as a list model, undo history, master track, row layout
+│   │   └── valueFormatWrap.h/.cpp                              // value and note texts shown the same everywhere
+│   ├── instruments/                                            // every instrument, one folder each
+│   │   ├── chords/                                             // Chords track
+│   │   │   └── chordsWrap.h/.cpp                               // strips' chords, autoplay, key, progressions; plays the strips
+│   │   ├── drums/                                              // drums: grooves for both kits
+│   │   │   ├── acoustic/                                       // acoustic drum kit
+│   │   │   │   └── acousticWrap.h/.cpp                         // one Drums track's kit controls; plays parts, reports hits and loading state
+│   │   │   ├── electronic/                                     // electronic drum kit
+│   │   │   │   └── electronicWrap.h/.cpp                       // one Electronic Drums track's drum knobs and keys; plays pads, reports hits
+│   │   │   └── groovePanelWrap.h/.cpp                          // drum grooves: lists them, adds one to the track, saves a clip as one
+│   │   ├── guitar/                                             // guitar types: electric, bass
+│   │   │   ├── bass/                                           // bass guitar
+│   │   │   │   └── bassWrap.h/.cpp                             // one Bass Guitar track's controls by key, and its presets
+│   │   │   └── electric/                                       // electric guitar (GuitarSuite pedalboard)
+│   │   │       ├── electricWrap.h/.cpp                         // pedalboard: add / remove / move pedals, parameters, bypass, presets, cabinet IR
+│   │   │       ├── levelMeterWrap.h/.cpp                       // one level meter: dB, bar height, text, clip state; reset
+│   │   │       └── tunerWrap.h/.cpp                            // tuner reading and its texts
+│   │   ├── harmonium/                                          // harmonium
+│   │   │   └── harmoniumWrap.h/.cpp                            // one Harmonium track's controls, stops and drones
+│   │   ├── piano/                                              // grand piano
+│   │   │   └── pianoWrap.h/.cpp                                // one Piano track's controls; plays keys and pedal, follows keys down
+│   │   └── synth/                                              // subtractive synth
+│   │       └── synthWrap.h/.cpp                                // one Synth track's controls by key, and its presets
+│   ├── mixerPanel/                                             // the mixer
+│   │   ├── mixerPanelWrap.h/.cpp                               // strip volume, pan, mute / solo, width, clip gain, master
+│   │   └── stereoLevelMeterWrap.h/.cpp                         // stereo meter readings, texts, clip state, scale heights
+│   ├── pianoRoll/                                              // the piano roll
+│   │   ├── pianoRollNoteModel.h/.cpp                           // the notes as a list model, one row per note
+│   │   ├── pianoRollWrap.h/.cpp                                // note editing and selection bound to a clip
+│   │   └── velocityLaneWrap.h/.cpp                             // velocity drag rules
+│   ├── timeline/                                               // the arrangement
+│   │   └── timelineWrap.h/.cpp                                 // selection, clipboard, clip drags, fades, grid lines, magnets
+│   ├── topBar/                                                 // the top bar
+│   │   ├── appSettings/                                        // Preferences
+│   │   │   ├── appSettingsWrap.h/.cpp                          // preferences kept in QSettings: record mode, chord zones, magnets, ripple, layout
+│   │   │   ├── deviceSettingsWrap.h/.cpp                       // output devices, buffer sizes, connection status
+│   │   │   └── shortcutEditorWrap.h/.cpp                       // waiting for a new key, what it collides with, assigning it
+│   │   ├── projectActions/                                     // File menu
+│   │   │   ├── importExportWrap.h/.cpp                         // audio import job on a worker thread
+│   │   │   ├── projectActionsWrap.h/.cpp                       // new / open / save / save as and the unsaved-changes prompt
+│   │   │   └── recentProjectsWrap.h/.cpp                       // Open Recent list, kept in the app settings
+│   │   ├── toolsMenu/                                          // Tools menu
+│   │   │   ├── chordAnalyzerWrap.h/.cpp                        // runs the chord analyzer with progress / cancel, fills a Chords track
+│   │   │   └── drumAnalyzerWrap.h/.cpp                         // runs the drum analyzer with progress / cancel, makes a clip or a groove
+│   │   └── deviceLineWrap.h/.cpp                               // the device line text and tooltip
+│   ├── transportBar/                                           // the transport bar
+│   │   ├── playbackControlsWrap.h/.cpp                         // transport actions, clock and bars.beats text
+│   │   ├── quickSettingsWrap.h/.cpp                            // buffer sizes, snap modes, audio status text
+│   │   ├── tempoEditorWrap.h/.cpp                              // BPM input to the backend tempo editor
+│   │   ├── typingKeyWrap.h/.cpp                                // KEYS: computer keyboard into the engine's MIDI input
+│   │   └── virtualKeyboardWrap.h/.cpp                          // on-screen piano notes into the engine's keyboard input
+│   ├── exportDialogWrap.h/.cpp                                 // export: start / cancel, progress, song length, default file
+│   └── statusStripWrap.h/.cpp                                  // status line message and readouts
+├── backend/                                                    // C++20, no Qt includes; every .cpp here builds the static library dawengine
+│   ├── common/                                                 // common logic
+│   │   ├── audiodevice/                                        // sound card
+│   │   │   ├── audiodevice.h                                   // AudioDevice and AudioCallback interfaces, device latency
+│   │   │   └── jackaudiodevice.h/.cpp                          // JACK device: ports, buffer size, latency, MIDI inputs
+│   │   ├── audiofile/                                          // audio file formats, all hand-written
+│   │   │   ├── flacreader.h/.cpp                               // FLAC decoder
+│   │   │   ├── md5.h/.cpp                                      // MD5, to check FLAC's decoded samples
+│   │   │   ├── mp3reader.h/.cpp                                // MP3 decoder (MPEG-1/2/2.5 Layer III)
+│   │   │   ├── mp3tables.h                                     // MP3 Huffman and scale factor tables
+│   │   │   ├── mp3writer.h/.cpp                                // MP3 encoder (MPEG-1 Layer III, CBR)
+│   │   │   ├── wavreader.h/.cpp                                // WAV reader: PCM / float, 1-8 channels
+│   │   │   └── wavwriter.h/.cpp                                // WAV writer: float32, int16, int24
+│   │   ├── core/                                               // basic types and text
+│   │   │   ├── audiodata.h                                     // decoded immutable audio, any thread may read
+│   │   │   ├── audioview.h                                     // non-owning audio view, safe on the audio thread
+│   │   │   ├── valueformat.h/.cpp                              // numbers, units and positions as text
+│   │   │   └── version.h/.cpp                                  // engine version
+│   │   ├── dsp/                                                // shared signal processing
+│   │   │   ├── biquad.h/.cpp                                   // one second-order filter section
+│   │   │   ├── eqbanddesign.h/.cpp                             // parametric EQ band maths: settings to biquads
+│   │   │   ├── fft.h/.cpp                                      // radix-2 FFT
+│   │   │   ├── oversampler2x.h                                 // 2x half-band oversampler around a nonlinearity
+│   │   │   ├── panlaw.h/.cpp                                   // pan position to left / right gains
+│   │   │   └── peakmeter.h                                     // realtime peak capture, latched clipping
+│   │   ├── engine/                                             // the realtime engine
+│   │   │   ├── audioengine.h/.cpp                              // AudioEngine: the audio callback, commands, snapshots, levels, MIDI input
+│   │   │   ├── enginecommands.h                                // UI-to-audio commands and audio-to-UI events
+│   │   │   ├── enginesnapshot.h                                // flat read-only arrangement the audio thread plays
+│   │   │   ├── enginestatus.h/.cpp                             // device readouts as text
+│   │   │   ├── snapshotbuilder.h/.cpp                          // builds the snapshot and routing from the project
+│   │   │   └── trackmeters.h                                   // per-track peak meters shared by audio and UI
+│   │   ├── midi/                                               // notes and keys
+│   │   │   ├── keyboardplay.h/.cpp                             // notes from an on-screen keyboard
+│   │   │   ├── midievent.h                                     // fixed-size MIDI event and buffer
+│   │   │   ├── midinote.h                                      // one note of a pattern clip
+│   │   │   └── notenames.h/.cpp                                // MIDI note names (60 = C4)
+│   │   ├── persistence/                                        // files on disk
+│   │   │   ├── effectchainjson.h/.cpp                          // FX chain file (.chaosfx): capture, read, import plan
+│   │   │   ├── effectstatejson.h/.cpp                          // master / clip effects in a project file
+│   │   │   ├── mediacollect.h/.cpp                             // keeps a saved project's audio with it
+│   │   │   └── projectdocument.h/.cpp                          // project JSON: serialize, deserialize, save, load
+│   │   ├── processor/                                          // processor base
+│   │   │   ├── parameter.h                                     // one lock-free knob
+│   │   │   ├── processor.h                                     // Processor and ProcessContext
+│   │   │   ├── smoother.h                                      // parameter glide, no clicks
+│   │   │   └── trackinput.h                                    // track input trim stage
+│   │   ├── recording/                                          // recording
+│   │   │   ├── livepeaks.h/.cpp                                // waveform of a take while it records
+│   │   │   ├── miditakerecorder.h                              // captures played MIDI notes into a take
+│   │   │   ├── recordingcontroller.h/.cpp                      // take lifecycle, recording tracks, latency compensation
+│   │   │   ├── recordinggroup.h                                // recorders handed to the audio thread
+│   │   │   └── takerecorder.h/.cpp                             // audio to disk on a worker thread
+│   │   ├── rt/                                                 // lock-free realtime tools
+│   │   │   ├── rtaudioring.h                                   // single-writer / single-reader audio ring
+│   │   │   ├── rtqueue.h                                       // single-producer / single-consumer queue
+│   │   │   ├── rtsafe.h                                        // RT_SAFE marker and denormal guard
+│   │   │   └── snapshotslot.h                                  // hands snapshots to the audio thread and back
+│   │   ├── session/                                            // the document
+│   │   │   ├── cliptakes.h/.cpp                                // several takes in one clip, one active
+│   │   │   ├── project.h/.cpp                                  // Project, Track, AudioClip, undo history
+│   │   │   ├── projectsession.h/.cpp                           // open file path, dirty flag, startup restore, session save / load
+│   │   │   └── tracklist.h/.cpp                                // track collection, monitoring, media, clipboard
+│   │   ├── trackEffectsPanel/                                  // the FX window, effect chains and the effects
+│   │   │   ├── plugins/                                        // insert effects
+│   │   │   │   ├── chaosEq/                                    // Chaos EQ
+│   │   │   │   │   ├── chaoseq.h/.cpp                          // up to 24 parametric bands, auto-gain
+│   │   │   │   │   ├── chaoseqcurve.h/.cpp                     // response curves for the display
+│   │   │   │   │   ├── chaoseqjson.h/.cpp                      // settings in save files
+│   │   │   │   │   ├── chaoseqsettings.h/.cpp                  // everything the user sets
+│   │   │   │   │   └── spectrumanalyzer.h/.cpp                 // display spectrum from a sample stream
+│   │   │   │   ├── mixFx/                                      // mixing plugins
+│   │   │   │   │   ├── common/                                 // shared by several mixing plugins
+│   │   │   │   │   │   ├── gaincomputer.h                      // compressor / de-esser gain curve
+│   │   │   │   │   │   └── reverbcore.h                        // reverb building blocks: delays, allpasses, filters
+│   │   │   │   │   ├── chaosverb.h/.cpp                        // lush reverb
+│   │   │   │   │   ├── deesser.h/.cpp                          // de-esser
+│   │   │   │   │   ├── gate.h/.cpp                             // gate
+│   │   │   │   │   ├── limiter.h/.cpp                          // look-ahead limiter
+│   │   │   │   │   ├── mixcompressor.h/.cpp                    // mixing compressor
+│   │   │   │   │   ├── mixdelay.h/.cpp                         // tempo-synced delay, ping-pong
+│   │   │   │   │   ├── mixeffect.h/.cpp                        // base of every mixing plugin, bypass crossfade
+│   │   │   │   │   ├── mixfxfactory.h/.cpp                     // makes a mixing plugin by type
+│   │   │   │   │   ├── mixfxjson.h/.cpp                        // settings in save files
+│   │   │   │   │   ├── mixfxspec.h/.cpp                        // mixing plugins' controls, ranges, defaults
+│   │   │   │   │   ├── roomreverb.h/.cpp                       // Room / Plate / Hall reverb
+│   │   │   │   │   └── saturation.h/.cpp                       // Tape / Tube / Clip saturation
+│   │   │   │   ├── pitchMonitor/                               // Pitch Monitor
+│   │   │   │   │   ├── musickey.h/.cpp                         // keys and scales, nearest in-key note
+│   │   │   │   │   ├── pitchanalysis.h/.cpp                    // pitch of recorded audio over the song
+│   │   │   │   │   ├── pitchmonitor.h/.cpp                     // pass-through effect that reads the live pitch
+│   │   │   │   │   └── pitchtracker.h/.cpp                     // pitch of one voice every 10 ms, live or offline
+│   │   │   │   ├── tenbandeq/                                  // 10-band EQ
+│   │   │   │   │   ├── eqpresets.h                             // factory EQ curves
+│   │   │   │   │   ├── eqpresetstore.h/.cpp                    // EQ presets: factory list, file read / write, checks
+│   │   │   │   │   └── tenbandeq.h/.cpp                        // ten fixed-frequency peaking filters
+│   │   │   │   └── denoise.h/.cpp                              // noise reduction
+│   │   │   ├── effectchain.h/.cpp                              // effect slots and their order on a track
+│   │   │   ├── effectstate.h/.cpp                              // effects of a track, the master or a clip
+│   │   │   └── trackeffectspanel.h/.cpp                        // which effect of the chain the panel shows
+│   │   ├── transport/                                          // time
+│   │   │   ├── musicalgrid.h/.cpp                              // one musical grid for every editor
+│   │   │   └── tempomap.h                                      // beats to samples and back
+│   │   ├── mixerpanel.h/.cpp                                   // mixer maths and texts: volume, pan, clip gain, strip width
+│   │   ├── namedialog.h/.cpp                                   // rules of the name dialog
+│   │   └── shortcutmap.h/.cpp                                  // user-changeable keyboard shortcuts
+│   ├── exportDialog/                                           // export
+│   │   ├── exportdialog.h/.cpp                                 // file names, formats, the export job
+│   │   └── songrender.h/.cpp                                   // offline render of the song
+│   ├── instruments/                                            // every instrument, one folder each
+│   │   ├── common/                                             // shared by several instruments
+│   │   │   ├── sampler/                                        // sample player
+│   │   │   │   ├── sampler.h/.cpp                              // notes into voices playing matching zones
+│   │   │   │   ├── samplervoice.h/.cpp                         // one playing note: pitch, envelope, filter
+│   │   │   │   ├── samplezone.h                                // one SFZ region
+│   │   │   │   └── zonemap.h/.cpp                              // finds the zones for a key press
+│   │   │   ├── sfz/                                            // SFZ files
+│   │   │   │   ├── sfzloader.h/.cpp                            // SFZ file into the sampler's zones
+│   │   │   │   └── sfzparser.h/.cpp                            // SFZ text into regions
+│   │   │   ├── instrumentcatalog.h/.cpp                        // instrument ids, names, pages, picker groups, drum key names
+│   │   │   ├── instrumentfactory.h/.cpp                        // makes the instrument for a track type (TestSynth for the rest)
+│   │   │   ├── samplekits.h/.cpp                               // where the sample kits are
+│   │   │   ├── tempodivision.h                                 // names of the beat divisions and their rate at a BPM
+│   │   │   └── testsynth.h/.cpp                                // sine stand-in synth for instruments not built yet
+│   │   ├── chords/                                             // Chords track
+│   │   │   ├── chordplayer.h/.cpp                              // strip presses into a pianist's notes, in time
+│   │   │   ├── chordrender.h/.cpp                              // "Convert to notes" for a Chords clip
+│   │   │   ├── chordsettings.h/.cpp                            // strips' chords, autoplay, dynamics
+│   │   │   ├── chordsinstrument.h/.cpp                         // Chords track instrument: ChordPlayer before the piano
+│   │   │   ├── chordsjson.h/.cpp                               // settings in save files
+│   │   │   ├── chordsymbol.h/.cpp                              // chord names, chords of a key, progressions
+│   │   │   ├── chordvoicer.h/.cpp                              // voice leading: where the right hand places a chord
+│   │   │   └── rhythmpattern.h/.cpp                            // autoplay patterns: Flowing, Pop, Comping, Ballad
+│   │   ├── drums/                                              // drums: grooves for both kits
+│   │   │   ├── acoustic/                                       // acoustic drum kit (sampled)
+│   │   │   │   ├── drumkit.h/.cpp                              // the drum kit instrument; counts hits per key
+│   │   │   │   ├── drumkitjson.h/.cpp                          // kit settings in save files
+│   │   │   │   ├── drumkitlibrary.h/.cpp                       // kit samples, loaded once and shared; builds zones
+│   │   │   │   ├── drumkitsettings.h/.cpp                      // everything the user sets on a kit
+│   │   │   │   └── drummap.h/.cpp                              // drum keys and their names
+│   │   │   ├── electronic/                                     // electronic drum kit (synthesised)
+│   │   │   │   ├── electrodrums.h/.cpp                         // the electronic kit instrument
+│   │   │   │   ├── electrodrumsjson.h/.cpp                     // kit settings in save files
+│   │   │   │   ├── electromap.h/.cpp                           // drum keys and their names
+│   │   │   │   ├── electrosettings.h/.cpp                      // everything the user sets on a kit
+│   │   │   │   └── electrovoices.h/.cpp                        // drum sounds: pitched tones and noise layers
+│   │   │   └── groovePanel/                                    // drum grooves
+│   │   │       ├── drumgroove.h/.cpp                           // ready-made beats on the shared drum keys
+│   │   │       ├── drumgroovejson.h/.cpp                       // a groove as a .groove file
+│   │   │       └── groovestore.h/.cpp                          // factory and user grooves
+│   │   ├── guitar/                                             // guitar types: electric, bass
+│   │   │   ├── bass/                                           // bass guitar (modelled strings)
+│   │   │   │   ├── bassexciter.h/.cpp                          // how a string is set going: pluck, slap, pop
+│   │   │   │   ├── bassfretboard.h/.cpp                        // where on the neck a note is played
+│   │   │   │   ├── bassguitar.h/.cpp                           // the bass instrument: four strings
+│   │   │   │   ├── bassjson.h/.cpp                             // bass settings in save files
+│   │   │   │   ├── basspickup.h/.cpp                           // pickups and tone stage
+│   │   │   │   ├── basspresets.h/.cpp                          // factory bass presets
+│   │   │   │   ├── basspresetstore.h/.cpp                      // factory and user bass presets
+│   │   │   │   ├── basssettings.h/.cpp                         // everything the user sets on a bass
+│   │   │   │   ├── bassstring.h/.cpp                           // one waveguide string
+│   │   │   │   └── bassvaluetext.h/.cpp                        // control value texts
+│   │   │   └── electric/                                       // electric guitar (GuitarSuite pedalboard)
+│   │   │       ├── pedals/                                     // the pedals
+│   │   │       │   ├── common/                                 // shared by several pedals
+│   │   │       │   │   ├── dcblocker.h                         // DC offset removal
+│   │   │       │   │   ├── delayline.h                         // ring-buffer delay line
+│   │   │       │   │   ├── drivestage.h                        // one playing-sensitive clipping stage
+│   │   │       │   │   ├── oversampler4x.h                     // 4x oversampler from two 2x stages
+│   │   │       │   │   ├── pedalcontrols.h                     // smoothing and peak detection for pedals
+│   │   │       │   │   ├── pedalfilter.h                       // one EQ band as a pedal filter
+│   │   │       │   │   └── pitchvoice.h/.cpp                   // phase-vocoder pitch-shift voice
+│   │   │       │   ├── amp.h/.cpp                              // three-channel amp: preamp, tone stack, power
+│   │   │       │   ├── cabinet.h/.cpp                          // speaker cabinet: IR or built-in model
+│   │   │       │   ├── chorus.h/.cpp                           // chorus: rate, depth, mix
+│   │   │       │   ├── compressor.h/.cpp                       // compressor: threshold, ratio, attack, release, makeup
+│   │   │       │   ├── crunch.h/.cpp                           // light touch-sensitive drive
+│   │   │       │   ├── delaypedal.h/.cpp                       // delay: time, feedback, mix
+│   │   │       │   ├── distortion.h/.cpp                       // metal distortion, 4x oversampled
+│   │   │       │   ├── fuzz.h/.cpp                             // fuzz
+│   │   │       │   ├── noisegate.h/.cpp                        // noise gate with hold and hysteresis
+│   │   │       │   ├── octaver.h/.cpp                          // octaver: dry, octave down, octave up, level
+│   │   │       │   ├── overdrive.h/.cpp                        // overdrive
+│   │   │       │   ├── parametriceq.h/.cpp                     // three-band parametric EQ
+│   │   │       │   ├── partitionedconvolver.h/.cpp             // zero-latency FFT convolution (cabinet IRs)
+│   │   │       │   ├── phaser.h/.cpp                           // phaser: rate, depth, feedback, mix, level, BPM sync
+│   │   │       │   ├── pitchshift.h/.cpp                       // pitch shifter: semitones, mix, level
+│   │   │       │   ├── reverbpedal.h/.cpp                      // reverb: room, damping, mix
+│   │   │       │   ├── tremolo.h/.cpp                          // tremolo: rate, depth, BPM sync, sustain-only options
+│   │   │       │   └── wah.h/.cpp                              // wah: position, resonance, mix
+│   │   │       ├── tuner/                                      // tuner pedal
+│   │   │       │   ├── pitchdetector.h/.cpp                    // YIN pitch detection
+│   │   │       │   ├── standardtuning.h                        // standard tuning strings; nearest string and cents
+│   │   │       │   ├── tuner.h/.cpp                            // tuner pedal: detects pitch, leaves the sound alone
+│   │   │       │   ├── tunerstate.h/.cpp                       // tuner reading: note, cents, freshness
+│   │   │       │   └── tunertext.h/.cpp                        // tuner texts
+│   │   │       ├── guitardefinition.h/.cpp                     // the guitar instrument variants
+│   │   │       ├── guitarsuite.h/.cpp                          // realtime pedal chain container
+│   │   │       ├── guitarsuiteeditor.h/.cpp                    // chain editing: add, remove, move, bypass, parameters, input trim
+│   │   │       ├── guitarsuitepreset.h/.cpp                    // preset files: parse, write, build slots
+│   │   │       ├── impulsewav.h/.cpp                           // cabinet IR WAV loading and resampling
+│   │   │       ├── levelmeter.h/.cpp                           // one meter's state: peak decay, target, snapshot
+│   │   │       ├── pedaleditorrules.h/.cpp                     // what the pedal editor shows per pedal
+│   │   │       ├── pedalregistry.h/.cpp                        // pedal list, display names, makes a pedal by type
+│   │   │       └── pedalslot.h                                 // one slot's shared UI / audio state
+│   │   ├── harmonium/                                          // harmonium (synthesised)
+│   │   │   ├── harmonium.h/.cpp                                // the harmonium: reeds, bellows, case
+│   │   │   ├── harmoniumjson.h/.cpp                            // settings in save files
+│   │   │   ├── harmoniumsettings.h/.cpp                        // everything the user sets
+│   │   │   ├── reedvoice.h/.cpp                                // one key: its reed ranks behind a valve
+│   │   │   └── reedwave.h/.cpp                                 // one reed's tone as wavetables
+│   │   ├── piano/                                              // grand piano (sampled)
+│   │   │   ├── piano.h/.cpp                                    // the piano instrument; keys down and pedal for the page
+│   │   │   ├── pianojson.h/.cpp                                // settings in save files
+│   │   │   ├── pianolibrary.h/.cpp                             // piano samples, loaded once and shared; builds zones
+│   │   │   └── pianosettings.h/.cpp                            // everything the user sets
+│   │   └── synth/                                              // subtractive synth
+│   │       ├── synth.h/.cpp                                    // the synth instrument: voices, poly / mono
+│   │       ├── synthenvelope.h/.cpp                            // ADSR envelope
+│   │       ├── synthfilter.h/.cpp                              // state-variable filter
+│   │       ├── synthjson.h/.cpp                                // settings in save files
+│   │       ├── synthlfo.h/.cpp                                 // LFO
+│   │       ├── synthoscillator.h/.cpp                          // band-limited oscillator
+│   │       ├── synthpresets.h/.cpp                             // factory synth presets
+│   │       ├── synthpresetstore.h/.cpp                         // factory and user synth presets
+│   │       ├── synthsettings.h/.cpp                            // everything the user sets
+│   │       ├── synthvaluetext.h/.cpp                           // control value texts
+│   │       └── synthvoice.h/.cpp                               // one note: oscillators, drive, filter, envelope
+│   ├── mixerPanel/                                             // the mixer
+│   │   └── stereoLevelMeter/                                   // stereo meter
+│   │       ├── levelscale.h/.cpp                               // gain / dB conversions, meter bands, peak decay
+│   │       └── stereolevelmeter.h/.cpp                         // stereo meter state, reset, tooltip
+│   ├── pianoRoll/                                              // the piano roll
+│   │   ├── notedrag.h/.cpp                                     // what dragging notes may do
+│   │   ├── pianorollgrid.h/.cpp                                // grid and snapping
+│   │   ├── pianorollpattern.h/.cpp                             // notes: add, move, resize, velocity, selection
+│   │   └── velocitylane.h/.cpp                                 // velocity drag rules
+│   ├── timeline/                                               // the arrangement
+│   │   ├── timeline.h/.cpp                                     // selection, snapping, clip edits, clipboard, time range
+│   │   └── volumeenvelope.h/.cpp                               // a track's volume envelope
+│   ├── topBar/                                                 // the top bar
+│   │   ├── appSettings/                                        // Preferences
+│   │   │   ├── appsettings.h/.cpp                              // preferences as key=value text: restore, layout, autosave, magnets, ripple...
+│   │   │   ├── devicesettings.h/.cpp                           // buffer sizes, output devices, port routing
+│   │   │   └── shortcuteditor.h/.cpp                           // shortcut editor rules
+│   │   ├── projectActions/                                     // File menu
+│   │   │   ├── audioimport.h/.cpp                              // reads WAV / FLAC / MP3 to import
+│   │   │   ├── projectactions.h/.cpp                           // New / Open / Save / Close state machine with unsaved prompt
+│   │   │   └── recentprojects.h/.cpp                           // Open Recent list
+│   │   ├── toolsMenu/                                          // Tools menu
+│   │   │   ├── common/                                         // shared by the drum and chord analyzers
+│   │   │   │   ├── beattracker.h/.cpp                          // tempo and beat positions from an onset envelope
+│   │   │   │   ├── hpss.h/.cpp                                 // harmonic / percussive separation
+│   │   │   │   ├── meterdetect.h/.cpp                          // time signature and bar starts
+│   │   │   │   ├── onsets.h/.cpp                               // where hits start (log spectral flux)
+│   │   │   │   ├── progress.h                                  // progress and cancel for long analyses, any thread
+│   │   │   │   └── spectrogram.h/.cpp                          // log-band spectrum over time (10 ms frames)
+│   │   │   ├── chordAnalyzer/                                  // chord analyzer
+│   │   │   │   ├── chordfinder.h/.cpp                          // song to chords over time and key
+│   │   │   │   └── chromagram.h/.cpp                           // which note names sound over time
+│   │   │   └── drumAnalyzer/                                   // drum pattern analyzer
+│   │   │       ├── drumnmf.h/.cpp                              // which drum plays when (NMF)
+│   │   │       ├── drumtranscriber.h/.cpp                      // recording to a drum pattern, tempo, meter
+│   │   │       └── kitshapes.h/.cpp                            // learns this recording's own drum sounds
+│   │   └── deviceline.h/.cpp                                   // device line text
+│   ├── trackList/                                              // the track list
+│   │   ├── clipwaveform.h/.cpp                                 // visible clip interval to source samples
+│   │   └── tracklayout.h/.cpp                                  // track and envelope lane heights
+│   ├── transportBar/                                           // the transport bar
+│   │   ├── tempoEditor/                                        // tempo field
+│   │   │   ├── taptempo.h/.cpp                                 // BPM from taps
+│   │   │   └── tempoeditor.h/.cpp                              // tempo entry rules
+│   │   ├── playbackcontrols.h/.cpp                             // transport state, repeat range, loop, time conversions, clock text
+│   │   ├── quicksettings.h/.cpp                                // buffer sizes, snap modes, audio status text
+│   │   └── typingkeyboard.h/.cpp                               // computer keyboard as a sargam MIDI keyboard
+│   └── statusstrip.h/.cpp                                      // status line readouts and message
+├── tests/                                                      // tests: backendtests (no Qt, no sound card) and Qt checks
+│   ├── analysis/                                               // analyzers
+│   │   ├── beattracker_test.cpp                                // tempo and beats found, uneven tempo, long song
+│   │   ├── chordfinder_test.cpp                                // chords and key of rendered songs, sevenths, drone
+│   │   ├── chordrender.h                                       // test songs of strummed chords
+│   │   ├── chromagram_test.cpp                                 // chord notes, tuning, drums over chords
+│   │   ├── drumrender.h                                        // test drum patterns played by the app's kits
+│   │   ├── drumtranscriber_test.cpp                            // tempo, meter and hits of loops and songs
+│   │   └── spectrogram_test.cpp                                // frames, bands, harmonic / percussive, onsets
+│   ├── audiodevice/                                            // audio device
+│   │   └── devicesettings_test.cpp                             // buffer sizes, devices, port routing, status
+│   ├── audiofile/                                              // audio files
+│   │   ├── data/                                               // decoder fixtures
+│   │   │   ├── s16_fixed_odd_blocks.flac                       // FLAC 44.1 kHz stereo 16-bit, uneven block sizes
+│   │   │   ├── s16_independent.flac                            // FLAC 44.1 kHz stereo 16-bit, independent channels
+│   │   │   ├── s16_left_side.flac                              // FLAC 44.1 kHz stereo 16-bit, left-side stereo
+│   │   │   ├── s16_mid_side_lpc32.flac                         // FLAC 44.1 kHz stereo 16-bit, mid-side stereo
+│   │   │   ├── s16_right_side.flac                             // FLAC 44.1 kHz stereo 16-bit, right-side stereo
+│   │   │   ├── s24_mono.flac                                   // FLAC 48 kHz mono 24-bit
+│   │   │   ├── sine1k-mono-22k-mpeg2.mp3                       // MP3: MPEG-2 Layer III, 22.05 kHz mono, 32 kbps
+│   │   │   ├── sine440-stereo-128k-id3.mp3                     // MP3: MPEG-1 Layer III, 44.1 kHz joint stereo, 128 kbps, ID3 tag
+│   │   │   └── sine440-stereo-vbr.mp3                          // MP3: MPEG-1 Layer III, 44.1 kHz joint stereo, variable bitrate
+│   │   ├── audioimport_test.cpp                                // import: formats, bad files, mixdown, undo
+│   │   ├── flacreader_test.cpp                                 // MD5, FLAC decoding, damage, ID3, piano samples
+│   │   ├── mp3reader_test.cpp                                  // MP3 decoder against the fixtures
+│   │   ├── mp3writer_test.cpp                                  // MP3 encoder, checked by decoding
+│   │   └── wavreader_test.cpp                                  // WAV formats, chunks, bad files
+│   ├── automation/                                             // automation
+│   │   └── volumeenvelope_test.cpp                             // envelope scale, points, curves, loading
+│   ├── core/                                                   // core
+│   │   ├── allheaders_test.cpp                                 // includes the headers, so a broken one fails here
+│   │   ├── valueformat_test.cpp                                // value, position and clock texts
+│   │   ├── version_test.cpp                                    // version is not empty
+│   │   └── waveform_test.cpp                                   // waveform peak cache
+│   ├── dsp/                                                    // DSP
+│   │   ├── biquad_test.cpp                                     // biquad filter
+│   │   ├── eqbanddesign_test.cpp                               // EQ band shapes and slopes
+│   │   ├── fft_test.cpp                                        // FFT against a plain DFT
+│   │   ├── latencymeasure_test.cpp                             // latency measurement
+│   │   ├── levelmeter_test.cpp                                 // mono and stereo meters
+│   │   ├── levelscale_test.cpp                                 // gain / dB, bands, peak decay
+│   │   ├── panlaw_test.cpp                                     // pan law
+│   │   ├── pitchtracker_test.cpp                               // pitch tracking, live and offline
+│   │   └── spectrumanalyzer_test.cpp                           // spectrum analyzer levels
+│   ├── engine/                                                 // engine
+│   │   ├── audioengine_midi_test.cpp                           // engine MIDI: timing, loops, mute / solo, live input
+│   │   ├── enginestatus_test.cpp                               // device readouts and xrun count
+│   │   ├── playbackcontrols_test.cpp                           // transport states, conversions, repeat, actions
+│   │   └── snapshotbuilder_test.cpp                            // snapshot building, effects, routing, notes
+│   ├── instruments/                                            // instruments
+│   │   ├── bass_test.cpp                                       // bass tuning, strings, pickups, playing styles
+│   │   ├── drumgroove_test.cpp                                 // grooves, groove files and store, adding to a track
+│   │   ├── drumkit_test.cpp                                    // drum kit settings, zones, loading, hits
+│   │   ├── drummap_test.cpp                                    // drum keys and names
+│   │   ├── electrodrums_test.cpp                               // electronic drums: sounds, styles, map, hits
+│   │   ├── guitarsuiteeditor_test.cpp                          // chain editing, session data, preset name
+│   │   ├── guitarsuitepreset_test.cpp                          // guitar preset parse, checks, slots
+│   │   ├── harmonium_test.cpp                                  // harmonium reeds, tone, timing, sustain
+│   │   ├── instrumentcatalog_test.cpp                          // instrument ids, pages, drum names, groups
+│   │   ├── pedaleditorrules_test.cpp                           // pedal features, dials, texts
+│   │   ├── pedalregistry_test.cpp                              // all eighteen pedals, names, creation
+│   │   ├── piano_test.cpp                                      // piano settings, zones, loading, scale changer
+│   │   ├── sampler_test.cpp                                    // zone map and sampler voices
+│   │   ├── sfzloader_test.cpp                                  // SFZ loading into zones
+│   │   ├── sfzparser_test.cpp                                  // SFZ parsing
+│   │   ├── synth_test.cpp                                      // synth waves, filter, envelopes, LFO
+│   │   └── tunerstate_test.cpp                                 // tuner states, in tune, string choice, freshness
+│   ├── midi/                                                   // MIDI and the piano roll
+│   │   ├── midibuffer_test.cpp                                 // a full MIDI buffer refuses events
+│   │   ├── musickey_test.cpp                                   // scales and nearest in-key note
+│   │   ├── notenames_test.cpp                                  // note names
+│   │   ├── pianorollgrid_test.cpp                              // piano roll grid, snapping, quantize step
+│   │   ├── pianorollpattern_test.cpp                           // note editing, quantize, selection, velocity
+│   │   └── typingkeyboard_test.cpp                             // computer keyboard layout and held keys
+│   ├── mixer/                                                  // mixer
+│   │   └── mixerpanel_test.cpp                                 // mixer clamping, texts, strip states, clip gain target
+│   ├── persistence/                                            // save files
+│   │   ├── bassjson_test.cpp                                   // bass settings JSON and chains
+│   │   ├── basspresetstore_test.cpp                            // bass factory presets and user store
+│   │   ├── chaoseqjson_test.cpp                                // Chaos EQ JSON
+│   │   ├── chordsjson_test.cpp                                 // Chords JSON and saving a Chords track
+│   │   ├── drumkitjson_test.cpp                                // drum kit JSON
+│   │   ├── effectchainjson_test.cpp                            // FX chain files: capture, refuse, import
+│   │   ├── electrodrumsjson_test.cpp                           // electronic kit JSON
+│   │   ├── harmoniumjson_test.cpp                              // harmonium JSON
+│   │   ├── mediacollect_test.cpp                               // project keeps its audio
+│   │   ├── mixfxjson_test.cpp                                  // mixing plugin JSON
+│   │   ├── pianojson_test.cpp                                  // piano JSON
+│   │   ├── projectdocument_test.cpp                            // project files: round trip, checks, old versions
+│   │   ├── synthjson_test.cpp                                  // synth settings JSON and chains
+│   │   └── synthpresetstore_test.cpp                           // synth factory presets and user store
+│   ├── plugins/                                                // effects
+│   │   ├── ampcab_test.cpp                                     // amp channels, cabinet, convolution, EQ presets
+│   │   ├── chaoseq_test.cpp                                    // Chaos EQ processing
+│   │   ├── chaoseqcurve_test.cpp                               // Chaos EQ display curves
+│   │   ├── chaosverb_test.cpp                                  // Chaos Verb
+│   │   ├── chordplayer_test.cpp                                // chord player patterns and timing
+│   │   ├── chordsymbol_test.cpp                                // chord names, keys, progressions
+│   │   ├── chordvoicer_test.cpp                                // chord voicing
+│   │   ├── deesser_test.cpp                                    // de-esser
+│   │   ├── denoise_test.cpp                                    // noise reduction
+│   │   ├── drives_test.cpp                                     // crunch, distortion and overdrive pedals
+│   │   ├── effectchain_test.cpp                                // effect chains and fixed instrument pages
+│   │   ├── eqpresetstore_test.cpp                              // EQ presets
+│   │   ├── extrafx_test.cpp                                    // parametric EQ, fuzz and phaser pedals
+│   │   ├── guitarsuite_test.cpp                                // pedal order and bypass in the chain
+│   │   ├── impulsewav_test.cpp                                 // cabinet IR loading
+│   │   ├── mixcompressor_test.cpp                              // mixing compressor
+│   │   ├── mixextras_test.cpp                                  // delay, limiter, saturation, gate
+│   │   ├── mixfxspec_test.cpp                                  // mixing plugin specs
+│   │   ├── monitorlevels_test.cpp                              // input trim and monitor levels
+│   │   ├── oversampler_test.cpp                                // oversamplers
+│   │   ├── phase2_test.cpp                                     // gate, compressor, wah, chorus, tuner pedals
+│   │   ├── pitch_test.cpp                                      // pitch shifter and octaver
+│   │   ├── pitchanalysis_test.cpp                              // pitch analysis of recordings
+│   │   ├── pitchmonitor_test.cpp                               // Pitch Monitor effect
+│   │   ├── roomreverb_test.cpp                                 // room reverb
+│   │   ├── tenbandeq_test.cpp                                  // 10-band EQ
+│   │   ├── testsynth_test.cpp                                  // test synth
+│   │   ├── trackeffectspanel_test.cpp                          // FX panel selection and instrument pages
+│   │   ├── trackmeters_test.cpp                                // track meters and pan
+│   │   ├── tremolosustain_test.cpp                             // tremolo sustain-only mode
+│   │   └── tremolosync_test.cpp                                // tremolo tempo sync
+│   ├── processor/                                              // processor base
+│   │   ├── parameter_test.cpp                                  // parameter
+│   │   ├── processor_test.cpp                                  // how to test a plugin
+│   │   └── smoother_test.cpp                                   // smoother
+│   ├── recording/                                              // recording
+│   │   ├── countin_test.cpp                                    // count-in
+│   │   ├── livepeaks_test.cpp                                  // live waveform
+│   │   ├── multirecording_test.cpp                             // wet and dry takes together
+│   │   ├── recording_test.cpp                                  // recording takes
+│   │   └── recordingcontroller_test.cpp                        // recording controller
+│   ├── render/                                                 // export
+│   │   └── songrender_test.cpp                                 // offline song render
+│   ├── rt/                                                     // realtime tools
+│   │   ├── rtqueue_test.cpp                                    // realtime queue across threads
+│   │   └── snapshotslot_test.cpp                               // snapshot handover across threads
+│   ├── session/                                                // the document
+│   │   ├── clip_clipboard_test.cpp                             // clip copy / cut / paste / duplicate
+│   │   ├── clipeffects_test.cpp                                // clip effects
+│   │   ├── clipnotes_test.cpp                                  // notes in clips
+│   │   ├── projectactions_test.cpp                             // File actions and unsaved prompt
+│   │   ├── projectsession_test.cpp                             // project session
+│   │   ├── recentprojects_test.cpp                             // recent projects list
+│   │   └── tracklist_test.cpp                                  // track list
+│   ├── settings/                                               // settings
+│   │   ├── appsettings_test.cpp                                // preferences
+│   │   ├── quicksettings_test.cpp                              // quick settings
+│   │   └── shortcutmap_test.cpp                                // keyboard shortcuts
+│   ├── tempo/                                                  // tempo
+│   │   ├── taptempo_test.cpp                                   // tap tempo
+│   │   └── tempoeditor_test.cpp                                // tempo field input
+│   ├── timeline/                                               // timeline
+│   │   ├── clipwaveform_test.cpp                               // clip waveform interval
+│   │   ├── timeline_clipboard_test.cpp                         // timeline selection and clipboard
+│   │   ├── timeline_test.cpp                                   // timeline snapping, group edits, selection
+│   │   └── tracklayout_test.cpp                                // track and lane heights
+│   ├── tools/                                                  // dev tools, not part of the app
+│   │   ├── chordrender/                                        // chord autoplay listening tool
+│   │   │   └── chordrender.cpp                                 // renders chord progressions to WAV
+│   │   ├── drumbench/                                          // drum analyzer bench
+│   │   │   └── drumbench.cpp                                   // measures the drum analyzer on real recordings
+│   │   ├── fxrender/                                           // pedal listening tool
+│   │   │   └── fxrender.cpp                                    // renders a dry guitar through pedals to WAV
+│   │   ├── latencytest/                                        // latency tool
+│   │   │   ├── latencymeasure.h/.cpp                           // round-trip latency from a loopback click
+│   │   │   └── latencytest.cpp                                 // measures round-trip latency through JACK
+│   │   ├── sfzcheck/                                           // empty (placeholder)
+│   │   └── uishots/                                            // UI screenshot tool
+│   │       └── uishots.cpp                                     // pictures of the app's views, offscreen
+│   ├── transport/                                              // transport
+│   │   ├── metronome_test.cpp                                  // metronome
+│   │   ├── musicalgrid_test.cpp                                // musical grid
+│   │   ├── playbackend_test.cpp                                // stop at the arrangement end, repeat
+│   │   └── tempomap_test.cpp                                   // tempo map
+│   ├── ui/                                                     // UI tests
+│   │   ├── transport_qtcheck.cpp                               // UI tests on the real views (transport, FX pages, theme, preferences...)
+│   │   └── TransportHarness.qml                                // test window with the app's main views
+│   ├── wrapper/                                                // Qt wrapper checks
+│   │   ├── audioengine_qtcheck.cpp                             // engine wrapper, live notes, MIDI keyboards
+│   │   ├── bass_qtcheck.cpp                                    // bass wrapper, presets, MIDI, chains
+│   │   ├── chordanalyzer_qtcheck.cpp                           // chord analyzer bridge
+│   │   ├── chords_qtcheck.cpp                                  // Chords track page, playing, recording, zones
+│   │   ├── clipediting_qtcheck.cpp                             // clip edits and undo
+│   │   ├── denoise_qtcheck.cpp                                 // Noise Reduction model
+│   │   ├── drumanalyzer_qtcheck.cpp                            // drum analyzer bridge
+│   │   ├── drumgroove_qtcheck.cpp                              // groove panel
+│   │   ├── drumkit_qtcheck.cpp                                 // drum kit wrapper and picture
+│   │   ├── effectchain_qtcheck.cpp                             // FX chain export / import
+│   │   ├── electrodrums_qtcheck.cpp                            // electronic kit wrapper and picture
+│   │   ├── fileswrapper_qtcheck.cpp                            // Files singleton: paths and filters
+│   │   ├── harmonium_qtcheck.cpp                               // harmonium wrapper, scale changer, MIDI
+│   │   ├── importexport_qtcheck.cpp                            // import and export jobs
+│   │   ├── mixeffect_qtcheck.cpp                               // mixing plugins on tracks, master and clips
+│   │   ├── piano_qtcheck.cpp                                   // piano wrapper and drawn piano
+│   │   ├── pianoroll_qtcheck.cpp                               // piano roll wrapper
+│   │   ├── pitchmonitor_qtcheck.cpp                            // Pitch Monitor model
+│   │   ├── presets_qtcheck.cpp                                 // EQ presets, cabinet IR, pedal and factory presets
+│   │   ├── recording_qtcheck.cpp                               // recording through the wrappers
+│   │   ├── shortcuts_qtcheck.cpp                               // shortcuts
+│   │   ├── synth_qtcheck.cpp                                   // synth wrapper, presets, MIDI, chains
+│   │   ├── virtualkeyboard_qtcheck.cpp                         // on-screen piano plays the monitored instrument
+│   │   └── volumeenvelope_qtcheck.cpp                          // volume envelope editing
+│   ├── backendtests.cpp                                        // runs the backend tests
+│   ├── testkit.h                                               // tiny hand-written test library
+│   └── testsignals.h                                           // test signals and measurements
+├── resources/                                                  // icon and factory presets embedded in the app
+│   ├── icons/                                                  // app icon
+│   │   └── icon.svg                                            // the app icon
+│   └── presets/                                                // factory presets
+│       └── guitarsuite/                                        // guitar pedalboard presets
+│           ├── best_djent.gspreset                             // gate, distortion, amp, cab, EQ, crunch, reverb; not used by the build
+│           ├── Djent.gspreset                                  // factory preset "Djent": gate, overdrive, amp, cab, EQ
+│           ├── Jazz.gspreset                                   // factory preset "Jazz": compressor, amp, cab, EQ, reverb
+│           ├── MetalSolo.gspreset                              // factory preset "MetalSolo": gate, overdrive, amp, cab, EQ, delay, reverb
+│           ├── RockChords.gspreset                             // factory preset "RockChords": gate, amp, cab, EQ, reverb
+│           └── RockSolo.gspreset                               // factory preset "RockSolo": gate, overdrive, amp, cab, EQ, delay, reverb
+├── packaging/                                                  // Linux packages
+│   └── linux/                                                  // Linux packaging scripts and metadata
+│       ├── licenses/                                           // licence texts shipped in packages
+│       │   ├── Qt/                                             // Qt licences
+│       │   │   ├── GPL-2.0-only.txt                            // GPL 2.0
+│       │   │   ├── GPL-3.0-only.txt                            // GPL 3.0
+│       │   │   └── LGPL-3.0-only.txt                           // LGPL 3.0
+│       │   └── xcb-util-keysyms/                               // xcb-util-keysyms licence
+│       │       └── COPYING                                     // xcb-util-keysyms copyright and licence text
+│       ├── get-sample-kits.sh                                  // downloads the drum kit and piano samples into the data folder
+│       ├── install-app.sh                                      // installs the app for the user, its command, menu entry, icon, sample kits
+│       ├── io.github.chandandasgit.ChaosMaker.desktop          // menu entry "Chaos Maker" (runs appChaosMaker)
+│       ├── io.github.chandandasgit.ChaosMaker.metainfo.xml     // app id, name and summary for software centres
+│       ├── make-packages.sh                                    // makes the AppImage, the tar.xz, get-sample-kits.sh and SHA256SUMS
+│       ├── make-sample-kits.sh                                 // packs the sample kits archive and prints its SHA-256
+│       └── uninstall-app.sh                                    // removes the install and the sample kits; keeps settings and projects
+├── dependencies/                                               // third-party code, one folder per library (empty on purpose)
+│   └── README.md                                               // why it is empty: Qt, libjack, nlohmann json come from the system
+├── EducationPurpose/                                           // holds this map
+│   └── architecture.txt                                        // this map
+├── .github/                                                    // GitHub
+│   └── workflows/                                              // CI
+│       └── release.yml                                         // on a v* tag: builds, packages, checks and publishes a release
+├── main.cpp                                                    // sets the app name, desktop id and icon, loads the Main QML module
+├── Main.qml                                                    // main window: top bar, track list, timeline, mixer / piano roll panel, transport bar, status line
+├── CMakeLists.txt                                              // build: dawengine library, appChaosMaker, tools, test programs
+├── CMakePresets.json                                           // build presets: default, rt, tsan, asan
+├── README.md                                                   // what the app is, for readers of the repository
+├── LICENSE                                                     // GPL 3.0
+└── .gitignore                                                  // files git ignores

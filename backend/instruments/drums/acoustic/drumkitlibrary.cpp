@@ -1,0 +1,248 @@
+#include "instruments/drums/acoustic/drumkitlibrary.h"
+
+#include "instruments/common/samplekits.h"
+
+#include "instruments/drums/acoustic/drummap.h"
+#include "instruments/common/sampler/sampler.h"
+
+#include <algorithm>
+#include <cstdlib>
+#include <filesystem>
+#if defined(__GLIBC__)
+#include <malloc.h>
+#endif
+
+namespace drumkit {
+
+namespace fs = std::filesystem;
+
+std::string findKitFolder()
+{
+    const auto kits = samplekits::folder();
+    return kits.empty() ? std::string() : (fs::path(kits) / KitFolderName).string();
+}
+
+namespace {
+
+// The part a drum-map key belongs to, for the part levels.
+double partLevelDb(int key, const Settings& s)
+{
+    if (key == 60) return s.kickDb;
+    if (key == 61 || key == 62 || key == 64) return s.snareDb;
+    if (key == 65 || key == 67 || key == 69) return s.tomsDb;
+    return s.hihatDb;                                       // 55-57, 66, 68, 70
+}
+
+} // namespace
+
+double roomTrimDb(Room room) noexcept
+{
+    switch (room) {
+    case Room::Close: return -3.0;
+    case Room::Full: return -11.0;
+    default: return -6.0;
+    }
+}
+
+std::vector<SampleZone> buildZones(const sfz::Document& kit, const Settings& in,
+                                   const std::shared_ptr<sfz::SampleCache>& cache, sfz::LoadReport* report)
+{
+    const Settings settings = sanitize(in);
+    std::vector<SampleZone> zones;
+    for (const auto& pass : drummap::passes()) {
+        sfz::LoadOptions options;
+        options.controllers = controllers(settings);
+        options.controllers[4] = pass.hihatPedal;
+        options.cache = cache;
+        auto result = sfz::buildZones(kit, options);
+        if (report && pass.fromKey < 0) *report = result.report;   // the full pass speaks for the kit
+        for (auto& zone : result.zones) {
+            const auto covers = [&zone](int key) { return zone.loKey <= key && key <= zone.hiKey; };
+            if (pass.fromKey < 0) {
+                // The kit's hi-hat keys are played by the other passes, on keys of their own.
+                if (covers(drummap::KitHihatKey) || covers(drummap::KitTightHihatKey)) continue;
+                zone.loKey += drummap::KitOffset;
+                zone.hiKey += drummap::KitOffset;
+                zone.rootKey += drummap::KitOffset;
+            } else {
+                if (zone.loKey != pass.fromKey || zone.hiKey != pass.fromKey) continue;
+                zone.rootKey += pass.toKey - pass.fromKey;
+                zone.loKey = zone.hiKey = pass.toKey;
+            }
+            zones.push_back(std::move(zone));
+        }
+    }
+    for (auto& zone : zones)
+        zone.volumeDb += float(roomTrimDb(settings.room) + partLevelDb(zone.loKey, settings) + settings.volumeDb);
+    return zones;
+}
+
+Library::Library(std::string kitFolder) : m_folder(std::move(kitFolder)), m_worker([this] { run(); }) {}
+
+Library::~Library()
+{
+    {
+        std::lock_guard lock(m_mutex);
+        m_stop = true;
+    }
+    m_wake.notify_all();
+    if (m_worker.joinable()) m_worker.join();
+}
+
+std::shared_ptr<Library> Library::shared()
+{
+    static std::mutex mutex;
+    static std::shared_ptr<Library> library;
+    std::lock_guard lock(mutex);
+    if (!library) library = std::make_shared<Library>(findKitFolder());
+    return library;
+}
+
+void Library::request(std::weak_ptr<Sampler> target, const Settings& settings)
+{
+    {
+        std::lock_guard lock(m_mutex);
+        const auto same = [&target](const Job& job) {
+            return !job.target.owner_before(target) && !target.owner_before(job.target);
+        };
+        std::erase_if(m_jobs, same);
+        std::erase_if(m_targets, [](const auto& known) { return known.expired(); });
+        const auto known = [&target](const std::weak_ptr<Sampler>& other) {
+            return !other.owner_before(target) && !target.owner_before(other);
+        };
+        if (std::none_of(m_targets.begin(), m_targets.end(), known)) m_targets.push_back(target);
+        m_jobs.push_back({std::move(target), settings});
+    }
+    m_wake.notify_all();
+}
+
+Library::State Library::state() const
+{
+    std::lock_guard lock(m_mutex);
+    return m_state;
+}
+
+std::string Library::message() const
+{
+    std::lock_guard lock(m_mutex);
+    return m_message;
+}
+
+void Library::waitUntilIdle()
+{
+    std::unique_lock lock(m_mutex);
+    m_idle.wait(lock, [this] { return m_jobs.empty() && !m_busy; });
+}
+
+void Library::trimSoon()
+{
+    {
+        std::lock_guard lock(m_mutex);
+        m_trimRequested = true;
+    }
+    m_wake.notify_all();
+}
+
+int Library::trim()
+{
+    std::lock_guard build(m_buildMutex);
+    std::vector<std::weak_ptr<Sampler>> targets;
+    {
+        std::lock_guard lock(m_mutex);
+        std::erase_if(m_targets, [](const auto& known) { return known.expired(); });
+        targets = m_targets;
+    }
+    for (const auto& target : targets)
+        if (auto sampler = target.lock()) sampler->collectRetired();
+    int dropped = 0;
+    {
+        std::lock_guard cacheLock(m_cache->mutex);
+        // Only the cache holds a sample no zone uses (zones are built under m_buildMutex).
+        dropped = int(std::erase_if(m_cache->entries, [](const auto& entry) {
+            return entry.second.audio && entry.second.audio.use_count() == 1;
+        }));
+    }
+#if defined(__GLIBC__)
+    // glibc keeps freed memory for later; a room's samples are hundreds of MB: give them back.
+    if (dropped > 0) malloc_trim(0);
+#endif
+    return dropped;
+}
+
+int Library::cachedSamples() const
+{
+    std::lock_guard cacheLock(m_cache->mutex);
+    return int(std::count_if(m_cache->entries.begin(), m_cache->entries.end(),
+                             [](const auto& entry) { return bool(entry.second.audio); }));
+}
+
+bool Library::loadKit()
+{
+    const fs::path program = fs::path(m_folder) / KitProgram;
+    std::error_code error;
+    if (m_folder.empty() || !fs::is_regular_file(program, error)) {
+        std::lock_guard lock(m_mutex);
+        m_state = State::Missing;
+        m_message = m_folder.empty()
+            ? "Drum kit not found: put Gogodze Phu Vol II in " + samplekits::userFolder() + "/" + std::string(KitFolderName)
+            : "Drum kit not found at " + program.string();
+        return false;
+    }
+    {
+        std::lock_guard lock(m_mutex);
+        m_state = State::Loading;
+        m_message = "Loading the drum kit...";
+    }
+    m_kit = sfz::parseFile(program.string());
+    m_loaded = true;
+    return true;
+}
+
+void Library::run()
+{
+    for (;;) {
+        Job job;
+        {
+            std::unique_lock lock(m_mutex);
+            const auto woken = [this] { return m_stop || !m_jobs.empty() || m_trimRequested; };
+            const bool timedOut = m_trimTries > 0 ? !m_wake.wait_for(lock, TrimInterval, woken)
+                                                  : (m_wake.wait(lock, woken), false);
+            if (m_stop) return;
+            if (m_trimRequested) {
+                m_trimRequested = false;
+                m_trimTries = TrimAttempts;
+                continue;
+            }
+            if (timedOut) {
+                --m_trimTries;
+                lock.unlock();
+                trim();
+                continue;
+            }
+            job = std::move(m_jobs.front());
+            m_jobs.pop_front();
+            m_busy = true;
+        }
+        if ((m_loaded || loadKit()) && !job.target.expired()) {
+            {
+                std::lock_guard build(m_buildMutex);
+                auto zones = buildZones(m_kit, job.settings, m_cache);
+                if (auto sampler = job.target.lock()) {
+                    sampler->stageZones(std::move(zones));
+                    sampler->collectRetired();
+                }
+            }
+            std::lock_guard lock(m_mutex);
+            m_state = State::Ready;
+            m_message.clear();
+        }
+        {
+            std::lock_guard lock(m_mutex);
+            m_busy = false;
+            m_trimTries = TrimAttempts;               // the old zones go once the audio thread lets go
+        }
+        m_idle.notify_all();
+    }
+}
+
+} // namespace drumkit

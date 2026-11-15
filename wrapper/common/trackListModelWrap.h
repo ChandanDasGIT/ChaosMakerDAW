@@ -195,16 +195,16 @@ public:
     // Harmonium tracks, for HarmoniumWrap, the same way: harmoniumChanged, not dataChanged.
     const harmonium::Settings* harmonium(int trackId) const;   // null unless a Harmonium track
     bool setHarmonium(int trackId, const harmonium::Settings& settings);
-    // Drums tracks, for DrumsWrap, the same way: drumKitChanged.
+    // Drums tracks, for AcousticWrap, the same way: drumKitChanged.
     const drumkit::Settings* drumKit(int trackId) const;       // null unless a Drums track
     bool setDrumKit(int trackId, const drumkit::Settings& settings);
-    // Electronic Drums tracks, for ElectrodrumsWrap, the same way: electroDrumsChanged.
+    // Electronic Drums tracks, for ElectronicWrap, the same way: electroDrumsChanged.
     const electrodrums::Settings* electroDrums(int trackId) const;   // null unless Electronic Drums
     bool setElectroDrums(int trackId, const electrodrums::Settings& settings);
     // Piano tracks, for PianoWrap, the same way: pianoChanged.
     const piano::Settings* piano(int trackId) const;             // null unless a Piano or Chords track
     bool setPiano(int trackId, const piano::Settings& settings);
-    // Chords tracks (strips, autoplay, key), for ChordPlayerWrap: chordsChanged.
+    // Chords tracks (strips, autoplay, key), for ChordsWrap: chordsChanged.
     const chords::Settings* chords(int trackId) const;           // null unless a Chords track
     bool setChords(int trackId, const chords::Settings& settings);
     // Synth tracks, for SynthWrap, the same way: synthChanged.

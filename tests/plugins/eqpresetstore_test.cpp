@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "common/eq/eqpresetstore.h"
-#include "common/eq/tenbandeq.h"
+#include "common/trackEffectsPanel/plugins/tenbandeq/eqpresetstore.h"
+#include "common/trackEffectsPanel/plugins/tenbandeq/tenbandeq.h"
 
 #include <cstdio>
 #include <filesystem>

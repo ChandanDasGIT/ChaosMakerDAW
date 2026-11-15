@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/analysis/progress.h"
+#include "topBar/toolsMenu/common/progress.h"
 
 #include <array>
 #include <vector>

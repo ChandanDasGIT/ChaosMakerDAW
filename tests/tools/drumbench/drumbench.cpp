@@ -33,9 +33,9 @@
 // velocity 40 is a ghost note: counted apart ("soft"), as missing those matters less.
 
 #include "topBar/toolsMenu/drumAnalyzer/drumtranscriber.h"
-#include "common/analysis/hpss.h"
+#include "topBar/toolsMenu/common/hpss.h"
 #include "topBar/toolsMenu/drumAnalyzer/kitshapes.h"
-#include "common/analysis/spectrogram.h"
+#include "topBar/toolsMenu/common/spectrogram.h"
 #include "topBar/projectActions/audioimport.h"
 
 #include <algorithm>

@@ -8,9 +8,9 @@
 // (default Am G F E) one per bar, twice
 // through, then the last chord stopped and the piano left to ring out. The piano comes from the
 // resources/sample-kits (or $CHAOSMAKER_SAMPLE_KITS); nothing else is read or written.
-#include "common/trackEffectsPanel/instruments/piano/piano.h"
-#include "common/chordPlayer/chordplayer.h"
-#include "common/chordPlayer/chordsymbol.h"
+#include "instruments/piano/piano.h"
+#include "instruments/chords/chordplayer.h"
+#include "instruments/chords/chordsymbol.h"
 #include "common/processor/processor.h"
 
 #include <algorithm>

@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/instruments/synth/synth.h"
-#include "common/trackEffectsPanel/instruments/synth/synthpresets.h"
-#include "common/trackEffectsPanel/instruments/synth/synthjson.h"
-#include "common/trackEffectsPanel/instruments/synth/synthpresetstore.h"
+#include "instruments/synth/synth.h"
+#include "instruments/synth/synthpresets.h"
+#include "instruments/synth/synthjson.h"
+#include "instruments/synth/synthpresetstore.h"
 
 #include <chrono>
 #include <cmath>

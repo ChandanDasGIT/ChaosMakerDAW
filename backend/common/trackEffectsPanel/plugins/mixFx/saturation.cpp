@@ -1,5 +1,5 @@
 #include "common/trackEffectsPanel/plugins/mixFx/saturation.h"
-#include "common/dsp/gaincomputer.h"
+#include "common/trackEffectsPanel/plugins/mixFx/common/gaincomputer.h"
 
 #include <algorithm>
 #include <cmath>

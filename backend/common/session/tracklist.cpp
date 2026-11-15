@@ -3,7 +3,7 @@
 #include "common/dsp/panlaw.h"
 #include "common/mixerpanel.h"
 #include "trackList/tracklayout.h"
-#include "common/instruments/instrumentcatalog.h"
+#include "instruments/common/instrumentcatalog.h"
 
 #include <algorithm>
 #include <cmath>

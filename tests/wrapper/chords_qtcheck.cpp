@@ -1,11 +1,11 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackEffectsPanel/plugins/chordPlayer/chordPlayerWrap.h"
+#include "wrapper/instruments/chords/chordsWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
 #include "wrapper/topBar/appSettings/appSettingsWrap.h"
 #include "wrapper/pianoRoll/pianoRollWrap.h"
 #include "common/audiodevice/audiodevice.h"
-#include "common/instruments/chordsinstrument.h"
+#include "instruments/chords/chordsinstrument.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -83,7 +83,7 @@ TEST(qtchords, the_page_edits_the_track_and_its_player_follows)
     const int piano = tracks.addInstrumentTrackOfType("Piano");
     CHECK(id >= 0 && playerOf(controller, id));
 
-    ChordPlayerWrap page;
+    ChordsWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id); page.setEngine(&controller);
     CHECK(page.valid());
     CHECK((page.chords() == QStringList{"C", "Dm", "Em", "F", "G", "Am", "Bdim", "G7"}));
@@ -162,10 +162,10 @@ TEST(qtchords, the_page_edits_the_track_and_its_player_follows)
     CHECK(controller.projectDirty());
 
     // A second page on the same track follows; a page on another track type does nothing.
-    ChordPlayerWrap other;
+    ChordsWrap other;
     other.setTrackModel(&tracks); other.setTrackId(id);
     CHECK(other.chords() == page.chords() && other.autoplay() == 1);
-    ChordPlayerWrap notChords;
+    ChordsWrap notChords;
     notChords.setTrackModel(&tracks); notChords.setTrackId(piano);
     CHECK(!notChords.valid() && !notChords.setChord(0, "C"));
     CHECK(page.resetToDefaults() && page.chords()[0] == "C" && other.chords()[0] == "C");
@@ -181,7 +181,7 @@ TEST(qtchords, strips_and_midi_keys_play_and_autoplay_keeps_going_while_stopped)
     TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addTrackChoice("Chords");
-    ChordPlayerWrap page;
+    ChordsWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id); page.setEngine(&controller);
     page.setWatchActive(true);
     tick(); io->process();
@@ -227,7 +227,7 @@ TEST(qtchords, a_time_signature_change_reaches_the_patterns)
     TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addTrackChoice("Chords");
-    ChordPlayerWrap page;
+    ChordsWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id); page.setEngine(&controller);
     tick(); io->process();
     const auto* player = playerOf(controller, id);
@@ -257,7 +257,7 @@ TEST(qtchords, recording_keeps_the_presses_which_play_back_and_convert_to_piano_
     controller.setBpm(120);
     controller.setMeter(4, 4);
     const int id = tracks.addTrackChoice("Chords");
-    ChordPlayerWrap page;
+    ChordsWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id); page.setEngine(&controller);
     CHECK(tracks.setRecordArmed(id, true));
     tick(); io->process();
@@ -325,7 +325,7 @@ TEST(qtchords, zones_follow_the_preferred_mapping_and_the_name_plays_the_whole_s
     TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addTrackChoice("Chords");
-    ChordPlayerWrap page;
+    ChordsWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id); page.setEngine(&controller);
     page.setWatchActive(true);
     tick(); io->process();
@@ -387,7 +387,7 @@ TEST(qtchords, volume_and_bass_with_chords_are_saved_on_the_track_and_reach_the_
     TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addTrackChoice("Chords");
-    ChordPlayerWrap page;
+    ChordsWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id); page.setEngine(&controller);
     CHECK(page.dynamics() == 0 && page.bassWithChords());              // the defaults
     tick(); io->process();

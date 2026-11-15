@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/guitarsuitepreset.h"
+#include "instruments/guitar/electric/guitarsuitepreset.h"
 
 TEST(guitarsuitepreset, parse_valid_preset_and_validate_schema) {
     const std::string json = R"({

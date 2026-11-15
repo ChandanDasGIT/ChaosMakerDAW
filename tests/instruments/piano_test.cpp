@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "common/instruments/instrumentfactory.h"
-#include "common/trackEffectsPanel/instruments/piano/piano.h"
-#include "common/trackEffectsPanel/instruments/piano/pianolibrary.h"
-#include "common/instruments/sampler/sampler.h"
+#include "instruments/common/instrumentfactory.h"
+#include "instruments/piano/piano.h"
+#include "instruments/piano/pianolibrary.h"
+#include "instruments/common/sampler/sampler.h"
 #include "common/session/project.h"
 
 #include <cmath>

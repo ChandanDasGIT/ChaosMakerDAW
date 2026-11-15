@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedaleditorrules.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/tuner/tunertext.h"
+#include "instruments/guitar/electric/pedaleditorrules.h"
+#include "instruments/guitar/electric/tuner/tunertext.h"
 
 TEST(pedaleditorrules, pedal_features_by_type)
 {

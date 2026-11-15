@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/dsp/pitchtracker.h"
+#include "common/trackEffectsPanel/plugins/pitchMonitor/pitchtracker.h"
 #include "common/trackEffectsPanel/plugins/mixFx/mixeffect.h"
 #include "common/rt/rtqueue.h"
 

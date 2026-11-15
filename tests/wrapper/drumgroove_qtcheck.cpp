@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/groovePanelWrap.h"
+#include "wrapper/instruments/drums/groovePanelWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
 

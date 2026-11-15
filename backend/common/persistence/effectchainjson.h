@@ -1,14 +1,14 @@
 #pragma once
 
-#include "common/trackEffectsPanel/instruments/drums/drumkitsettings.h"
-#include "common/trackEffectsPanel/instruments/electrodrums/electrosettings.h"
-#include "common/trackEffectsPanel/instruments/harmonium/harmoniumsettings.h"
-#include "common/trackEffectsPanel/instruments/piano/pianosettings.h"
-#include "common/trackEffectsPanel/instruments/synth/synthsettings.h"
-#include "common/trackEffectsPanel/instruments/guitar/bass/basssettings.h"
+#include "instruments/drums/acoustic/drumkitsettings.h"
+#include "instruments/drums/electronic/electrosettings.h"
+#include "instruments/harmonium/harmoniumsettings.h"
+#include "instruments/piano/pianosettings.h"
+#include "instruments/synth/synthsettings.h"
+#include "instruments/guitar/bass/basssettings.h"
 #include "common/trackEffectsPanel/plugins/chaosEq/chaoseqsettings.h"
-#include "common/chordPlayer/chordsettings.h"
-#include "common/mixfxspec.h"
+#include "instruments/chords/chordsettings.h"
+#include "common/trackEffectsPanel/plugins/mixFx/mixfxspec.h"
 
 #include <map>
 

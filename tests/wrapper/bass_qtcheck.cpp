@@ -1,10 +1,10 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackEffectsPanel/instruments/guitar/bass/bassWrap.h"
+#include "wrapper/instruments/guitar/bass/bassWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
-#include "common/trackEffectsPanel/instruments/guitar/bass/bassguitar.h"
-#include "common/trackEffectsPanel/instruments/guitar/bass/basspresets.h"
+#include "instruments/guitar/bass/bassguitar.h"
+#include "instruments/guitar/bass/basspresets.h"
 
 #include <QCoreApplication>
 #include <QDir>

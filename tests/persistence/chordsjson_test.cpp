@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "common/instruments/instrumentfactory.h"
-#include "common/trackEffectsPanel/plugins/chordPlayer/chordsjson.h"
+#include "instruments/common/instrumentfactory.h"
+#include "instruments/chords/chordsjson.h"
 #include "common/persistence/projectdocument.h"
 #include "common/session/tracklist.h"
 

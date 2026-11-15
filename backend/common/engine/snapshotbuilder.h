@@ -2,11 +2,11 @@
 
 #include "common/engine/enginesnapshot.h"
 #include "common/processor/trackinput.h"
-#include "common/eq/tenbandeq.h"
+#include "common/trackEffectsPanel/plugins/tenbandeq/tenbandeq.h"
 #include "common/trackEffectsPanel/plugins/chaosEq/chaoseq.h"
 #include "common/trackEffectsPanel/plugins/mixFx/mixeffect.h"
 #include "common/session/project.h"
-#include "common/dsp/trackmeters.h"
+#include "common/engine/trackmeters.h"
 
 #include <algorithm>
 #include <cmath>

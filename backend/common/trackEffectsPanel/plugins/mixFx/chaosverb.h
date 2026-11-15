@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/trackEffectsPanel/plugins/mixFx/mixeffect.h"
-#include "common/dsp/reverbcore.h"
+#include "common/trackEffectsPanel/plugins/mixFx/common/reverbcore.h"
 #include "common/dsp/biquad.h"
 #include "common/dsp/eqbanddesign.h"
 #include "common/processor/smoother.h"

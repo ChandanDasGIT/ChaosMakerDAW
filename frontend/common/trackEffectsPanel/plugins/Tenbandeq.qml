@@ -9,7 +9,7 @@ Item {
     property string trackName: ""
     property var eqBands: []
 
-    EqWrap {
+    TenbandeqWrap {
         id: eqBridge
     }
 

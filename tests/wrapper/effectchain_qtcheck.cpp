@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackEffectsPanel/instruments/guitar/electric/electricWrap.h"
+#include "wrapper/instruments/guitar/electric/electricWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
 

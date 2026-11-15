@@ -3,7 +3,7 @@
 #include "wrapper/common/engine/engineController.h"
 #include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
-#include "common/mixfxspec.h"
+#include "common/trackEffectsPanel/plugins/mixFx/mixfxspec.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>

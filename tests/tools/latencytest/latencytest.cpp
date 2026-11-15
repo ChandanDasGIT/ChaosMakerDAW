@@ -12,7 +12,7 @@
 // the two ports (playback + capture). The difference is what the reports leave out, i.e.
 // what recording would need to shift takes by to line up with playback.
 
-#include "common/dsp/latencymeasure.h"
+#include "latencymeasure.h"
 
 #include <jack/jack.h>
 

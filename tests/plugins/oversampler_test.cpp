@@ -2,7 +2,7 @@
 #include "testsignals.h"
 #include "common/dsp/fft.h"
 #include "common/dsp/oversampler2x.h"
-#include "common/dsp/oversampler4x.h"
+#include "instruments/guitar/electric/pedals/common/oversampler4x.h"
 
 #include <cmath>
 #include <complex>

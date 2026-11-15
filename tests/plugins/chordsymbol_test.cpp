@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/chordPlayer/chordsymbol.h"
+#include "instruments/chords/chordsymbol.h"
 
 #include <set>
 

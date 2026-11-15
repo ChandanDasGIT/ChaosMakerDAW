@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/tuner/tunerstate.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/tuner/tuner.h"
+#include "instruments/guitar/electric/tuner/tunerstate.h"
+#include "instruments/guitar/electric/tuner/tuner.h"
 
 TEST(tunerstate, bypassed_or_silent_returns_waiting_state) {
     auto silent = TunerState::evaluate(0.0f, 1, 0, false);

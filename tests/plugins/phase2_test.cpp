@@ -1,14 +1,14 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/noisegate.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/compressor.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/wah.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/chorus.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/tremolo.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/tuner/tuner.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/tuner/standardtuning.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/delaypedal.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/guitarsuite.h"
+#include "instruments/guitar/electric/pedals/noisegate.h"
+#include "instruments/guitar/electric/pedals/compressor.h"
+#include "instruments/guitar/electric/pedals/wah.h"
+#include "instruments/guitar/electric/pedals/chorus.h"
+#include "instruments/guitar/electric/pedals/tremolo.h"
+#include "instruments/guitar/electric/tuner/tuner.h"
+#include "instruments/guitar/electric/tuner/standardtuning.h"
+#include "instruments/guitar/electric/pedals/delaypedal.h"
+#include "instruments/guitar/electric/guitarsuite.h"
 #include <memory>
 
 namespace {

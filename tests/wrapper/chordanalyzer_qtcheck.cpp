@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "analysis/chordrender.h"
-#include "common/chordPlayer/chordplayer.h"
+#include "instruments/chords/chordplayer.h"
 #include "wrapper/topBar/toolsMenu/chordAnalyzerWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
 

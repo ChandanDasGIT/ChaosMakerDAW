@@ -1,8 +1,8 @@
 #include "testkit.h"
 #include "common/recording/takerecorder.h"
-#include "wrapper/common/trackEffectsPanel/instruments/guitar/electric/electricWrap.h"
+#include "wrapper/instruments/guitar/electric/electricWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/guitarsuite.h"
+#include "instruments/guitar/electric/guitarsuite.h"
 #include <QCoreApplication>
 #include <QDataStream>
 #include <QEventLoop>

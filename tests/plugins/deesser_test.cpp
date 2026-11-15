@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "common/trackEffectsPanel/plugins/mixFx/deesser.h"
-#include "common/dsp/gaincomputer.h"
+#include "common/trackEffectsPanel/plugins/mixFx/common/gaincomputer.h"
 
 #include <cmath>
 #include <vector>

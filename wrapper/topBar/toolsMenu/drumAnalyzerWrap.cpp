@@ -1,8 +1,8 @@
 #include "drumAnalyzerWrap.h"
 
-#include "common/groovePanel/drumgroove.h"
-#include "common/instruments/instrumentcatalog.h"
-#include "common/groovePanel/groovestore.h"
+#include "instruments/drums/groovePanel/drumgroove.h"
+#include "instruments/common/instrumentcatalog.h"
+#include "instruments/drums/groovePanel/groovestore.h"
 #include "common/session/project.h"
 #include "common/session/tracklist.h"
 #include "wrapper/common/trackListModelWrap.h"

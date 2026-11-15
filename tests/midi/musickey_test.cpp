@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/midi/musickey.h"
+#include "common/trackEffectsPanel/plugins/pitchMonitor/musickey.h"
 
 using musickey::Scale;
 

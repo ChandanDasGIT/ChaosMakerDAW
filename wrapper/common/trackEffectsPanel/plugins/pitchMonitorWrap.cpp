@@ -1,6 +1,6 @@
 #include "pitchMonitorWrap.h"
-#include "common/dsp/pitchtracker.h"
-#include "common/midi/musickey.h"
+#include "common/trackEffectsPanel/plugins/pitchMonitor/pitchtracker.h"
+#include "common/trackEffectsPanel/plugins/pitchMonitor/musickey.h"
 #include "common/midi/notenames.h"
 #include "common/trackEffectsPanel/plugins/pitchMonitor/pitchanalysis.h"
 #include "common/trackEffectsPanel/plugins/pitchMonitor/pitchmonitor.h"

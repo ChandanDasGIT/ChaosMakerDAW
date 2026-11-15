@@ -1,10 +1,10 @@
 #pragma once
 
-#include "common/analysis/beattracker.h"
+#include "topBar/toolsMenu/common/beattracker.h"
 #include "topBar/toolsMenu/drumAnalyzer/drumnmf.h"
-#include "common/analysis/meterdetect.h"
-#include "common/analysis/onsets.h"
-#include "common/analysis/progress.h"
+#include "topBar/toolsMenu/common/meterdetect.h"
+#include "topBar/toolsMenu/common/onsets.h"
+#include "topBar/toolsMenu/common/progress.h"
 #include "common/midi/midinote.h"
 
 #include <optional>

@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/mixEffectWrap.h"
+#include "wrapper/common/trackEffectsPanel/plugins/mixEffectWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
 

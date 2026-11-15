@@ -2,7 +2,7 @@
 #include "common/audiodevice/audiodevice.h"
 #include "common/engine/enginecommands.h"
 #include "common/engine/enginesnapshot.h"
-#include "common/eq/tenbandeq.h"
+#include "common/trackEffectsPanel/plugins/tenbandeq/tenbandeq.h"
 #include "common/dsp/peakmeter.h"
 #include "common/processor/smoother.h"
 #include "common/rt/rtqueue.h"

@@ -1,7 +1,7 @@
 #include "topBar/toolsMenu/drumAnalyzer/drumtranscriber.h"
 
-#include "common/analysis/hpss.h"
-#include "common/analysis/spectrogram.h"
+#include "topBar/toolsMenu/common/hpss.h"
+#include "topBar/toolsMenu/common/spectrogram.h"
 
 #include <algorithm>
 #include <cmath>

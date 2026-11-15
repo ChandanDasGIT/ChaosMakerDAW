@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "common/dsp/spectrumanalyzer.h"
+#include "common/trackEffectsPanel/plugins/chaosEq/spectrumanalyzer.h"
 
 #include <cmath>
 #include <vector>

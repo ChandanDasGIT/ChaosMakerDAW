@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "common/instruments/instrumentcatalog.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/guitardefinition.h"
+#include "instruments/common/instrumentcatalog.h"
+#include "instruments/guitar/electric/guitardefinition.h"
 
 #include <array>
 #include <set>

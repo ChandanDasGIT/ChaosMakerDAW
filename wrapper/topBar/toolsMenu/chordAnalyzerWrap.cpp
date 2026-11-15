@@ -1,7 +1,7 @@
 #include "chordAnalyzerWrap.h"
 
-#include "common/chordPlayer/chordplayer.h"
-#include "common/chordPlayer/chordsettings.h"
+#include "instruments/chords/chordplayer.h"
+#include "instruments/chords/chordsettings.h"
 #include "common/session/project.h"
 #include "common/session/tracklist.h"
 #include "wrapper/common/trackListModelWrap.h"

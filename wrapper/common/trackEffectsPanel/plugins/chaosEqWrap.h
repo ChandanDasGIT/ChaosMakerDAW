@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/trackEffectsPanel/plugins/chaosEq/chaoseqcurve.h"
-#include "common/dsp/spectrumanalyzer.h"
+#include "common/trackEffectsPanel/plugins/chaosEq/spectrumanalyzer.h"
 
 #include <QElapsedTimer>
 #include <QObject>

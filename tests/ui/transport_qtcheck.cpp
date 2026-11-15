@@ -1,12 +1,12 @@
 #include <QtTest>
 #include <QStyleHints>
-#include "common/mixfxspec.h"
+#include "common/trackEffectsPanel/plugins/mixFx/mixfxspec.h"
 #include "wrapper/common/engine/engineController.h"
 #include "wrapper/topBar/appSettings/appSettingsWrap.h"
 #include "wrapper/common/shortcutsWrap.h"
-#include "wrapper/common/trackEffectsPanel/instruments/guitar/electric/electricWrap.h"
-#include "common/trackEffectsPanel/instruments/synth/synthpresets.h"
-#include "common/trackEffectsPanel/instruments/guitar/bass/basspresets.h"
+#include "wrapper/instruments/guitar/electric/electricWrap.h"
+#include "instruments/synth/synthpresets.h"
+#include "instruments/guitar/bass/basspresets.h"
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QSignalSpy>
@@ -21,7 +21,7 @@
 #include <QTemporaryDir>
 #include "tests/analysis/chordrender.h"
 #include "tests/analysis/drumrender.h"
-#include "common/groovePanel/groovestore.h"
+#include "instruments/drums/groovePanel/groovestore.h"
 #include <QStandardPaths>
 #include <QScopeGuard>
 #include <QAbstractItemModelTester>
@@ -986,7 +986,7 @@ private slots:
         while(it.hasNext()) files<<it.next();
         for(const QString& path:files) {
             const QString rel=path.mid(root.size()+1);
-            if(rel.startsWith("frontend/common/")&&!rel.startsWith("frontend/common/trackEffectsPanel/")&&rel!="frontend/common/FilePicker.qml"&&rel!="frontend/common/GroovePanel.qml"&&rel!="frontend/common/NameDialog.qml") continue;
+            if(rel.startsWith("frontend/common/")&&!rel.startsWith("frontend/common/trackEffectsPanel/")&&rel!="frontend/common/FilePicker.qml"&&rel!="frontend/common/NameDialog.qml") continue;
             QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
             int line=0;
             for(const QByteArray& bytes:file.readAll().split('\n')) {
@@ -1902,7 +1902,7 @@ private slots:
         QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
         while(it.hasNext()) {
             const QString path=it.next(), rel=path.mid(root.size()+1);
-            if(!rel.startsWith("frontend/common/trackEffectsPanel/")&&rel!="frontend/common/GroovePanel.qml"&&rel!="frontend/transportBar/QuickSettings.qml") continue;
+            if(!rel.startsWith("frontend/common/trackEffectsPanel/")&&!rel.startsWith("frontend/instruments/")&&rel!="frontend/transportBar/QuickSettings.qml") continue;
             QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
             if(file.readAll().contains("ThemedSlider")) offenders<<rel;
         }

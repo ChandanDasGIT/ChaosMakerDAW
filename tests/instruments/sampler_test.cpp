@@ -1,7 +1,7 @@
 #include "testkit.h"
-#include "common/instruments/sampler/sampler.h"
-#include "common/instruments/sampler/samplervoice.h"
-#include "common/instruments/sampler/zonemap.h"
+#include "instruments/common/sampler/sampler.h"
+#include "instruments/common/sampler/samplervoice.h"
+#include "instruments/common/sampler/zonemap.h"
 
 #include <array>
 #include <cmath>

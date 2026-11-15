@@ -3,11 +3,11 @@
 #include "common/engine/snapshotbuilder.h"
 #include "common/mixerpanel.h"
 #include <optional>
-#include "common/eq/eqpresets.h"
-#include "common/eq/eqpresetstore.h"
+#include "common/trackEffectsPanel/plugins/tenbandeq/eqpresets.h"
+#include "common/trackEffectsPanel/plugins/tenbandeq/eqpresetstore.h"
 #include "common/recording/takerecorder.h"
 #include <QFileInfo>
-#include "common/eq/tenbandeq.h"
+#include "common/trackEffectsPanel/plugins/tenbandeq/tenbandeq.h"
 #include <QFile>
 #include <QSaveFile>
 #include <QJsonArray>

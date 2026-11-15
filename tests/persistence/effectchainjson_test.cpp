@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "common/persistence/effectchainjson.h"
-#include "common/effects/effectchain.h"
+#include "common/trackEffectsPanel/effectchain.h"
 #include "common/session/tracklist.h"
 
 #include <algorithm>

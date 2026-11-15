@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/instruments/harmonium/harmoniumjson.h"
+#include "instruments/harmonium/harmoniumjson.h"
 #include "common/persistence/projectdocument.h"
 
 using persistence::harmoniumjson::fromJson;

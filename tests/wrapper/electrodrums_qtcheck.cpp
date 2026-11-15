@@ -1,9 +1,9 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackEffectsPanel/instruments/electrodrums/electrodrumsWrap.h"
+#include "wrapper/instruments/drums/electronic/electronicWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
-#include "common/trackEffectsPanel/instruments/electrodrums/electrodrums.h"
+#include "instruments/drums/electronic/electrodrums.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -95,7 +95,7 @@ TEST(qtelectrodrums, wrapper_edits_the_track_and_follows_other_panels)
     CHECK(tracks.electroDrums(id) != nullptr);
     CHECK(tracks.electroDrums(acoustic) == nullptr);
 
-    ElectrodrumsWrap a, b;
+    ElectronicWrap a, b;
     a.setTrackModel(&tracks); a.setTrackId(id);
     b.setTrackModel(&tracks); b.setTrackId(id);
     CHECK(a.valid());
@@ -129,7 +129,7 @@ TEST(qtelectrodrums, wrapper_edits_the_track_and_follows_other_panels)
     CHECK(a.styles().size() == 3 && a.drums().size() == electrodrums::DrumCount);
     CHECK(a.drumTitle("hihatPedal") == "Hi-hat pedal" && a.drumTitle("cowbell").isEmpty());
 
-    ElectrodrumsWrap other;                                   // the acoustic kit's track
+    ElectronicWrap other;                                   // the acoustic kit's track
     other.setTrackModel(&tracks); other.setTrackId(acoustic);
     CHECK(!other.valid());
     other.setVolume(-3.0);
@@ -149,7 +149,7 @@ TEST(qtelectrodrums, the_track_plays_the_kit_and_edits_reach_it)
     if (!instrument || instrument->typeId() != "electrodrums") return;
     const auto& kit = static_cast<const ElectroDrums&>(*instrument);
 
-    ElectrodrumsWrap page;
+    ElectronicWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id);
     page.setStyle("studio");
     page.setLevel("snare", -4.0);
@@ -176,15 +176,15 @@ TEST(qtelectrodrums, the_picture_plays_pads_and_sees_every_hit)
     const int id = tracks.addInstrumentTrackOfType("Electronic Drums");
     tick(); keyboard->play(2);
 
-    ElectrodrumsWrap page;
+    ElectronicWrap page;
     CHECK(page.pads().size() == 16);
     CHECK(page.pads().first().toMap().value("key").toInt() == 55);
     CHECK(page.padName(63) == "Clap" && page.padDrum(63) == "clap" && page.padDrum(56) == "hihatClosed");
     CHECK(page.padName(59).isEmpty() && page.padDrum(59).isEmpty());
     page.setTrackModel(&tracks); page.setTrackId(id);
     QList<QPair<int, int>> hits, played;
-    QObject::connect(&page, &ElectrodrumsWrap::hit, &page, [&hits](int key, int velocity) { hits.append({key, velocity}); });
-    QObject::connect(&page, &ElectrodrumsWrap::played, &page, [&played](int key, int velocity) { played.append({key, velocity}); });
+    QObject::connect(&page, &ElectronicWrap::hit, &page, [&hits](int key, int velocity) { hits.append({key, velocity}); });
+    QObject::connect(&page, &ElectronicWrap::played, &page, [&played](int key, int velocity) { played.append({key, velocity}); });
 
     page.play(63, 90);                                           // no engine yet: nothing
     CHECK(played.isEmpty());

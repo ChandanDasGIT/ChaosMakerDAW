@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/trackEffectsPanel/instruments/drums/drummap.h"
+#include "instruments/drums/acoustic/drummap.h"
 
 #include <set>
 

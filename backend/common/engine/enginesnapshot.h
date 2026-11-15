@@ -3,7 +3,7 @@
 #include "common/midi/midievent.h"
 #include "common/processor/processor.h"
 #include "common/transport/tempomap.h"
-#include "common/dsp/trackmeters.h"
+#include "common/engine/trackmeters.h"
 #include "timeline/volumeenvelope.h"
 
 #include <algorithm>

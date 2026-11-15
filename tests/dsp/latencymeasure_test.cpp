@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/dsp/latencymeasure.h"
+#include "tools/latencytest/latencymeasure.h"
 
 #include <cstdint>
 #include <algorithm>

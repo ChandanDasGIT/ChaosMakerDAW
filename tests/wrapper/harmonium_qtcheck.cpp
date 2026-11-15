@@ -1,9 +1,9 @@
 #include "testkit.h"
 #include "wrapper/common/engine/engineController.h"
-#include "wrapper/common/trackEffectsPanel/instruments/harmonium/harmoniumWrap.h"
+#include "wrapper/instruments/harmonium/harmoniumWrap.h"
 #include "wrapper/common/trackListModelWrap.h"
 #include "common/audiodevice/audiodevice.h"
-#include "common/trackEffectsPanel/instruments/harmonium/harmonium.h"
+#include "instruments/harmonium/harmonium.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>

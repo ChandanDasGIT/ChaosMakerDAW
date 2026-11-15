@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "common/dsp/pitchtracker.h"
+#include "common/trackEffectsPanel/plugins/pitchMonitor/pitchtracker.h"
 
 #include <algorithm>
 #include <cmath>

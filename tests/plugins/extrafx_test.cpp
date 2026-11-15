@@ -1,9 +1,9 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/parametriceq.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/fuzz.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/phaser.h"
-#include "common/trackEffectsPanel/instruments/guitar/electric/guitarsuite.h"
+#include "instruments/guitar/electric/pedals/parametriceq.h"
+#include "instruments/guitar/electric/pedals/fuzz.h"
+#include "instruments/guitar/electric/pedals/phaser.h"
+#include "instruments/guitar/electric/guitarsuite.h"
 #include <memory>
 
 namespace {

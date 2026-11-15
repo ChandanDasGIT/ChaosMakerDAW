@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/analysis/spectrogram.h"
+#include "topBar/toolsMenu/common/spectrogram.h"
 
 #include <array>
 #include <vector>
