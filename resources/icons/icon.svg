@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>ChaosMaker</title>
+  <defs>
+    <radialGradient id="bg" cx="42%" cy="38%" r="80%">
+      <stop offset="0" stop-color="#3a2f8f"/>
+      <stop offset=".38" stop-color="#22245e"/>
+      <stop offset=".72" stop-color="#110f2c"/>
+      <stop offset="1" stop-color="#05050d"/>
+    </radialGradient>
+    <radialGradient id="sun" cx="38%" cy="34%" r="78%">
+      <stop offset="0" stop-color="#fff3d6"/>
+      <stop offset=".6" stop-color="#f1d49a"/>
+      <stop offset="1" stop-color="#c9a46a"/>
+    </radialGradient>
+    <radialGradient id="glow">
+      <stop offset=".45" stop-color="#e9d6ff" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#e9d6ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- stars -->
+  <g fill="#ffffff">
+    <circle cx="150" cy="52" r="3" opacity=".6"/>
+    <circle cx="262" cy="36" r="2.5" opacity=".5"/>
+    <circle cx="456" cy="160" r="3" opacity=".5"/>
+    <circle cx="474" cy="300" r="2.5" opacity=".45"/>
+    <circle cx="40" cy="240" r="3" opacity=".5"/>
+    <circle cx="250" cy="476" r="3" opacity=".5"/>
+    <circle cx="150" cy="462" r="2.5" opacity=".45"/>
+    <circle cx="346" cy="470" r="2.5" opacity=".45"/>
+    <circle cx="330" cy="58" r="2" opacity=".4"/>
+    <circle cx="60" cy="150" r="2" opacity=".4"/>
+  </g>
+  <!-- sparkles -->
+  <g fill="#ffffff">
+    <path transform="translate(84 92)" opacity=".95" d="M0 -15 Q1.8 -1.8 15 0 Q1.8 1.8 0 15 Q-1.8 1.8 -15 0 Q-1.8 -1.8 0 -15Z"/>
+    <path transform="translate(432 420)" opacity=".8" d="M0 -12 Q1.44 -1.44 12 0 Q1.44 1.44 0 12 Q-1.44 1.44 -12 0 Q-1.44 -1.44 0 -12Z"/>
+    <path transform="translate(396 74)" opacity=".7" d="M0 -8 Q.96 -.96 8 0 Q.96 .96 0 8 Q-.96 .96 -8 0 Q-.96 -.96 0 -8Z"/>
+    <path transform="translate(70 424)" opacity=".7" d="M0 -8 Q.96 -.96 8 0 Q.96 .96 0 8 Q-.96 .96 -8 0 Q-.96 -.96 0 -8Z"/>
+  </g>
+
+  <g transform="translate(256 256) rotate(-18)">
+    <!-- orbits -->
+    <g fill="none" stroke="#ffffff" stroke-width="4.5" opacity=".7">
+      <ellipse rx="142" ry="104"/>
+      <ellipse rx="186" ry="128"/>
+      <ellipse rx="232" ry="150"/>
+    </g>
+    <circle r="168" fill="url(#glow)"/>
+
+    <!-- planets (muted silver / steel blue / lavender) -->
+    <circle cx="-125.4" cy="-48.8" r="13" fill="#c9c3ee"/>
+    <circle cx="-129.3" cy="-53" r="4.2" fill="#ffffff" opacity=".55"/>
+    <circle cx="66.7" cy="91.8" r="11" fill="#9aa6d8"/>
+    <circle cx="63.4" cy="88.3" r="3.5" fill="#ffffff" opacity=".5"/>
+    <circle cx="138.2" cy="-85.6" r="17" fill="#8fb0e6"/>
+    <circle cx="133.1" cy="-91.1" r="5.4" fill="#ffffff" opacity=".55"/>
+    <circle cx="-142.5" cy="82.3" r="15" fill="#6f7fc4"/>
+    <circle cx="-147" cy="77.5" r="4.8" fill="#dfe5ff" opacity=".5"/>
+    <circle cx="204.8" cy="70.4" r="23" fill="#b4b8d6"/>
+    <circle cx="197.9" cy="63.1" r="7.4" fill="#ffffff" opacity=".5"/>
+    <!-- ringed planet -->
+    <g transform="translate(-182.8 -92.3)">
+      <ellipse rx="33" ry="10" fill="none" stroke="#ffffff" stroke-width="4.5" opacity=".85" transform="rotate(-14)"/>
+      <circle r="19" fill="#d8d2f2"/>
+      <circle cx="-6" cy="-6" r="6" fill="#ffffff" opacity=".5"/>
+      <path d="M-32 7.5 A33 10 0 0 0 32 -7.5" fill="none" stroke="#ffffff" stroke-width="4.5" opacity=".85"/>
+    </g>
+
+    <!-- sun -->
+    <circle r="92" fill="url(#sun)"/>
+
+    <!-- level-meter / waveform mark, upright -->
+    <g transform="rotate(18)" fill="#2a2466">
+      <rect x="-53" y="-12" width="12" height="24" rx="6"/>
+      <rect x="-33" y="-34" width="12" height="68" rx="6"/>
+      <rect x="-13" y="-50" width="12" height="100" rx="6"/>
+      <rect x="7"   y="-26" width="12" height="52" rx="6"/>
+      <rect x="27"  y="-42" width="12" height="84" rx="6"/>
+      <rect x="47"  y="-16" width="12" height="32" rx="6"/>
+    </g>
+  </g>
+</svg>

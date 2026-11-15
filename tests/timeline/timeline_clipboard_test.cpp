@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "timeline/timeline.h"
-#include "session/tracklist.h"
+#include "common/session/tracklist.h"
 
 TEST(timeline_clipboard, queries_and_actions_manage_selection_lifecycle)
 {

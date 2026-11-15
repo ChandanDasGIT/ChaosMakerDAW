@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "instruments/sampler/sampler.h"
-#include "instruments/sfz/sfzloader.h"
+#include "common/instruments/sampler/sampler.h"
+#include "common/instruments/sfz/sfzloader.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -320,7 +320,7 @@ TEST(sfzloader, the_splendid_piano_map_loads_whole_with_the_pedal_live)
 {
     // The piano library (not in the repository): checked when it is here.
     const auto file = fs::path(__FILE__).parent_path().parent_path().parent_path()
-                    / "sample-kits/GrandPiano/SplendidGrandPiano/Splendid Grand Piano.sfz";
+                    / "resources/sample-kits/GrandPiano/SplendidGrandPiano/Splendid Grand Piano.sfz";
     if (!fs::exists(file)) { std::printf("    skipped: %s is not here\n", file.string().c_str()); return; }
     sfz::LoadOptions options;
     options.samples = sfz::SampleMode::Exists;

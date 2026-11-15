@@ -1,9 +1,9 @@
 #include "testkit.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "audiodevice/audiodevice.h"
-#include "instruments/harmonium/harmonium.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/common/trackEffectsPanel/instruments/harmonium/harmoniumWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/audiodevice/audiodevice.h"
+#include "common/trackEffectsPanel/instruments/harmonium/harmonium.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -87,19 +87,19 @@ struct Storage {
 TEST(qtharmonium, wrapper_edits_the_track_and_follows_other_panels)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int id = tracks.addInstrumentTrackOfType("Harmonium");
     const int piano = tracks.addInstrumentTrackOfType("Piano");
     CHECK(tracks.harmonium(id) != nullptr);
     CHECK(tracks.harmonium(piano) == nullptr);
 
-    HarmoniumWrapper a, b;
+    HarmoniumWrap a, b;
     a.setTrackModel(&tracks); a.setTrackId(id);
     b.setTrackModel(&tracks); b.setTrackId(id);
     CHECK(a.valid());
     CHECK(a.style() == "indian" && a.male() && !a.female());
     int changes = 0;
-    QObject::connect(&tracks, &TrackListWrapper::harmoniumChanged, &tracks, [&changes] { ++changes; });
+    QObject::connect(&tracks, &TrackListModelWrap::harmoniumChanged, &tracks, [&changes] { ++changes; });
 
     a.setFemale(true);
     a.setBellows(0.5);
@@ -131,7 +131,7 @@ TEST(qtharmonium, wrapper_edits_the_track_and_follows_other_panels)
     CHECK(a.resetToDefaults());
     CHECK(*tracks.harmonium(id) == harmonium::Settings{});
 
-    HarmoniumWrapper other;                                      // not a harmonium track
+    HarmoniumWrap other;                                      // not a harmonium track
     other.setTrackModel(&tracks); other.setTrackId(piano);
     CHECK(!other.valid());
     other.setFemale(true);
@@ -143,13 +143,13 @@ TEST(qtharmonium, wrapper_edits_the_track_and_follows_other_panels)
 TEST(qtharmonium, selected_key_shift_follows_the_selected_harmonium_scale_changer)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int id = tracks.addInstrumentTrackOfType("Harmonium");
     const int drums = tracks.addInstrumentTrackOfType("Drums");
-    HarmoniumWrapper panel;
+    HarmoniumWrap panel;
     panel.setTrackModel(&tracks); panel.setTrackId(id);
     QList<int> sent;
-    QObject::connect(&tracks, &TrackListWrapper::selectedKeyShiftChanged, &tracks, [&sent](int s) { sent << s; });
+    QObject::connect(&tracks, &TrackListModelWrap::selectedKeyShiftChanged, &tracks, [&sent](int s) { sent << s; });
 
     CHECK(tracks.selectTrack(id));
     CHECK(tracks.selectedKeyShift() == 0 && sent.isEmpty());      // C plays C: nothing to tell
@@ -171,7 +171,7 @@ TEST(qtharmonium, harmonium_track_plays_the_harmonium_and_edits_reach_it)
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addInstrumentTrackOfType("Harmonium");
     const auto instrument = controller.trackInstrument(id);
@@ -179,7 +179,7 @@ TEST(qtharmonium, harmonium_track_plays_the_harmonium_and_edits_reach_it)
     if (!instrument || instrument->typeId() != "harmonium") return;
     const auto& h = static_cast<const Harmonium&>(*instrument);
 
-    HarmoniumWrapper panel;
+    HarmoniumWrap panel;
     panel.setTrackModel(&tracks); panel.setTrackId(id);
     panel.setBass(true);
     panel.setDrone(1, 50);
@@ -202,7 +202,7 @@ TEST(qtharmonium, mon_lets_a_midi_keyboard_play_the_harmonium)
     auto device = std::make_unique<KeyboardDevice>();
     auto* keyboard = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int harmonium = tracks.addInstrumentTrackOfType("Harmonium");
     tracks.addInstrumentTrackOfType("Electric Guitar");          // more than one instrument
@@ -227,7 +227,7 @@ TEST(qtharmonium, mon_lets_a_midi_keyboard_play_the_harmonium)
     keyboard->play(150);
     CHECK(keyboard->play(10) > 1e-3f);                           // a new track sustains the key
 
-    HarmoniumWrapper panel;
+    HarmoniumWrap panel;
     panel.setTrackModel(&tracks); panel.setTrackId(harmonium);
     panel.setSustain(0.0);                                       // a plain harmonium
     keyboard->midi.add({0, 0x90, 62, 100});                      // the next key cuts the tail

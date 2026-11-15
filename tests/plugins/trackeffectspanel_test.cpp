@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "plugins/trackeffectspanel.h"
+#include "common/trackEffectsPanel/trackeffectspanel.h"
 
 #include <string>
 #include <vector>

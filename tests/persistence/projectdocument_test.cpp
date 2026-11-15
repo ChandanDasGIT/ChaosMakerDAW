@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include <nlohmann/json.hpp>
-#include "persistence/projectdocument.h"
+#include "common/persistence/projectdocument.h"
 #include <filesystem>
 #include <fstream>
 

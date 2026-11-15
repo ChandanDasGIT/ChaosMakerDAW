@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "dsp/levelscale.h"
+#include "mixerPanel/stereoLevelMeter/levelscale.h"
 
 #include <limits>
 

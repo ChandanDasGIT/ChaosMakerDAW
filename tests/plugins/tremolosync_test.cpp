@@ -1,7 +1,7 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "instruments/guitar/plugins/tremolo/tremolo.h"
-#include "engine/audioengine.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/tremolo/tremolo.h"
+#include "common/engine/audioengine.h"
 #include <limits>
 
 namespace {

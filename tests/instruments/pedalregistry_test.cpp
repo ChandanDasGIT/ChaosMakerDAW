@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "instruments/guitar/plugins/guitarsuite/pedalregistry.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedalregistry.h"
 
 TEST(pedalregistry, available_pedals_contains_all_eighteen_effects) {
     const auto pedals = PedalRegistry::availablePedals();

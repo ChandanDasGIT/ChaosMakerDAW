@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "persistence/chaoseqjson.h"
-#include "persistence/projectdocument.h"
+#include "common/trackEffectsPanel/plugins/chaosEq/chaoseqjson.h"
+#include "common/persistence/projectdocument.h"
 
 using persistence::chaoseqjson::fromJson;
 using persistence::chaoseqjson::toJson;

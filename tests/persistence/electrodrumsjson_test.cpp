@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "persistence/electrodrumsjson.h"
-#include "persistence/projectdocument.h"
+#include "common/trackEffectsPanel/instruments/electrodrums/electrodrumsjson.h"
+#include "common/persistence/projectdocument.h"
 
 #include <functional>
 

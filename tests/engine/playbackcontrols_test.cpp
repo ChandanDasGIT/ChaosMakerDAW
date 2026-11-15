@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "engine/playbackcontrols.h"
-#include "core/valueformat.h"
+#include "transportBar/playbackControls/playbackcontrols.h"
+#include "common/core/valueformat.h"
 
 #include <cmath>
 #include <limits>

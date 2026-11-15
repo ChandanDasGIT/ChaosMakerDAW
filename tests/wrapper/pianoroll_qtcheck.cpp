@@ -1,12 +1,12 @@
 #include "testkit.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "wrapper/pianorollwrap/pianorollwrapper.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/pianoRoll/pianoRollWrap.h"
 
 
 namespace {
-PianoRollWrapper* boundRoll(TrackListWrapper& tracks, int track, int clip, QObject* parent)
+PianoRollWrap* boundRoll(TrackListModelWrap& tracks, int track, int clip, QObject* parent)
 {
-    auto* roll = new PianoRollWrapper(parent);
+    auto* roll = new PianoRollWrap(parent);
     roll->setTrackList(&tracks);
     roll->setTrackId(track);
     roll->setClipId(clip);
@@ -16,7 +16,7 @@ PianoRollWrapper* boundRoll(TrackListWrapper& tracks, int track, int clip, QObje
 
 TEST(qtpianoroll, edits_are_written_to_the_clip_and_exposed_to_the_timeline) {
     QObject owner;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t = tracks.addInstrumentTrack();
     const int c = tracks.addClipAtBeat(t, 4, 4);
     auto* roll = boundRoll(tracks, t, c, &owner);
@@ -24,7 +24,7 @@ TEST(qtpianoroll, edits_are_written_to_the_clip_and_exposed_to_the_timeline) {
     CHECK(roll->count() == 0);
 
     int clipsChanges = 0;
-    QObject::connect(&tracks, &TrackListWrapper::clipsChanged, &owner, [&] { ++clipsChanges; });
+    QObject::connect(&tracks, &TrackListModelWrap::clipsChanged, &owner, [&] { ++clipsChanges; });
     const int id = roll->addNote(60, 1.0, 0.5, 90);
     CHECK(id > 0);
     CHECK(clipsChanges == 1);
@@ -53,7 +53,7 @@ TEST(qtpianoroll, edits_are_written_to_the_clip_and_exposed_to_the_timeline) {
 
 TEST(qtpianoroll, undo_redo_reload_notes_and_keep_selection) {
     QObject owner;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t = tracks.addInstrumentTrack();
     const int c = tracks.addClipAtBeat(t, 0, 4);
     auto* roll = boundRoll(tracks, t, c, &owner);
@@ -73,7 +73,7 @@ TEST(qtpianoroll, undo_redo_reload_notes_and_keep_selection) {
 
 TEST(qtpianoroll, docked_and_floating_views_stay_in_sync) {
     QObject owner;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t = tracks.addInstrumentTrack();
     const int c = tracks.addClipAtBeat(t, 0, 4);
     auto* docked = boundRoll(tracks, t, c, &owner);
@@ -90,7 +90,7 @@ TEST(qtpianoroll, docked_and_floating_views_stay_in_sync) {
 
 TEST(qtpianoroll, rejected_edits_revert_and_switching_or_removing_clips_reloads) {
     QObject owner;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t = tracks.addInstrumentTrack();
     const int first = tracks.addClipAtBeat(t, 0, 4);
     const int second = tracks.addClipAtBeat(t, 8, 4);
@@ -116,21 +116,21 @@ TEST(qtpianoroll, rejected_edits_revert_and_switching_or_removing_clips_reloads)
     CHECK(roll->addNote(60, 0.0, 1.0) == -1);
 
     // Unbound wrapper (no track list) still edits locally
-    PianoRollWrapper local;
+    PianoRollWrap local;
     CHECK(local.addNote(60, 0.0, 1.0) > 0);
     CHECK(local.count() == 1);
 }
 
 TEST(qtpianoroll, clip_start_beat_is_exposed_and_notifies_on_clip_moves) {
     QObject owner;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t = tracks.addInstrumentTrack();
     const int c = tracks.addClipAtBeat(t, 4, 4);
     auto* roll = boundRoll(tracks, t, c, &owner);
     CHECK(std::abs(roll->clipStartBeat() - 4.0) < 1e-6);
 
     int startChanges = 0;
-    QObject::connect(roll, &PianoRollWrapper::clipStartChanged, &owner, [&] { ++startChanges; });
+    QObject::connect(roll, &PianoRollWrap::clipStartChanged, &owner, [&] { ++startChanges; });
     CHECK(tracks.moveClipAtBeat(t, c, 8.0)); // notes unchanged, start moved
     CHECK(startChanges >= 1);
     CHECK(std::abs(roll->clipStartBeat() - 8.0) < 1e-6);
@@ -141,7 +141,7 @@ TEST(qtpianoroll, clip_start_beat_is_exposed_and_notifies_on_clip_moves) {
 
 TEST(qtpianoroll, meter_follows_the_project_time_signature) {
     QObject owner;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t = tracks.addInstrumentTrack();
     const int c = tracks.addClipAtBeat(t, 0, 4);
     auto* roll = boundRoll(tracks, t, c, &owner);
@@ -149,20 +149,20 @@ TEST(qtpianoroll, meter_follows_the_project_time_signature) {
     CHECK(roll->positionLabel(5.25) == "2.2.25");
 
     int meterChanges = 0;
-    QObject::connect(roll, &PianoRollWrapper::meterChanged, &owner, [&] { ++meterChanges; });
+    QObject::connect(roll, &PianoRollWrap::meterChanged, &owner, [&] { ++meterChanges; });
     const double bpm = tracks.domain().project().tempo().bpm();
     tracks.setTempo(bpm, 6, 8);
     CHECK(meterChanges >= 1);
     CHECK(roll->beatsPerBar() == 3.0 && roll->beatUnit() == 0.5);
     CHECK(roll->positionLabel(3.75) == "2.2.50");
 
-    PianoRollWrapper unbound; // no project: plain 4/4
+    PianoRollWrap unbound; // no project: plain 4/4
     CHECK(unbound.beatsPerBar() == 4.0 && unbound.beatUnit() == 1.0);
 }
 
 TEST(qtpianoroll, quantize_is_one_undoable_edit) {
     QObject owner;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t = tracks.addInstrumentTrack();
     const int c = tracks.addClipAtBeat(t, 0, 4);
     auto* roll = boundRoll(tracks, t, c, &owner);
@@ -170,7 +170,7 @@ TEST(qtpianoroll, quantize_is_one_undoable_edit) {
     const int b = roll->addNote(64, 1.13, 0.5);
 
     int clipsChanges = 0;
-    QObject::connect(&tracks, &TrackListWrapper::clipsChanged, &owner, [&] { ++clipsChanges; });
+    QObject::connect(&tracks, &TrackListModelWrap::clipsChanged, &owner, [&] { ++clipsChanges; });
     CHECK(roll->quantize(0.25));
     CHECK(clipsChanges == 1);                                  // one document edit
     const auto stored = tracks.domain().clipNotes(t, c);
@@ -185,23 +185,23 @@ TEST(qtpianoroll, quantize_is_one_undoable_edit) {
 
 TEST(qtpianoroll, track_colour_follows_the_bound_track) {
     QObject owner;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t = tracks.addInstrumentTrack();
     const int c = tracks.addClipAtBeat(t, 0, 4);
     auto* roll = boundRoll(tracks, t, c, &owner);
     CHECK(roll->trackColour() == QString::fromStdString(tracks.domain().project().findTrack(t)->colour));
     int changes = 0;
-    QObject::connect(roll, &PianoRollWrapper::trackColourChanged, &owner, [&] { ++changes; });
+    QObject::connect(roll, &PianoRollWrap::trackColourChanged, &owner, [&] { ++changes; });
     CHECK(tracks.setTrackColour(t, "#d97c73"));
     CHECK(changes >= 1);
     CHECK(roll->trackColour() == "#d97c73");
-    PianoRollWrapper unbound;
+    PianoRollWrap unbound;
     CHECK(unbound.trackColour().isEmpty());
 }
 
 TEST(qtpianoroll, grid_settings_come_from_the_backend_and_follow_the_meter) {
     QObject owner;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t = tracks.addInstrumentTrack();
     const int c = tracks.addClipAtBeat(t, 0, 4);
     auto* roll = boundRoll(tracks, t, c, &owner);
@@ -210,7 +210,7 @@ TEST(qtpianoroll, grid_settings_come_from_the_backend_and_follow_the_meter) {
     CHECK(std::abs(roll->snapFloor(1.3) - 1.25) < 1e-9);
 
     int changes = 0;
-    QObject::connect(roll, &PianoRollWrapper::gridChanged, &owner, [&] { ++changes; });
+    QObject::connect(roll, &PianoRollWrap::gridChanged, &owner, [&] { ++changes; });
     roll->setGridStyle("dotted");
     CHECK(changes == 1 && roll->gridStyle() == "dotted");
     roll->setGridStyle("swing");                               // unknown name: ignored
@@ -236,7 +236,7 @@ TEST(qtpianoroll, grid_settings_come_from_the_backend_and_follow_the_meter) {
 }
 
 TEST(qtpianoroll, note_names_come_from_the_backend) {
-    PianoRollWrapper roll;
+    PianoRollWrap roll;
     CHECK(roll.noteName(60) == "C4" && roll.noteName(70) == "A#4");
     CHECK(roll.noteReadout(64) == "E4 64");
     CHECK(roll.isBlackKey(63) && !roll.isBlackKey(64));
@@ -246,7 +246,7 @@ TEST(qtpianoroll, note_names_come_from_the_backend) {
 
 TEST(qtpianoroll, velocity_edits_are_one_undoable_change_and_clamped) {
     QObject owner;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t = tracks.addInstrumentTrack();
     const int c = tracks.addClipAtBeat(t, 0, 4);
     auto* roll = boundRoll(tracks, t, c, &owner);
@@ -254,7 +254,7 @@ TEST(qtpianoroll, velocity_edits_are_one_undoable_change_and_clamped) {
     const int b = roll->addNote(64, 1.0, 1.0, 100);
 
     int clipsChanges = 0;
-    QObject::connect(&tracks, &TrackListWrapper::clipsChanged, &owner, [&] { ++clipsChanges; });
+    QObject::connect(&tracks, &TrackListModelWrap::clipsChanged, &owner, [&] { ++clipsChanges; });
     CHECK(roll->setNoteVelocities({a, b}, {40, 500}));
     CHECK(clipsChanges == 1);                                  // one document edit
     auto stored = tracks.domain().clipNotes(t, c);
@@ -277,13 +277,13 @@ TEST(qtpianoroll, velocity_edits_are_one_undoable_change_and_clamped) {
 
 TEST(qtpianoroll, clip_length_and_new_note_velocity_follow_the_clip_and_the_edits) {
     QObject owner;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t = tracks.addInstrumentTrack();
     const int c = tracks.addClipAtBeat(t, 4, 4);
     auto* roll = boundRoll(tracks, t, c, &owner);
     CHECK(std::abs(roll->clipLengthBeats() - 4.0) < 1e-6);
     int changes = 0;
-    QObject::connect(roll, &PianoRollWrapper::clipStartChanged, &owner, [&] { ++changes; });
+    QObject::connect(roll, &PianoRollWrap::clipStartChanged, &owner, [&] { ++changes; });
     CHECK(tracks.resizeClipAtBeat(t, c, 6.0));                 // a timeline resize
     CHECK(changes >= 1 && std::abs(roll->clipLengthBeats() - 6.0) < 1e-6);
     CHECK(tracks.undo());
@@ -303,7 +303,7 @@ TEST(qtpianoroll, clip_length_and_new_note_velocity_follow_the_clip_and_the_edit
 
 TEST(qtpianoroll, note_model_updates_only_the_rows_an_edit_touches) {
     QObject owner;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t = tracks.addInstrumentTrack();
     const int c = tracks.addClipAtBeat(t, 4, 4);
     auto* roll = boundRoll(tracks, t, c, &owner);

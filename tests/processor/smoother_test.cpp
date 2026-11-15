@@ -1,6 +1,6 @@
 #include "testkit.h"
 
-#include "processor/smoother.h"
+#include "common/processor/smoother.h"
 
 TEST(smoother, reaches_the_target_without_jumping)
 {

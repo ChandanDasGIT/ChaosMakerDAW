@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "dsp/pitchtracker.h"
+#include "common/dsp/pitchtracker.h"
 
 #include <algorithm>
 #include <cmath>

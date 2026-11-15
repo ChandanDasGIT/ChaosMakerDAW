@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "plugins/reverb/roomreverb.h"
-#include "plugins/dynamics/gaincomputer.h"
+#include "common/trackEffectsPanel/plugins/mixFx/reverb/roomreverb.h"
+#include "common/dsp/gaincomputer.h"
 
 #include <cmath>
 #include <random>

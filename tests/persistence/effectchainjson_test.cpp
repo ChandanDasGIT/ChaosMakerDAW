@@ -1,7 +1,7 @@
 #include "testkit.h"
-#include "persistence/effectchainjson.h"
-#include "plugins/effectchain.h"
-#include "session/tracklist.h"
+#include "common/persistence/effectchainjson.h"
+#include "common/effects/effectchain.h"
+#include "common/session/tracklist.h"
 
 #include <algorithm>
 

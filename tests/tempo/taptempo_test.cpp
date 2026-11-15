@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "tempo/taptempo.h"
+#include "transportBar/tempoEditor/taptempo.h"
 
 #include <cmath>
 

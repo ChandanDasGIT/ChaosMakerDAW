@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "instruments/sfz/sfzparser.h"
+#include "common/instruments/sfz/sfzparser.h"
 
 #include <map>
 #include <string>

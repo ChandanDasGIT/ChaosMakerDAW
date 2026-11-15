@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/instruments/drums/groovewrap/drumgroovewrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "audiodevice/audiodevice.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/common/groovePanel/groovePanelWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/audiodevice/audiodevice.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -70,12 +70,12 @@ TEST(qtdrumgroove, lists_the_project_meter_first_and_adds_a_groove_at_the_bar_st
     auto device = std::make_unique<SilentDevice>();
     auto* io = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int drums = tracks.addInstrumentTrackOfType("Electronic Drums");
     const int piano = tracks.addInstrumentTrackOfType("Piano");
 
-    DrumGrooveWrapper page;
+    GroovePanelWrap page;
     page.setFolder(storage.dir.path() + "/grooves");
     page.setTrackModel(&tracks); page.setTrackId(drums);
     page.setEngine(&controller);
@@ -115,7 +115,7 @@ TEST(qtdrumgroove, lists_the_project_meter_first_and_adds_a_groove_at_the_bar_st
     CHECK(page.addToTrack("No such groove", 2) == -1 && !page.lastError().isEmpty());
     CHECK(page.addToTrack("Rock A", 0) == -1);
 
-    DrumGrooveWrapper other;                                      // not a drum track
+    GroovePanelWrap other;                                      // not a drum track
     other.setTrackModel(&tracks); other.setTrackId(piano); other.setEngine(&controller);
     CHECK(!other.valid());
     CHECK(other.addToTrack("Rock A", 1) == -1);
@@ -125,18 +125,18 @@ TEST(qtdrumgroove, the_selected_clip_becomes_a_groove_that_can_be_renamed_and_de
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     controller.setMeter(3, 4);
     const int drums = tracks.addInstrumentTrackOfType("Drums");
     const QString folder = storage.dir.path() + "/grooves";
 
-    DrumGrooveWrapper page;
+    GroovePanelWrap page;
     page.setFolder(folder);
     page.setTrackModel(&tracks); page.setTrackId(drums);
     page.setEngine(&controller);
     int trackSignals = 0;
-    QObject::connect(&page, &DrumGrooveWrapper::trackChanged, &page, [&] { ++trackSignals; });
+    QObject::connect(&page, &GroovePanelWrap::trackChanged, &page, [&] { ++trackSignals; });
 
     CHECK(!page.canSaveClip());
     CHECK(!page.saveSelectedClip("Mine") && !page.lastError().isEmpty());
@@ -175,7 +175,7 @@ TEST(qtdrumgroove, the_selected_clip_becomes_a_groove_that_can_be_renamed_and_de
     CHECK(QDir(folder).entryList({"*.groove"}).isEmpty());
 
     // A second page (the other drum track's) reads the same folder.
-    DrumGrooveWrapper second;
+    GroovePanelWrap second;
     second.setFolder(folder);
     CHECK(second.grooves().size() == 6);
 }

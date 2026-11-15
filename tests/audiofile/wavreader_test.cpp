@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "audiofile/wavreader.h"
+#include "common/audiofile/wavreader.h"
 
 #include <bit>
 #include <cstdint>

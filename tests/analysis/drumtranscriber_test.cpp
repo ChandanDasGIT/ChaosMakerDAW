@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "analysis/drumtranscriber.h"
+#include "topBar/toolsMenu/drumAnalyzer/drumtranscriber.h"
 #include "drumrender.h"
 
 #include <atomic>

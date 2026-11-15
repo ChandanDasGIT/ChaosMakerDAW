@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "recording/recordingcontroller.h"
+#include "common/recording/recordingcontroller.h"
 
 #include <filesystem>
 

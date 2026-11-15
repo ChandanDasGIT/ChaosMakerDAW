@@ -1,7 +1,7 @@
 #include "testkit.h"
-#include "analysis/hpss.h"
-#include "analysis/onsets.h"
-#include "analysis/spectrogram.h"
+#include "common/analysis/hpss.h"
+#include "common/analysis/onsets.h"
+#include "common/analysis/spectrogram.h"
 #include "drumrender.h"
 
 #include <atomic>

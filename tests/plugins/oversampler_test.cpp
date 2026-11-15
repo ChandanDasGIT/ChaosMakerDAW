@@ -1,8 +1,8 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "dsp/fft.h"
-#include "instruments/guitar/dsp/oversampler2x.h"
-#include "instruments/guitar/dsp/oversampler4x.h"
+#include "common/dsp/fft.h"
+#include "common/dsp/oversampler2x.h"
+#include "common/dsp/oversampler4x.h"
 
 #include <cmath>
 #include <complex>

@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "timeline/clipwaveform.h"
+#include "trackList/clipwaveform.h"
 
 #include <limits>
 

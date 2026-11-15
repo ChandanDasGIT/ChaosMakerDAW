@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
 
 #include <QPointF>
 #include <QVariantMap>
@@ -7,15 +7,15 @@
 #include <cmath>
 
 namespace {
-QVariant role(TrackListWrapper& tracks, int row, int role) { return tracks.data(tracks.index(row), role); }
+QVariant role(TrackListModelWrap& tracks, int row, int role) { return tracks.data(tracks.index(row), role); }
 }
 
 TEST(qtvolumeenvelope, points_are_edited_in_beats_and_undo_as_one_step_per_drag)
 {
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int track = tracks.addAudioTrack();
     const double unity = tracks.envelopeUnityLevel();
-    CHECK(role(tracks, 0, TrackListWrapper::EnvelopePointsRole).toList().isEmpty());
+    CHECK(role(tracks, 0, TrackListModelWrap::EnvelopePointsRole).toList().isEmpty());
 
     int changes = 0;
     QObject::connect(&tracks, &QAbstractItemModel::dataChanged, [&] { ++changes; });
@@ -26,7 +26,7 @@ TEST(qtvolumeenvelope, points_are_edited_in_beats_and_undo_as_one_step_per_drag)
     const auto& points = tracks.project().findTrack(track)->volumeEnvelope.points();
     CHECK(points.size() == 2 && points[0].position == 48000 && points[1].position == 96000);   // 120 BPM, 48 kHz
 
-    auto list = role(tracks, 0, TrackListWrapper::EnvelopePointsRole).toList();
+    auto list = role(tracks, 0, TrackListModelWrap::EnvelopePointsRole).toList();
     CHECK(list.size() == 2);
     CHECK_NEAR(list[1].toMap()["beat"].toDouble(), 4.0, 1e-9);
     CHECK_NEAR(list[1].toMap()["level"].toDouble(), 0.5, 1e-9);
@@ -53,10 +53,10 @@ TEST(qtvolumeenvelope, points_are_edited_in_beats_and_undo_as_one_step_per_drag)
     // Bypass is undoable and reaches the engine snapshot.
     CHECK(tracks.playbackSnapshot()->tracks[0].envelope.active());
     CHECK(tracks.setEnvelopeBypassed(track, true));
-    CHECK(role(tracks, 0, TrackListWrapper::EnvelopeBypassedRole).toBool());
+    CHECK(role(tracks, 0, TrackListModelWrap::EnvelopeBypassedRole).toBool());
     CHECK(!tracks.playbackSnapshot()->tracks[0].envelope.active());
     CHECK(tracks.undo());
-    CHECK(!role(tracks, 0, TrackListWrapper::EnvelopeBypassedRole).toBool());
+    CHECK(!role(tracks, 0, TrackListModelWrap::EnvelopeBypassedRole).toBool());
 
     // The readout of the fader-shaped scale.
     CHECK(tracks.envelopeDbText(0.0) == "-inf dB");
@@ -66,7 +66,7 @@ TEST(qtvolumeenvelope, points_are_edited_in_beats_and_undo_as_one_step_per_drag)
 
 TEST(qtvolumeenvelope, showing_a_lane_changes_the_row_layout_but_not_the_undo_history)
 {
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int a = tracks.addAudioTrack(), b = tracks.addAudioTrack();
     // Each track has its own height (restMap U9); 106 for both here.
     CHECK(tracks.setTrackHeight(a, 106) && tracks.setTrackHeight(b, 106));
@@ -75,9 +75,9 @@ TEST(qtvolumeenvelope, showing_a_lane_changes_the_row_layout_but_not_the_undo_hi
     const bool couldUndo = tracks.canUndo();
 
     int layout = 0;
-    QObject::connect(&tracks, &TrackListWrapper::layoutChanged, [&] { ++layout; });
+    QObject::connect(&tracks, &TrackListModelWrap::layoutChanged, [&] { ++layout; });
     CHECK(tracks.toggleEnvelopeShown(a));
-    CHECK(role(tracks, 0, TrackListWrapper::EnvelopeShownRole).toBool());
+    CHECK(role(tracks, 0, TrackListModelWrap::EnvelopeShownRole).toBool());
     CHECK(layout == 1);
     CHECK(tracks.layoutHeight() == 276);
     CHECK(tracks.rowTops()[1].toDouble() == 170);
@@ -86,7 +86,7 @@ TEST(qtvolumeenvelope, showing_a_lane_changes_the_row_layout_but_not_the_undo_hi
     CHECK_NEAR(tracks.rowCoordinate(150), 1.0, 1e-12);
     CHECK(tracks.canUndo() == couldUndo);   // view state: no undo step
     // Showing it gave the empty envelope its start point, and the views hear about it.
-    const auto start = role(tracks, 0, TrackListWrapper::EnvelopePointsRole).toList();
+    const auto start = role(tracks, 0, TrackListModelWrap::EnvelopePointsRole).toList();
     CHECK(start.size() == 1);
     CHECK_NEAR(start[0].toMap()["beat"].toDouble(), 0.0, 1e-12);
     CHECK_NEAR(start[0].toMap()["level"].toDouble(), tracks.envelopeUnityLevel(), 1e-12);
@@ -111,7 +111,7 @@ TEST(qtvolumeenvelope, showing_a_lane_changes_the_row_layout_but_not_the_undo_hi
 // restMap U9: a track and its envelope lane each have their own height.
 TEST(qtvolumeenvelope, each_track_and_its_lane_have_their_own_height)
 {
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int a = tracks.addAudioTrack(), b = tracks.addAudioTrack();
     CHECK(tracks.layoutHeight() == 128);                     // two tracks at the default 64
     CHECK(tracks.minTrackHeight() == 64 && tracks.maxTrackHeight() == 400);
@@ -119,10 +119,10 @@ TEST(qtvolumeenvelope, each_track_and_its_lane_have_their_own_height)
     const bool couldUndo = tracks.canUndo();
 
     int layout = 0;
-    QObject::connect(&tracks, &TrackListWrapper::layoutChanged, [&] { ++layout; });
+    QObject::connect(&tracks, &TrackListModelWrap::layoutChanged, [&] { ++layout; });
     CHECK(tracks.setTrackHeight(a, 150));
     CHECK(layout == 1);
-    CHECK(role(tracks, 0, TrackListWrapper::TrackHeightRole).toDouble() == 150);
+    CHECK(role(tracks, 0, TrackListModelWrap::TrackHeightRole).toDouble() == 150);
     CHECK(tracks.trackHeights()[0].toDouble() == 150 && tracks.trackHeights()[1].toDouble() == 64);
     CHECK(tracks.rowTops()[1].toDouble() == 150 && tracks.layoutHeight() == 214);
     CHECK(tracks.rowAtY(149) == 0 && tracks.rowAtY(150) == 1);
@@ -133,7 +133,7 @@ TEST(qtvolumeenvelope, each_track_and_its_lane_have_their_own_height)
     CHECK(tracks.toggleEnvelopeShown(b));
     CHECK(tracks.layoutHeight() == 64 + 64 + 64);
     CHECK(tracks.setTrackEnvelopeHeight(b, 120));
-    CHECK(role(tracks, 1, TrackListWrapper::EnvelopeHeightRole).toDouble() == 120);
+    CHECK(role(tracks, 1, TrackListModelWrap::EnvelopeHeightRole).toDouble() == 120);
     CHECK(tracks.envelopeHeights()[1].toDouble() == 120);
     CHECK(tracks.layoutHeight() == 64 + 64 + 120);
     CHECK(tracks.inEnvelopeLane(64 + 64 + 119) && !tracks.inEnvelopeLane(64 + 63));
@@ -146,18 +146,18 @@ TEST(qtvolumeenvelope, each_track_and_its_lane_have_their_own_height)
 
 TEST(qtvolumeenvelope, envelope_beats_follow_a_tempo_change)
 {
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int track = tracks.addAudioTrack();
     CHECK(tracks.addEnvelopePoint(track, 4.0, 0.5) == 0);
     tracks.setTempo(60.0, 4, 4);
-    const auto list = tracks.data(tracks.index(0), TrackListWrapper::EnvelopePointsRole).toList();
+    const auto list = tracks.data(tracks.index(0), TrackListModelWrap::EnvelopePointsRole).toList();
     CHECK_NEAR(list[0].toMap()["beat"].toDouble(), 2.0, 1e-9);   // same sample, half the tempo
     CHECK(tracks.project().findTrack(track)->volumeEnvelope.points()[0].position == 96000);
 }
 
 TEST(qtvolumeenvelope, curve_shapes_are_chosen_by_id_and_the_drawn_curve_is_the_played_one)
 {
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int track = tracks.addAudioTrack();
     const auto shapes = tracks.envelopeShapes();
     CHECK(shapes.size() == 5);
@@ -168,11 +168,11 @@ TEST(qtvolumeenvelope, curve_shapes_are_chosen_by_id_and_the_drawn_curve_is_the_
 
     CHECK(tracks.addEnvelopePoint(track, 0.0, 0.2) == 0);
     CHECK(tracks.addEnvelopePoint(track, 4.0, 0.9) == 1);
-    CHECK(tracks.data(tracks.index(0), TrackListWrapper::EnvelopePointsRole).toList()[0].toMap()["shape"].toString() == "linear");
+    CHECK(tracks.data(tracks.index(0), TrackListModelWrap::EnvelopePointsRole).toList()[0].toMap()["shape"].toString() == "linear");
     CHECK(tracks.setEnvelopePointShape(track, 0, "hold"));
     CHECK(!tracks.setEnvelopePointShape(track, 0, "bezier"));
     CHECK(!tracks.setEnvelopePointShape(track, 9, "smooth"));
-    CHECK(tracks.data(tracks.index(0), TrackListWrapper::EnvelopePointsRole).toList()[0].toMap()["shape"].toString() == "hold");
+    CHECK(tracks.data(tracks.index(0), TrackListModelWrap::EnvelopePointsRole).toList()[0].toMap()["shape"].toString() == "hold");
 
     // Hold: flat until the next point, then the jump, exactly at the point.
     CHECK_NEAR(tracks.envelopeLevelAt(track, 3.99), 0.2, 1e-12);
@@ -194,7 +194,7 @@ TEST(qtvolumeenvelope, curve_shapes_are_chosen_by_id_and_the_drawn_curve_is_the_
     const double quarter = tracks.envelopeLevelAt(track, 1.0);
     CHECK(quarter < 0.2 + 0.7 * 0.25);   // eases out of the first point
     CHECK(tracks.undo());
-    CHECK(tracks.data(tracks.index(0), TrackListWrapper::EnvelopePointsRole).toList()[0].toMap()["shape"].toString() == "hold");
+    CHECK(tracks.data(tracks.index(0), TrackListModelWrap::EnvelopePointsRole).toList()[0].toMap()["shape"].toString() == "hold");
     CHECK(tracks.envelopeCurve(track, 2.0, 1.0, 4).isEmpty());
     CHECK(tracks.envelopeCurve(-5, 0.0, 1.0, 4).isEmpty());
 }

@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "settings/appsettings.h"
+#include "topBar/appSettings/appsettings.h"
 
 #include <cstdio>
 #include <limits>

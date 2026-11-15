@@ -1,9 +1,9 @@
 #include "testkit.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "engine/audioengine.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/engine/audioengine.h"
 
 TEST(qtclipediting, delete_resize_undo_redo_preserve_audio_ids_and_other_tracks) {
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int a=tracks.addAudioTrack(), b=tracks.addVocalTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="take.wav"; audio->frames=48000;
     audio->channels={std::vector<float>(48000,0.25f)};
@@ -22,7 +22,7 @@ TEST(qtclipediting, delete_resize_undo_redo_preserve_audio_ids_and_other_tracks)
 }
 
 TEST(qtclipediting, move_is_one_undoable_edit_and_keeps_source_audio_unchanged) {
-    TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+    TrackListModelWrap tracks; const int track=tracks.addAudioTrack();
     const int clip=tracks.addAudioClip(track,"take",24000,48000,123);
     CHECK(tracks.moveClipAtBeat(track,clip,4));
     auto c=tracks.project().findTrack(track)->audioClips[0];
@@ -33,7 +33,7 @@ TEST(qtclipediting, move_is_one_undoable_edit_and_keeps_source_audio_unchanged) 
 }
 
 TEST(qtclipediting, waveform_uses_clip_source_offset_and_recording_sample_rate) {
-    TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+    TrackListModelWrap tracks; const int track=tracks.addAudioTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="wave.wav"; audio->sampleRate=24000; audio->frames=512;
     audio->channels={std::vector<float>(512)}; audio->channels[0][256]=0.8f; audio->buildWaveform();
     CHECK(tracks.attachTake(track,0,audio));
@@ -44,7 +44,7 @@ TEST(qtclipediting, waveform_uses_clip_source_offset_and_recording_sample_rate) 
 }
 
 TEST(qtclipediting, split_and_both_trims_preserve_source_samples_and_undo_atomically) {
-    TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+    TrackListModelWrap tracks; const int track=tracks.addAudioTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="edit.wav"; audio->sampleRate=24000; audio->frames=48000;
     audio->channels={std::vector<float>(48000,0.2f)}; CHECK(tracks.attachTake(track,0,audio));
     const int id=tracks.project().findTrack(track)->audioClips[0].id;
@@ -62,7 +62,7 @@ TEST(qtclipediting, split_and_both_trims_preserve_source_samples_and_undo_atomic
 }
 
 TEST(qtclipediting, merging_split_clips_preserves_audio_and_is_one_undoable_edit) {
-    TrackListWrapper tracks; const int track=tracks.addAudioTrack(),other=tracks.addAudioTrack();
+    TrackListModelWrap tracks; const int track=tracks.addAudioTrack(),other=tracks.addAudioTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="merge.wav"; audio->sampleRate=24000; audio->frames=48000;
     audio->channels={std::vector<float>(48000,0.25f)}; CHECK(tracks.attachTake(track,0,audio));
     const int left=tracks.project().findTrack(track)->audioClips[0].id;
@@ -85,7 +85,7 @@ TEST(qtclipediting, merging_split_clips_preserves_audio_and_is_one_undoable_edit
 }
 
 TEST(qtclipediting, group_edits_across_tracks_are_atomic_and_preserve_offsets) {
-    TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack(),c=tracks.addAudioTrack();
+    TrackListModelWrap tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack(),c=tracks.addAudioTrack();
     const int x=tracks.addAudioClip(a,"x",48000,96000,24000);
     const int y=tracks.addAudioClip(b,"y",72000,144000,48000);
     const int z=tracks.addClipAtBeat(c,2,4);
@@ -115,7 +115,7 @@ TEST(qtclipediting, group_edits_across_tracks_are_atomic_and_preserve_offsets) {
 }
 
 TEST(qtclipediting, playback_endpoint_exists_only_when_the_arrangement_has_clips) {
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     CHECK(tracks.playbackSnapshot()->playbackEnd==-1);
     const int track=tracks.addAudioTrack();
     CHECK(tracks.playbackSnapshot()->playbackEnd==-1);
@@ -127,7 +127,7 @@ TEST(qtclipediting, playback_endpoint_exists_only_when_the_arrangement_has_clips
 }
 
 TEST(qtclipediting, adjacent_empty_cells_merge_as_one_undoable_group) {
-    TrackListWrapper tracks; const int track=tracks.addAudioTrack(),other=tracks.addAudioTrack();
+    TrackListModelWrap tracks; const int track=tracks.addAudioTrack(),other=tracks.addAudioTrack();
     const int a=tracks.addClipAtBeat(track,0,2),b=tracks.addClipAtBeat(track,2,2),c=tracks.addClipAtBeat(track,4,2);
     const int foreign=tracks.addClipAtBeat(other,6,2);
     CHECK(tracks.canMergeClips(track,a,b)); CHECK(tracks.canMergeSelectedClips({c,a,b}));
@@ -142,7 +142,7 @@ TEST(qtclipediting, adjacent_empty_cells_merge_as_one_undoable_group) {
     CHECK(!tracks.canMergeSelectedClips({a,b,c})); CHECK(!tracks.mergeSelectedClips({a,b,c}));
 }
 TEST(qtclipediting, three_split_recorded_pieces_merge_without_changing_source_audio) {
-    TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+    TrackListModelWrap tracks; const int track=tracks.addAudioTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="three.wav"; audio->sampleRate=24000; audio->frames=48000;
     audio->channels={std::vector<float>(48000,0.2f)}; CHECK(tracks.attachTake(track,0,audio));
     const int a=tracks.project().findTrack(track)->audioClips[0].id,b=tracks.splitClipAtBeat(track,a,2),c=tracks.splitClipAtBeat(track,b,3);
@@ -153,7 +153,7 @@ TEST(qtclipediting, three_split_recorded_pieces_merge_without_changing_source_au
     CHECK(tracks.undo()); CHECK(tracks.project().findTrack(track)->audioClips.size()==3);
 }
 TEST(qtclipediting, cross_track_move_preserves_source_offsets_and_group_history) {
-    TrackListWrapper tracks; const int a=tracks.addAudioTrack(),gap=tracks.addAudioTrack(); CHECK(tracks.removeTrack(gap));
+    TrackListModelWrap tracks; const int a=tracks.addAudioTrack(),gap=tracks.addAudioTrack(); CHECK(tracks.removeTrack(gap));
     const int b=tracks.addVocalTrack(),c=tracks.addAudioTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="transfer.wav"; audio->frames=48000;
     audio->channels={std::vector<float>(48000,0.2f)}; CHECK(tracks.attachTake(a,24000,audio,false));
@@ -175,7 +175,7 @@ TEST(qtclipediting, cross_track_move_preserves_source_offsets_and_group_history)
 }
 
 TEST(qtclipediting, per_clip_gain_updates_model_role_and_is_independent_of_track_volume) {
-    TrackListWrapper tracks; const int track = tracks.addAudioTrack();
+    TrackListModelWrap tracks; const int track = tracks.addAudioTrack();
     const int clip = tracks.addClipAtBeat(track, 0, 4);
     CHECK(clip > 0);
 
@@ -192,15 +192,15 @@ TEST(qtclipediting, per_clip_gain_updates_model_role_and_is_independent_of_track
     // Set clip gain to 3.5 dB and verify dataChanged was emitted for ClipsRole
     int dataChangedCount = 0;
     QObject::connect(&tracks, &QAbstractItemModel::dataChanged, [&](const QModelIndex&, const QModelIndex&, const QList<int>& roles) {
-        if (roles.contains(TrackListWrapper::ClipsRole)) ++dataChangedCount;
+        if (roles.contains(TrackListModelWrap::ClipsRole)) ++dataChangedCount;
     });
 
     // A gain change must not rebuild the clip list (that redraws the whole timeline), but the
     // engine (projectChanged) and the undo buttons (historyChanged) must still hear about it.
     int clipsChangedCount = 0, projectChangedCount = 0, historyChangedCount = 0;
-    QObject::connect(&tracks, &TrackListWrapper::clipsChanged, [&] { ++clipsChangedCount; });
-    QObject::connect(&tracks, &TrackListWrapper::projectChanged, [&] { ++projectChangedCount; });
-    QObject::connect(&tracks, &TrackListWrapper::historyChanged, [&] { ++historyChangedCount; });
+    QObject::connect(&tracks, &TrackListModelWrap::clipsChanged, [&] { ++clipsChangedCount; });
+    QObject::connect(&tracks, &TrackListModelWrap::projectChanged, [&] { ++projectChangedCount; });
+    QObject::connect(&tracks, &TrackListModelWrap::historyChanged, [&] { ++historyChangedCount; });
 
     CHECK(tracks.setClipGain(track, clip, 3.5));
     CHECK_NEAR(tracks.clipGain(track, clip), 3.5, 1e-6);
@@ -211,7 +211,7 @@ TEST(qtclipediting, per_clip_gain_updates_model_role_and_is_independent_of_track
     CHECK(tracks.canUndo());
 
     // Verify track model role directly
-    const auto rowClips = tracks.data(tracks.index(0), TrackListWrapper::ClipsRole).toList();
+    const auto rowClips = tracks.data(tracks.index(0), TrackListModelWrap::ClipsRole).toList();
     CHECK(!rowClips.isEmpty());
     CHECK_NEAR(rowClips.front().toMap().value("gainDb").toDouble(), 3.5, 1e-6);
 
@@ -234,7 +234,7 @@ TEST(qtclipediting, per_clip_gain_updates_model_role_and_is_independent_of_track
 }
 
 TEST(qtclipediting, clip_selection_auto_selects_parent_track_and_notifies_changes) {
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int t1 = tracks.addAudioTrack();
     const int t2 = tracks.addVocalTrack();
     const int c1 = tracks.addClipAtBeat(t1, 0, 4);
@@ -245,14 +245,14 @@ TEST(qtclipediting, clip_selection_auto_selects_parent_track_and_notifies_change
 
     int trackSignalCount = 0;
     int lastNotifiedTrack = -1;
-    QObject::connect(&tracks, &TrackListWrapper::selectedTrackChanged, [&](int trackId) {
+    QObject::connect(&tracks, &TrackListModelWrap::selectedTrackChanged, [&](int trackId) {
         ++trackSignalCount;
         lastNotifiedTrack = trackId;
     });
 
     int clipSignalCount = 0;
     int lastNotifiedClip = -1;
-    QObject::connect(&tracks, &TrackListWrapper::selectedClipChanged, [&](int clipId) {
+    QObject::connect(&tracks, &TrackListModelWrap::selectedClipChanged, [&](int clipId) {
         ++clipSignalCount;
         lastNotifiedClip = clipId;
     });
@@ -289,7 +289,7 @@ TEST(qtclipediting, clip_selection_auto_selects_parent_track_and_notifies_change
 }
 
 TEST(qtclipediting, undoing_a_track_removal_announces_the_row) {
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int a = tracks.addAudioTrack(), b = tracks.addVocalTrack(), c = tracks.addAudioTrack();
     tracks.addClipAtBeat(b, 0, 4);
     int inserted = -1, removed = -1, resets = 0;
@@ -309,7 +309,7 @@ TEST(qtclipediting, undoing_a_track_removal_announces_the_row) {
 }
 
 TEST(qtclipediting, a_reversed_clip_plays_and_draws_backwards_and_an_inverted_one_upside_down) {
-    TrackListWrapper tracks; tracks.setSampleRate(48000); const int track=tracks.addAudioTrack();
+    TrackListModelWrap tracks; tracks.setSampleRate(48000); const int track=tracks.addAudioTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="ramp.wav"; audio->sampleRate=48000; audio->frames=4800;
     audio->channels={std::vector<float>(4800)};
     for(int i=0;i<4800;++i) audio->channels[0][std::size_t(i)]=float(i)/4800.0f;
@@ -339,7 +339,7 @@ TEST(qtclipediting, a_reversed_clip_plays_and_draws_backwards_and_an_inverted_on
 
 TEST(qtclipediting, clip_fades_reach_qml_with_the_crossfade_and_are_one_undo_step) {
     // restMap G8. Two takes of 2 beats overlapping by half a beat (120 BPM, 48 kHz).
-    TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+    TrackListModelWrap tracks; const int track=tracks.addAudioTrack();
     auto audio=std::make_shared<AudioData>(); audio->path="take.wav"; audio->sampleRate=48000; audio->frames=48000;
     audio->channels={std::vector<float>(48000,0.25f)};
     CHECK(tracks.attachTake(track,0,audio)); CHECK(tracks.attachTake(track,36000,audio));
@@ -352,7 +352,7 @@ TEST(qtclipediting, clip_fades_reach_qml_with_the_crossfade_and_are_one_undo_ste
     };
     CHECK_NEAR(role(a,"fadeOutBeats"),0.5,1e-9);
     CHECK_NEAR(role(b,"fadeInBeats"),0.5,1e-9);
-    int clipsChanged=0; QObject::connect(&tracks,&TrackListWrapper::clipsChanged,[&]{ ++clipsChanged; });
+    int clipsChanged=0; QObject::connect(&tracks,&TrackListModelWrap::clipsChanged,[&]{ ++clipsChanged; });
     CHECK(tracks.setClipFade(track,a,false,0.25));
     CHECK(clipsChanged==1);                                   // the timeline redraws the fade
     CHECK_NEAR(role(a,"fadeInBeats"),0.25,1e-9);
@@ -364,16 +364,16 @@ TEST(qtclipediting, clip_fades_reach_qml_with_the_crossfade_and_are_one_undo_ste
 
 TEST(qtclipediting, range_edits_refresh_clips_and_envelopes_and_ripple_reaches_paste) {
     // restMap G15. One track: a clip over beats 0..4 and a volume line; another clip at 6..7.
-    TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+    TrackListModelWrap tracks; const int track=tracks.addAudioTrack();
     const int clip=tracks.addClipAtBeat(track,0,4); const int later=tracks.addClipAtBeat(track,6,1);
     CHECK(clip>0 && later>0);
     CHECK(tracks.addEnvelopePoint(track,0,0.5)>=0); CHECK(tracks.addEnvelopePoint(track,4,1.0)>=0);
     int envelopeChanges=0, clipsChanged=0, clipboardChanged=0;
     QObject::connect(&tracks,&QAbstractItemModel::dataChanged,[&](const QModelIndex&,const QModelIndex&,const QList<int>& roles) {
-        if(roles.contains(TrackListWrapper::EnvelopePointsRole)) ++envelopeChanges;
+        if(roles.contains(TrackListModelWrap::EnvelopePointsRole)) ++envelopeChanges;
     });
-    QObject::connect(&tracks,&TrackListWrapper::clipsChanged,[&]{ ++clipsChanged; });
-    QObject::connect(&tracks,&TrackListWrapper::clipboardChanged,[&]{ ++clipboardChanged; });
+    QObject::connect(&tracks,&TrackListModelWrap::clipsChanged,[&]{ ++clipsChanged; });
+    QObject::connect(&tracks,&TrackListModelWrap::clipboardChanged,[&]{ ++clipboardChanged; });
     const auto startOf=[&](int id) {
         for(const auto& c:tracks.clips()) if(c.toMap()["clipId"].toInt()==id) return c.toMap()["startBeat"].toDouble();
         return -1.0;
@@ -393,10 +393,10 @@ TEST(qtclipediting, range_edits_refresh_clips_and_envelopes_and_ripple_reaches_p
 }
 
 TEST(qtclipediting, the_undo_history_lists_steps_and_jumps_back_and_forth_through_them) {
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int a = tracks.addAudioTrack(), b = tracks.addVocalTrack();
     int announced = 0, inserted = -1;
-    QObject::connect(&tracks, &TrackListWrapper::undoHistoryChanged, [&] { ++announced; });
+    QObject::connect(&tracks, &TrackListModelWrap::undoHistoryChanged, [&] { ++announced; });
     QObject::connect(&tracks, &QAbstractItemModel::rowsInserted, [&](const QModelIndex&, int first, int) { inserted = first; });
     const int clip = tracks.addClipAtBeat(a, 0, 4);
     CHECK(tracks.moveClipAtBeat(a, clip, 2));

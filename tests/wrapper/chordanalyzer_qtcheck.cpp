@@ -1,8 +1,8 @@
 #include "testkit.h"
 #include "analysis/chordrender.h"
-#include "plugins/chordplayer/chordplayer.h"
-#include "wrapper/analysis/chordanalyzerwrap/chordanalyzerwrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
+#include "common/chordPlayer/chordplayer.h"
+#include "wrapper/topBar/toolsMenu/chordAnalyzer/chordAnalyzerWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -33,7 +33,7 @@ struct Storage {
 
 void tick(int ms = 20) { QEventLoop loop; QTimer::singleShot(ms, &loop, &QEventLoop::quit); loop.exec(); }
 
-bool settle(ChordAnalyzerWrapper& w)
+bool settle(ChordAnalyzerWrap& w)
 {
     for (int i = 0; i < 1500 && w.busy(); ++i) tick(20);
     return !w.busy();
@@ -59,14 +59,14 @@ std::shared_ptr<AudioData> song()
 TEST(qtchordanalyzer, the_selected_song_gives_its_key_and_chords_and_fills_a_chords_track)
 {
     Storage storage;
-    TrackListWrapper tracks;                                     // 120 BPM
+    TrackListModelWrap tracks;                                     // 120 BPM
     const int audioTrack = tracks.addAudioTrack();
     const double rate = tracks.project().tempo().sampleRate();
     const auto clipStart = std::int64_t(2 * rate);               // the clip starts at 2 s
     CHECK(tracks.attachTake(audioTrack, clipStart, song(), false));
     const int clipId = tracks.project().findTrack(audioTrack)->audioClips.at(0).id;
 
-    ChordAnalyzerWrapper w;
+    ChordAnalyzerWrap w;
     CHECK(w.unavailableReason() == "No project is open.");
     w.setTrackModel(&tracks);
     CHECK(w.unavailableReason().contains("Select the song"));
@@ -77,7 +77,7 @@ TEST(qtchordanalyzer, the_selected_song_gives_its_key_and_chords_and_fills_a_cho
     CHECK(!w.hasResult() && w.chords().isEmpty() && w.chartText().isEmpty());
 
     int finishedOk = 0;
-    QObject::connect(&w, &ChordAnalyzerWrapper::finished, [&](bool ok) { finishedOk += ok ? 1 : 0; });
+    QObject::connect(&w, &ChordAnalyzerWrap::finished, [&](bool ok) { finishedOk += ok ? 1 : 0; });
     CHECK(w.analyse());
     CHECK(w.busy() && !w.analyse());                             // one at a time
     CHECK(settle(w));
@@ -90,7 +90,7 @@ TEST(qtchordanalyzer, the_selected_song_gives_its_key_and_chords_and_fills_a_cho
     CHECK(!w.sevenths());
     CHECK(w.commonChords().size() == 4 && w.commonChords().contains("G") && !w.commonChords().contains("G7"));
     int changes = 0;
-    QObject::connect(&w, &ChordAnalyzerWrapper::resultChanged, [&] { ++changes; });
+    QObject::connect(&w, &ChordAnalyzerWrap::resultChanged, [&] { ++changes; });
     w.setSevenths(true);
     CHECK(changes == 1 && w.commonChords().contains("G7") && !w.commonChords().contains("G"));
     const auto list = w.chords();
@@ -171,8 +171,8 @@ TEST(qtchordanalyzer, the_selected_song_gives_its_key_and_chords_and_fills_a_cho
 TEST(qtchordanalyzer, midi_short_and_cancelled_clips_say_why)
 {
     Storage storage;
-    TrackListWrapper tracks;
-    ChordAnalyzerWrapper w;
+    TrackListModelWrap tracks;
+    ChordAnalyzerWrap w;
     w.setTrackModel(&tracks);
 
     // A MIDI clip.
@@ -197,7 +197,7 @@ TEST(qtchordanalyzer, midi_short_and_cancelled_clips_say_why)
     CHECK(tracks.attachTake(songTrack, 0, song(), false));
     w.setClipId(tracks.project().findTrack(songTrack)->audioClips.at(0).id);
     int finishedOk = 0, finished = 0;
-    QObject::connect(&w, &ChordAnalyzerWrapper::finished, [&](bool ok) { ++finished; finishedOk += ok ? 1 : 0; });
+    QObject::connect(&w, &ChordAnalyzerWrap::finished, [&](bool ok) { ++finished; finishedOk += ok ? 1 : 0; });
     CHECK(w.analyse());
     w.cancel();
     CHECK(settle(w));

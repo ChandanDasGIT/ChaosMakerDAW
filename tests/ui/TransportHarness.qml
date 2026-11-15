@@ -44,7 +44,24 @@ Window {
         x: 0; y: 650; width: parent.width; height: 166
         visible: false
     }
-    GuitarSuitePanel { trackName: "Transport interaction test" }
+    Popup {
+        id: guitarSuitePanel
+        objectName: "guitarSuitePanel"
+        parent: Overlay.overlay
+        x: (parent.width - width) / 2
+        y: (parent.height - height) / 2
+        width: Math.min(920, parent.width - 32)
+        height: Math.min(580, parent.height - 32)
+        modal: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape
+        padding: 0
+        background: Rectangle { radius: Theme.panelRadius; color: Theme.popupBg; border.color: Theme.popupBorder }
+        contentItem: GuitarSuiteEditor {
+            trackName: "Transport interaction test"
+            effectsModel: EngineController.guitarSuite
+        }
+    }
     StatusStrip {
         objectName: "testStatusStrip"
         x: 0; y: 600; width: parent.width

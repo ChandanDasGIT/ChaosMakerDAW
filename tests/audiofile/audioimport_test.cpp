@@ -1,9 +1,9 @@
 #include "testkit.h"
-#include "audiofile/audioimport.h"
-#include "audiofile/wavreader.h"
-#include "audiofile/wavwriter.h"
-#include "recording/takerecorder.h"
-#include "session/tracklist.h"
+#include "topBar/projectActions/importExport/audioimport.h"
+#include "common/audiofile/wavreader.h"
+#include "common/audiofile/wavwriter.h"
+#include "common/recording/takerecorder.h"
+#include "common/session/tracklist.h"
 
 #include <cmath>
 #include <filesystem>

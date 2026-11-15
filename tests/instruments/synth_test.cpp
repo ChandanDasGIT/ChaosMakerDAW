@@ -1,12 +1,12 @@
 #include "testkit.h"
-#include "dsp/fft.h"
-#include "instruments/instrumentfactory.h"
-#include "instruments/synth/synth.h"
-#include "instruments/synth/synthenvelope.h"
-#include "instruments/synth/synthfilter.h"
-#include "instruments/synth/synthlfo.h"
-#include "instruments/synth/synthoscillator.h"
-#include "instruments/synth/synthsettings.h"
+#include "common/dsp/fft.h"
+#include "common/instruments/instrumentfactory.h"
+#include "common/trackEffectsPanel/instruments/synth/synth.h"
+#include "common/trackEffectsPanel/instruments/synth/synthenvelope.h"
+#include "common/trackEffectsPanel/instruments/synth/synthfilter.h"
+#include "common/trackEffectsPanel/instruments/synth/synthlfo.h"
+#include "common/trackEffectsPanel/instruments/synth/synthoscillator.h"
+#include "common/trackEffectsPanel/instruments/synth/synthsettings.h"
 
 #include <algorithm>
 #include <cmath>

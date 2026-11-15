@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "instruments/drums/drumkit.h"
-#include "instruments/drums/drumkitlibrary.h"
-#include "instruments/instrumentfactory.h"
-#include "instruments/sampler/sampler.h"
+#include "common/trackEffectsPanel/instruments/drums/drumkit.h"
+#include "common/trackEffectsPanel/instruments/drums/drumkitlibrary.h"
+#include "common/instruments/instrumentfactory.h"
+#include "common/instruments/sampler/sampler.h"
 
 #include <cstdint>
 #include <cstdlib>

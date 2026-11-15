@@ -1,10 +1,10 @@
 #include "testkit.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/plugins/chaoseq/chaoseqwrap/chaoseqwrapper.h"
-#include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
-#include "audiodevice/audiodevice.h"
-#include "recording/takerecorder.h"
-#include "plugins/testsynth/testsynth.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/common/trackEffectsPanel/plugins/chaosEq/chaosEqWrap.h"
+#include "wrapper/common/trackEffectsPanel/instruments/guitar/electric/electricWrap.h"
+#include "common/audiodevice/audiodevice.h"
+#include "common/recording/takerecorder.h"
+#include "common/instruments/testsynth/testsynth.h"
 #include <QCoreApplication>
 #include <QSettings>
 #include <QTemporaryDir>
@@ -52,7 +52,7 @@ public:
 };
 // These existing scenarios exercise recording with live monitoring enabled.
 // Set both controls explicitly now that arming no longer changes monitoring.
-bool setCaptureAndMonitor(TrackListWrapper& tracks, int id, bool enabled) {
+bool setCaptureAndMonitor(TrackListModelWrap& tracks, int id, bool enabled) {
     const auto* track=tracks.project().findTrack(id);
     if (track && track->hasLiveInput() && !tracks.setMonitorEnabled(id,enabled)) return false;
     return tracks.setRecordArmed(id,enabled);
@@ -80,7 +80,7 @@ TEST(qtrecording, record_stop_creates_a_clip_and_play_renders_it_then_restores_a
     std::vector<float> recorded;
     {
         auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-        EngineController controller(std::move(device),false); TrackListWrapper tracks;
+        EngineController controller(std::move(device),false); TrackListModelWrap tracks;
         controller.attachProject(&tracks); controller.setRestoreSessionOnStartup(true);
         const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar"); setCaptureAndMonitor(tracks,guitar,true);
         controller.setBpm(90); controller.setMeter(7,8);
@@ -108,7 +108,7 @@ TEST(qtrecording, record_stop_creates_a_clip_and_play_renders_it_then_restores_a
     }
     {
         auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-        EngineController controller(std::move(device),false); TrackListWrapper tracks;
+        EngineController controller(std::move(device),false); TrackListModelWrap tracks;
         controller.attachProject(&tracks); CHECK(tracks.count()==1); CHECK(tracks.clips().size()==1);
         CHECK(controller.bpm()==90); CHECK(controller.numerator()==7); CHECK(controller.denominator()==8);
         CHECK(!controller.playing()); CHECK(!tracks.cleanMonitorArmed());
@@ -121,13 +121,13 @@ TEST(qtrecording, record_stop_creates_a_clip_and_play_renders_it_then_restores_a
 TEST(qtrecording, closing_during_recording_finalizes_take_and_invalid_session_is_not_overwritten) {
     Storage storage;
     auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     const int track=tracks.addAudioTrack(); setCaptureAndMonitor(tracks,track,true);
     controller.setRestoreSessionOnStartup(true); controller.transportAction("record"); io->process();
     controller.shutdownSession(); CHECK(tracks.clips().size()==1); CHECK(!controller.takeBusy());
     const QString path=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+"/last-session.json";
     { QFile file(path); CHECK(file.open(QIODevice::WriteOnly)); file.write("broken session"); }
-    auto other=std::make_unique<OfflineDevice>(); EngineController reopened(std::move(other),false); TrackListWrapper recovered;
+    auto other=std::make_unique<OfflineDevice>(); EngineController reopened(std::move(other),false); TrackListModelWrap recovered;
     reopened.attachProject(&recovered); CHECK(!reopened.transportMessage().isEmpty());
     recovered.addAudioTrack(); CHECK(!reopened.saveSession()); reopened.shutdownSession();
     QFile file(path); CHECK(file.open(QIODevice::ReadOnly)); CHECK(file.readAll()=="broken session");
@@ -136,7 +136,7 @@ TEST(qtrecording, closing_during_recording_finalizes_take_and_invalid_session_is
 TEST(qtrecording, audio_takes_remain_dry_with_live_fx_loaded) {
     Storage storage;
     auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     const int audio=tracks.addAudioTrack();
     auto* fx=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(audio)); CHECK(fx->addPedal("Tremolo"));
     tick(); io->process();
@@ -164,7 +164,7 @@ TEST(qtrecording, vocal_and_acoustic_share_live_input_fx_recording_and_session_p
         const QString input=vocal ? "test:mic" : "test:pickup";
         {
             auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-            EngineController controller(std::move(device),false); TrackListWrapper tracks;
+            EngineController controller(std::move(device),false); TrackListModelWrap tracks;
             controller.attachProject(&tracks);
             controller.setRestoreSessionOnStartup(true);
             const int track=vocal ? tracks.addVocalTrack() : tracks.addInstrumentTrackOfType(type);
@@ -172,10 +172,10 @@ TEST(qtrecording, vocal_and_acoustic_share_live_input_fx_recording_and_session_p
             CHECK(setCaptureAndMonitor(tracks,track,true)); CHECK(tracks.cleanMonitorArmed());
             CHECK(tracks.recordingTrackId()==track); CHECK(io->connectedInput==input.toStdString());
             const auto row=tracks.index(tracks.indexOfTrack(track));
-            CHECK(tracks.data(row,TrackListWrapper::LiveInputRole).toBool());
-            CHECK(tracks.data(row,TrackListWrapper::RecordsWithFxRole).toBool());
+            CHECK(tracks.data(row,TrackListModelWrap::LiveInputRole).toBool());
+            CHECK(tracks.data(row,TrackListModelWrap::RecordsWithFxRole).toBool());
             int eqUpdates=0;
-            QObject::connect(&tracks,&TrackListWrapper::cleanMonitorEqChanged,&tracks,[&] { ++eqUpdates; });
+            QObject::connect(&tracks,&TrackListModelWrap::cleanMonitorEqChanged,&tracks,[&] { ++eqUpdates; });
             CHECK(tracks.setEqBand(track,5,-6)); CHECK(eqUpdates==1);
             CHECK(tracks.cleanMonitorEqBands()[5].toDouble()==-6);
             CHECK(tracks.applyEqPreset(track,2)); CHECK(eqUpdates==2);
@@ -217,11 +217,11 @@ TEST(qtrecording, vocal_and_acoustic_share_live_input_fx_recording_and_session_p
         }
         {
             auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-            EngineController controller(std::move(device),false); TrackListWrapper tracks;
+            EngineController controller(std::move(device),false); TrackListModelWrap tracks;
             controller.attachProject(&tracks);
             CHECK(tracks.count()==1); CHECK(tracks.clips().size()==1); CHECK(!tracks.cleanMonitorArmed());
-            CHECK(tracks.data(tracks.index(0),TrackListWrapper::TypeRole).toString()==type);
-            CHECK(tracks.data(tracks.index(0),TrackListWrapper::InputPortRole).toString()==input);
+            CHECK(tracks.data(tracks.index(0),TrackListModelWrap::TypeRole).toString()==type);
+            CHECK(tracks.data(tracks.index(0),TrackListModelWrap::InputPortRole).toString()==input);
             tick(); io->process(); controller.transportAction("play"); io->process();
             for(int i=0;i<128;++i) {
                 CHECK_NEAR(io->output[i],recorded[0][i],1e-6);
@@ -232,7 +232,7 @@ TEST(qtrecording, vocal_and_acoustic_share_live_input_fx_recording_and_session_p
     }
 }
 TEST(qtrecording, switching_live_instruments_keeps_legacy_single_track_queries_unambiguous) {
-    Storage storage; TrackListWrapper tracks;
+    Storage storage; TrackListModelWrap tracks;
     const int vocal=tracks.addVocalTrack(), acoustic=tracks.addInstrumentTrackOfType("Acoustic Guitar");
     const int drums=tracks.addInstrumentTrackOfType("Drums");
     CHECK(tracks.setTrackInputPort(vocal,"test:mic")); CHECK(tracks.setTrackInputPort(acoustic,"test:pickup"));
@@ -255,7 +255,7 @@ TEST(qtrecording, each_track_owns_fx_trim_eq_and_recordings_and_restores_after_i
     Storage storage;
     {
         auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-        EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+        EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
         const int removed=tracks.addAudioTrack();
         const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar"), vocal=tracks.addVocalTrack();
         const int acoustic=tracks.addInstrumentTrackOfType("Acoustic Guitar");
@@ -303,7 +303,7 @@ TEST(qtrecording, each_track_owns_fx_trim_eq_and_recordings_and_restores_after_i
     }
     {
         auto device=std::make_unique<OfflineDevice>();
-        EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+        EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
         CHECK(tracks.count()==3); CHECK(tracks.clips().size()==3);
         auto* a=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(tracks.trackIdAt(0)));
         auto* b=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(tracks.trackIdAt(1)));
@@ -320,7 +320,7 @@ TEST(qtrecording, each_track_owns_fx_trim_eq_and_recordings_and_restores_after_i
 }
 TEST(qtrecording, legacy_shared_chain_migrates_to_independent_copies_and_invalid_fx_cannot_overwrite_session) {
     Storage storage;
-    TrackListWrapper original; original.addInstrumentTrackOfType("Electric Guitar"); original.addVocalTrack();
+    TrackListModelWrap original; original.addInstrumentTrackOfType("Electric Guitar"); original.addVocalTrack();
     GuitarSuiteModel shared; CHECK(shared.addPedal("Tremolo")); shared.setInputTrimDb(-7);
     const QString folder=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     CHECK(QDir().mkpath(folder)); const QString path=folder+"/last-session.json";
@@ -330,7 +330,7 @@ TEST(qtrecording, legacy_shared_chain_migrates_to_independent_copies_and_invalid
     { QSettings settings; settings.setValue("session/restoreOnStartup",true); settings.sync(); }
     {
         auto device=std::make_unique<OfflineDevice>(); EngineController controller(std::move(device),false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         auto* a=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(tracks.trackIdAt(0)));
         auto* b=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(tracks.trackIdAt(1)));
         // The shared chain loads onto the guitar only; the vocal has no GuitarSuite (plan 6.1).
@@ -347,7 +347,7 @@ TEST(qtrecording, legacy_shared_chain_migrates_to_independent_copies_and_invalid
     { QFile file(path); CHECK(file.open(QIODevice::WriteOnly)); file.write(bytes); }
     {
         auto device=std::make_unique<OfflineDevice>(); EngineController controller(std::move(device),false);
-        TrackListWrapper tracks; controller.attachProject(&tracks); CHECK(!controller.saveSession()); controller.shutdownSession();
+        TrackListModelWrap tracks; controller.attachProject(&tracks); CHECK(!controller.saveSession()); controller.shutdownSession();
     }
     QFile file(path); CHECK(file.open(QIODevice::ReadOnly)); CHECK(file.readAll()==bytes);
 }
@@ -360,7 +360,7 @@ TEST(qtrecording, per_track_async_cabinet_restore_waits_for_all_tracks_and_prese
             TakeRecorder writer(ir.toStdString(),48000); float impulse[]{1,0,0,0};
             CHECK(writer.capture(impulse,4)); writer.finish(); writer.wait(); CHECK(writer.error().empty());
         }
-        TrackListWrapper original; original.addInstrumentTrackOfType("Electric Guitar"); original.addInstrumentTrackOfType("Acoustic Guitar");
+        TrackListModelWrap original; original.addInstrumentTrackOfType("Electric Guitar"); original.addInstrumentTrackOfType("Acoustic Guitar");
         auto preset=[&](double trim) {
             return QJsonObject{{"format","GuitarSuitePreset"},{"version",1},{"inputTrimDb",trim},
                 {"pedals",QJsonArray{QJsonObject{{"type","pedal.cabinet"},{"irPath",ir},{"parameters",QJsonObject{}}}}}};
@@ -372,7 +372,7 @@ TEST(qtrecording, per_track_async_cabinet_restore_waits_for_all_tracks_and_prese
         { QFile file(path); CHECK(file.open(QIODevice::WriteOnly)); file.write(bytes); }
         { QSettings settings; settings.setValue("session/restoreOnStartup",true); settings.sync(); }
         auto device=std::make_unique<OfflineDevice>(); EngineController controller(std::move(device),false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         auto* a=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(tracks.trackIdAt(0)));
         auto* b=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(tracks.trackIdAt(1)));
         CHECK(!controller.saveSession());
@@ -391,7 +391,7 @@ TEST(qtrecording, per_track_async_cabinet_restore_waits_for_all_tracks_and_prese
 
 TEST(qtprojectfiles, save_as_open_and_new_preserve_clips_fx_and_named_file_state) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     // A guitar: only tracks with GuitarSuite keep a pedalboard (plan 6.1).
     const int track=tracks.addInstrumentTrackOfType("Electric Guitar"); CHECK(setCaptureAndMonitor(tracks,track,true));
     auto* fx=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(track)); CHECK(fx->addPedal("Tremolo")); fx->setInputTrimDb(-5);
@@ -417,7 +417,7 @@ TEST(qtprojectfiles, save_as_open_and_new_preserve_clips_fx_and_named_file_state
 TEST(qtprojectfiles, corrupt_files_and_failed_effect_resources_keep_the_current_document) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); EngineController controller(std::move(device),false);
     // A guitar, so its (broken) pedalboard is actually loaded (plan 6.1).
-    TrackListWrapper tracks; controller.attachProject(&tracks); const int track=tracks.addInstrumentTrackOfType("Electric Guitar");
+    TrackListModelWrap tracks; controller.attachProject(&tracks); const int track=tracks.addInstrumentTrackOfType("Electric Guitar");
     CHECK(tracks.addClipAtBeat(track,1,4)>0);
     const QUrl good=QUrl::fromLocalFile(storage.dir.path()+"/good.chaos"); CHECK(controller.saveProject(good));
     const QUrl bad=QUrl::fromLocalFile(storage.dir.path()+"/bad.chaos");
@@ -436,7 +436,7 @@ TEST(qtprojectfiles, corrupt_files_and_failed_effect_resources_keep_the_current_
 
 TEST(qtrecording, dry_mode_keeps_raw_audio_and_edits_playback_without_changing_printed_takes) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     const int track=tracks.addInstrumentTrackOfType("Electric Guitar"); CHECK(tracks.setRecordDry(track,true));
     auto* fx=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(track)); fx->setInputTrimDb(-6.020599913);
     CHECK(setCaptureAndMonitor(tracks,track,true)); std::fill_n(io->input,128,0.25f);
@@ -466,7 +466,7 @@ TEST(qtrecording, dry_mode_keeps_raw_audio_and_edits_playback_without_changing_p
 
 TEST(qttrackmeters, controller_polls_track_levels_and_removes_stale_project_meters) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     const int a=tracks.addAudioTrack(), b=tracks.addVocalTrack();
     CHECK(setCaptureAndMonitor(tracks,a,true)); std::fill_n(io->input,128,0.25f); io->process(); tick(70);
     auto levels=controller.trackLevels();
@@ -481,7 +481,7 @@ TEST(qttrackmeters, controller_polls_track_levels_and_removes_stale_project_mete
 
 TEST(qtmultirecording, independent_inputs_monitor_fx_and_aligned_wet_dry_takes_survive_reopen) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get(); io->multipleInputs=true;
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     // Both guitars: the trim lives in GuitarSuite, which only guitar tracks keep (plan 6.1).
     const int a=tracks.addInstrumentTrackOfType("Electric Guitar"), b=tracks.addInstrumentTrackOfType("Acoustic Guitar");
     CHECK(tracks.setTrackInputPort(a,"test:input")); CHECK(tracks.setTrackInputPort(b,"test:mic"));
@@ -523,7 +523,7 @@ TEST(qtmultirecording, independent_inputs_monitor_fx_and_aligned_wet_dry_takes_s
 
 TEST(qtmultirecording, disarming_one_track_finishes_only_its_take_and_shutdown_finalizes_the_rest) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get(); io->multipleInputs=true;
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     const int a=tracks.addAudioTrack(), b=tracks.addVocalTrack();
     CHECK(tracks.setTrackInputPort(b,"test:mic"));
     CHECK(setCaptureAndMonitor(tracks,a,true)); CHECK(setCaptureAndMonitor(tracks,b,true));
@@ -546,7 +546,7 @@ TEST(qtmultirecording, disarming_one_track_finishes_only_its_take_and_shutdown_f
 
 TEST(qtmultirecording, shared_input_can_feed_two_independent_chains_and_invalid_routes_do_not_start_takes) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get(); io->multipleInputs=true;
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     const int a=tracks.addAudioTrack(), b=tracks.addAudioTrack();
     CHECK(setCaptureAndMonitor(tracks,a,true)); CHECK(setCaptureAndMonitor(tracks,b,true));
     CHECK(tracks.setVolume(a,0.5)); std::fill_n(io->input,128,0.2f); io->process();
@@ -565,7 +565,7 @@ TEST(qtmultirecording, shared_input_can_feed_two_independent_chains_and_invalid_
 }
 
 TEST(qttracknames, rename_validates_names_notifies_views_and_preserves_track_identity_and_history) {
-    Storage storage; TrackListWrapper tracks;
+    Storage storage; TrackListModelWrap tracks;
     const int a=tracks.addVocalTrack(), b=tracks.addInstrumentTrackOfType("Electric Guitar");
     const int clip=tracks.addClipAtBeat(a,1,4); CHECK(clip>0);
     CHECK(setCaptureAndMonitor(tracks,a,true)); CHECK(tracks.setVolume(a,0.6));
@@ -575,9 +575,9 @@ TEST(qttracknames, rename_validates_names_notifies_views_and_preserves_track_ide
     });
     const QString name=QString::fromUtf8("  Lead voix — रात 🎤  ");
     CHECK(tracks.renameTrack(a,name)); CHECK(changes==1);
-    CHECK(roles.contains(TrackListWrapper::NameRole)); CHECK(roles.contains(Qt::DisplayRole)); CHECK(roles.contains(Qt::EditRole));
+    CHECK(roles.contains(TrackListModelWrap::NameRole)); CHECK(roles.contains(Qt::DisplayRole)); CHECK(roles.contains(Qt::EditRole));
     const auto row=tracks.index(0);
-    CHECK(tracks.data(row,TrackListWrapper::NameRole).toString()==name.trimmed());
+    CHECK(tracks.data(row,TrackListModelWrap::NameRole).toString()==name.trimmed());
     CHECK(tracks.data(row,Qt::EditRole).toString()==name.trimmed());
     CHECK(tracks.project().findTrack(a)->type=="Vocal"); CHECK(tracks.project().findTrack(a)->recordArmed);
     CHECK_NEAR(tracks.project().findTrack(a)->volume,0.6,1e-6);
@@ -587,7 +587,7 @@ TEST(qttracknames, rename_validates_names_notifies_views_and_preserves_track_ide
     for(const auto& invalid:QStringList{"", "   ", "two\nlines", "two\tparts",QString(257,'x'),QString(QChar(0))})
         CHECK(!tracks.renameTrack(a,invalid));
     CHECK(!tracks.renameTrack(-1,"Missing")); CHECK(changes==1);
-    CHECK(tracks.setData(row,"Harmony",TrackListWrapper::NameRole)); CHECK(changes==2);
+    CHECK(tracks.setData(row,"Harmony",TrackListModelWrap::NameRole)); CHECK(changes==2);
     CHECK(tracks.setData(row,"Final vocal",Qt::EditRole)); CHECK(changes==3);
     CHECK(tracks.undo()); CHECK(tracks.project().findTrack(a)->audioClips.empty());
     CHECK(tracks.project().findTrack(a)->name=="Final vocal"); // existing clip history remains usable
@@ -596,7 +596,7 @@ TEST(qttracknames, rename_validates_names_notifies_views_and_preserves_track_ide
 
 TEST(qttracknames, renaming_dirties_project_persists_on_reopen_and_is_safe_during_recording) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     const int track=tracks.addAudioTrack(); const auto file=QUrl::fromLocalFile(storage.dir.path()+"/names.chaos");
     CHECK(controller.saveProject(file)); CHECK(!controller.projectDirty());
     CHECK(tracks.renameTrack(track,"Audio 1")); CHECK(!controller.projectDirty());
@@ -613,31 +613,31 @@ TEST(qttracknames, renaming_dirties_project_persists_on_reopen_and_is_safe_durin
     for(float sample:recorded->channels[0])CHECK(sample==0.25f);
     CHECK(controller.saveProject()); CHECK(!controller.projectDirty());
     CHECK(controller.newProject()); CHECK(controller.openProject(file)); io->process();
-    CHECK(tracks.count()==1); CHECK(tracks.data(tracks.index(0),TrackListWrapper::NameRole).toString()==QString::fromUtf8("Main — गिटार"));
+    CHECK(tracks.count()==1); CHECK(tracks.data(tracks.index(0),TrackListModelWrap::NameRole).toString()==QString::fromUtf8("Main — गिटार"));
     CHECK(tracks.project().findTrack(tracks.trackIdAt(0))->type=="Audio");
     CHECK(tracks.playbackSnapshot()->keepAudio[0]->channels==recorded->channels);
     CHECK(!controller.projectDirty()); controller.shutdownSession();
 }
 
 TEST(qttrackcolours, colours_validate_notify_clips_and_preserve_other_tracks_and_history) {
-    Storage storage; TrackListWrapper tracks;
+    Storage storage; TrackListModelWrap tracks;
     const int a=tracks.addVocalTrack(),b=tracks.addAudioTrack();
     const int clip=tracks.addClipAtBeat(a,0,4); CHECK(clip>0);
     const auto other=tracks.project().findTrack(b)->colour;
     int changes=0,clipsChanged=0;
     QObject::connect(&tracks,&QAbstractItemModel::dataChanged,&tracks,[&](const QModelIndex& first,const QModelIndex&,const QList<int>& roles){
-        CHECK(first.row()==0); CHECK(roles.contains(TrackListWrapper::ColourRole)); ++changes;
+        CHECK(first.row()==0); CHECK(roles.contains(TrackListModelWrap::ColourRole)); ++changes;
     });
-    QObject::connect(&tracks,&TrackListWrapper::clipsChanged,&tracks,[&]{++clipsChanged;});
+    QObject::connect(&tracks,&TrackListModelWrap::clipsChanged,&tracks,[&]{++clipsChanged;});
     CHECK(tracks.setTrackColour(a,"  #A1B2C3  ")); CHECK(changes==1 && clipsChanged==1);
-    CHECK(tracks.data(tracks.index(0),TrackListWrapper::ColourRole).toString()=="#a1b2c3");
+    CHECK(tracks.data(tracks.index(0),TrackListModelWrap::ColourRole).toString()=="#a1b2c3");
     CHECK(tracks.clips()[0].toMap()["trackColour"].toString()=="#a1b2c3");
     CHECK(tracks.project().findTrack(b)->colour==other);
     CHECK(tracks.project().findTrack(a)->type=="Vocal");
     CHECK(tracks.setTrackColour(a,"#a1b2c3")); CHECK(changes==1 && clipsChanged==1);
     for(const auto& invalid:QStringList{"", "red", "#abc", "#12345g", "#ff123456", "#1234567"})CHECK(!tracks.setTrackColour(a,invalid));
     CHECK(!tracks.setTrackColour(-1,"#123456")); CHECK(changes==1);
-    CHECK(tracks.setData(tracks.index(0),"#765432",TrackListWrapper::ColourRole)); CHECK(changes==2);
+    CHECK(tracks.setData(tracks.index(0),"#765432",TrackListModelWrap::ColourRole)); CHECK(changes==2);
     CHECK(tracks.project().findTrack(a)->audioClips[0].id==clip); CHECK(tracks.canUndo());
     // Clip history is unaffected by appearance changes.
     QObject::disconnect(&tracks,&QAbstractItemModel::dataChanged,&tracks,nullptr);
@@ -648,7 +648,7 @@ TEST(qttrackcolours, colours_validate_notify_clips_and_preserve_other_tracks_and
 
 TEST(qttrackcolours, project_and_session_roundtrip_support_legacy_files_and_reject_invalid_colours) {
     Storage storage; auto device=std::make_unique<OfflineDevice>();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     const int a=tracks.addAudioTrack(),b=tracks.addVocalTrack(); CHECK(tracks.addClipAtBeat(a,1,4)>0);
     const auto file=QUrl::fromLocalFile(storage.dir.path()+"/colours.chaos");
     CHECK(controller.saveProject(file)); CHECK(!controller.projectDirty());
@@ -658,7 +658,7 @@ TEST(qttrackcolours, project_and_session_roundtrip_support_legacy_files_and_reje
     CHECK(tracks.setTrackColour(a,"#123456")); CHECK(tracks.setTrackColour(b,"#fedcba")); CHECK(controller.projectDirty());
     CHECK(tracks.setTrackColour(a,"#123456"));
     CHECK(controller.saveProject()); CHECK(!controller.projectDirty());
-    TrackListWrapper session; QString error; CHECK(session.restoreSessionState(tracks.sessionState(),error));
+    TrackListModelWrap session; QString error; CHECK(session.restoreSessionState(tracks.sessionState(),error));
     CHECK(session.project().findTrack(session.trackIdAt(0))->colour=="#123456");
     CHECK(session.project().findTrack(session.trackIdAt(1))->colour=="#fedcba");
     CHECK(controller.newProject()); CHECK(controller.openProject(file));
@@ -689,7 +689,7 @@ TEST(qttrackcolours, project_and_session_roundtrip_support_legacy_files_and_reje
     CHECK(controller.saveProject(plain)); CHECK(controller.newProject()); CHECK(controller.openProject(plain));
     CHECK(tracks.project().findTrack(tracks.trackIdAt(0))->colour.empty());
     CHECK(tracks.project().findTrack(tracks.trackIdAt(1))->colour=="#fedcba");
-    TrackListWrapper again; CHECK(again.restoreSessionState(tracks.sessionState(),error));
+    TrackListModelWrap again; CHECK(again.restoreSessionState(tracks.sessionState(),error));
     CHECK(again.project().findTrack(again.trackIdAt(0))->colour.empty());
     CHECK(again.project().findTrack(again.trackIdAt(1))->colour=="#fedcba");
     controller.shutdownSession();
@@ -700,7 +700,7 @@ TEST(qtmidirecording, armed_instrument_track_records_midi_into_timeline_clip) {
     auto device = std::make_unique<OfflineDevice>();
     auto* io = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
 
     const int synth = tracks.addInstrumentTrack();
@@ -736,7 +736,7 @@ TEST(qtmidirecording, armed_instrument_track_records_midi_into_timeline_clip) {
 TEST(qtrecording, undoing_a_track_removal_restores_its_pedalboard) {
     Storage storage;
     auto device=std::make_unique<OfflineDevice>();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar");
     auto* fx=qobject_cast<GuitarSuiteModel*>(controller.trackEffects(guitar)); CHECK(fx);
     CHECK(fx->addPedal("Delay")); CHECK(fx->addPedal("Reverb")); CHECK(fx->count()==2);
@@ -755,10 +755,10 @@ TEST(qtrecording, undoing_a_track_removal_restores_its_pedalboard) {
 }
 
 TEST(qttrackeffects, effects_role_lists_the_chain_and_edits_follow_the_backend_rules) {
-    Storage storage; TrackListWrapper tracks;
+    Storage storage; TrackListModelWrap tracks;
     const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar"), vocal=tracks.addVocalTrack();
-    const auto effects=[&](int id) { return tracks.data(tracks.index(tracks.indexOfTrack(id)),TrackListWrapper::EffectsRole).toList(); };
-    CHECK(tracks.roleNames().value(TrackListWrapper::EffectsRole)=="effects");
+    const auto effects=[&](int id) { return tracks.data(tracks.index(tracks.indexOfTrack(id)),TrackListModelWrap::EffectsRole).toList(); };
+    CHECK(tracks.roleNames().value(TrackListModelWrap::EffectsRole)=="effects");
     // Guitar: GuitarSuite, fixed. Vocal: nothing.
     CHECK(effects(guitar).size()==1);
     const auto suite=effects(guitar)[0].toMap();
@@ -771,8 +771,8 @@ TEST(qttrackeffects, effects_role_lists_the_chain_and_edits_follow_the_backend_r
     CHECK(tracks.addableEffects(vocal)[1].toMap()["title"].toString()=="Chaos EQ");
     int roleChanges=0, projectChanges=0;
     QObject::connect(&tracks,&QAbstractItemModel::dataChanged,&tracks,[&](const QModelIndex&,const QModelIndex&,const QList<int>& roles) {
-        if(roles.contains(TrackListWrapper::EffectsRole)) ++roleChanges; });
-    QObject::connect(&tracks,&TrackListWrapper::projectChanged,&tracks,[&] { ++projectChanges; });
+        if(roles.contains(TrackListModelWrap::EffectsRole)) ++roleChanges; });
+    QObject::connect(&tracks,&TrackListModelWrap::projectChanged,&tracks,[&] { ++projectChanges; });
     const int eq=tracks.addTrackEffect(vocal,"eq"); CHECK(eq>0);
     CHECK(roleChanges==1 && projectChanges==1);
     CHECK(effects(vocal).size()==1 && effects(vocal)[0].toMap()["id"].toInt()==eq && effects(vocal)[0].toMap()["removable"].toBool());
@@ -796,7 +796,7 @@ TEST(qttrackeffects, effects_role_lists_the_chain_and_edits_follow_the_backend_r
 
 TEST(qttrackeffects, the_engine_runs_the_eq_only_while_it_is_on_the_track) {
     Storage storage; auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     const int vocal=tracks.addVocalTrack();
     CHECK(tracks.setTrackInputPort(vocal,"test:mic")); CHECK(tracks.setVolume(vocal,0.5));
     for(int band=0;band<10;++band) CHECK(tracks.setEqBand(vocal,band,12));
@@ -816,17 +816,17 @@ TEST(qttrackeffects, the_engine_runs_the_eq_only_while_it_is_on_the_track) {
 }
 
 TEST(qttrackeffects, chaos_eq_wrapper_edits_the_track_bands_without_rebuilding_playback) {
-    Storage storage; TrackListWrapper tracks;
+    Storage storage; TrackListModelWrap tracks;
     const int vocal=tracks.addVocalTrack(), other=tracks.addVocalTrack();
     CHECK(tracks.addTrackEffect(vocal,"chaoseq")>0);
     int projectChanges=0, chaosChanges=0;
-    QObject::connect(&tracks,&TrackListWrapper::projectChanged,&tracks,[&] { ++projectChanges; });
-    QObject::connect(&tracks,&TrackListWrapper::chaosEqChanged,&tracks,[&](int id) { if(id==vocal) ++chaosChanges; });
-    ChaosEqWrapper eq, mirror;
+    QObject::connect(&tracks,&TrackListModelWrap::projectChanged,&tracks,[&] { ++projectChanges; });
+    QObject::connect(&tracks,&TrackListModelWrap::chaosEqChanged,&tracks,[&](int id) { if(id==vocal) ++chaosChanges; });
+    ChaosEqWrap eq, mirror;
     eq.setTrackModel(&tracks); eq.setTrackId(vocal);
     mirror.setTrackModel(&tracks); mirror.setTrackId(vocal);
     CHECK(eq.bandCount()==0 && eq.canAddBand() && eq.bands().isEmpty());
-    CHECK(eq.curveFrequencies().size()==ChaosEqWrapper::CurvePoints && eq.totalCurve().size()==ChaosEqWrapper::CurvePoints);
+    CHECK(eq.curveFrequencies().size()==ChaosEqWrap::CurvePoints && eq.totalCurve().size()==ChaosEqWrap::CurvePoints);
     CHECK(eq.shapes().size()==8 && eq.placements().size()==5 && eq.slopes().size()==4);
 
     const int first=eq.addBand(1000,3); CHECK(first==0);
@@ -868,9 +868,9 @@ TEST(qttrackeffects, chaos_eq_wrapper_edits_the_track_bands_without_rebuilding_p
 TEST(qttrackeffects, chaos_eq_reaches_the_engine_and_feeds_the_analyzer) {
     Storage storage;
     auto device=std::make_unique<OfflineDevice>();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     const int vocal=tracks.addVocalTrack(); CHECK(tracks.addTrackEffect(vocal,"chaoseq")>0);
-    ChaosEqWrapper eq; eq.setTrackModel(&tracks); eq.setTrackId(vocal); eq.setEngine(&controller);
+    ChaosEqWrap eq; eq.setTrackModel(&tracks); eq.setTrackId(vocal); eq.setEngine(&controller);
     const auto processors=controller.chaosEqProcessors(vocal);
     CHECK(processors[0] && processors[1]);
     CHECK(eq.addBand(2000,6)==0);
@@ -889,7 +889,7 @@ TEST(qttrackeffects, chaos_eq_reaches_the_engine_and_feeds_the_analyzer) {
     ProcessContext context; context.audio=AudioView{channels,2,4096}; context.sampleRate=48000;
     processors[0]->process(context);
     eq.pollAnalyzer(0.03);
-    const auto spectrum=eq.spectrum(); CHECK(spectrum.size()==ChaosEqWrapper::CurvePoints);
+    const auto spectrum=eq.spectrum(); CHECK(spectrum.size()==ChaosEqWrap::CurvePoints);
     const auto frequencies=eq.curveFrequencies();
     int peak=0;
     for(int i=1;i<spectrum.size();++i) if(spectrum[i].toDouble()>spectrum[peak].toDouble()) peak=i;
@@ -903,7 +903,7 @@ TEST(qttrackeffects, chaos_eq_reaches_the_engine_and_feeds_the_analyzer) {
 TEST(qtrecording, instrument_is_prepared_once_and_replaced_when_the_buffer_changes) {
     Storage storage;
     auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks; controller.attachProject(&tracks);
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks; controller.attachProject(&tracks);
     const int piano=tracks.addInstrumentTrackOfType("Strings");   // still TestSynth, so its voices can be read
     const int audio=tracks.addAudioTrack();
     tick(); io->process();
@@ -940,7 +940,7 @@ TEST(qtrecording, instrument_is_prepared_once_and_replaced_when_the_buffer_chang
 TEST(qtrecording, the_waveform_of_a_take_grows_while_it_records) {
     Storage storage;
     auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks;
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int vocal=tracks.addVocalTrack(); CHECK(setCaptureAndMonitor(tracks,vocal,true));
     tick(); io->process();
@@ -971,7 +971,7 @@ TEST(qtrecording, audio_takes_move_earlier_by_the_reported_round_trip_plus_the_e
     // restMap G10. 48 kHz: the device reports 480 frames (10 ms), the extra offset is 2 ms (96).
     Storage storage;
     auto device=std::make_unique<OfflineDevice>(); auto* io=device.get(); io->roundTrip=480;
-    EngineController controller(std::move(device),false); TrackListWrapper tracks;
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     CHECK(controller.recordingLatencyCompensation());                 // on by default
     CHECK(controller.recordingExtraOffsetMs()==0.0);
@@ -1012,7 +1012,7 @@ TEST(qtrecording, audio_takes_move_earlier_by_the_reported_round_trip_plus_the_e
 TEST(qtrecording, loop_recording_makes_takes_and_punch_keeps_only_the_time_selection) {
     Storage storage;
     auto device=std::make_unique<OfflineDevice>(); auto* io=device.get();
-    EngineController controller(std::move(device),false); TrackListWrapper tracks;
+    EngineController controller(std::move(device),false); TrackListModelWrap tracks;
     controller.attachProject(&tracks); controller.setBpm(120);
     const int vocal=tracks.addVocalTrack(); CHECK(setCaptureAndMonitor(tracks,vocal,true));
     tick(); io->process();

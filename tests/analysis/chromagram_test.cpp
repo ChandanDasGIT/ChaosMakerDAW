@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "analysis/chromagram.h"
+#include "topBar/toolsMenu/chordAnalyzer/chromagram.h"
 
 #include <algorithm>
 #include <atomic>

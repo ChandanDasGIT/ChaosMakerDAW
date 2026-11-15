@@ -1,7 +1,7 @@
 #include "testkit.h"
-#include "plugins/effectchain.h"
-#include "plugins/mixfx/mixfxfactory.h"
-#include "plugins/mixfx/mixfxspec.h"
+#include "common/effects/effectchain.h"
+#include "common/trackEffectsPanel/plugins/mixFx/mixfxfactory.h"
+#include "common/mixEffect/mixfxspec.h"
 
 #include <cmath>
 #include <limits>

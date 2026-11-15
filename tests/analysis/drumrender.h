@@ -3,13 +3,13 @@
 // kits, alone or in a "song" with the Synth's chords and the Bass Guitar's line, so a test
 // knows exactly where every hit is.
 
-#include "instruments/bass/bassguitar.h"
-#include "instruments/drums/drumkit.h"
-#include "instruments/drums/drumkitlibrary.h"
-#include "instruments/electrodrums/electrodrums.h"
-#include "instruments/synth/synth.h"
-#include "instruments/synth/synthpresets.h"
-#include "processor/processor.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/bassguitar.h"
+#include "common/trackEffectsPanel/instruments/drums/drumkit.h"
+#include "common/trackEffectsPanel/instruments/drums/drumkitlibrary.h"
+#include "common/trackEffectsPanel/instruments/electrodrums/electrodrums.h"
+#include "common/trackEffectsPanel/instruments/synth/synth.h"
+#include "common/trackEffectsPanel/instruments/synth/synthpresets.h"
+#include "common/processor/processor.h"
 
 #include <algorithm>
 #include <cmath>
@@ -133,11 +133,11 @@ inline std::vector<float> electroDrums(const std::vector<Timed>& hits, double se
     return render(kit, drumEvents(hits), seconds);
 }
 
-// The acoustic kit from the repository's sample-kits (empty when it is not there).
+// The acoustic kit from resources/sample-kits (empty when it is not there).
 inline std::filesystem::path acousticKitFolder()
 {
     const auto folder = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path()
-                      / "sample-kits" / drumkit::KitFolderName;
+                      / "resources/sample-kits" / drumkit::KitFolderName;
     return std::filesystem::exists(folder) ? folder : std::filesystem::path();
 }
 

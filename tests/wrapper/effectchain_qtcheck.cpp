@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "audiodevice/audiodevice.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/common/trackEffectsPanel/instruments/guitar/electric/electricWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/audiodevice/audiodevice.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -50,7 +50,7 @@ struct Storage {
     }
 };
 
-QStringList chain(TrackListWrapper& tracks, int id)
+QStringList chain(TrackListModelWrap& tracks, int id)
 {
     QStringList out;
     for (const auto& slot : tracks.project().findTrack(id)->effects) out << QString::fromStdString(slot.type);
@@ -63,7 +63,7 @@ TEST(qteffectchain, a_chain_exports_and_replaces_another_tracks_chain)
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int guitar = tracks.addInstrumentTrackOfType("Electric Guitar");
     CHECK(tracks.addTrackEffect(guitar, "chaoseq") >= 0);
@@ -116,7 +116,7 @@ TEST(qteffectchain, bad_files_and_instrument_pages_of_other_instruments_change_n
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int drums = tracks.addInstrumentTrackOfType("Drums");
     const int electro = tracks.addInstrumentTrackOfType("Electronic Drums");

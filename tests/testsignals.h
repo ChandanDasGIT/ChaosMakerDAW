@@ -1,8 +1,8 @@
 #pragma once
-#include "core/audioview.h"
-#include "midi/midievent.h"
-#include "processor/processor.h"
-#include "rt/rtsafe.h"
+#include "common/core/audioview.h"
+#include "common/midi/midievent.h"
+#include "common/processor/processor.h"
+#include "common/rt/rtsafe.h"
 
 #include <algorithm>
 #include <cmath>

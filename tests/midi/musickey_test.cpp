@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "midi/musickey.h"
+#include "common/midi/musickey.h"
 
 using musickey::Scale;
 

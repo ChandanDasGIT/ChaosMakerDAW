@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "instruments/bass/bassguitar.h"
-#include "instruments/bass/basspresets.h"
-#include "persistence/bassjson.h"
-#include "persistence/basspresetstore.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/bassguitar.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/basspresets.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/bassjson.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/basspresetstore.h"
 
 #include <chrono>
 #include <cmath>

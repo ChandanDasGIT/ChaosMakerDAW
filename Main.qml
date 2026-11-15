@@ -15,7 +15,7 @@ Window {
     palette.toolTipBase: Theme.tooltipBg
     palette.toolTipText: Theme.tooltipText
 
-    TrackListWrapper {
+    TrackListModelWrap {
         id: trackModel
         // New tracks start in the recording mode chosen in Preferences (plan 6.6).
         newTrackRecordDry: window.layoutSettings.recordDryByDefault
@@ -23,7 +23,7 @@ Window {
 
     // The project's tracks under a name no panel uses for its own property: inside a Loader's
     // component, "trackModel: trackModel" finds the panel's own (empty) property, not the id.
-    readonly property TrackListWrapper projectTracks: trackModel
+    readonly property TrackListModelWrap projectTracks: trackModel
     property int activePianoRollTrackId: -1
     property int activePianoRollClipId: -1
     property string activePianoRollClipLabel: ""
@@ -63,7 +63,7 @@ Window {
 
     // Layout sizes start from the saved preferences (AppSettings); a splitter drag changes them
     // live and saves once on release.
-    readonly property var layoutSettings: topBar.appSettings.bridge // AppSettingsWrapper
+    readonly property var layoutSettings: topBar.appSettings.bridge // AppSettingsWrap
     property real trackListWidth: layoutSettings.trackListWidth
     property bool mixerVisible: true
     property real mixerHeight: layoutSettings.mixerHeight

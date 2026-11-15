@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "audiofile/mp3reader.h"
-#include "audiofile/mp3writer.h"
+#include "common/audiofile/mp3reader.h"
+#include "common/audiofile/mp3writer.h"
 
 #include <array>
 #include <cmath>

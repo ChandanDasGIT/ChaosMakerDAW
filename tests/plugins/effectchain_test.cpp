@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "plugins/effectchain.h"
-#include "session/project.h"
+#include "common/effects/effectchain.h"
+#include "common/session/project.h"
 
 #include <string>
 #include <vector>

@@ -1,9 +1,9 @@
 #include "testkit.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/instruments/piano/pianowrap/pianowrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "audiodevice/audiodevice.h"
-#include "instruments/piano/piano.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/common/trackEffectsPanel/instruments/piano/pianoWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/audiodevice/audiodevice.h"
+#include "common/trackEffectsPanel/instruments/piano/piano.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -87,18 +87,18 @@ struct Storage {
 TEST(qtpiano, wrapper_edits_the_track_and_follows_other_panels)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int id = tracks.addInstrumentTrackOfType("Piano");
     const int strings = tracks.addInstrumentTrackOfType("Strings");
     CHECK(tracks.piano(id) != nullptr && tracks.piano(strings) == nullptr);
 
-    PianoWrapper a, b;
+    PianoWrap a, b;
     a.setTrackModel(&tracks); a.setTrackId(id);
     b.setTrackModel(&tracks); b.setTrackId(id);
     CHECK(a.valid());
     CHECK(a.release() == piano::DefaultRelease && a.brightness() == 1.0 && a.transpose() == 0);
     int changes = 0;
-    QObject::connect(&tracks, &TrackListWrapper::pianoChanged, &tracks, [&changes] { ++changes; });
+    QObject::connect(&tracks, &TrackListModelWrap::pianoChanged, &tracks, [&changes] { ++changes; });
 
     a.setVolume(-3.0);
     a.setRelease(0.9);
@@ -125,7 +125,7 @@ TEST(qtpiano, wrapper_edits_the_track_and_follows_other_panels)
     CHECK(*tracks.piano(id) == piano::Settings{});
     CHECK(a.noteName(60) == "C4" && a.lowestKey() == 21 && a.highestKey() == 108);
 
-    PianoWrapper other;                                          // not a Piano track
+    PianoWrap other;                                          // not a Piano track
     other.setTrackModel(&tracks); other.setTrackId(strings);
     CHECK(!other.valid());
     other.setVolume(-3.0);
@@ -137,7 +137,7 @@ TEST(qtpiano, piano_track_plays_the_piano_and_edits_reach_it)
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addInstrumentTrackOfType("Piano");
     const auto instrument = controller.trackInstrument(id);
@@ -145,7 +145,7 @@ TEST(qtpiano, piano_track_plays_the_piano_and_edits_reach_it)
     if (!instrument || instrument->typeId() != "piano") return;
     const auto& keys = static_cast<const Piano&>(*instrument);
 
-    PianoWrapper page;
+    PianoWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id);
     page.setRelease(0.8);
     page.setTranspose(3);
@@ -172,16 +172,16 @@ TEST(qtpiano, the_drawn_piano_plays_keys_and_the_pedal_and_sees_every_key)
     auto device = std::make_unique<KeyboardDevice>();
     auto* keyboard = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addInstrumentTrackOfType("Piano");
     tick(); keyboard->play(2);
 
-    PianoWrapper page;
+    PianoWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id);
     QList<QPair<int, int>> struck, played;
-    QObject::connect(&page, &PianoWrapper::struck, &page, [&struck](int key, int velocity) { struck.append({key, velocity}); });
-    QObject::connect(&page, &PianoWrapper::played, &page, [&played](int key, int velocity) { played.append({key, velocity}); });
+    QObject::connect(&page, &PianoWrap::struck, &page, [&struck](int key, int velocity) { struck.append({key, velocity}); });
+    QObject::connect(&page, &PianoWrap::played, &page, [&played](int key, int velocity) { played.append({key, velocity}); });
 
     page.play(60, 90);                                           // no engine yet: nothing
     CHECK(played.isEmpty());

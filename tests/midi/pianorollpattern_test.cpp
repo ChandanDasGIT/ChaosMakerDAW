@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "midi/pianorollpattern.h"
+#include "pianoRoll/pianorollpattern.h"
 #include <cmath>
 
 TEST(pianorollpattern, add_move_and_delete_notes)

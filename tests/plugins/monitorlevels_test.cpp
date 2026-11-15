@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "engine/audioengine.h"
-#include "processor/trackinput.h"
+#include "common/engine/audioengine.h"
+#include "common/processor/trackinput.h"
 #include "testsignals.h"
 #include <limits>
 

@@ -1,6 +1,6 @@
 #include "testkit.h"
 
-#include "transport/tempomap.h"
+#include "common/transport/tempomap.h"
 
 TEST(tempomap, beats_per_bar_follows_the_time_signature)
 {

@@ -1,7 +1,7 @@
 #include "timeline.h"
-#include "core/valueformat.h"
-#include "transport/musicalgrid.h"
-#include "timeline/tracklayout.h"
+#include "common/core/valueformat.h"
+#include "common/transport/musicalgrid.h"
+#include "trackList/tracklayout.h"
 
 #include <algorithm>
 #include <cmath>
@@ -330,3 +330,8 @@ void Timeline::acceptRepeatRange(bool accepted) { if (accepted && m_pendingRange
 void Timeline::cancelSelection() { m_selecting = m_hasSelection = false; }
 void Timeline::setRangeStart(double value) { if (std::isfinite(value) && value >= 0) m_range.start = value; }
 void Timeline::setRangeEnd(double value) { if (std::isfinite(value) && value >= 0) m_range.end = value; }
+
+double Timeline::fadeLength(double proposed, double otherFade, double clipLength)
+{
+    return std::max(0.0, std::min(clipLength - otherFade, proposed));
+}

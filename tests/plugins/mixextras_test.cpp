@@ -1,9 +1,9 @@
 #include "testkit.h"
-#include "plugins/delay/mixdelay.h"
-#include "plugins/dynamics/gaincomputer.h"
-#include "plugins/gate/gate.h"
-#include "plugins/limiter/limiter.h"
-#include "plugins/saturation/saturation.h"
+#include "common/trackEffectsPanel/plugins/mixFx/delay/mixdelay.h"
+#include "common/dsp/gaincomputer.h"
+#include "common/trackEffectsPanel/plugins/mixFx/gate/gate.h"
+#include "common/trackEffectsPanel/plugins/mixFx/limiter/limiter.h"
+#include "common/trackEffectsPanel/plugins/mixFx/saturation/saturation.h"
 
 #include <cmath>
 #include <vector>

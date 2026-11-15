@@ -1,9 +1,9 @@
 #include "testkit.h"
-#include "persistence/bassjson.h"
-#include "persistence/effectchainjson.h"
-#include "persistence/projectdocument.h"
-#include "plugins/effectchain.h"
-#include "session/tracklist.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/bassjson.h"
+#include "common/persistence/effectchainjson.h"
+#include "common/persistence/projectdocument.h"
+#include "common/effects/effectchain.h"
+#include "common/session/tracklist.h"
 
 #include <functional>
 

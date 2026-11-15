@@ -1,6 +1,6 @@
 #include "testkit.h"
 
-#include "rt/rtqueue.h"
+#include "common/rt/rtqueue.h"
 
 #include <atomic>
 #include <cstdint>

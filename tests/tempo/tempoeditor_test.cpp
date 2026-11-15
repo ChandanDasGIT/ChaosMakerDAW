@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "tempo/tempoeditor.h"
+#include "transportBar/tempoEditor/tempoeditor.h"
 
 #include <limits>
 

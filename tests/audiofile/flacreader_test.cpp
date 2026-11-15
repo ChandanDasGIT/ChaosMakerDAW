@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "audiofile/flacreader.h"
-#include "audiofile/md5.h"
+#include "common/audiofile/flacreader.h"
+#include "common/audiofile/md5.h"
 
 #include <cstdio>
 #include <filesystem>
@@ -159,7 +159,7 @@ TEST(flacreader, every_splendid_piano_sample_matches_its_own_md5)
 {
     // The piano library (not in the repository): when it is here, every file must decode and
     // match the MD5 its encoder stored.
-    const auto folder = Here.parent_path().parent_path() / "sample-kits/GrandPiano/SplendidGrandPiano/Samples";
+    const auto folder = Here.parent_path().parent_path() / "resources/sample-kits/GrandPiano/SplendidGrandPiano/Samples";
     if (!std::filesystem::is_directory(folder)) {
         std::printf("    skipped: %s is not here\n", folder.string().c_str());
         return;

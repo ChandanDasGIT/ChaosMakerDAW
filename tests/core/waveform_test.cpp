@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "core/audiodata.h"
+#include "common/core/audiodata.h"
 TEST(waveform, cache_preserves_stereo_peaks_offsets_and_silent_extensions) {
     AudioData audio; audio.frames=1024; audio.channels={std::vector<float>(1024),std::vector<float>(1024)};
     audio.channels[0][255]=-0.7f; audio.channels[1][256]=0.9f; audio.buildWaveform();

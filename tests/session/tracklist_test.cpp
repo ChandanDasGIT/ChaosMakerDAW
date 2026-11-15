@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "session/tracklist.h"
-#include "plugins/denoise/denoise.h"
+#include "common/session/tracklist.h"
+#include "common/trackEffectsPanel/plugins/denoise/denoise.h"
 
 #include <cmath>
 #include <cstdint>

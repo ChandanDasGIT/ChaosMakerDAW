@@ -2,8 +2,8 @@
 #include "testkit.h"
 #include "testsignals.h"
 
-#include "processor/processor.h"
-#include "processor/smoother.h"
+#include "common/processor/processor.h"
+#include "common/processor/smoother.h"
 
 #include <cmath>
 

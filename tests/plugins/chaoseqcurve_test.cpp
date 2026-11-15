@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "plugins/chaoseq/chaoseqcurve.h"
+#include "common/trackEffectsPanel/plugins/chaosEq/chaoseqcurve.h"
 
 #include <cmath>
 

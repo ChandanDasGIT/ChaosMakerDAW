@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "midi/notenames.h"
+#include "common/midi/notenames.h"
 
 TEST(notenames, names_follow_midi_60_is_c4)
 {

@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/midi/virtualkeyboardwrap/virtualkeyboardwrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "audiodevice/audiodevice.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/transportBar/virtualKeyboard/virtualKeyboardWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/audiodevice/audiodevice.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -73,16 +73,16 @@ TEST(qtvirtualkeyboard, clicked_keys_play_the_monitored_instrument_and_never_han
     auto device = std::make_unique<KeyboardDevice>();
     auto* keyboard = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int harmonium = tracks.addInstrumentTrackOfType("Harmonium");
     tracks.addInstrumentTrackOfType("Piano");                    // more than one instrument
     CHECK(tracks.setMonitorEnabled(harmonium, true));
     tick(); keyboard->play(2);
 
-    VirtualKeyboardWrapper piano;
+    VirtualKeyboardWrap piano;
     QList<QPair<int, bool>> sent;
-    QObject::connect(&piano, &VirtualKeyboardWrapper::noteSent, &piano,
+    QObject::connect(&piano, &VirtualKeyboardWrap::noteSent, &piano,
                      [&sent](int note, int, bool on) { sent.append({note, on}); });
     CHECK(piano.noteName(60) == "C4" && piano.noteName(61) == "C#4");
 

@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "persistence/mediacollect.h"
-#include "persistence/projectdocument.h"
-#include "session/projectsession.h"
-#include "audiofile/wavwriter.h"
+#include "common/persistence/mediacollect.h"
+#include "common/persistence/projectdocument.h"
+#include "common/session/projectsession.h"
+#include "common/audiofile/wavwriter.h"
 
 #include <nlohmann/json.hpp>
 

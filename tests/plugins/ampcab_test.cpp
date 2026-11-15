@@ -1,11 +1,11 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "instruments/guitar/plugins/amp/amp.h"
-#include "instruments/guitar/plugins/cabinet/cabinet.h"
-#include "instruments/guitar/dsp/partitionedconvolver.h"
-#include "plugins/eq/eqpresets.h"
-#include "plugins/eq/tenbandeq.h"
-#include "dsp/fft.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/amp/amp.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/cabinet/cabinet.h"
+#include "common/dsp/partitionedconvolver.h"
+#include "common/eq/eqpresets.h"
+#include "common/eq/tenbandeq.h"
+#include "common/dsp/fft.h"
 #include <complex>
 #include <numeric>
 

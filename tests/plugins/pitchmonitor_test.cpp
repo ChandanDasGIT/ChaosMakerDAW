@@ -1,7 +1,7 @@
 #include "testkit.h"
-#include "plugins/mixfx/mixfxfactory.h"
-#include "plugins/pitchmonitor/pitchmonitor.h"
-#include "persistence/mixfxjson.h"
+#include "common/trackEffectsPanel/plugins/mixFx/mixfxfactory.h"
+#include "common/trackEffectsPanel/plugins/pitchMonitor/pitchmonitor.h"
+#include "common/trackEffectsPanel/plugins/mixFx/mixfxjson.h"
 
 #include <cmath>
 #include <numbers>

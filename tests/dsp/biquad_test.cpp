@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "dsp/biquad.h"
+#include "common/dsp/biquad.h"
 #include <cmath>
 
 TEST(biquad, default_section_passes_signal_unchanged)

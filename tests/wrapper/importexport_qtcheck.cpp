@@ -1,11 +1,12 @@
 #include "testkit.h"
-#include "wrapper/session/importexportwrap/importexportwrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "audiodevice/audiodevice.h"
-#include "audiofile/audioimport.h"
-#include "audiofile/mp3reader.h"
-#include "audiofile/wavwriter.h"
+#include "wrapper/topBar/projectActions/importExport/importExportWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/exportDialog/exportDialogWrap.h"
+#include "common/audiodevice/audiodevice.h"
+#include "topBar/projectActions/importExport/audioimport.h"
+#include "common/audiofile/mp3reader.h"
+#include "common/audiofile/wavwriter.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -25,11 +26,11 @@ void application()
     static int argc = 1; static char name[] = "importexporttests"; static char* argv[]{name, nullptr};
     static QCoreApplication app(argc, argv);
 }
-bool waitFor(ImportExportWrapper& job, int ms = 10000)
+bool waitFor(ImportExportWrap& job, int ms = 10000)
 {
     QEventLoop loop;
     bool done = false;
-    QObject::connect(&job, &ImportExportWrapper::finished, &loop, [&] { done = true; loop.quit(); });
+    QObject::connect(&job, &ImportExportWrap::finished, &loop, [&] { done = true; loop.quit(); });
     QTimer::singleShot(ms, &loop, &QEventLoop::quit);
     if (job.busy()) loop.exec();
     return done || !job.busy();
@@ -58,15 +59,15 @@ void isolate(const QString& path)
     QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, path);
 }
-bool waitForExport(EngineController& controller, bool& ok, QString& message, int ms = 20000)
+bool waitForExport(ExportDialogWrap& exporter, bool& ok, QString& message, int ms = 20000)
 {
     QEventLoop loop;
     bool done = false;
-    QObject::connect(&controller, &EngineController::exportFinished, &loop, [&](bool good, const QString& text) {
+    QObject::connect(&exporter, &ExportDialogWrap::exportFinished, &loop, [&](bool good, const QString& text) {
         done = true; ok = good; message = text; loop.quit();
     });
     QTimer::singleShot(ms, &loop, &QEventLoop::quit);
-    if (controller.exporting()) loop.exec();
+    if (exporter.exporting()) loop.exec();
     return done;
 }
 std::vector<std::vector<float>> tone(int channels, int frames)
@@ -86,9 +87,9 @@ TEST(qtimportexport, files_import_in_the_background_as_new_tracks_and_bad_ones_a
     audiofile::writeWav((dir.path() + "/Vox.wav").toStdString(), tone(1, 24000), 44100, audiofile::WavFormat::Int16);
     { QFile junk(dir.path() + "/junk.wav"); CHECK(junk.open(QIODevice::WriteOnly)); junk.write("not audio at all"); }
 
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     tracks.setSampleRate(48000);
-    ImportExportWrapper job;
+    ImportExportWrap job;
     job.setTrackModel(&tracks);
     job.setMediaFolder(dir.path() + "/media");
     CHECK(job.isImportable(QUrl::fromLocalFile("/x/a.FLAC")) && job.isImportable(QUrl::fromLocalFile("/x/b.mp3")));
@@ -103,7 +104,7 @@ TEST(qtimportexport, files_import_in_the_background_as_new_tracks_and_bad_ones_a
     CHECK(job.problems().size() == 1 && job.problems()[0].contains("junk.wav"));
     CHECK(job.status().contains("Imported 2"));
     CHECK(QDir(dir.path() + "/media").entryList(QDir::Files).size() == 2);   // kept as takes
-    CHECK(tracks.data(tracks.index(0), TrackListWrapper::NameRole).toString() == "Guitar");
+    CHECK(tracks.data(tracks.index(0), TrackListModelWrap::NameRole).toString() == "Guitar");
     CHECK(tracks.clips().size() == 2);
     CHECK(tracks.undo());                                                     // one step
     CHECK(tracks.count() == 0);
@@ -126,30 +127,31 @@ TEST(qtimportexport, the_song_exports_to_wav_and_mp3_in_the_background)
     audiofile::writeWav((dir.path() + "/Guitar.wav").toStdString(), tone(2, 48000), 48000, audiofile::WavFormat::Float32);
 
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     tracks.setSampleRate(48000);
     controller.attachProject(&tracks);
     controller.setBpm(120.0);
+    ExportDialogWrap exporter(&controller);
     const QUrl wav = QUrl::fromLocalFile(dir.path() + "/out.wav");
-    CHECK(controller.songEndBeats() == 0.0);
-    CHECK(!controller.startExport(wav, 0, 0, "wav24", 320, 0, false, 0));      // nothing to export yet
+    CHECK(exporter.songEndBeats() == 0.0);
+    CHECK(!exporter.startExport(wav, 0, 0, "wav24", 320, 0, false, 0));      // nothing to export yet
 
-    ImportExportWrapper job;
+    ImportExportWrap job;
     job.setTrackModel(&tracks);
     job.setMediaFolder(dir.path() + "/media");
     CHECK(job.importFiles({QUrl::fromLocalFile(dir.path() + "/Guitar.wav")}, 0.0));
     CHECK(waitFor(job));
-    CHECK(std::abs(controller.songEndBeats() - 2.0) < 1e-6);                    // 1 s at 120 bpm
+    CHECK(std::abs(exporter.songEndBeats() - 2.0) < 1e-6);                    // 1 s at 120 bpm
 
     // The whole song plus a 0.5 s tail, as 24-bit WAV.
-    CHECK(!controller.startExport(wav, 0, 0, "flac", 320, 0, false, 0));        // not a format
-    CHECK(controller.startExport(wav, 0, 0, "wav24", 320, 0.5, false, 0));
-    CHECK(controller.exporting());
-    CHECK(!controller.startExport(wav, 0, 0, "wav24", 320, 0.5, false, 0));     // one at a time
+    CHECK(!exporter.startExport(wav, 0, 0, "flac", 320, 0, false, 0));        // not a format
+    CHECK(exporter.startExport(wav, 0, 0, "wav24", 320, 0.5, false, 0));
+    CHECK(exporter.exporting());
+    CHECK(!exporter.startExport(wav, 0, 0, "wav24", 320, 0.5, false, 0));     // one at a time
     bool ok = false;
     QString message;
-    CHECK(waitForExport(controller, ok, message));
-    CHECK(ok && message.contains("out.wav") && !controller.exporting());
+    CHECK(waitForExport(exporter, ok, message));
+    CHECK(ok && message.contains("out.wav") && !exporter.exporting());
     const auto rendered = audioimport::read(wav.toLocalFile().toStdString());
     CHECK(rendered->sampleRate == 48000.0 && rendered->frames == 48000 + 24000);
     float peak = 0;
@@ -159,8 +161,8 @@ TEST(qtimportexport, the_song_exports_to_wav_and_mp3_in_the_background)
 
     // A time selection, normalised to -1 dBFS, as MP3.
     const QUrl mp3 = QUrl::fromLocalFile(dir.path() + "/part.mp3");
-    CHECK(controller.startExport(mp3, 0.5, 1.5, "mp3", 192, 0, true, -1.0));
-    CHECK(waitForExport(controller, ok, message));
+    CHECK(exporter.startExport(mp3, 0.5, 1.5, "mp3", 192, 0, true, -1.0));
+    CHECK(waitForExport(exporter, ok, message));
     CHECK(ok);
     const auto decoded = audiofile::readMp3(mp3.toLocalFile().toStdString());
     CHECK(decoded.bitrateKbps == 192 && decoded.audio->sampleRate == 48000.0);
@@ -170,9 +172,9 @@ TEST(qtimportexport, the_song_exports_to_wav_and_mp3_in_the_background)
     CHECK(std::abs(peak - std::pow(10.0f, -1.0f / 20.0f)) < 0.03f);
 
     // Cancel: no file is reported as written.
-    CHECK(controller.startExport(QUrl::fromLocalFile(dir.path() + "/cancel.wav"), 0, 0, "wav16", 320, 10.0, false, 0));
-    controller.cancelExport();
-    CHECK(waitForExport(controller, ok, message));
+    CHECK(exporter.startExport(QUrl::fromLocalFile(dir.path() + "/cancel.wav"), 0, 0, "wav16", 320, 10.0, false, 0));
+    exporter.cancelExport();
+    CHECK(waitForExport(exporter, ok, message));
     CHECK(!ok && message.contains("cancelled"));
     controller.shutdownSession();
 }

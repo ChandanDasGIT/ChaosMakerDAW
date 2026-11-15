@@ -1,9 +1,9 @@
 #include "testkit.h"
-#include "wrapper/plugins/pitchmonitor/pitchmonitorwrap/pitchmonitorwrapper.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "audiodevice/audiodevice.h"
-#include "plugins/mixfx/mixfxspec.h"
+#include "wrapper/common/trackEffectsPanel/plugins/pitchMonitor/pitchMonitorWrap.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/audiodevice/audiodevice.h"
+#include "common/mixEffect/mixfxspec.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -55,7 +55,7 @@ struct Storage {
     }
 };
 void tick(int ms = 30) { QEventLoop loop; QTimer::singleShot(ms, &loop, &QEventLoop::quit); loop.exec(); }
-bool settle(PitchMonitorWrapper& page)
+bool settle(PitchMonitorWrap& page)
 {
     tick(300);                                                   // the change's short wait
     for (int i = 0; i < 300 && page.analysing(); ++i) tick(20);
@@ -89,13 +89,13 @@ double medianPitch(const QVariantList& list, double* cents = nullptr)
 TEST(qtpitchmonitor, the_recorded_line_follows_the_clips_the_key_and_the_tempo)
 {
     Storage storage;
-    TrackListWrapper tracks;                                     // 120 BPM, 48 kHz
+    TrackListModelWrap tracks;                                     // 120 BPM, 48 kHz
     const int vocal = tracks.addVocalTrack();
     CHECK(tracks.attachTake(vocal, 48000, sung(220.0, 1.0, "a3.wav"), false));     // beats 2..4
     CHECK(tracks.attachTake(vocal, 240000, sung(261.63, 0.5, "c4.wav"), false));   // beats 10..11
     CHECK(tracks.addTrackEffect(vocal, "pitchmonitor") > 0);
 
-    PitchMonitorWrapper page;
+    PitchMonitorWrap page;
     page.setTrackModel(&tracks);
     page.setEffectsId(vocal);
     CHECK(!page.hasLine() && page.lowestNote() == 48 && page.highestNote() == 72);   // a default range
@@ -112,7 +112,7 @@ TEST(qtpitchmonitor, the_recorded_line_follows_the_clips_the_key_and_the_tempo)
 
     // C minor pentatonic (C Eb F G Bb) has no A: A3 is 100 cents under A#3, its nearest in-key note.
     int keyChanges = 0;
-    QObject::connect(&page, &PitchMonitorWrapper::keyChanged, [&] { ++keyChanges; });
+    QObject::connect(&page, &PitchMonitorWrap::keyChanged, [&] { ++keyChanges; });
     auto key = mixfx::defaults(mixfx::PitchMonitor);
     key.values["key"] = 0;
     key.values["scale"] = 4;
@@ -150,7 +150,7 @@ TEST(qtpitchmonitor, the_live_input_gives_the_readout_and_a_line_while_the_song_
     auto device = std::make_unique<ToneDevice>(); auto* io = device.get();
     EngineController controller(std::move(device), false);
     controller.setRestoreSessionOnStartup(false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int vocal = tracks.addVocalTrack();
     CHECK(tracks.setTrackInputPort(vocal, "test:input"));
@@ -159,7 +159,7 @@ TEST(qtpitchmonitor, the_live_input_gives_the_readout_and_a_line_while_the_song_
     tick(); io->process();                                       // publish the chain
     CHECK(controller.monitoredTracks().size() == 1);
 
-    PitchMonitorWrapper page;
+    PitchMonitorWrap page;
     page.setTrackModel(&tracks);
     page.setEffectsId(vocal);
     page.setEngine(&controller);
@@ -178,7 +178,7 @@ TEST(qtpitchmonitor, the_live_input_gives_the_readout_and_a_line_while_the_song_
 
     io->hz = 0.0;                                                // the voice stops: the readout lets go
     for (int i = 0; i < 40; ++i) io->process();
-    tick(PitchMonitorWrapper::HoldMs + 50);
+    tick(PitchMonitorWrap::HoldMs + 50);
     page.poll();
     CHECK(!page.hasPitch() && page.noteName().isEmpty());
     page.setActive(false);

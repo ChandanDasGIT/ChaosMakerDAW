@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "persistence/drumkitjson.h"
-#include "persistence/projectdocument.h"
+#include "common/trackEffectsPanel/instruments/drums/drumkitjson.h"
+#include "common/persistence/projectdocument.h"
 
 using persistence::drumkitjson::fromJson;
 using persistence::drumkitjson::toJson;

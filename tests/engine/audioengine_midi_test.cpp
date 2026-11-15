@@ -1,7 +1,7 @@
 #include "testkit.h"
-#include "engine/audioengine.h"
-#include "processor/processor.h"
-#include "plugins/testsynth/testsynth.h"
+#include "common/engine/audioengine.h"
+#include "common/processor/processor.h"
+#include "common/instruments/testsynth/testsynth.h"
 
 #include <cmath>
 #include <vector>

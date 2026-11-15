@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "wrapper/files/fileswrap/fileswrapper.h"
+#include "wrapper/common/filePicker/filePickerWrap.h"
 
 #include <QDir>
 #include <QFile>
@@ -12,7 +12,7 @@ TEST(qtfiles, paths_crumbs_and_parents_work_on_real_folders)
     CHECK(QDir(dir.path()).mkpath("Songs/Live"));
     { QFile f(dir.path() + "/Songs/take.wav"); CHECK(f.open(QIODevice::WriteOnly)); }
 
-    FilesWrapper files;
+    FilePickerWrap files;
     const QUrl songs = files.toUrl(dir.path() + "/Songs/");
     CHECK(files.toPath(songs) == dir.path() + "/Songs");                      // cleaned
     CHECK(files.toPath(QUrl()).isEmpty() && files.toUrl(QString()).isEmpty());
@@ -40,7 +40,7 @@ TEST(qtfiles, paths_crumbs_and_parents_work_on_real_folders)
 
 TEST(qtfiles, name_filters_split_into_patterns_and_match_ignoring_case)
 {
-    FilesWrapper files;
+    FilePickerWrap files;
     CHECK(files.filterPatterns("Audio files (*.wav *.WAV *.mp3)") == QStringList({"*.wav", "*.WAV", "*.mp3"}));
     CHECK(files.filterPatterns("*.chaos") == QStringList({"*.chaos"}));
     CHECK(files.filterPatterns("All files (*)") == QStringList({"*"}));

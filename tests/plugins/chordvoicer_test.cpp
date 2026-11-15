@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "plugins/chordplayer/chordsymbol.h"
-#include "plugins/chordplayer/chordvoicer.h"
+#include "common/chordPlayer/chordsymbol.h"
+#include "common/chordPlayer/chordvoicer.h"
 
 #include <algorithm>
 #include <cstdlib>

@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "plugins/eq/tenbandeq.h"
+#include "common/eq/tenbandeq.h"
 
 TEST(tenbandeq, band_descriptors_and_frequencies) {
     const auto& descriptors = TenBandEq::bandDescriptors();

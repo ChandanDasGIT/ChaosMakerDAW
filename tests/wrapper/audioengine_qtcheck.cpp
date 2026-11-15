@@ -1,7 +1,7 @@
 #include "testkit.h"
-#include "wrapper/engine/audioenginewrap/audioenginewrapper.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "audiodevice/audiodevice.h"
+#include "wrapper/common/engine/audioEngineWrap.h"
+#include "wrapper/common/engine/engineController.h"
+#include "common/audiodevice/audiodevice.h"
 
 namespace {
 
@@ -57,7 +57,7 @@ TEST(qtaudioengine, lifecycle_and_properties)
 {
     auto device = std::make_unique<DummyOfflineDevice>();
     auto* devPtr = device.get();
-    AudioEngineWrapper wrapper(std::move(device));
+    AudioEngineWrap wrapper(std::move(device));
 
     CHECK(!wrapper.isAudioReady());
     CHECK(wrapper.engine() != nullptr);

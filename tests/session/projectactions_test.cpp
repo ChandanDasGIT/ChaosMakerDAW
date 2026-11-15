@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "session/projectactions.h"
+#include "topBar/projectActions/projectactions.h"
 
 using ActionType = ProjectActions::ActionType;
 using Request = ProjectActions::Request;

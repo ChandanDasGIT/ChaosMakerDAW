@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "audiodevice/devicesettings.h"
+#include "topBar/appSettings/deviceSettings/devicesettings.h"
 
 TEST(devicesettings, buffer_sizes)
 {

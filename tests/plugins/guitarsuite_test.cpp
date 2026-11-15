@@ -1,9 +1,9 @@
 #include "testkit.h"
 #include "testsignals.h"
 
-#include "instruments/guitar/plugins/delay/delaypedal.h"
-#include "instruments/guitar/plugins/guitarsuite/guitarsuite.h"
-#include "instruments/guitar/plugins/overdrive/overdrive.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/delay/delaypedal.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/guitarsuite.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/overdrive/overdrive.h"
 
 #include <cmath>
 #include <memory>

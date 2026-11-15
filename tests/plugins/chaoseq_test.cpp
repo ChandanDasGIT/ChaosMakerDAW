@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "plugins/chaoseq/chaoseq.h"
+#include "common/trackEffectsPanel/plugins/chaosEq/chaoseq.h"
 
 #include <algorithm>
 #include <cmath>

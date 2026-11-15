@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "session/projectsession.h"
+#include "common/session/projectsession.h"
 
 #include <filesystem>
 

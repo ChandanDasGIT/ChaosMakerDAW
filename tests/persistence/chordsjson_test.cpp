@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "instruments/instrumentfactory.h"
-#include "persistence/chordsjson.h"
-#include "persistence/projectdocument.h"
-#include "session/tracklist.h"
+#include "common/instruments/instrumentfactory.h"
+#include "common/trackEffectsPanel/plugins/chordPlayer/chordsjson.h"
+#include "common/persistence/projectdocument.h"
+#include "common/session/tracklist.h"
 
 using persistence::ProjectDocument;
 using persistence::ProjectFileContent;

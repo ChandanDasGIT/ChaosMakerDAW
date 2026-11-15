@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "audiofile/audioimport.h"
-#include "audiofile/mp3reader.h"
+#include "topBar/projectActions/importExport/audioimport.h"
+#include "common/audiofile/mp3reader.h"
 
 #include <cmath>
 #include <filesystem>

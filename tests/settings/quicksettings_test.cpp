@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "settings/quicksettings.h"
+#include "transportBar/quickSettings/quicksettings.h"
 
 TEST(quicksettings, supported_buffer_sizes)
 {

@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "plugins/pitchmonitor/pitchanalysis.h"
-#include "session/tracklist.h"
+#include "common/trackEffectsPanel/plugins/pitchMonitor/pitchanalysis.h"
+#include "common/session/tracklist.h"
 
 #include <algorithm>
 #include <cmath>

@@ -1,12 +1,12 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "instruments/guitar/plugins/crunch/crunch.h"
-#include "instruments/guitar/plugins/distortion/distortion.h"
-#include "instruments/guitar/plugins/overdrive/overdrive.h"
-#include "dsp/fft.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/crunch/crunch.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/distortion/distortion.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/overdrive/overdrive.h"
+#include "common/dsp/fft.h"
 #include <complex>
-#include "instruments/guitar/plugins/guitarsuite/guitarsuite.h"
-#include "engine/audioengine.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/guitarsuite.h"
+#include "common/engine/audioengine.h"
 #include <memory>
 
 namespace {

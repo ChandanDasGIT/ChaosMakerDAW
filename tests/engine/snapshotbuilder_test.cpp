@@ -1,7 +1,7 @@
 #include "testkit.h"
-#include "engine/snapshotbuilder.h"
-#include "core/audiodata.h"
-#include "processor/processor.h"
+#include "common/engine/snapshotbuilder.h"
+#include "common/core/audiodata.h"
+#include "common/processor/processor.h"
 
 #include <cmath>
 

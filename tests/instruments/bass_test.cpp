@@ -1,10 +1,10 @@
 #include "testkit.h"
-#include "dsp/fft.h"
-#include "instruments/bass/bassfretboard.h"
-#include "instruments/bass/bassguitar.h"
-#include "instruments/bass/basspickup.h"
-#include "instruments/bass/basssettings.h"
-#include "instruments/instrumentfactory.h"
+#include "common/dsp/fft.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/bassfretboard.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/bassguitar.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/basspickup.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/basssettings.h"
+#include "common/instruments/instrumentfactory.h"
 
 #include <algorithm>
 #include <cmath>

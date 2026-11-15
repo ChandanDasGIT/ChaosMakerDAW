@@ -1,5 +1,6 @@
 #include "testkit.h"
-#include "instruments/guitar/pedaleditorrules.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedaleditorrules.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/tuner/tunertext.h"
 
 TEST(pedaleditorrules, pedal_features_by_type)
 {
@@ -52,15 +53,15 @@ TEST(pedaleditorrules, value_and_tuner_texts)
     CHECK(pedaleditor::beatDivisionNames()[2] == "1/4 · Quarter note");
     CHECK(pedaleditor::syncText(true, 120) == "120 BPM · follows bottom-bar tempo");
     CHECK(pedaleditor::syncText(false, 120) == "Free rate · adjust Rate below");
-    const auto strings = pedaleditor::tunerStringLabels();
+    const auto strings = tunertext::stringLabels();
     CHECK(strings.size() == 6 && strings.front() == "6 · E2" && strings.back() == "1 · E4");
-    CHECK(pedaleditor::tunerReferenceText() == "Standard tuning · A4 = 440 Hz");
-    CHECK(pedaleditor::inTune(3.0) && pedaleditor::inTune(-2.9) && !pedaleditor::inTune(3.1));
-    CHECK(pedaleditor::tunerStatus(false, true, 0) == "Tuner bypassed");
-    CHECK(pedaleditor::tunerStatus(false, false, 0) == "Play one open string");
-    CHECK(pedaleditor::tunerStatus(true, false, 1.0) == "In tune");
-    CHECK(pedaleditor::tunerStatus(true, false, -20) == "LOW / FLAT · Tune up ↑");
-    CHECK(pedaleditor::tunerStatus(true, false, 20) == "HIGH / SHARP · Tune down ↓");
-    CHECK(pedaleditor::formatCents(2.46) == "+2.5 cents" && pedaleditor::formatCents(-10) == "-10.0 cents");
-    CHECK(pedaleditor::formatTunerFrequency(110.24, 110.0) == "110.2 Hz → 110.00 Hz");
+    CHECK(tunertext::referenceText() == "Standard tuning · A4 = 440 Hz");
+    CHECK(tunertext::inTune(3.0) && tunertext::inTune(-2.9) && !tunertext::inTune(3.1));
+    CHECK(tunertext::status(false, true, 0) == "Tuner bypassed");
+    CHECK(tunertext::status(false, false, 0) == "Play one open string");
+    CHECK(tunertext::status(true, false, 1.0) == "In tune");
+    CHECK(tunertext::status(true, false, -20) == "LOW / FLAT · Tune up ↑");
+    CHECK(tunertext::status(true, false, 20) == "HIGH / SHARP · Tune down ↓");
+    CHECK(tunertext::formatCents(2.46) == "+2.5 cents" && tunertext::formatCents(-10) == "-10.0 cents");
+    CHECK(tunertext::formatFrequency(110.24, 110.0) == "110.2 Hz → 110.00 Hz");
 }

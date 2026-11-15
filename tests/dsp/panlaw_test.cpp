@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "dsp/panlaw.h"
+#include "common/dsp/panlaw.h"
 #include <cmath>
 #include <limits>
 

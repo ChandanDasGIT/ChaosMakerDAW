@@ -15,7 +15,7 @@ Item {
     property alias ripple: editor.ripple
     signal rippleEdited(bool on)
     property alias snapSelection: editor.snapSelection
-    TimelineWrapper {
+    TimelineWrap {
         id: editor
         trackModel: root.trackModel ?? null
         numerator: root.timeSignature
@@ -214,7 +214,7 @@ Item {
     readonly property real barWidth: beatWidth * editor.beatsPerBar
     readonly property real contentEndBars: editor.contentEndBars
     readonly property real contentWidth: Math.max(width, (Math.ceil(contentEndBars) + 1) * barWidth, recordingTailX)
-    // Which bar labels and grid lines to draw: backend rules (MusicalGrid via TimelineWrapper).
+    // Which bar labels and grid lines to draw: backend rules (MusicalGrid via TimelineWrap).
     readonly property real barLabelStride: editor.lineStride(barWidth, 48)
     readonly property real firstVisibleBar: editor.firstVisibleLine(scroll.contentX, barWidth, barLabelStride)
     readonly property int visibleBarCount: editor.visibleLineCount(width, barWidth, barLabelStride)
@@ -962,8 +962,8 @@ Item {
                             function dragged(mouse) {
                                 const delta = (mapToItem(scroll.contentItem, mouse.x, mouse.y).x - pointerStart) / root.beatWidth
                                 const other = fadeHandle.atEnd ? clipItem.fadeInBeats : clipItem.fadeOutBeats
-                                return Math.max(0, Math.min(clipItem.lengthBeats - other,
-                                                            original + (fadeHandle.atEnd ? -delta : delta)))
+                                return editor.fadeLength(original + (fadeHandle.atEnd ? -delta : delta), other,
+                                                         clipItem.lengthBeats)
                             }
                             onPressed: mouse => {
                                 editor.selectClip(clipItem.trackId, clipItem.clipId, false, true)

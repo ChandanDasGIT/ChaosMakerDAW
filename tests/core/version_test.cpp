@@ -1,6 +1,6 @@
 #include "testkit.h"
 
-#include "core/version.h"
+#include "common/core/version.h"
 
 #include <string>
 

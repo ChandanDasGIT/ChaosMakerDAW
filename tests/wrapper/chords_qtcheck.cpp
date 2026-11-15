@@ -1,11 +1,11 @@
 #include "testkit.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/plugins/chordplayer/chordswrap/chordswrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "wrapper/settings/appsettingswrap/appsettingswrapper.h"
-#include "wrapper/pianorollwrap/pianorollwrapper.h"
-#include "audiodevice/audiodevice.h"
-#include "instruments/chords/chordsinstrument.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/common/trackEffectsPanel/plugins/chordPlayer/chordPlayerWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "wrapper/topBar/appSettings/appSettingsWrap.h"
+#include "wrapper/pianoRoll/pianoRollWrap.h"
+#include "common/audiodevice/audiodevice.h"
+#include "common/instruments/chords/chordsinstrument.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -77,13 +77,13 @@ TEST(qtchords, the_page_edits_the_track_and_its_player_follows)
 {
     Storage storage;
     EngineController controller(std::make_unique<OfflineDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addTrackChoice("Chords");
     const int piano = tracks.addInstrumentTrackOfType("Piano");
     CHECK(id >= 0 && playerOf(controller, id));
 
-    ChordsWrapper page;
+    ChordPlayerWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id); page.setEngine(&controller);
     CHECK(page.valid());
     CHECK((page.chords() == QStringList{"C", "Dm", "Em", "F", "G", "Am", "Bdim", "G7"}));
@@ -111,7 +111,7 @@ TEST(qtchords, the_page_edits_the_track_and_its_player_follows)
     CHECK(page.degreeLabels().size() == 7 && page.degreeLabels()[4] == "V");
 
     int changes = 0;
-    QObject::connect(&tracks, &TrackListWrapper::chordsChanged, &tracks, [&changes] { ++changes; });
+    QObject::connect(&tracks, &TrackListModelWrap::chordsChanged, &tracks, [&changes] { ++changes; });
     CHECK(page.setChord(0, "Amin7") && page.chords()[0] == "Am7");
     CHECK(!page.setChord(1, "H7") && page.lastError().contains("H7") && page.chords()[1] == "Dm");
     CHECK(page.setChord(1, "") && page.chords()[1].isEmpty());
@@ -162,10 +162,10 @@ TEST(qtchords, the_page_edits_the_track_and_its_player_follows)
     CHECK(controller.projectDirty());
 
     // A second page on the same track follows; a page on another track type does nothing.
-    ChordsWrapper other;
+    ChordPlayerWrap other;
     other.setTrackModel(&tracks); other.setTrackId(id);
     CHECK(other.chords() == page.chords() && other.autoplay() == 1);
-    ChordsWrapper notChords;
+    ChordPlayerWrap notChords;
     notChords.setTrackModel(&tracks); notChords.setTrackId(piano);
     CHECK(!notChords.valid() && !notChords.setChord(0, "C"));
     CHECK(page.resetToDefaults() && page.chords()[0] == "C" && other.chords()[0] == "C");
@@ -178,10 +178,10 @@ TEST(qtchords, strips_and_midi_keys_play_and_autoplay_keeps_going_while_stopped)
     auto device = std::make_unique<OfflineDevice>();
     auto* io = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addTrackChoice("Chords");
-    ChordsWrapper page;
+    ChordPlayerWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id); page.setEngine(&controller);
     page.setWatchActive(true);
     tick(); io->process();
@@ -224,10 +224,10 @@ TEST(qtchords, a_time_signature_change_reaches_the_patterns)
     auto device = std::make_unique<OfflineDevice>();
     auto* io = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addTrackChoice("Chords");
-    ChordsWrapper page;
+    ChordPlayerWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id); page.setEngine(&controller);
     tick(); io->process();
     const auto* player = playerOf(controller, id);
@@ -252,12 +252,12 @@ TEST(qtchords, recording_keeps_the_presses_which_play_back_and_convert_to_piano_
     auto device = std::make_unique<OfflineDevice>();
     auto* io = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     controller.setBpm(120);
     controller.setMeter(4, 4);
     const int id = tracks.addTrackChoice("Chords");
-    ChordsWrapper page;
+    ChordPlayerWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id); page.setEngine(&controller);
     CHECK(tracks.setRecordArmed(id, true));
     tick(); io->process();
@@ -322,10 +322,10 @@ TEST(qtchords, zones_follow_the_preferred_mapping_and_the_name_plays_the_whole_s
     auto device = std::make_unique<OfflineDevice>();
     auto* io = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addTrackChoice("Chords");
-    ChordsWrapper page;
+    ChordPlayerWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id); page.setEngine(&controller);
     page.setWatchActive(true);
     tick(); io->process();
@@ -335,8 +335,8 @@ TEST(qtchords, zones_follow_the_preferred_mapping_and_the_name_plays_the_whole_s
     const auto play = [&](auto&& action) { action(); io->process(nullptr, 4); };
 
     // The default mapping: each zone its own octave.
-    AppSettingsWrapper settings;
-    CHECK(settings.chordZoneMapping() == "octaves" && AppSettingsWrapper::storedChordZoneMapping() == "octaves");
+    AppSettingsWrap settings;
+    CHECK(settings.chordZoneMapping() == "octaves" && AppSettingsWrap::storedChordZoneMapping() == "octaves");
     play([&] { page.press(2, false, 100, 2); page.release(2, false); });
     CHECK(player->activeStrip() == 2 && player->activeZone() == ChordPlayer::High);
     tick(80);
@@ -344,7 +344,7 @@ TEST(qtchords, zones_follow_the_preferred_mapping_and_the_name_plays_the_whole_s
 
     // Zone keys: the same zones, written as a zone key before the middle-octave press.
     settings.setChordZoneMapping("zonekeys");
-    CHECK(AppSettingsWrapper::storedChordZoneMapping() == "zonekeys");
+    CHECK(AppSettingsWrap::storedChordZoneMapping() == "zonekeys");
     play([&] { page.press(3, false, 100, 0); page.release(3, false); });
     CHECK(player->activeStrip() == 3 && player->activeZone() == ChordPlayer::Low);
     play([&] { page.press(3, false, 100, 1); page.release(3, false); });   // another zone re-voices, it does not stop
@@ -365,9 +365,9 @@ TEST(qtchords, zones_follow_the_preferred_mapping_and_the_name_plays_the_whole_s
 TEST(qtchords, the_piano_roll_names_every_zone_key)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int id = tracks.addTrackChoice("Chords");                 // C Dm Em F G Am Bdim G7
-    PianoRollWrapper roll;
+    PianoRollWrap roll;
     roll.setTrackList(&tracks);
     roll.setTrackId(id);
     CHECK(roll.drumName(65) == QString::fromUtf8("4 \u00b7 F"));
@@ -384,10 +384,10 @@ TEST(qtchords, volume_and_bass_with_chords_are_saved_on_the_track_and_reach_the_
     auto device = std::make_unique<OfflineDevice>();
     auto* io = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addTrackChoice("Chords");
-    ChordsWrapper page;
+    ChordPlayerWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id); page.setEngine(&controller);
     CHECK(page.dynamics() == 0 && page.bassWithChords());              // the defaults
     tick(); io->process();

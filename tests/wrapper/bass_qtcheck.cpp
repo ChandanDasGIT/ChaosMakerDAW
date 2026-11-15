@@ -1,10 +1,10 @@
 #include "testkit.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/instruments/bass/basswrap/basswrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "audiodevice/audiodevice.h"
-#include "instruments/bass/bassguitar.h"
-#include "instruments/bass/basspresets.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/common/trackEffectsPanel/instruments/guitar/bass/bassWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/audiodevice/audiodevice.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/bassguitar.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/basspresets.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -90,13 +90,13 @@ struct Storage {
 TEST(qtbass, wrapper_edits_the_track_by_key_and_follows_other_panels)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int id = tracks.addInstrumentTrackOfType("Bass Guitar");
     const int piano = tracks.addInstrumentTrackOfType("Piano");
     CHECK(tracks.bass(id) != nullptr);
     CHECK(tracks.bass(piano) == nullptr);
 
-    BassWrapper a, b;
+    BassWrap a, b;
     a.setFolder(storage.dir.path() + "/presets");
     a.setTrackModel(&tracks); a.setTrackId(id);
     b.setTrackModel(&tracks); b.setTrackId(id);
@@ -106,7 +106,7 @@ TEST(qtbass, wrapper_edits_the_track_by_key_and_follows_other_panels)
     CHECK(a.values().value("slapVelocity").toInt() == 110);
     CHECK(a.values().size() == int(bass::controls().size()));
     int changes = 0;
-    QObject::connect(&tracks, &TrackListWrapper::bassChanged, &tracks, [&changes] { ++changes; });
+    QObject::connect(&tracks, &TrackListModelWrap::bassChanged, &tracks, [&changes] { ++changes; });
 
     CHECK(a.set("style", "slap"));
     CHECK(a.set("pickupBlend", 0.8));
@@ -137,7 +137,7 @@ TEST(qtbass, wrapper_edits_the_track_by_key_and_follows_other_panels)
     CHECK(a.resetToDefaults());
     CHECK(*tracks.bass(id) == bass::Settings{});
 
-    BassWrapper other;                                            // not a bass track
+    BassWrap other;                                            // not a bass track
     other.setTrackModel(&tracks); other.setTrackId(piano);
     CHECK(!other.valid());
     CHECK(!other.set("tone", 0.5));
@@ -148,9 +148,9 @@ TEST(qtbass, wrapper_edits_the_track_by_key_and_follows_other_panels)
 TEST(qtbass, presets_load_save_rename_and_delete_in_their_own_folder)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int id = tracks.addInstrumentTrackOfType("Bass Guitar");
-    BassWrapper page;
+    BassWrap page;
     const QString folder = storage.dir.path() + "/bass-presets";
     page.setFolder(folder);
     page.setTrackModel(&tracks); page.setTrackId(id);
@@ -186,7 +186,7 @@ TEST(qtbass, presets_load_save_rename_and_delete_in_their_own_folder)
     CHECK(!page.loadPreset("Funk") && !page.lastError().isEmpty());
 
     // The default folder is the app data folder's "bass-presets" (here a throwaway one).
-    BassWrapper fresh;
+    BassWrap fresh;
     CHECK(fresh.folder().startsWith(storage.dir.path()) && fresh.folder().endsWith("/bass-presets"));
 }
 
@@ -194,7 +194,7 @@ TEST(qtbass, bass_track_plays_the_bass_and_edits_reach_it)
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addInstrumentTrackOfType("Bass Guitar");
     const auto instrument = controller.trackInstrument(id);
@@ -202,7 +202,7 @@ TEST(qtbass, bass_track_plays_the_bass_and_edits_reach_it)
     if (!instrument || instrument->typeId() != "bassguitar") return;
     const auto& b = static_cast<const BassGuitar&>(*instrument);
 
-    BassWrapper page;
+    BassWrap page;
     page.setFolder(storage.dir.path() + "/presets");
     page.setTrackModel(&tracks); page.setTrackId(id);
     page.set("style", "mute");
@@ -226,7 +226,7 @@ TEST(qtbass, mon_lets_a_midi_keyboard_play_the_bass)
     auto device = std::make_unique<KeyboardDevice>();
     auto* keyboard = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addInstrumentTrackOfType("Bass Guitar");
     tick(); keyboard->play(2);
@@ -248,11 +248,11 @@ TEST(qtbass, a_chain_file_carries_the_bass_sound_to_another_bass_track)
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int first = tracks.addInstrumentTrackOfType("Bass Guitar");
     const int second = tracks.addInstrumentTrackOfType("Bass Guitar");
-    BassWrapper page;
+    BassWrap page;
     page.setFolder(storage.dir.path() + "/presets");
     page.setTrackModel(&tracks); page.setTrackId(first);
     CHECK(page.loadPreset("Rock Drive"));

@@ -1,9 +1,9 @@
 #include "testkit.h"
-#include "persistence/effectchainjson.h"
-#include "persistence/projectdocument.h"
-#include "persistence/synthjson.h"
-#include "plugins/effectchain.h"
-#include "session/tracklist.h"
+#include "common/persistence/effectchainjson.h"
+#include "common/persistence/projectdocument.h"
+#include "common/trackEffectsPanel/instruments/synth/synthjson.h"
+#include "common/effects/effectchain.h"
+#include "common/session/tracklist.h"
 
 #include <functional>
 

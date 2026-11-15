@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "plugins/denoise/denoise.h"
-#include "persistence/mixfxjson.h"
+#include "common/trackEffectsPanel/plugins/denoise/denoise.h"
+#include "common/trackEffectsPanel/plugins/mixFx/mixfxjson.h"
 
 #include <cmath>
 #include <cstdint>

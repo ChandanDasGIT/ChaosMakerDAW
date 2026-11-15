@@ -1,9 +1,9 @@
 #include "testkit.h"
-#include "instruments/drums/drummap.h"
-#include "instruments/drums/grooves/drumgroove.h"
-#include "persistence/drumgroovejson.h"
-#include "persistence/groovestore.h"
-#include "session/tracklist.h"
+#include "common/trackEffectsPanel/instruments/drums/drummap.h"
+#include "common/groovePanel/drumgroove.h"
+#include "common/groovePanel/drumgroovejson.h"
+#include "common/groovePanel/groovestore.h"
+#include "common/session/tracklist.h"
 
 #include <chrono>
 #include <cmath>

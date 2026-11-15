@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "instruments/guitar/audiofile/impulsewav.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/impulsewav.h"
 #include <bit>
 #include <cmath>
 #include <chrono>

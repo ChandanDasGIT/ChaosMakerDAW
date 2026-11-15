@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "analysis/chordfinder.h"
+#include "topBar/toolsMenu/chordAnalyzer/chordfinder.h"
 #include "chordrender.h"
 
 #include <atomic>

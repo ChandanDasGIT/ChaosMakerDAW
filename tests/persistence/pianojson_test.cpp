@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "persistence/pianojson.h"
-#include "persistence/projectdocument.h"
+#include "common/trackEffectsPanel/instruments/piano/pianojson.h"
+#include "common/persistence/projectdocument.h"
 
 using persistence::pianojson::fromJson;
 using persistence::pianojson::toJson;

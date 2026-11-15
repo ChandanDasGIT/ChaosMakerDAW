@@ -1,8 +1,8 @@
 #include "testkit.h"
 #include "analysis/drumrender.h"
-#include "persistence/groovestore.h"
-#include "wrapper/analysis/drumanalyzerwrap/drumanalyzerwrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
+#include "common/groovePanel/groovestore.h"
+#include "wrapper/topBar/toolsMenu/drumAnalyzer/drumAnalyzerWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -33,7 +33,7 @@ struct Storage {
 
 void tick(int ms = 20) { QEventLoop loop; QTimer::singleShot(ms, &loop, &QEventLoop::quit); loop.exec(); }
 
-bool settle(DrumAnalyzerWrapper& w)
+bool settle(DrumAnalyzerWrap& w)
 {
     for (int i = 0; i < 1500 && w.busy(); ++i) tick(20);
     return !w.busy();
@@ -56,7 +56,7 @@ std::shared_ptr<AudioData> drumLoop(std::vector<drumrender::Timed>* played = nul
 }
 
 // The project beats of the pattern clip's notes of `key`, from the song's start.
-std::vector<double> noteBeats(const TrackListWrapper& tracks, int trackId, int clipId, int key)
+std::vector<double> noteBeats(const TrackListModelWrap& tracks, int trackId, int clipId, int key)
 {
     std::vector<double> beats;
     const auto* track = tracks.project().findTrack(trackId);
@@ -81,14 +81,14 @@ bool near(const std::vector<double>& beats, double beat, double within)
 TEST(qtdrumanalyzer, the_selected_clip_gives_tempo_meter_and_a_pattern_clip_in_time_with_it)
 {
     Storage storage;
-    TrackListWrapper tracks;                                     // 120 BPM, 48 kHz
+    TrackListModelWrap tracks;                                     // 120 BPM, 48 kHz
     const int audioTrack = tracks.addAudioTrack();
     std::vector<drumrender::Timed> played;
     constexpr std::int64_t ClipStart = 2 * 48000;                // the clip starts at 2 s
     CHECK(tracks.attachTake(audioTrack, ClipStart, drumLoop(&played), false));
     const int clipId = tracks.project().findTrack(audioTrack)->audioClips.at(0).id;
 
-    DrumAnalyzerWrapper w;
+    DrumAnalyzerWrap w;
     CHECK(w.unavailableReason() == "No project is open.");
     w.setTrackModel(&tracks);
     CHECK(w.unavailableReason().contains("Select an audio clip"));
@@ -98,7 +98,7 @@ TEST(qtdrumanalyzer, the_selected_clip_gives_tempo_meter_and_a_pattern_clip_in_t
     CHECK(!w.clipLabel().isEmpty());
 
     int finishedOk = 0;
-    QObject::connect(&w, &DrumAnalyzerWrapper::finished, [&](bool ok) { finishedOk += ok ? 1 : 0; });
+    QObject::connect(&w, &DrumAnalyzerWrap::finished, [&](bool ok) { finishedOk += ok ? 1 : 0; });
     CHECK(w.analyse());
     CHECK(w.busy());
     CHECK(!w.analyse());                                         // one at a time
@@ -183,10 +183,10 @@ TEST(qtdrumanalyzer, the_selected_clip_gives_tempo_meter_and_a_pattern_clip_in_t
 TEST(qtdrumanalyzer, the_typical_bars_become_a_groove_and_a_taken_name_is_refused)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int audioTrack = tracks.addAudioTrack();
     CHECK(tracks.attachTake(audioTrack, 0, drumLoop(), false));
-    DrumAnalyzerWrapper w;
+    DrumAnalyzerWrap w;
     const QString folder = storage.dir.path() + "/grooves";
     w.setGrooveFolder(folder);
     CHECK(w.grooveFolder() == folder);
@@ -218,14 +218,14 @@ TEST(qtdrumanalyzer, the_typical_bars_become_a_groove_and_a_taken_name_is_refuse
 TEST(qtdrumanalyzer, midi_short_and_cancelled_clips_say_why)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int audioTrack = tracks.addAudioTrack();
     auto shortAudio = std::make_shared<AudioData>();
     shortAudio->path = "short.wav"; shortAudio->sampleRate = 48000; shortAudio->frames = 2 * 48000;
     shortAudio->channels = {std::vector<float>(std::size_t(shortAudio->frames), 0.1f)};
     shortAudio->buildWaveform();
     CHECK(tracks.attachTake(audioTrack, 0, shortAudio, false));
-    DrumAnalyzerWrapper w;
+    DrumAnalyzerWrap w;
     w.setTrackModel(&tracks);
     w.setClipId(tracks.project().findTrack(audioTrack)->audioClips.at(0).id);
     CHECK(w.unavailableReason().contains("too short"));

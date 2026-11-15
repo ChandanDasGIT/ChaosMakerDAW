@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "dsp/fft.h"
+#include "common/dsp/fft.h"
 
 #include <cmath>
 #include <complex>

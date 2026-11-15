@@ -1,6 +1,6 @@
 #include "testkit.h"
 
-#include "midi/midievent.h"
+#include "common/midi/midievent.h"
 
 TEST(midibuffer, refuses_events_when_full)
 {

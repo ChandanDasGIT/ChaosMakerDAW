@@ -1,7 +1,7 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "instruments/guitar/plugins/octaver/octaver.h"
-#include "instruments/guitar/plugins/pitchshift/pitchshift.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/octaver/octaver.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/pedals/pitchshift/pitchshift.h"
 #include <memory>
 
 namespace {

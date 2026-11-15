@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "midi/pianorollgrid.h"
+#include "pianoRoll/pianorollgrid.h"
 
 #include <cmath>
 

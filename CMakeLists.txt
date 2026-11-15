@@ -32,7 +32,7 @@ target_compile_definitions(dawengine PUBLIC DAW_VERSION="${PROJECT_VERSION}")
 target_compile_options(dawengine PUBLIC -march=x86-64-v3 -fno-math-errno)
 target_compile_options(dawengine PRIVATE -Wall -Wextra)
 target_link_libraries(dawengine PUBLIC Threads::Threads PkgConfig::JACK)
-# PRIVATE: only backend .cpp files can see it. Keep its include inside backend/persistence/.
+# PRIVATE: only backend .cpp files can see it.
 target_link_libraries(dawengine PRIVATE nlohmann_json::nlohmann_json)
 
 # ---------------------------------------------------------------- the app
@@ -83,19 +83,19 @@ endif()
 
 # ---------------------------------------------------------------- tools (no Qt)
 # fxrender: runs a dry WAV through guitar suite pedals offline (listening tests, plan 6.3).
-add_executable(fxrender tools/fxrender/fxrender.cpp)
+add_executable(fxrender tests/tools/fxrender/fxrender.cpp)
 target_compile_options(fxrender PRIVATE -Wall -Wextra)
 target_link_libraries(fxrender PRIVATE dawengine)
 # chordrender: the Chords track's autoplay patterns on the grand piano, offline (restMap G4).
-add_executable(chordrender tools/chordrender/chordrender.cpp)
+add_executable(chordrender tests/tools/chordrender/chordrender.cpp)
 target_compile_options(chordrender PRIVATE -Wall -Wextra)
 target_link_libraries(chordrender PRIVATE dawengine)
 # latencytest: measures the interface's round trip through JACK with a loopback cable (restMap F3).
-add_executable(latencytest tools/latencytest/latencytest.cpp)
+add_executable(latencytest tests/tools/latencytest/latencytest.cpp)
 target_compile_options(latencytest PRIVATE -Wall -Wextra)
 target_link_libraries(latencytest PRIVATE dawengine)
 # drumbench: scores the drum pattern analyzer against the MIDI a drummer played (restMap G20).
-add_executable(drumbench tools/drumbench/drumbench.cpp)
+add_executable(drumbench tests/tools/drumbench/drumbench.cpp)
 target_compile_options(drumbench PRIVATE -Wall -Wextra)
 target_link_libraries(drumbench PRIVATE dawengine)
 
@@ -122,37 +122,36 @@ if(DAW_BUILD_APP)
     add_executable(wrappertests
         tests/backendtests.cpp tests/wrapper/presets_qtcheck.cpp tests/wrapper/recording_qtcheck.cpp tests/wrapper/clipediting_qtcheck.cpp
         tests/wrapper/audioengine_qtcheck.cpp tests/wrapper/pianoroll_qtcheck.cpp tests/wrapper/harmonium_qtcheck.cpp tests/wrapper/drumkit_qtcheck.cpp tests/wrapper/electrodrums_qtcheck.cpp tests/wrapper/piano_qtcheck.cpp tests/wrapper/virtualkeyboard_qtcheck.cpp tests/wrapper/drumgroove_qtcheck.cpp tests/wrapper/effectchain_qtcheck.cpp tests/wrapper/chords_qtcheck.cpp tests/wrapper/volumeenvelope_qtcheck.cpp tests/wrapper/mixeffect_qtcheck.cpp tests/wrapper/importexport_qtcheck.cpp tests/wrapper/fileswrapper_qtcheck.cpp tests/wrapper/shortcuts_qtcheck.cpp tests/wrapper/denoise_qtcheck.cpp tests/wrapper/pitchmonitor_qtcheck.cpp tests/wrapper/synth_qtcheck.cpp tests/wrapper/bass_qtcheck.cpp tests/wrapper/drumanalyzer_qtcheck.cpp tests/wrapper/chordanalyzer_qtcheck.cpp
-        wrapper/files/fileswrap/fileswrapper.cpp wrapper/files/fileswrap/fileswrapper.h
-        wrapper/plugins/denoise/denoisewrap/denoisewrapper.cpp wrapper/plugins/denoise/denoisewrap/denoisewrapper.h
-        wrapper/plugins/pitchmonitor/pitchmonitorwrap/pitchmonitorwrapper.cpp wrapper/plugins/pitchmonitor/pitchmonitorwrap/pitchmonitorwrapper.h
-        wrapper/settings/shortcutswrap/shortcutswrapper.cpp wrapper/settings/shortcutswrap/shortcutswrapper.h
-        wrapper/pianorollwrap/pianorollwrapper.cpp wrapper/pianorollwrap/pianorollwrapper.h
-        wrapper/pianorollwrap/pianorollnotemodel.cpp wrapper/pianorollwrap/pianorollnotemodel.h
-        wrapper/engineWrap/enginecontroller.cpp wrapper/engineWrap/enginecontroller.h
-        wrapper/session/tracklistwrap/tracklistwrapper.cpp wrapper/session/tracklistwrap/tracklistwrapper.h
-        wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.cpp wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h
-        wrapper/recording/recordingcontrollerwrap/recordingcontrollerwrapper.cpp wrapper/recording/recordingcontrollerwrap/recordingcontrollerwrapper.h
-        wrapper/session/projectsessionwrap/projectsessionwrapper.cpp wrapper/session/projectsessionwrap/projectsessionwrapper.h
-        wrapper/session/projectactionswrap/projectactionswrapper.cpp wrapper/session/projectactionswrap/projectactionswrapper.h
-        wrapper/settings/quicksettingswrap/quicksettingswrapper.cpp wrapper/settings/quicksettingswrap/quicksettingswrapper.h
-        wrapper/audiodevice/devicesettingswrap/devicesettingswrapper.cpp wrapper/audiodevice/devicesettingswrap/devicesettingswrapper.h
-        wrapper/settings/appsettingswrap/appsettingswrapper.cpp wrapper/settings/appsettingswrap/appsettingswrapper.h
-        wrapper/engine/playbackcontrolswrap/playbackcontrolswrapper.cpp wrapper/engine/playbackcontrolswrap/playbackcontrolswrapper.h
-        wrapper/engine/audioenginewrap/audioenginewrapper.cpp wrapper/engine/audioenginewrap/audioenginewrapper.h
-        wrapper/plugins/chaoseq/chaoseqwrap/chaoseqwrapper.cpp wrapper/plugins/chaoseq/chaoseqwrap/chaoseqwrapper.h
-        wrapper/plugins/mixfx/mixfxwrap/mixeffectwrapper.cpp wrapper/plugins/mixfx/mixfxwrap/mixeffectwrapper.h
-        wrapper/session/importexportwrap/importexportwrapper.cpp wrapper/session/importexportwrap/importexportwrapper.h
-        wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.cpp wrapper/instruments/harmonium/harmoniumwrap/harmoniumwrapper.h
-        wrapper/instruments/synth/synthwrap/synthwrapper.cpp wrapper/instruments/synth/synthwrap/synthwrapper.h
-        wrapper/instruments/bass/basswrap/basswrapper.cpp wrapper/instruments/bass/basswrap/basswrapper.h
-        wrapper/analysis/drumanalyzerwrap/drumanalyzerwrapper.cpp wrapper/analysis/drumanalyzerwrap/drumanalyzerwrapper.h
-        wrapper/analysis/chordanalyzerwrap/chordanalyzerwrapper.cpp wrapper/analysis/chordanalyzerwrap/chordanalyzerwrapper.h
-        wrapper/instruments/drums/drumkitwrap/drumkitwrapper.cpp wrapper/instruments/drums/drumkitwrap/drumkitwrapper.h
-        wrapper/instruments/drums/groovewrap/drumgroovewrapper.cpp wrapper/instruments/drums/groovewrap/drumgroovewrapper.h
-        wrapper/plugins/chordplayer/chordswrap/chordswrapper.cpp wrapper/plugins/chordplayer/chordswrap/chordswrapper.h
-        wrapper/instruments/electrodrums/electrodrumswrap/electrodrumswrapper.cpp wrapper/instruments/electrodrums/electrodrumswrap/electrodrumswrapper.h
-        wrapper/instruments/piano/pianowrap/pianowrapper.cpp wrapper/instruments/piano/pianowrap/pianowrapper.h
-        wrapper/midi/virtualkeyboardwrap/virtualkeyboardwrapper.cpp wrapper/midi/virtualkeyboardwrap/virtualkeyboardwrapper.h)
+        wrapper/common/filePicker/filePickerWrap.cpp wrapper/common/filePicker/filePickerWrap.h
+        wrapper/common/trackEffectsPanel/plugins/denoise/denoiseWrap.cpp wrapper/common/trackEffectsPanel/plugins/denoise/denoiseWrap.h
+        wrapper/common/trackEffectsPanel/plugins/pitchMonitor/pitchMonitorWrap.cpp wrapper/common/trackEffectsPanel/plugins/pitchMonitor/pitchMonitorWrap.h
+        wrapper/common/shortcuts/shortcutsWrap.cpp wrapper/common/shortcuts/shortcutsWrap.h
+        wrapper/pianoRoll/pianoRollWrap.cpp wrapper/pianoRoll/pianoRollWrap.h
+        wrapper/pianoRoll/pianoRollNoteModel.cpp wrapper/pianoRoll/pianoRollNoteModel.h
+        wrapper/common/engine/engineController.cpp wrapper/common/engine/engineController.h
+        wrapper/common/trackList/trackListModelWrap.cpp wrapper/common/trackList/trackListModelWrap.h
+        wrapper/common/trackEffectsPanel/instruments/guitar/electric/electricWrap.cpp wrapper/common/trackEffectsPanel/instruments/guitar/electric/electricWrap.h
+        wrapper/topBar/projectActions/projectActionsWrap.cpp wrapper/topBar/projectActions/projectActionsWrap.h
+        wrapper/transportBar/quickSettings/quickSettingsWrap.cpp wrapper/transportBar/quickSettings/quickSettingsWrap.h
+        wrapper/topBar/appSettings/deviceSettings/deviceSettingsWrap.cpp wrapper/topBar/appSettings/deviceSettings/deviceSettingsWrap.h
+        wrapper/topBar/appSettings/appSettingsWrap.cpp wrapper/topBar/appSettings/appSettingsWrap.h
+        wrapper/transportBar/playbackControls/playbackControlsWrap.cpp wrapper/transportBar/playbackControls/playbackControlsWrap.h
+        wrapper/common/engine/audioEngineWrap.cpp wrapper/common/engine/audioEngineWrap.h
+        wrapper/common/trackEffectsPanel/plugins/chaosEq/chaosEqWrap.cpp wrapper/common/trackEffectsPanel/plugins/chaosEq/chaosEqWrap.h
+        wrapper/common/mixEffect/mixEffectWrap.cpp wrapper/common/mixEffect/mixEffectWrap.h
+        wrapper/topBar/projectActions/importExport/importExportWrap.cpp wrapper/topBar/projectActions/importExport/importExportWrap.h
+        wrapper/exportDialog/exportDialogWrap.cpp wrapper/exportDialog/exportDialogWrap.h
+        wrapper/common/trackEffectsPanel/instruments/harmonium/harmoniumWrap.cpp wrapper/common/trackEffectsPanel/instruments/harmonium/harmoniumWrap.h
+        wrapper/common/trackEffectsPanel/instruments/synth/synthWrap.cpp wrapper/common/trackEffectsPanel/instruments/synth/synthWrap.h
+        wrapper/common/trackEffectsPanel/instruments/guitar/bass/bassWrap.cpp wrapper/common/trackEffectsPanel/instruments/guitar/bass/bassWrap.h
+        wrapper/topBar/toolsMenu/drumAnalyzer/drumAnalyzerWrap.cpp wrapper/topBar/toolsMenu/drumAnalyzer/drumAnalyzerWrap.h
+        wrapper/topBar/toolsMenu/chordAnalyzer/chordAnalyzerWrap.cpp wrapper/topBar/toolsMenu/chordAnalyzer/chordAnalyzerWrap.h
+        wrapper/common/trackEffectsPanel/instruments/drums/drumsWrap.cpp wrapper/common/trackEffectsPanel/instruments/drums/drumsWrap.h
+        wrapper/common/groovePanel/groovePanelWrap.cpp wrapper/common/groovePanel/groovePanelWrap.h
+        wrapper/common/trackEffectsPanel/plugins/chordPlayer/chordPlayerWrap.cpp wrapper/common/trackEffectsPanel/plugins/chordPlayer/chordPlayerWrap.h
+        wrapper/common/trackEffectsPanel/instruments/electrodrums/electrodrumsWrap.cpp wrapper/common/trackEffectsPanel/instruments/electrodrums/electrodrumsWrap.h
+        wrapper/common/trackEffectsPanel/instruments/piano/pianoWrap.cpp wrapper/common/trackEffectsPanel/instruments/piano/pianoWrap.h
+        wrapper/transportBar/virtualKeyboard/virtualKeyboardWrap.cpp wrapper/transportBar/virtualKeyboard/virtualKeyboardWrap.h)
     target_include_directories(wrappertests PRIVATE "${CMAKE_CURRENT_LIST_DIR}" "${CMAKE_CURRENT_LIST_DIR}/tests" ${WRAPPER_DIRS})
     target_compile_options(wrappertests PRIVATE -Wall -Wextra)
     target_link_libraries(wrappertests PRIVATE Qt6::Qml Qt6::Gui Qt6::Concurrent dawengine)
@@ -195,35 +194,34 @@ if(DAW_BUILD_APP)
         qt_add_qml_module(transporttests URI TransportTests
             QML_FILES frontend/theme/Theme.qml frontend/theme/PianoRollColors.qml frontend/theme/TrackListColors.qml frontend/theme/TimelineColors.qml frontend/theme/MixerColors.qml frontend/theme/TransportColors.qml
                       frontend/theme/GuitarSuiteColors.qml frontend/theme/EffectsColors.qml frontend/theme/ChaosEqColors.qml
-                      frontend/icons/Icons.qml frontend/window/TopBar.qml frontend/transportbar/TransportBar.qml
-                      frontend/window/EditMenu.qml frontend/window/UndoHistory.qml frontend/window/ViewMenu.qml frontend/window/ToolsMenu.qml frontend/window/TapTempoDialog.qml frontend/tools/DrumAnalyzerDialog.qml frontend/tools/ChordAnalyzerDialog.qml frontend/window/PanelTabs.qml
-                      frontend/window/StatusStrip.qml
-                      frontend/common/ThemedMenuItem.qml frontend/common/ThemedMenu.qml frontend/common/ThemedMenuSeparator.qml frontend/common/ToggleChip.qml frontend/common/PanelButton.qml frontend/common/ThemedComboBox.qml frontend/common/CloseButton.qml frontend/common/ThemedSlider.qml frontend/common/HardwareSlider.qml frontend/common/ThemedDialog.qml frontend/common/ThemedMenuButton.qml frontend/common/ToolWindow.qml frontend/common/ThemedCheckBox.qml frontend/common/ThemedRadioButton.qml frontend/common/ThemedSwitch.qml
-                      frontend/engine/PlaybackControls.qml
-                      frontend/session/ProjectActions.qml frontend/session/ExportDialog.qml frontend/dialogs/FilePicker.qml frontend/audiodevice/DeviceSettings.qml
-                      frontend/settings/AppSettings.qml frontend/settings/QuickSettings.qml frontend/settings/ShortcutEditor.qml
-                      frontend/tempo/TempoEditor.qml frontend/tempo/MeterEditor.qml
+                      frontend/icons/Icons.qml frontend/topBar/TopBar.qml frontend/topBar/deviceLine/DeviceLine.qml frontend/transportBar/TransportBar.qml frontend/transportBar/typingKey/TypingKey.qml
+                      frontend/topBar/editMenu/EditMenu.qml frontend/topBar/editMenu/undoHistory/UndoHistory.qml frontend/topBar/viewMenu/ViewMenu.qml frontend/topBar/toolsMenu/ToolsMenu.qml frontend/topBar/toolsMenu/tapTempo/TapTempoDialog.qml frontend/topBar/toolsMenu/drumAnalyzer/DrumAnalyzerDialog.qml frontend/topBar/toolsMenu/chordAnalyzer/ChordAnalyzerDialog.qml frontend/topBar/panelTabs/PanelTabs.qml
+                      frontend/statusStrip/StatusStrip.qml
+                      frontend/common/themedMenuItem/ThemedMenuItem.qml frontend/common/themedMenu/ThemedMenu.qml frontend/common/themedMenuSeparator/ThemedMenuSeparator.qml frontend/common/toggleChip/ToggleChip.qml frontend/common/panelButton/PanelButton.qml frontend/common/themedComboBox/ThemedComboBox.qml frontend/common/closeButton/CloseButton.qml frontend/common/themedSlider/ThemedSlider.qml frontend/common/hardwareSlider/HardwareSlider.qml frontend/common/themedDialog/ThemedDialog.qml frontend/common/themedMenuButton/ThemedMenuButton.qml frontend/common/toolWindow/ToolWindow.qml frontend/common/themedCheckBox/ThemedCheckBox.qml frontend/common/themedRadioButton/ThemedRadioButton.qml frontend/common/themedSwitch/ThemedSwitch.qml
+                      frontend/transportBar/playbackControls/PlaybackControls.qml
+                      frontend/topBar/projectActions/ProjectActions.qml frontend/topBar/projectActions/importExport/ImportExport.qml frontend/topBar/projectActions/recentProjects/RecentProjects.qml frontend/exportDialog/ExportDialog.qml frontend/common/filePicker/FilePicker.qml frontend/topBar/appSettings/deviceSettings/DeviceSettings.qml
+                      frontend/topBar/appSettings/AppSettings.qml frontend/transportBar/quickSettings/QuickSettings.qml frontend/topBar/appSettings/shortcutEditor/ShortcutEditor.qml
+                      frontend/transportBar/tempoEditor/TempoEditor.qml frontend/transportBar/meterEditor/MeterEditor.qml
                       frontend/icons/MetronomeIcon.qml frontend/icons/MagnetIcon.qml
-                      frontend/instruments/guitar/GuitarSuitePanel.qml
-                      frontend/instruments/guitar/GuitarSuiteEditor.qml frontend/instruments/guitar/SignalChainBar.qml
-                      frontend/instruments/harmonium/HarmoniumEditor.qml
-                      frontend/instruments/synth/SynthEditor.qml
-                      frontend/instruments/bass/BassEditor.qml
-                      frontend/instruments/drums/DrumKitEditor.qml
-                      frontend/instruments/drums/DrumKitPicture.qml frontend/instruments/drums/GroovePanel.qml
-                      frontend/instruments/electrodrums/ElectroDrumsEditor.qml
-                      frontend/instruments/electrodrums/ElectroDrumsPicture.qml
-                      frontend/instruments/piano/PianoEditor.qml
-                      frontend/instruments/piano/PianoPicture.qml
-                      frontend/transportbar/VirtualKeyboard.qml
-                      frontend/plugins/TrackEffectsPanel.qml frontend/plugins/denoise/NoiseReductionEditor.qml frontend/plugins/pitchmonitor/PitchMonitorEditor.qml frontend/plugins/eq/Tenbandeq.qml frontend/plugins/chaoseq/ChaosEqEditor.qml
-                      frontend/plugins/chordplayer/ChordsEditor.qml frontend/plugins/chordplayer/ChordStrips.qml
-                      frontend/session/TrackList.qml frontend/timeline/Timeline.qml frontend/timeline/VolumeEnvelopeLane.qml frontend/plugins/mixfx/MixEffectEditor.qml
-                      frontend/mixer/MixerPanel.qml
-                      frontend/dsp/StereoLevelMeter.qml
-                      frontend/dsp/LevelMeter.qml
-                      frontend/pianoroll/PianoRollView.qml frontend/pianoroll/PianoKeys.qml
-                      frontend/pianoroll/PianoRollComboBox.qml frontend/pianoroll/VelocityLane.qml
+                      frontend/common/trackEffectsPanel/instruments/guitar/electric/GuitarSuiteEditor.qml frontend/common/trackEffectsPanel/instruments/guitar/electric/tuner/Tuner.qml frontend/common/trackEffectsPanel/instruments/guitar/electric/signalChainBar/SignalChainBar.qml
+                      frontend/common/trackEffectsPanel/instruments/harmonium/HarmoniumEditor.qml
+                      frontend/common/trackEffectsPanel/instruments/synth/SynthEditor.qml
+                      frontend/common/trackEffectsPanel/instruments/guitar/bass/BassEditor.qml
+                      frontend/common/trackEffectsPanel/instruments/drums/DrumKitEditor.qml
+                      frontend/common/trackEffectsPanel/instruments/drums/drumKitPicture/DrumKitPicture.qml frontend/common/groovePanel/GroovePanel.qml frontend/common/nameDialog/NameDialog.qml
+                      frontend/common/trackEffectsPanel/instruments/electrodrums/ElectroDrumsEditor.qml
+                      frontend/common/trackEffectsPanel/instruments/electrodrums/electroDrumsPicture/ElectroDrumsPicture.qml
+                      frontend/common/trackEffectsPanel/instruments/piano/PianoEditor.qml
+                      frontend/common/trackEffectsPanel/instruments/piano/pianoPicture/PianoPicture.qml
+                      frontend/transportBar/virtualKeyboard/VirtualKeyboard.qml
+                      frontend/common/trackEffectsPanel/TrackEffectsPanel.qml frontend/common/trackEffectsPanel/plugins/denoise/NoiseReductionEditor.qml frontend/common/trackEffectsPanel/plugins/pitchMonitor/PitchMonitorEditor.qml frontend/common/trackEffectsPanel/plugins/eq/Tenbandeq.qml frontend/common/trackEffectsPanel/plugins/chaosEq/ChaosEqEditor.qml
+                      frontend/common/trackEffectsPanel/plugins/chordPlayer/ChordsEditor.qml frontend/common/trackEffectsPanel/plugins/chordPlayer/chordStrips/ChordStrips.qml
+                      frontend/trackList/TrackList.qml frontend/timeline/Timeline.qml frontend/timeline/volumeEnvelopeLane/VolumeEnvelopeLane.qml frontend/common/trackEffectsPanel/plugins/mixFx/MixEffectEditor.qml
+                      frontend/mixerPanel/MixerPanel.qml
+                      frontend/mixerPanel/stereoLevelMeter/StereoLevelMeter.qml
+                      frontend/common/trackEffectsPanel/instruments/guitar/electric/levelMeter/LevelMeter.qml
+                      frontend/pianoRoll/PianoRollView.qml frontend/pianoRoll/pianoKeys/PianoKeys.qml
+                      frontend/pianoRoll/pianoRollComboBox/PianoRollComboBox.qml frontend/pianoRoll/velocityLane/VelocityLane.qml
                       tests/ui/TransportHarness.qml Main.qml
             SOURCES ${WRAPPER_SOURCES})
         target_include_directories(transporttests PRIVATE "${CMAKE_CURRENT_LIST_DIR}" ${WRAPPER_DIRS})
@@ -234,7 +232,7 @@ if(DAW_BUILD_APP)
         set_tests_properties(transport_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;PIPEWIRE_REMOTE=chaosmaker-test-no-server;PULSE_SERVER=unix:/tmp/chaosmaker-test-no-server")
 
         # uishots: pictures of the app's views, offscreen with throwaway settings (UI work).
-        qt_add_executable(uishots tools/uishots/uishots.cpp)
+        qt_add_executable(uishots tests/tools/uishots/uishots.cpp)
         qt_add_qml_module(uishots URI UiShots
             QML_FILES Main.qml ${FRONTEND_QML}
             SOURCES ${WRAPPER_SOURCES})

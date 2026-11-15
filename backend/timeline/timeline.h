@@ -1,6 +1,6 @@
 #pragma once
 
-#include "session/tracklist.h"
+#include "common/session/tracklist.h"
 
 #include <optional>
 #include <string_view>
@@ -37,6 +37,8 @@ public:
     double snap(double beat, std::string_view direction = {}) const;
     bool isBarLine(double beat) const;
     static bool isBarLine(double beat, double beatsPerBar);
+    // A clip's fade dragged to `proposed` beats: never negative, never into the other fade.
+    static double fadeLength(double proposed, double otherFade, double clipLength);
     std::string barLabel(double bar) const;
     bool hasOverlap(int trackId, double start, double length) const;
     std::optional<CreationRequest> createClip(double beat, int lane) const;

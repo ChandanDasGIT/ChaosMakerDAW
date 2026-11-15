@@ -1,9 +1,9 @@
 #include "testkit.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/instruments/drums/drumkitwrap/drumkitwrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "audiodevice/audiodevice.h"
-#include "instruments/drums/drumkit.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/common/trackEffectsPanel/instruments/drums/drumsWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/audiodevice/audiodevice.h"
+#include "common/trackEffectsPanel/instruments/drums/drumkit.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -87,19 +87,19 @@ struct Storage {
 TEST(qtdrumkit, wrapper_edits_the_track_and_follows_other_panels)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int id = tracks.addInstrumentTrackOfType("Drums");
     const int piano = tracks.addInstrumentTrackOfType("Piano");
     CHECK(tracks.drumKit(id) != nullptr);
     CHECK(tracks.drumKit(piano) == nullptr);
 
-    DrumKitWrapper a, b;
+    DrumsWrap a, b;
     a.setTrackModel(&tracks); a.setTrackId(id);
     b.setTrackModel(&tracks); b.setTrackId(id);
     CHECK(a.valid());
     CHECK(a.room() == "front" && a.kick() == 0.0 && a.kickBeater() == 1.0);
     int changes = 0;
-    QObject::connect(&tracks, &TrackListWrapper::drumKitChanged, &tracks, [&changes] { ++changes; });
+    QObject::connect(&tracks, &TrackListModelWrap::drumKitChanged, &tracks, [&changes] { ++changes; });
 
     a.setRoom("full");
     a.setRoom("cathedral");                                      // unknown: ignored
@@ -119,7 +119,7 @@ TEST(qtdrumkit, wrapper_edits_the_track_and_follows_other_panels)
     CHECK(*tracks.drumKit(id) == drumkit::Settings{});
     CHECK(a.rooms().size() == 3);
 
-    DrumKitWrapper other;                                        // not a Drums track
+    DrumsWrap other;                                        // not a Drums track
     other.setTrackModel(&tracks); other.setTrackId(piano);
     CHECK(!other.valid());
     other.setKick(-3.0);
@@ -131,7 +131,7 @@ TEST(qtdrumkit, drums_track_plays_the_kit_and_edits_reach_it)
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addInstrumentTrackOfType("Drums");
     const auto instrument = controller.trackInstrument(id);
@@ -139,7 +139,7 @@ TEST(qtdrumkit, drums_track_plays_the_kit_and_edits_reach_it)
     if (!instrument || instrument->typeId() != "drumkit") return;
     const auto& kit = static_cast<const DrumKit&>(*instrument);
 
-    DrumKitWrapper page;
+    DrumsWrap page;
     page.setTrackModel(&tracks); page.setTrackId(id);
     page.setRoom("close");
     page.setHihat(-4.0);
@@ -166,19 +166,19 @@ TEST(qtdrumkit, the_picture_plays_parts_and_sees_every_hit)
     auto device = std::make_unique<KeyboardDevice>();
     auto* keyboard = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addInstrumentTrackOfType("Drums");
     tick(); keyboard->play(2);
 
-    DrumKitWrapper page;
+    DrumsWrap page;
     CHECK(page.partKeys().value("kick").toInt() == 60 && page.partKeys().value("hihatOpen").toInt() == 70);
     CHECK(page.partKeys().size() == 13);
     CHECK(page.partName(62) == "Snare" && page.partName(73).isEmpty());
     page.setTrackModel(&tracks); page.setTrackId(id);
     QList<QPair<int, int>> hits, played;
-    QObject::connect(&page, &DrumKitWrapper::hit, &page, [&hits](int key, int velocity) { hits.append({key, velocity}); });
-    QObject::connect(&page, &DrumKitWrapper::played, &page, [&played](int key, int velocity) { played.append({key, velocity}); });
+    QObject::connect(&page, &DrumsWrap::hit, &page, [&hits](int key, int velocity) { hits.append({key, velocity}); });
+    QObject::connect(&page, &DrumsWrap::played, &page, [&played](int key, int velocity) { played.append({key, velocity}); });
 
     page.play(62, 90);                                           // no engine yet: nothing
     CHECK(played.isEmpty());

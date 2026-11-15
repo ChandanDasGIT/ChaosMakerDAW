@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "session/tracklist.h"
+#include "common/session/tracklist.h"
 
 #include <algorithm>
 

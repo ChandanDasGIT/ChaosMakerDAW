@@ -1,10 +1,10 @@
 #include "testkit.h"
-#include "instruments/electrodrums/electrodrums.h"
-#include "instruments/electrodrums/electromap.h"
-#include "instruments/electrodrums/electrosettings.h"
-#include "instruments/electrodrums/electrovoices.h"
-#include "instruments/drums/drummap.h"
-#include "instruments/instrumentfactory.h"
+#include "common/trackEffectsPanel/instruments/electrodrums/electrodrums.h"
+#include "common/trackEffectsPanel/instruments/electrodrums/electromap.h"
+#include "common/trackEffectsPanel/instruments/electrodrums/electrosettings.h"
+#include "common/trackEffectsPanel/instruments/electrodrums/electrovoices.h"
+#include "common/trackEffectsPanel/instruments/drums/drummap.h"
+#include "common/instruments/instrumentfactory.h"
 
 #include <algorithm>
 #include <cmath>

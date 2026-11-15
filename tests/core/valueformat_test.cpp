@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "core/valueformat.h"
+#include "common/core/valueformat.h"
 
 #include <limits>
 

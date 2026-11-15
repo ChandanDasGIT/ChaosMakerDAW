@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "wrapper/settings/shortcutswrap/shortcutswrapper.h"
+#include "wrapper/common/shortcuts/shortcutsWrap.h"
 
 #include <QCoreApplication>
 #include <QSettings>
@@ -27,9 +27,9 @@ struct ShortcutStorage {
 TEST(qtshortcuts, keys_reach_qml_and_a_change_is_saved_and_read_back)
 {
     ShortcutStorage storage;
-    ShortcutsWrapper shortcuts;
+    ShortcutsWrap shortcuts;
     int changed = 0;
-    QObject::connect(&shortcuts, &ShortcutsWrapper::changed, [&] { ++changed; });
+    QObject::connect(&shortcuts, &ShortcutsWrap::changed, [&] { ++changed; });
     CHECK(shortcuts.keys()["transport.goToStart"].toString() == "W");
     CHECK(shortcuts.keys()["transport.playPause"].toString() == "Space");
     CHECK(shortcuts.keys()["edit.delete"].toString() == "Del");
@@ -46,7 +46,7 @@ TEST(qtshortcuts, keys_reach_qml_and_a_change_is_saved_and_read_back)
     CHECK(QSettings().value("shortcuts/transport.goToStart").toString() == "Home");
 
     // Saved: a new instance (the next start of the app) reads the same keys.
-    ShortcutsWrapper again;
+    ShortcutsWrap again;
     CHECK(again.keys() == shortcuts.keys());
     again.resetAll();
     CHECK(again.keys()["transport.goToStart"].toString() == "W");
@@ -58,7 +58,7 @@ TEST(qtshortcuts, keys_reach_qml_and_a_change_is_saved_and_read_back)
 TEST(qtshortcuts, a_key_press_becomes_key_text_and_dialog_keys_are_refused)
 {
     ShortcutStorage storage;
-    ShortcutsWrapper shortcuts;
+    ShortcutsWrap shortcuts;
     CHECK(shortcuts.keyFromEvent(Qt::Key_W, Qt::NoModifier) == "W");
     CHECK(shortcuts.keyFromEvent(Qt::Key_S, int(Qt::ControlModifier | Qt::ShiftModifier)) == "Ctrl+Shift+S");
     CHECK(shortcuts.keyFromEvent(Qt::Key_Delete, Qt::NoModifier) == "Del");

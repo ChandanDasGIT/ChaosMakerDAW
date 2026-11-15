@@ -1,12 +1,12 @@
 #include <QtTest>
 #include <QStyleHints>
-#include "plugins/mixfx/mixfxspec.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/settings/appsettingswrap/appsettingswrapper.h"
-#include "wrapper/settings/shortcutswrap/shortcutswrapper.h"
-#include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
-#include "instruments/synth/synthpresets.h"
-#include "instruments/bass/basspresets.h"
+#include "common/mixEffect/mixfxspec.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/topBar/appSettings/appSettingsWrap.h"
+#include "wrapper/common/shortcuts/shortcutsWrap.h"
+#include "wrapper/common/trackEffectsPanel/instruments/guitar/electric/electricWrap.h"
+#include "common/trackEffectsPanel/instruments/synth/synthpresets.h"
+#include "common/trackEffectsPanel/instruments/guitar/bass/basspresets.h"
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QSignalSpy>
@@ -21,7 +21,7 @@
 #include <QTemporaryDir>
 #include "tests/analysis/chordrender.h"
 #include "tests/analysis/drumrender.h"
-#include "persistence/groovestore.h"
+#include "common/groovePanel/groovestore.h"
 #include <QStandardPaths>
 #include <QScopeGuard>
 #include <QAbstractItemModelTester>
@@ -34,8 +34,8 @@
 #include <QRegularExpression>
 #include <QJsonArray>
 #include <QJsonObject>
-#include "audiodevice/audiodevice.h"
-#include "audiofile/wavwriter.h"
+#include "common/audiodevice/audiodevice.h"
+#include "common/audiofile/wavwriter.h"
 
 class MultiInputUiDevice final : public AudioDevice {
 public:
@@ -173,7 +173,7 @@ private slots:
     void transport_bars_beats_readout_follows_position_and_meter() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks); tracks.addAudioTrack();
+        TrackListModelWrap tracks; controller.attachProject(&tracks); tracks.addAudioTrack();
         const auto restore=qScopeGuard([&] { window->setProperty("transport",QVariant::fromValue(EngineController::instance())); });
         window->setProperty("transport",QVariant::fromValue(&controller));
         auto* readout=visualItem(window->contentItem(),"transportBarsBeats"); QVERIFY(readout); QVERIFY(readout->isVisible());
@@ -191,7 +191,7 @@ private slots:
     void recording_count_in_uses_one_bar_and_can_be_cancelled() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks); const int track=tracks.addAudioTrack();
+        TrackListModelWrap tracks; controller.attachProject(&tracks); const int track=tracks.addAudioTrack();
         QVERIFY(tracks.setRecordArmed(track,true)); controller.setMeter(3,8);
         const auto restore=qScopeGuard([&] { window->setProperty("transport",QVariant::fromValue(EngineController::instance())); });
         window->setProperty("transport",QVariant::fromValue(&controller));
@@ -224,7 +224,7 @@ private slots:
     void metronome_controls_toggle_click_and_adjust_volume() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         QCOMPARE(tracks.count(),0);
         const auto restore=qScopeGuard([&] { window->setProperty("transport",QVariant::fromValue(EngineController::instance())); });
         window->setProperty("transport",QVariant::fromValue(&controller));
@@ -245,7 +245,7 @@ private slots:
     void playback_pauses_red_line_at_the_last_block_across_tracks() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
         tracks.addAudioClip(a,"first",0,128); tracks.addAudioClip(b,"last",200,57);
         QVERIFY(tracks.setMuted(b,true)); // Muted/offline blocks still define the arrangement end.
@@ -276,7 +276,7 @@ private slots:
         QFETCH(bool,emptyTrack);
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         if(emptyTrack)tracks.addAudioTrack();
         const auto restore=qScopeGuard([&] { window->setProperty("transport",QVariant::fromValue(EngineController::instance())); });
         window->setProperty("transport",QVariant::fromValue(&controller));
@@ -300,10 +300,10 @@ private slots:
         controller.shutdownSession();
     }
     void w_goes_to_start_and_the_shortcut_editor_changes_keys() {
-        auto* shortcuts=engine->singletonInstance<ShortcutsWrapper*>("TransportTests","Shortcuts"); QVERIFY(shortcuts);
+        auto* shortcuts=engine->singletonInstance<ShortcutsWrap*>("TransportTests","Shortcuts"); QVERIFY(shortcuts);
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         tracks.addClipAtBeat(tracks.addAudioTrack(),0,64);                // long enough not to stop at the end
         auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
         const auto restore=qScopeGuard([&] {
@@ -408,7 +408,7 @@ private slots:
         QFETCH(bool,useButton);
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         const int track=tracks.addAudioTrack();
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         const auto restore=qScopeGuard([&] {
@@ -862,16 +862,17 @@ private slots:
         auto* rate=visualItem(strip,"statusSampleRate"); auto* buffer=visualItem(strip,"statusBuffer");
         auto* xruns=visualItem(strip,"statusXruns"); auto* message=visualItem(strip,"statusMessage");
         QVERIFY(rate); QVERIFY(buffer); QVERIFY(xruns); QVERIFY(message);
-        // The readouts show the controller's backend-formatted text.
-        QCOMPARE(rate->property("text").toString(),controller->sampleRateText());
-        QCOMPARE(buffer->property("text").toString(),controller->bufferText());
+        // The readouts show the status line's backend-formatted text.
+        auto* wrap=strip->findChild<QObject*>("statusStripWrap"); QVERIFY(wrap);
+        QCOMPARE(rate->property("text").toString(),wrap->property("sampleRateText").toString());
+        QCOMPARE(buffer->property("text").toString(),wrap->property("bufferText").toString());
         QVERIFY(!controller->status().contains("JACK block"));    // no longer repeated in the message
         QCOMPARE(xruns->property("text").toString(),QString("0 xruns"));
         const QColor calm=xruns->property("color").value<QColor>();
         // Dropouts reported by the device show up (polled) and turn the readout orange.
         controller->engine()->xrunOccurred(); controller->engine()->xrunOccurred();
         QTRY_COMPARE(xruns->property("text").toString(),QString("2 xruns"));
-        QCOMPARE(controller->xrunCount(),2);
+        QCOMPARE(wrap->property("xrunCount").toInt(),2);
         QVERIFY(xruns->property("color").value<QColor>()!=calm);
         // Clicking it starts counting again.
         click(xruns);
@@ -985,7 +986,7 @@ private slots:
         while(it.hasNext()) files<<it.next();
         for(const QString& path:files) {
             const QString rel=path.mid(root.size()+1);
-            if(rel.startsWith("frontend/common/")) continue;
+            if(rel.startsWith("frontend/common/")&&!rel.startsWith("frontend/common/trackEffectsPanel/")&&!rel.startsWith("frontend/common/groovePanel/")&&!rel.startsWith("frontend/common/filePicker/")) continue;
             QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
             int line=0;
             for(const QByteArray& bytes:file.readAll().split('\n')) {
@@ -1002,7 +1003,7 @@ private slots:
         QCOMPARE(save->property("implicitHeight").toDouble(),26.0);   // tighter rows (restMap U8 F3)
     }
     void toggle_chips_light_up_lighten_on_hover_and_fade_when_disabled() {
-        TrackListWrapper tracks; const int vocal=tracks.addVocalTrack(), synth=tracks.addInstrumentTrack();
+        TrackListModelWrap tracks; const int vocal=tracks.addVocalTrack(), synth=tracks.addInstrumentTrack();
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         const auto restore=qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel",QVariant()); });
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true); QTest::qWait(30);
@@ -1057,7 +1058,7 @@ private slots:
         const auto name=[](QQuickItem* item) { return QQmlProperty::read(item,"Accessible.name",qmlContext(item)).toString(); };
         auto* play=visualItem(window->contentItem(),"transport_play"); QVERIFY(play);
         QCOMPARE(name(play),QString("Play (Space)"));
-        TrackListWrapper tracks; const int id=tracks.addVocalTrack();
+        TrackListModelWrap tracks; const int id=tracks.addVocalTrack();
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         const auto restore=qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel",QVariant()); });
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true); QTest::qWait(30);
@@ -1087,7 +1088,7 @@ private slots:
     }
     void track_popups_are_shared_and_follow_the_card_that_opened_them() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int a=tracks.addInstrumentTrackOfType("Electric Guitar"),b=tracks.addInstrumentTrackOfType("Electric Guitar"),
                   vocal=tracks.addVocalTrack();
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
@@ -1143,13 +1144,13 @@ private slots:
         QQmlComponent component(engine.get()); component.loadFromModule("TransportTests","Main");
         std::unique_ptr<QObject> created(component.create()); QVERIFY2(created,qPrintable(component.errorString()));
         auto* main=qobject_cast<QQuickWindow*>(created.get()); QVERIFY(main);
-        auto* settings=qvariant_cast<AppSettingsWrapper*>(main->property("layoutSettings")); QVERIFY(settings);
+        auto* settings=qvariant_cast<AppSettingsWrap*>(main->property("layoutSettings")); QVERIFY(settings);
         const auto restore=qScopeGuard([&] {
             settings->setPianoRollPresentation("dock"); controller->shutdownSession();
             created.reset(); window->requestActivate(); [[maybe_unused]] const bool active=QTest::qWaitForWindowActive(window);
         });
         settings->setPianoRollPresentation("dock");
-        auto* tracks=main->findChild<TrackListWrapper*>(); QVERIFY(tracks);
+        auto* tracks=main->findChild<TrackListModelWrap*>(); QVERIFY(tracks);
         const int drums=tracks->addInstrumentTrackOfType("Drums"), clip=tracks->addClipAtBeat(drums,0,4);
         QVERIFY(QMetaObject::invokeMethod(main,"openPianoRoll",Q_ARG(QVariant,drums),Q_ARG(QVariant,clip),
                                           Q_ARG(QVariant,QString("Clip")),Q_ARG(QVariant,4.0)));
@@ -1176,14 +1177,14 @@ private slots:
         QQmlComponent component(engine.get()); component.loadFromModule("TransportTests","Main");
         std::unique_ptr<QObject> created(component.create()); QVERIFY2(created,qPrintable(component.errorString()));
         auto* main=qobject_cast<QQuickWindow*>(created.get()); QVERIFY(main);
-        auto* settings=qvariant_cast<AppSettingsWrapper*>(main->property("layoutSettings")); QVERIFY(settings);
+        auto* settings=qvariant_cast<AppSettingsWrap*>(main->property("layoutSettings")); QVERIFY(settings);
         const auto restore=qScopeGuard([&] {
             settings->setPianoRollPresentation("dock"); controller->shutdownSession();
             // Hand focus back to the harness window: later tests check keyboard focus there.
             created.reset(); window->requestActivate(); [[maybe_unused]] const bool active=QTest::qWaitForWindowActive(window);
         });
         settings->setPianoRollPresentation("dock");
-        auto* tracks=main->findChild<TrackListWrapper*>(); QVERIFY(tracks);
+        auto* tracks=main->findChild<TrackListModelWrap*>(); QVERIFY(tracks);
         const int track=tracks->addInstrumentTrack(), clip=tracks->addClipAtBeat(track,0,4);
         auto* docked=main->findChild<QObject*>("dockedPianoRollLoader"); QVERIFY(docked);
         auto* floating=main->findChild<QObject*>("floatingPianoRollLoader"); QVERIFY(floating);
@@ -1214,7 +1215,7 @@ private slots:
     }
     void chord_zone_mapping_is_a_preference() {
         // Preferences: own octave per zone by default, zone keys the other choice; a click saves it.
-        auto* bridge=window->findChild<AppSettingsWrapper*>("appSettingsBridge"); QVERIFY(bridge);
+        auto* bridge=window->findChild<AppSettingsWrap*>("appSettingsBridge"); QVERIFY(bridge);
         const auto restoreBridge=qScopeGuard([&] { bridge->setChordZoneMapping("octaves"); });
         QCOMPARE(bridge->chordZoneMapping(),QString("octaves"));
         auto* settings=visualItem(window->contentItem(),"settingsButton"); QVERIFY(settings); click(settings);
@@ -1226,14 +1227,14 @@ private slots:
         QVERIFY(octaves->property("checked").toBool()); QVERIFY(!keys->property("checked").toBool());
         click(keys); QTRY_COMPARE(bridge->chordZoneMapping(),QString("zonekeys"));
         QCOMPARE(QSettings().value("chords/zoneMapping").toString(),QString("zonekeys"));
-        QCOMPARE(AppSettingsWrapper::storedChordZoneMapping(),QString("zonekeys"));
+        QCOMPARE(AppSettingsWrap::storedChordZoneMapping(),QString("zonekeys"));
         click(octaves); QTRY_COMPARE(bridge->chordZoneMapping(),QString("octaves"));
         QCOMPARE(QSettings().value("chords/zoneMapping").toString(),QString("octaves"));
         QMetaObject::invokeMethod(window->findChild<QObject*>("preferencesPopup"),"close");
     }
     void default_record_mode_is_a_preference_and_new_tracks_follow_it() {
         // Preferences: two radio buttons, Dry checked by default; a click saves the choice.
-        auto* bridge=window->findChild<AppSettingsWrapper*>("appSettingsBridge"); QVERIFY(bridge);
+        auto* bridge=window->findChild<AppSettingsWrap*>("appSettingsBridge"); QVERIFY(bridge);
         const auto restoreBridge=qScopeGuard([&] { bridge->setDefaultRecordMode("dry"); });
         QCOMPARE(bridge->defaultRecordMode(),QString("dry"));
         auto* settings=visualItem(window->contentItem(),"settingsButton"); QVERIFY(settings); click(settings);
@@ -1255,12 +1256,12 @@ private slots:
         QQmlComponent component(engine.get()); component.loadFromModule("TransportTests","Main");
         std::unique_ptr<QObject> created(component.create()); QVERIFY2(created,qPrintable(component.errorString()));
         auto* main=qobject_cast<QQuickWindow*>(created.get()); QVERIFY(main);
-        auto* mainSettings=qvariant_cast<AppSettingsWrapper*>(main->property("layoutSettings")); QVERIFY(mainSettings);
+        auto* mainSettings=qvariant_cast<AppSettingsWrap*>(main->property("layoutSettings")); QVERIFY(mainSettings);
         const auto restore=qScopeGuard([&] {
             mainSettings->setDefaultRecordMode("dry"); controller->shutdownSession();
             created.reset(); window->requestActivate(); [[maybe_unused]] const bool active=QTest::qWaitForWindowActive(window);
         });
-        auto* tracks=main->findChild<TrackListWrapper*>(); QVERIFY(tracks);
+        auto* tracks=main->findChild<TrackListModelWrap*>(); QVERIFY(tracks);
         QVERIFY(tracks->property("newTrackRecordDry").toBool());
         const int dryVocal=tracks->addVocalTrack();
         QVERIFY(tracks->project().findTrack(dryVocal)->recordDry);              // Dry by default
@@ -1271,7 +1272,7 @@ private slots:
         QVERIFY(tracks->project().findTrack(dryVocal)->recordDry);              // existing tracks keep theirs
     }
     void track_card_chips_fit_on_one_line_at_the_narrowest_track_list() {
-        TrackListWrapper tracks; const int id=tracks.addVocalTrack();
+        TrackListModelWrap tracks; const int id=tracks.addVocalTrack();
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         const qreal oldWidth=list->width();
         const auto restore=qScopeGuard([&] { list->setVisible(false); list->setWidth(oldWidth); list->setProperty("trackModel",QVariant()); });
@@ -1308,10 +1309,10 @@ private slots:
                 qs.remove(QString::fromLatin1(key));
         });
         {
-            AppSettingsWrapper settings;
+            AppSettingsWrap settings;
             QCOMPARE(settings.trackListWidth(),230.0); QCOMPARE(settings.mixerHeight(),180.0);
             QCOMPARE(settings.pianoRollDockHeight(),380.0);
-            QSignalSpy changed(&settings,&AppSettingsWrapper::layoutSizesChanged);
+            QSignalSpy changed(&settings,&AppSettingsWrap::layoutSizesChanged);
             settings.setProperty("trackListWidth",312.0);
             settings.setProperty("mixerHeight",900.0);              // clamped by the backend
             settings.setProperty("pianoRollDockHeight",450.0);
@@ -1323,17 +1324,17 @@ private slots:
         // Main.qml reads the sizes through the top bar's settings button (topBar.appSettings.bridge).
         auto* topBar=window->findChild<QQuickItem*>("testTopBar"); QVERIFY(topBar);
         auto* bridge=qvariant_cast<QObject*>(qvariant_cast<QObject*>(topBar->property("appSettings"))->property("bridge"));
-        QVERIFY(qobject_cast<AppSettingsWrapper*>(bridge));
+        QVERIFY(qobject_cast<AppSettingsWrap*>(bridge));
         for(const char* size:{"trackListWidth","mixerHeight","pianoRollDockHeight"})
             QVERIFY2(bridge->property(size).canConvert<double>() && bridge->property(size).toDouble()>0,size);
-        AppSettingsWrapper next;                                    // a new session reads them back
+        AppSettingsWrap next;                                    // a new session reads them back
         QCOMPARE(next.trackListWidth(),312.0); QCOMPARE(next.mixerHeight(),480.0);
         QCOMPARE(next.pianoRollDockHeight(),450.0);
         qs.setValue(QString::fromLatin1(AppSettings::KeyMixerHeight),"huge"); qs.sync();
-        AppSettingsWrapper corrupted;                               // bad stored text: default
+        AppSettingsWrap corrupted;                               // bad stored text: default
         QCOMPARE(corrupted.mixerHeight(),180.0);
         corrupted.resetToDefaults();
-        AppSettingsWrapper reset;
+        AppSettingsWrap reset;
         QCOMPARE(reset.trackListWidth(),230.0); QCOMPARE(reset.pianoRollDockHeight(),380.0);
     }
     void device_selectors_live_in_preferences_not_the_top_bar() {
@@ -1369,8 +1370,9 @@ private slots:
         auto* top=window->findChild<QQuickItem*>("testTopBar"); QVERIFY(top);
         auto* line=visualItem(top,"deviceSummaryButton"); QVERIFY(line); QVERIFY(line->isVisible());
         auto* text=visualItem(top,"deviceSummaryText"); QVERIFY(text);
-        QCOMPARE(text->property("text").toString(),"["+controller->deviceSummaryText()+"]");
-        QVERIFY(!controller->deviceSummaryText().isEmpty());
+        auto* device=top->findChild<QObject*>("deviceLineWrap"); QVERIFY(device);
+        QCOMPARE(text->property("text").toString(),"["+device->property("text").toString()+"]");
+        QVERIFY(!device->property("text").toString().isEmpty());
         // Far right: its right edge sits at the bar's right margin, past the Settings button.
         const double right=line->mapToItem(top,QPointF(line->width(),0)).x();
         QVERIFY(std::abs(right-(top->width()-10))<1.5);
@@ -1391,7 +1393,7 @@ private slots:
     void startup_setting_saves_and_restores_session_stopped() {
         auto* controller=EngineController::instance();
         controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper first; controller->attachProject(&first);
+        TrackListModelWrap first; controller->attachProject(&first);
         const int track=first.addInstrumentTrackOfType("Electric Guitar");
         first.setVolume(track,0.42); first.setRecordArmed(track,true);
         controller->setBpm(88); controller->setMeter(3,4);
@@ -1400,16 +1402,16 @@ private slots:
         QTRY_VERIFY((option=visualItem(window->contentItem(),"restoreSessionSetting")));
         click(option); QTRY_VERIFY(controller->restoreSessionOnStartup());
         QVERIFY(controller->saveSession());
-        TrackListWrapper second; controller->attachProject(&second);
+        TrackListModelWrap second; controller->attachProject(&second);
         QCOMPARE(second.count(),1); QCOMPARE(controller->bpm(),88.0); QCOMPARE(controller->numerator(),3);
         QVERIFY(!controller->playing()); QVERIFY(!controller->recording()); QVERIFY(!second.cleanMonitorArmed());
-        QCOMPARE(second.data(second.index(0),TrackListWrapper::VolumeRole).toFloat(),0.42f);
+        QCOMPARE(second.data(second.index(0),TrackListModelWrap::VolumeRole).toFloat(),0.42f);
         controller->setRestoreSessionOnStartup(false);
     }
     void track_effects_switch_in_place_and_keep_edits_on_the_selected_track() {
         auto* controller=EngineController::instance();
         controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar"), vocal=tracks.addVocalTrack();
         auto* guitarFx=qobject_cast<GuitarSuiteModel*>(controller->trackEffects(guitar));
         auto* vocalFx=qobject_cast<GuitarSuiteModel*>(controller->trackEffects(vocal));
@@ -1487,7 +1489,7 @@ private slots:
         // skipped (the panel's exportChain / previewChain take the file); import asks first and
         // names what the track can't take.
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar"), vocal=tracks.addVocalTrack();
         QVERIFY(tracks.addTrackEffect(guitar,"eq")>=0); QVERIFY(tracks.setEqBand(guitar,4,-3.5));
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
@@ -1495,7 +1497,7 @@ private slots:
         QObject* panel=nullptr;
         const auto restore=qScopeGuard([&] {
             if(panel) QMetaObject::invokeMethod(panel,"close");
-            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListModelWrap*>(nullptr)));
             window->requestActivate(); (void)QTest::qWaitForWindowActive(window);
         });
         QTest::qWait(30);
@@ -1563,7 +1565,7 @@ private slots:
     }
     void vocal_effects_offer_eq_and_recording_controls_without_guitarsuite() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks); const int vocal=tracks.addVocalTrack();
+        TrackListModelWrap tracks; controller->attachProject(&tracks); const int vocal=tracks.addVocalTrack();
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
         QTest::qWait(30);
@@ -1685,7 +1687,7 @@ private slots:
         QCOMPARE(chip->property("text").toString(),QString("Off"));
     }
     void virtual_piano_follows_the_selected_track_scale_changer() {
-        TrackListWrapper tracks;
+        TrackListModelWrap tracks;
         const int harmonium=tracks.addInstrumentTrackOfType("Harmonium");
         const int drums=tracks.addInstrumentTrackOfType("Drums");
         auto* bar=window->findChild<QObject*>("transport"); QVERIFY(bar);
@@ -1767,12 +1769,12 @@ private slots:
         QCOMPARE(tooltipColours(piano),themed);
 
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int d=tracks.addInstrumentTrackOfType("Drums");
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
         const auto restore=qScopeGuard([&] {
-            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListModelWrap*>(nullptr)));
         });
         QTest::qWait(30);
         auto* fx=visualItem(list,"trackFxButton"+QString::number(d)); QVERIFY(fx); click(fx);
@@ -1786,14 +1788,14 @@ private slots:
         window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
     }
     void close_buttons_share_one_look_soft_round_on_hover_red_when_removing() {
-        // Every × is the shared CloseButton (frontend/common): no other file draws Icons.close.
+        // Every × is the shared CloseButton (frontend/common/closeButton): no other file draws Icons.close.
         const QString root=QStringLiteral(CHAOSMAKER_SOURCE_DIR);
         QStringList offenders;
         QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
         QStringList files{root+"/Main.qml"}; while(it.hasNext()) files<<it.next();
         for(const QString& path:files) {
             const QString rel=path.mid(root.size()+1);
-            if(rel=="frontend/common/CloseButton.qml"||rel=="frontend/icons/Icons.qml") continue;
+            if(rel=="frontend/common/closeButton/CloseButton.qml"||rel=="frontend/icons/Icons.qml") continue;
             QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
             if(file.readAll().contains("Icons.close")) offenders<<rel;
         }
@@ -1806,11 +1808,11 @@ private slots:
         const auto hover=[](QWindow* w,QQuickItem* b) { QTest::mouseMove(w,b->mapToScene(QPointF(b->width()/2,b->height()/2)).toPoint()); };
 
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int vocal=tracks.addVocalTrack();
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         const auto restore=qScopeGuard([&] {
-            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListModelWrap*>(nullptr)));
         });
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true); QTest::qWait(30);
 
@@ -1847,7 +1849,7 @@ private slots:
             for(auto* child:slider->findChildren<QQuickItem*>()) if(child->objectName()==name) return child;
             return static_cast<QQuickItem*>(nullptr);
         };
-        TrackListWrapper tracks; const int vocal=tracks.addVocalTrack();
+        TrackListModelWrap tracks; const int vocal=tracks.addVocalTrack();
         QVERIFY(tracks.setTrackColour(vocal,"#3fb950"));
         const QColor green("#3fb950");
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
@@ -1900,7 +1902,7 @@ private slots:
         QDirIterator it(root+"/frontend",{"*.qml"},QDir::Files,QDirIterator::Subdirectories);
         while(it.hasNext()) {
             const QString path=it.next(), rel=path.mid(root.size()+1);
-            if(!rel.startsWith("frontend/plugins/")&&!rel.startsWith("frontend/instruments/")&&rel!="frontend/settings/QuickSettings.qml") continue;
+            if(!rel.startsWith("frontend/common/trackEffectsPanel/")&&!rel.startsWith("frontend/common/groovePanel/")&&rel!="frontend/transportBar/quickSettings/QuickSettings.qml") continue;
             QFile file(path); QVERIFY2(file.open(QIODevice::ReadOnly),qPrintable(rel));
             if(file.readAll().contains("ThemedSlider")) offenders<<rel;
         }
@@ -1912,7 +1914,7 @@ private slots:
             for(auto* child:slider->findChildren<QQuickItem*>()) if(child->objectName()==name) return child;
             return static_cast<QQuickItem*>(nullptr);
         };
-        TrackListWrapper tracks; tracks.addVocalTrack();
+        TrackListModelWrap tracks; tracks.addVocalTrack();
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
         const auto restore=qScopeGuard([&] { mixer->setVisible(false); mixer->setProperty("trackModel",QVariant()); });
         mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true); QTest::qWait(30);
@@ -1941,12 +1943,12 @@ private slots:
     }
     void drum_kit_lives_in_fx_and_edits_its_settings() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int d=tracks.addInstrumentTrackOfType("Drums");
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
         const auto restore=qScopeGuard([&] {
-            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListModelWrap*>(nullptr)));
         });
         QTest::qWait(30);
         const auto settings=[&]{ return tracks.project().findTrack(d)->drumkit; };
@@ -2006,14 +2008,14 @@ private slots:
         // buttons are pressed directly: the section may be scrolled out of view.
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
         controller->setMeter(4,4);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int e=tracks.addInstrumentTrackOfType("Electronic Drums");
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
         QObject* panel=nullptr;
         const auto restore=qScopeGuard([&] {
             if(panel) QMetaObject::invokeMethod(panel,"close");
-            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListModelWrap*>(nullptr)));
             window->requestActivate(); (void)QTest::qWaitForWindowActive(window);
         });
         QTest::qWait(30);
@@ -2107,12 +2109,12 @@ private slots:
         // strips page (autoplay, key, progressions, eight strips), the grand piano's page after.
         // Controls are pressed directly: the window's size varies on this machine (U4).
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         QObject* panel=nullptr;
         const auto restore=qScopeGuard([&] {
             if(panel) QMetaObject::invokeMethod(panel,"close");
-            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListModelWrap*>(nullptr)));
             window->requestActivate(); (void)QTest::qWaitForWindowActive(window);
         });
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true); QTest::qWait(30);
@@ -2256,12 +2258,12 @@ private slots:
     }
     void electronic_drums_live_in_fx_and_the_drawn_machine_plays_and_edits() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int e=tracks.addInstrumentTrackOfType("Electronic Drums");
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
         const auto restore=qScopeGuard([&] {
-            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListModelWrap*>(nullptr)));
         });
         QTest::qWait(30);
         const auto settings=[&]{ return tracks.project().findTrack(e)->electrodrums; };
@@ -2318,12 +2320,12 @@ private slots:
     }
     void grand_piano_lives_in_fx_and_the_drawn_piano_plays_and_edits() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int p=tracks.addInstrumentTrackOfType("Piano");
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
         const auto restore=qScopeGuard([&] {
-            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            list->setVisible(false); list->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListModelWrap*>(nullptr)));
         });
         QTest::qWait(30);
         const auto settings=[&]{ return tracks.project().findTrack(p)->piano; };
@@ -2393,7 +2395,7 @@ private slots:
     }
     void synth_lives_in_fx_and_edits_by_its_controls_and_presets() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int id=tracks.addInstrumentTrackOfType("Synth");
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
@@ -2482,7 +2484,7 @@ private slots:
     }
     void bass_guitar_lives_in_fx_and_edits_by_its_controls_and_presets() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int id=tracks.addInstrumentTrackOfType("Bass Guitar");
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
@@ -2559,7 +2561,7 @@ private slots:
     }
     void harmonium_lives_in_fx_like_guitarsuite_and_edits_its_settings() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int h=tracks.addInstrumentTrackOfType("Harmonium"), piano=tracks.addInstrumentTrackOfType("Piano");
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
@@ -2634,7 +2636,7 @@ private slots:
     }
     void in_on_instrument_tracks_picks_midi_and_input_popups_stay_inside_the_window() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int vocal=tracks.addVocalTrack(), h=tracks.addInstrumentTrackOfType("Harmonium");
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
@@ -2733,7 +2735,7 @@ private slots:
     }
     void chaos_eq_adds_drags_edits_and_removes_bands_on_the_curve() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks); const int vocal=tracks.addVocalTrack();
+        TrackListModelWrap tracks; controller->attachProject(&tracks); const int vocal=tracks.addVocalTrack();
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
         QTest::qWait(30);
@@ -2806,7 +2808,7 @@ private slots:
     // track, its cards shown, a slider moved and reset, a choice picked, bypass switched.
     void checkMixEffectPage(const QString& type,const QStringList& cards,const QString& slider,const QString& choice,bool meter) {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks); const int vocal=tracks.addVocalTrack();
+        TrackListModelWrap tracks; controller->attachProject(&tracks); const int vocal=tracks.addVocalTrack();
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         const auto restore=qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel",QVariant()); });
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
@@ -2866,7 +2868,7 @@ private slots:
     }
     void noise_reduction_has_its_own_page_and_learns_from_the_time_selection() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int vocal=tracks.addVocalTrack();
         auto audio=std::make_shared<AudioData>(); audio->path="noisy-vocal.wav"; audio->sampleRate=48000; audio->frames=96000;
         audio->channels={std::vector<float>(96000)};
@@ -2919,7 +2921,7 @@ private slots:
     }
     void pitch_monitor_has_its_own_page_with_the_recorded_pitch_and_a_key() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int vocal=tracks.addVocalTrack();
         auto audio=std::make_shared<AudioData>(); audio->path="sung-a3.wav"; audio->sampleRate=48000; audio->frames=48000;
         audio->channels={std::vector<float>(48000)};
@@ -2983,7 +2985,7 @@ private slots:
     }
     void the_master_strip_opens_the_master_effects_and_a_limiter_goes_on_the_mix() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks); tracks.addVocalTrack();
+        TrackListModelWrap tracks; controller->attachProject(&tracks); tracks.addVocalTrack();
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
         const auto restore=qScopeGuard([&] { mixer->setVisible(false); mixer->setProperty("trackModel",QVariant()); });
         mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true); QTest::qWait(30);
@@ -3071,7 +3073,7 @@ private slots:
     void drum_pattern_analyzer_turns_the_selected_clip_into_a_drum_clip_and_a_groove() {
         auto* controller=EngineController::instance();
         const double bpmBefore=controller->bpm();
-        TrackListWrapper tracks; tracks.setSampleRate(48000);
+        TrackListModelWrap tracks; tracks.setSampleRate(48000);
         controller->attachProject(&tracks);                     // Set BPM reaches this project, as in the app
         const int audioTrack=tracks.addAudioTrack();
         auto audio=std::make_shared<AudioData>(); audio->path="loop.wav"; audio->sampleRate=48000;
@@ -3174,7 +3176,7 @@ private slots:
     void chord_analyzer_reads_the_selected_song_and_fills_a_chords_track() {
         auto* controller=EngineController::instance();
         const double bpmBefore=controller->bpm();
-        TrackListWrapper tracks; tracks.setSampleRate(44100);
+        TrackListModelWrap tracks; tracks.setSampleRate(44100);
         const int audioTrack=tracks.addAudioTrack();
         auto audio=std::make_shared<AudioData>(); audio->path="song.wav"; audio->sampleRate=chordrender::rate;
         audio->channels={chordrender::song(chordrender::repeated({{0,chordrender::major},{9,chordrender::minor},{5,chordrender::major},{7,chordrender::seventh}},4),100.0)};
@@ -3260,7 +3262,7 @@ private slots:
         click(visualItem(window->contentItem(),"chordAnalyzerClose")); QTRY_VERIFY(!dialog->isVisible());
     }
     void clip_takes_show_on_the_clip_the_menu_picks_one_and_punch_toggles() {
-        TrackListWrapper tracks; tracks.setSampleRate(48000);
+        TrackListModelWrap tracks; tracks.setSampleRate(48000);
         const int track=tracks.addAudioTrack();
         auto audio=std::make_shared<AudioData>(); audio->path="passes.wav"; audio->sampleRate=48000; audio->frames=3*48000;
         audio->channels={std::vector<float>(3*48000,0.2f)}; audio->buildWaveform();
@@ -3323,7 +3325,7 @@ private slots:
         controller.shutdownSession();
     }
     void clip_menu_reverses_normalises_and_inverts_audio_clips() {
-        TrackListWrapper tracks; tracks.setSampleRate(48000);
+        TrackListModelWrap tracks; tracks.setSampleRate(48000);
         const int audioTrack=tracks.addAudioTrack(), harmonium=tracks.addInstrumentTrackOfType("Harmonium");
         auto audio=std::make_shared<AudioData>(); audio->path="tone.wav"; audio->sampleRate=48000; audio->frames=96000;
         audio->channels={std::vector<float>(96000,0.0f)};
@@ -3369,7 +3371,7 @@ private slots:
     }
     void effects_on_a_selection_split_the_clip_and_open_its_own_effects() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks); tracks.setSampleRate(48000);
+        TrackListModelWrap tracks; controller->attachProject(&tracks); tracks.setSampleRate(48000);
         const int vocal=tracks.addVocalTrack();
         auto audio=std::make_shared<AudioData>(); audio->path="voice.wav"; audio->sampleRate=48000; audio->frames=960000;
         audio->channels={std::vector<float>(960000,0.2f)}; audio->buildWaveform();
@@ -3428,7 +3430,7 @@ private slots:
     }
     void double_click_empty_track_area_adds_vocals_without_interfering_with_renaming() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         auto* list=window->findChild<QQuickItem*>("testTrackList");
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(list); QVERIFY(mixer);
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
@@ -3461,7 +3463,7 @@ private slots:
         mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
     }
     void backend_catalog_choices_create_instruments_and_vocals_through_the_mirrored_bridge() {
-        TrackListWrapper tracks;
+        TrackListModelWrap tracks;
         QAbstractItemModelTester tester(&tracks, QAbstractItemModelTester::FailureReportingMode::QtTest);
         auto* list = window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         const auto restore = qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel", QVariant()); });
@@ -3529,7 +3531,7 @@ private slots:
     }
     void track_names_edit_inline_commit_cancel_and_update_mixer_and_fx() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int a=tracks.addAudioTrack(),b=tracks.addVocalTrack();
         auto* list=window->findChild<QQuickItem*>("testTrackList");
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(list); QVERIFY(mixer);
@@ -3573,7 +3575,7 @@ private slots:
     }
     void track_list_and_mixer_share_mute_solo_order_colours_and_tooltips() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         auto* list=window->findChild<QQuickItem*>("testTrackList");
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(list); QVERIFY(mixer);
         const auto restore=qScopeGuard([&] {
@@ -3622,7 +3624,7 @@ private slots:
     }
     void track_colour_picker_updates_cards_timeline_and_mixer_and_cancels_custom_edits() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks);
+        TrackListModelWrap tracks; controller->attachProject(&tracks);
         const int a=tracks.addVocalTrack(),b=tracks.addInstrumentTrackOfType("Electric Guitar");
         const int first=tracks.addClipAtBeat(a,0,4),second=tracks.addClipAtBeat(a,4,4),other=tracks.addClipAtBeat(b,0,4);
         auto* list=window->findChild<QQuickItem*>("testTrackList");
@@ -3694,7 +3696,7 @@ private slots:
         list->setHeight(650); timeline->setX(0); timeline->setWidth(1000);
     }
     void adjacent_empty_cells_merge_from_the_context_menu() {
-        TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+        TrackListModelWrap tracks; const int track=tracks.addAudioTrack();
         const int a=tracks.addClipAtBeat(track,0,2),b=tracks.addClipAtBeat(track,2,2),c=tracks.addClipAtBeat(track,4,2);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); });
@@ -3711,7 +3713,7 @@ private slots:
         QCOMPARE(tracks.project().findTrack(track)->audioClips[1].id,b);
     }
     void clip_drag_moves_between_tracks_with_preview_and_undo() {
-        TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addVocalTrack(),c=tracks.addAudioTrack();
+        TrackListModelWrap tracks; const int a=tracks.addAudioTrack(),b=tracks.addVocalTrack(),c=tracks.addAudioTrack();
         const int clip=tracks.addClipAtBeat(a,2,2);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); timeline->setProperty("snapMode",1); });
@@ -3753,7 +3755,7 @@ private slots:
     void clip_keyboard_operations_across_tracks() {
         QFETCH(int,mode); QFETCH(int,denominator);
         auto* controller=EngineController::instance(); controller->setMeter(denominator==8 ? 3 : 4,denominator);
-        TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack(),c=tracks.addAudioTrack();
+        TrackListModelWrap tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack(),c=tracks.addAudioTrack();
         const int first=tracks.addClipAtBeat(a,2,2),second=tracks.addClipAtBeat(b,4,2),hidden=tracks.addClipAtBeat(c,40,2);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         const auto restore=qScopeGuard([&] {
@@ -3793,13 +3795,13 @@ private slots:
         QVERIFY(tracks.undo()); QCOMPARE(tracks.clips().size(),3);
     }
     void clip_keyboard_operations_preserve_text_and_reject_negative_group_positions() {
-        TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
+        TrackListModelWrap tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
         const int first=tracks.addClipAtBeat(a,0,2); tracks.addClipAtBeat(b,4,2);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); EngineController::instance()->setBpm(120); });
         timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true); QTest::qWait(20);
         timeline->forceActiveFocus(); QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
-        QSignalSpy changes(&tracks,&TrackListWrapper::clipsChanged);
+        QSignalSpy changes(&tracks,&TrackListModelWrap::clipsChanged);
         QTest::keyClick(window,Qt::Key_Left); QCOMPARE(changes.count(),0);
         QCOMPARE(tracks.project().findTrack(a)->audioClips[0].start,qint64(0));
         QCOMPARE(tracks.project().findTrack(b)->audioClips[0].start,qint64(96000));
@@ -3825,7 +3827,7 @@ private slots:
     void adjustable_snap_grid_applies_to_group_edits_and_ranges() {
         QFETCH(int,mode); QFETCH(int,numerator); QFETCH(int,denominator);
         auto* controller=EngineController::instance(); controller->setMeter(numerator,denominator);
-        TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
+        TrackListModelWrap tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
         const int x=tracks.addClipAtBeat(a,2,4),y=tracks.addClipAtBeat(b,3.25,4);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         const auto restore=qScopeGuard([&] {
@@ -3876,7 +3878,7 @@ private slots:
         QCOMPARE(timeline->property("rangeEndBeat").toDouble(),rangeEnd);
     }
     void snap_off_allows_subbeat_clip_lengths() {
-        TrackListWrapper tracks; const int track=tracks.addAudioTrack(),clip=tracks.addClipAtBeat(track,2,1);
+        TrackListModelWrap tracks; const int track=tracks.addAudioTrack(),clip=tracks.addClipAtBeat(track,2,1);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); timeline->setProperty("snapMode",1); });
         timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setProperty("snapMode",6); timeline->setVisible(true);
@@ -3889,7 +3891,7 @@ private slots:
     void manual_timeline_scrolling_is_not_overridden_by_transport_updates() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         const int track=tracks.addAudioTrack(); tracks.addClipAtBeat(track,0,80);
         for(int i=0;i<11;++i)tracks.addAudioTrack();   // more rows than fit (64 px each)
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
@@ -3969,7 +3971,7 @@ private slots:
         QFETCH(bool,repeatBeyondClips);
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         if(repeatBeyondClips) {
             tracks.addClipAtBeat(tracks.addAudioTrack(),0,4);
             QVERIFY(controller.setRepeatRange(40,60)); controller.transportAction("repeat");
@@ -4003,7 +4005,7 @@ private slots:
     void the_playhead_follows_clicks_and_drags_off_the_grid_unless_its_magnet_is_on() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks); const int track=tracks.addAudioTrack();
+        TrackListModelWrap tracks; controller.attachProject(&tracks); const int track=tracks.addAudioTrack();
         tracks.addClipAtBeat(track,0,16);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         const auto restore=qScopeGuard([&] {
@@ -4103,7 +4105,7 @@ private slots:
         QTest::failOnWarning(QRegularExpression("^(?!This plugin does not support raise\\(\\)).*"));
         auto device=std::make_unique<MultiInputUiDevice>();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         const int first=tracks.addAudioTrack(), second=tracks.addAudioTrack();
         tracks.addClipAtBeat(first,0,8); const int later=tracks.addClipAtBeat(second,5,2);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
@@ -4173,7 +4175,7 @@ private slots:
     void normal_drag_selects_grid_range_and_repeat_stays_inside_it() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks); const int track=tracks.addAudioTrack();
+        TrackListModelWrap tracks; controller.attachProject(&tracks); const int track=tracks.addAudioTrack();
         tracks.addClipAtBeat(track,0,8);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         const auto restore=qScopeGuard([&] {
@@ -4228,7 +4230,7 @@ private slots:
         controller.shutdownSession();
     }
     void rectangular_selection_moves_trims_and_deletes_across_tracks() {
-        TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack(),c=tracks.addAudioTrack();
+        TrackListModelWrap tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack(),c=tracks.addAudioTrack();
         const int x=tracks.addClipAtBeat(a,2,4),y=tracks.addClipAtBeat(b,3,4),z=tracks.addClipAtBeat(c,2,4);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         const auto restore=qScopeGuard([&] { timeline->setVisible(false); timeline->setProperty("trackModel",QVariant()); });
@@ -4262,7 +4264,7 @@ private slots:
         QCOMPARE(tracks.project().findTrack(a)->audioClips[0].id,x); QCOMPARE(tracks.project().findTrack(b)->audioClips[0].id,y);
     }
     void multiple_clip_selection_and_merge_context_action() {
-        TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
+        TrackListModelWrap tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
         const int left=tracks.addClipAtBeat(a,0,4),right=tracks.splitClipAtBeat(a,left,2);
         const int other=tracks.addClipAtBeat(b,0,4);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
@@ -4293,7 +4295,7 @@ private slots:
     void removing_reordering_and_undoing_tracks_keeps_the_track_list_free_of_qml_warnings() {
         // A removed card has index -1 for a moment; its position must not become undefined.
         QTest::failOnWarning(QRegularExpression("Unable to assign|TypeError|ReferenceError"));
-        TrackListWrapper tracks; const int a=tracks.addVocalTrack(),b=tracks.addAudioTrack(); tracks.addVocalTrack();
+        TrackListModelWrap tracks; const int a=tracks.addVocalTrack(),b=tracks.addAudioTrack(); tracks.addVocalTrack();
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         const auto restore=qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel",QVariant()); });
         list->setProperty("trackModel",QVariant::fromValue(&tracks)); list->setVisible(true);
@@ -4309,7 +4311,7 @@ private slots:
         QCOMPARE(card->parentItem()->y(),0.0);
     }
     void volume_envelope_lane_edits_points_bypasses_and_keeps_rows_aligned() {
-        TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
+        TrackListModelWrap tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
         const int clipB=tracks.addClipAtBeat(b,0,2);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         auto* trackList=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(trackList);
@@ -4433,7 +4435,7 @@ private slots:
     // restMap U9: drag a track's bottom edge (or its volume lane's) on the timeline to resize it;
     // the V chip after FX shows / hides the lane. Not undo steps; a track never below 64 px.
     void tracks_and_volume_lanes_resize_by_dragging_their_bottom_edge() {
-        TrackListWrapper tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
+        TrackListModelWrap tracks; const int a=tracks.addAudioTrack(),b=tracks.addAudioTrack();
         const int clipA=tracks.addClipAtBeat(a,0,2),clipB=tracks.addClipAtBeat(b,0,2);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         auto* trackList=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(trackList);
@@ -4528,7 +4530,7 @@ private slots:
         QCOMPARE(tracks.canUndo(),couldUndo);   // view state: no undo steps
     }
     void undo_redo_buttons_restore_deleted_clips() {
-        TrackListWrapper tracks;
+        TrackListModelWrap tracks;
         auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
         top->setProperty("trackModel",QVariant::fromValue(&tracks));
         const int track=tracks.addAudioTrack(); const int clip=tracks.addClipAtBeat(track,0,4);
@@ -4541,7 +4543,7 @@ private slots:
     }
     void file_menu_imports_audio_and_shows_what_happened() {
         QTest::failOnWarning(QRegularExpression("^(?!This plugin does not support raise\\(\\)).*"));
-        TrackListWrapper tracks;
+        TrackListModelWrap tracks;
         auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
         top->setProperty("trackModel",QVariant::fromValue(&tracks));
         const auto restore=qScopeGuard([&] { top->setProperty("trackModel",QVariant()); });
@@ -4641,7 +4643,8 @@ private slots:
         range->setProperty("currentIndex",0);
         click(start);
         QTRY_VERIFY(!message->property("text").toString().isEmpty());
-        QVERIFY(!EngineController::instance() || !EngineController::instance()->exporting());
+        auto* exporter=window->findChild<QObject*>("exportDialogWrap"); QVERIFY(exporter);
+        QVERIFY(!exporter->property("exporting").toBool());
         auto* close=visualItem(window->contentItem(),"exportClose"); QVERIFY(close);
         click(close); QTRY_VERIFY(!dialog->property("visible").toBool());
     }
@@ -4718,7 +4721,7 @@ private slots:
         QMetaObject::invokeMethod(menu,"close"); QTRY_VERIFY(!menu->property("visible").toBool());
     }
     void settings_menu_opens_the_keyboard_shortcuts_panel() {
-        auto* shortcuts=engine->singletonInstance<ShortcutsWrapper*>("TransportTests","Shortcuts"); QVERIFY(shortcuts);
+        auto* shortcuts=engine->singletonInstance<ShortcutsWrap*>("TransportTests","Shortcuts"); QVERIFY(shortcuts);
         auto* editor=window->findChild<QObject*>("shortcutEditor"); QVERIFY(editor);
         const auto restore=qScopeGuard([&] { shortcuts->resetAll(); QMetaObject::invokeMethod(editor,"close"); });
         window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
@@ -4764,7 +4767,7 @@ private slots:
     void edit_menu_cuts_copies_pastes_duplicates_and_deletes_timeline_clips() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         const int track=tracks.addAudioTrack(); tracks.addClipAtBeat(track,0,4);
         auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
@@ -4802,7 +4805,7 @@ private slots:
         controller.shutdownSession();
     }
     void undo_history_lists_the_steps_and_a_click_jumps_back_and_forth() {
-        TrackListWrapper tracks;
+        TrackListModelWrap tracks;
         auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top);
         const auto restore=qScopeGuard([&] {
             if(auto* popup=window->findChild<QObject*>("undoHistoryPopup")) QMetaObject::invokeMethod(popup,"close");
@@ -4846,7 +4849,7 @@ private slots:
     }
     void timeline_bpm_edit_updates_grid_and_preserves_recorded_audio_timing() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks); controller->setMeter(4,4);
+        TrackListModelWrap tracks; controller->attachProject(&tracks); controller->setMeter(4,4);
         const int track=tracks.addAudioTrack();
         auto audio=std::make_shared<AudioData>(); audio->path="tempo-wave.wav"; audio->frames=96000;
         audio->channels={std::vector<float>(96000,0.25f)}; audio->buildWaveform();
@@ -4904,7 +4907,7 @@ private slots:
         QCOMPARE(timeline->property("beatWidth").toDouble(),48.0);
     }
     void timeline_drag_selects_snaps_and_undoes_as_one_edit() {
-        TrackListWrapper tracks; const int track=tracks.addAudioTrack(); const int clip=tracks.addClipAtBeat(track,1,4);
+        TrackListModelWrap tracks; const int track=tracks.addAudioTrack(); const int clip=tracks.addClipAtBeat(track,1,4);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true);
         QCoreApplication::processEvents();
@@ -4919,7 +4922,7 @@ private slots:
         timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
     }
     void recorded_block_displays_waveform_peaks() {
-        TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+        TrackListModelWrap tracks; const int track=tracks.addAudioTrack();
         auto audio=std::make_shared<AudioData>(); audio->path="ui-wave.wav"; audio->frames=48000;
         audio->channels={std::vector<float>(48000)};
         for(int i=0;i<48000;++i)audio->channels[0][i]=float(std::sin(i*0.07)*0.7);
@@ -4935,7 +4938,7 @@ private slots:
         timeline->setVisible(false); timeline->setProperty("trackModel",QVariant());
     }
     void scrolling_a_long_clip_reuses_its_waveform_and_keeps_it_covering_the_view() {
-        TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+        TrackListModelWrap tracks; const int track=tracks.addAudioTrack();
         auto audio=std::make_shared<AudioData>(); audio->path="ui-long-wave.wav"; audio->frames=48000*60;
         audio->channels={std::vector<float>(audio->frames)};
         for(qint64 i=0;i<audio->frames;++i)audio->channels[0][i]=float(std::sin(i*0.01)*0.7);
@@ -4971,7 +4974,7 @@ private slots:
         QCOMPARE(waveform->property("peaks").toList().size(),qsizetype(std::ceil(waveform->width())));
     }
     void timeline_left_and_right_handles_trim_without_moving_source() {
-        TrackListWrapper tracks; const int track=tracks.addAudioTrack(); const int clip=tracks.addClipAtBeat(track,1,4);
+        TrackListModelWrap tracks; const int track=tracks.addAudioTrack(); const int clip=tracks.addClipAtBeat(track,1,4);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         timeline->setProperty("trackModel",QVariant::fromValue(&tracks)); timeline->setVisible(true); QCoreApplication::processEvents();
         auto drag=[&](const QString& name,int delta) {
@@ -4988,7 +4991,7 @@ private slots:
     }
     void timeline_fade_handles_set_audio_clip_fades_in_one_undo_step() {
         // restMap G8. A 4-beat take at beat 1; 48 px per beat in this view.
-        TrackListWrapper tracks; const int track=tracks.addAudioTrack();
+        TrackListModelWrap tracks; const int track=tracks.addAudioTrack();
         auto audio=std::make_shared<AudioData>(); audio->path="fade.wav"; audio->sampleRate=48000; audio->frames=96000;
         audio->channels={std::vector<float>(96000,0.25f)};
         QVERIFY(tracks.attachTake(track,24000,audio)); const int clip=tracks.project().findTrack(track)->audioClips[0].id;
@@ -5022,7 +5025,7 @@ private slots:
     void monitor_buttons_are_independent_of_record_arm_and_capture() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         const int first=tracks.addAudioTrack(),second=tracks.addVocalTrack();
         QVERIFY(tracks.setTrackInputPort(second,"test:mic"));
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
@@ -5057,7 +5060,7 @@ private slots:
         QVERIFY(tracks.project().findTrack(first)->monitorEnabled);
         QVERIFY(!tracks.project().findTrack(first)->recordArmed);
         QVERIFY(std::abs(io->outputSample-0.125f)<1e-5);
-        TrackListWrapper reopened; QString error;
+        TrackListModelWrap reopened; QString error;
         QVERIFY2(reopened.restoreSessionState(tracks.sessionState(),error),qPrintable(error));
         QVERIFY(!reopened.project().tracks()[0]->monitorEnabled);
         QVERIFY(!reopened.project().tracks()[1]->monitorEnabled);
@@ -5065,7 +5068,7 @@ private slots:
         controller.shutdownSession();
     }
     void dragging_track_headers_reorders_mixer_lanes_and_saved_order() {
-        TrackListWrapper tracks;
+        TrackListModelWrap tracks;
         QAbstractItemModelTester modelCheck(&tracks,QAbstractItemModelTester::FailureReportingMode::QtTest);
         const int first=tracks.addAudioTrack(),removed=tracks.addAudioTrack();
         QVERIFY(tracks.removeTrack(removed));
@@ -5084,8 +5087,8 @@ private slots:
         auto* firstStrip=visualItem(mixer,"mixerStrip"+QString::number(first)); QVERIFY(firstStrip);
         auto* secondStrip=visualItem(mixer,"mixerStrip"+QString::number(second)); QVERIFY(secondStrip);
         auto* thirdStrip=visualItem(mixer,"mixerStrip"+QString::number(third)); QVERIFY(thirdStrip);
-        QSignalSpy changes(&tracks,&TrackListWrapper::projectChanged);
-        QSignalSpy countChanges(&tracks,&TrackListWrapper::countChanged);
+        QSignalSpy changes(&tracks,&TrackListModelWrap::projectChanged);
+        QSignalSpy countChanges(&tracks,&TrackListModelWrap::countChanged);
         const auto drag=[&](int id,int rows) {
             auto* header=visualItem(list,"trackHeader"+QString::number(id)); QVERIFY(header);
             const QPoint start=header->mapToScene(QPointF(30,header->height()/2)).toPoint();
@@ -5107,14 +5110,14 @@ private slots:
         QVERIFY(!tracks.moveTrack(-1,0)); QVERIFY(!tracks.moveTrack(first,-1)); QVERIFY(!tracks.moveTrack(first,tracks.count()));
         QVERIFY(tracks.moveTrack(first,0)); QCOMPARE(changes.count(),2);
         drag(third,-1);
-        TrackListWrapper reopened; QString error;
+        TrackListModelWrap reopened; QString error;
         QVERIFY2(reopened.restoreSessionState(tracks.sessionState(),error),qPrintable(error));
         for(int row=0;row<tracks.count();++row)
-            QCOMPARE(reopened.data(reopened.index(row),TrackListWrapper::NameRole),
-                     tracks.data(tracks.index(row),TrackListWrapper::NameRole));
+            QCOMPARE(reopened.data(reopened.index(row),TrackListModelWrap::NameRole),
+                     tracks.data(tracks.index(row),TrackListModelWrap::NameRole));
     }
     void mixer_strip_width_is_saved_per_track_once_per_drag() {
-        TrackListWrapper tracks; const int first=tracks.addAudioTrack(), second=tracks.addVocalTrack();
+        TrackListModelWrap tracks; const int first=tracks.addAudioTrack(), second=tracks.addVocalTrack();
         QVERIFY(tracks.setStripWidth(second,180.0));                // e.g. loaded from a project
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
         const auto restore=qScopeGuard([&] { mixer->setVisible(false); mixer->setProperty("trackModel",QVariant()); });
@@ -5141,7 +5144,7 @@ private slots:
         QVERIFY(tracks.setStripWidth(first,120.0)); QCOMPARE(firstStrip->width(),120.0);
         // Session state keeps the widths; old sessions restore the default.
         QJsonObject state=tracks.sessionState();
-        TrackListWrapper restored; QString error;
+        TrackListModelWrap restored; QString error;
         QVERIFY2(restored.restoreSessionState(state,error),qPrintable(error));
         QCOMPARE(restored.project().tracks()[1]->stripWidth,210.0f);
         auto list=state["tracks"].toArray(); auto track=list[1].toObject(); track.remove("stripWidth"); list[1]=track;
@@ -5152,7 +5155,7 @@ private slots:
         QVERIFY(!restored.restoreSessionState(state,error));
     }
     void mixer_tracks_follow_add_remove_and_project_replacement() {
-        TrackListWrapper tracks;
+        TrackListModelWrap tracks;
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
         mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
         QCOMPARE(mixer->property("stripCount").toInt(),0);
@@ -5178,7 +5181,7 @@ private slots:
         auto* scroll=mixer->findChild<QQuickItem*>("mixerScroll"); QVERIFY(scroll);
         QTRY_VERIFY(scroll->property("contentWidth").toDouble()>mixer->width());
         // New/Open replace the contents of the same model object.
-        TrackListWrapper replacement; const int guitar=replacement.addInstrumentTrackOfType("Electric Guitar");
+        TrackListModelWrap replacement; const int guitar=replacement.addInstrumentTrackOfType("Electric Guitar");
         replacement.setVolume(guitar,0.5); replacement.setSolo(guitar,true);
         tracks.adoptDocument(replacement); QTRY_COMPARE(mixer->property("stripCount").toInt(),1);
         // Track volume is not in the mixer (it lives in the track list); the strip shows clip gain.
@@ -5187,12 +5190,12 @@ private slots:
         auto* solo=visualItem(mixer,"mixerSolo"+QString::number(guitar)); QVERIFY(solo);
         QVERIFY(solo->property("active").toBool());
         QTRY_COMPARE(scroll->property("contentWidth").toDouble(),108.0);
-        TrackListWrapper empty; tracks.adoptDocument(empty); QTRY_COMPARE(mixer->property("stripCount").toInt(),0);
+        TrackListModelWrap empty; tracks.adoptDocument(empty); QTRY_COMPARE(mixer->property("stripCount").toInt(),0);
         QTRY_COMPARE(scroll->property("contentWidth").toDouble(),0.0);
         mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
     }
     void mixer_controls_update_shared_track_state_and_follow_external_changes() {
-        TrackListWrapper tracks; const int first=tracks.addAudioTrack(), second=tracks.addVocalTrack();
+        TrackListModelWrap tracks; const int first=tracks.addAudioTrack(), second=tracks.addVocalTrack();
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
         mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
         QCoreApplication::processEvents();
@@ -5208,7 +5211,7 @@ private slots:
         mixer->setVisible(false); mixer->setProperty("trackModel",QVariant());
     }
     void mixer_pan_knob_sets_track_pan_resets_to_centre_and_is_saved() {
-        TrackListWrapper tracks; const int first=tracks.addAudioTrack(), second=tracks.addVocalTrack();
+        TrackListModelWrap tracks; const int first=tracks.addAudioTrack(), second=tracks.addVocalTrack();
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
         const auto restore=qScopeGuard([&] { mixer->setVisible(false); mixer->setProperty("trackModel",QVariant()); });
         mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
@@ -5244,7 +5247,7 @@ private slots:
         QVERIFY(tracks.setPan(first,9.0)); QCOMPARE(tracks.project().findTrack(first)->pan,1.0f);
         // Session state keeps pan; sessions saved before pan existed restore centred.
         QJsonObject state=tracks.sessionState();
-        TrackListWrapper restored; QString error;
+        TrackListModelWrap restored; QString error;
         QVERIFY2(restored.restoreSessionState(state,error),qPrintable(error));
         QCOMPARE(restored.project().tracks()[0]->pan,1.0f);
         auto list=state["tracks"].toArray(); auto track=list[0].toObject(); track.remove("pan"); list[0]=track;
@@ -5263,7 +5266,7 @@ private slots:
     }
     void volume_faders_double_click_restores_unity_gain() {
         QFETCH(double,initialGain);
-        TrackListWrapper tracks; const int first=tracks.addAudioTrack(),second=tracks.addVocalTrack();
+        TrackListModelWrap tracks; const int first=tracks.addAudioTrack(),second=tracks.addVocalTrack();
         QVERIFY(tracks.setVolume(first,initialGain)); QVERIFY(tracks.setVolume(second,0.5));
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
         const auto restore=qScopeGuard([&] { list->setVisible(false); list->setProperty("trackModel",QVariant()); });
@@ -5286,7 +5289,7 @@ private slots:
         QCOMPARE(fader->property("value").toDouble(),0.5);
     }
     void mixer_split_meters_show_independent_channels_beside_the_vertical_fader() {
-        TrackListWrapper tracks; const int a=tracks.addAudioTrack(), b=tracks.addVocalTrack();
+        TrackListModelWrap tracks; const int a=tracks.addAudioTrack(), b=tracks.addVocalTrack();
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
         mixer->setProperty("trackModel",QVariant::fromValue(&tracks)); mixer->setVisible(true);
         QVariantMap levels{{QString::number(a),QVariantMap{{"inputLeftDb",-6.0},{"inputRightDb",-18.0},
@@ -5311,7 +5314,7 @@ private slots:
     void timeline_shows_each_recording_lane_and_disarming_one_keeps_the_other_active() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks);
+        TrackListModelWrap tracks; controller.attachProject(&tracks);
         const int a=tracks.addAudioTrack(),b=tracks.addVocalTrack();
         QVERIFY(tracks.setTrackInputPort(b,"test:mic"));
         QVERIFY(tracks.setRecordArmed(a,true)); QVERIFY(tracks.setRecordArmed(b,true));
@@ -5344,7 +5347,7 @@ private slots:
     }
     void open_recent_lists_saved_projects_and_opens_them() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks); tracks.addAudioTrack();
+        TrackListModelWrap tracks; controller->attachProject(&tracks); tracks.addAudioTrack();
         auto* recent=window->findChild<QObject*>("recentProjects"); QVERIFY(recent);
         QMetaObject::invokeMethod(recent,"clear");
         const auto restore=qScopeGuard([&] { QMetaObject::invokeMethod(recent,"clear"); controller->newProject(); });
@@ -5396,7 +5399,7 @@ private slots:
     }
     void new_project_prompts_before_discarding_unsaved_clips() {
         auto* controller=EngineController::instance(); controller->setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller->attachProject(&tracks); const int track=tracks.addAudioTrack(); tracks.addClipAtBeat(track,0,4);
+        TrackListModelWrap tracks; controller->attachProject(&tracks); const int track=tracks.addAudioTrack(); tracks.addClipAtBeat(track,0,4);
         auto* top=window->findChild<QObject*>("testTopBar"); QVERIFY(top); top->setProperty("trackModel",QVariant::fromValue(&tracks));
         // Use the real File > New path (a mouse click cannot reliably hit the 1x1 test hook).
         auto* fileButton=visualItem(window->contentItem(),"fileMenuButton"); QVERIFY(fileButton); click(fileButton);
@@ -5440,7 +5443,7 @@ private slots:
     void timeline_clip_keys_work_with_a_piano_roll_in_the_window() {
         QFETCH(bool,pianoRollVisible);
         window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window)); // keys need the active window
-        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        TrackListModelWrap tracks; const int track=tracks.addInstrumentTrack();
         QVERIFY(tracks.addClipAtBeat(track,0,4)>0);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
@@ -5460,7 +5463,7 @@ private slots:
     }
     void piano_roll_keys_edit_notes_only_when_it_has_focus() {
         window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window)); // keys need the active window
-        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        TrackListModelWrap tracks; const int track=tracks.addInstrumentTrack();
         QVERIFY(tracks.addClipAtBeat(track,0,4)>0);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
@@ -5489,7 +5492,7 @@ private slots:
         QCOMPARE(count(),0);
     }
     void piano_roll_undo_redo_buttons_use_the_project_history() {
-        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        TrackListModelWrap tracks; const int track=tracks.addInstrumentTrack();
         const int clip=tracks.addClipAtBeat(track,0,4); QVERIFY(clip>0);
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
         auto* notes=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(notes);
@@ -5572,7 +5575,7 @@ private slots:
     void piano_roll_footer_buttons_drive_the_transport() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks); tracks.addAudioTrack();
+        TrackListModelWrap tracks; controller.attachProject(&tracks); tracks.addAudioTrack();
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
         const auto restore=qScopeGuard([&] {
             roll->setVisible(false); roll->setProperty("transport",QVariant::fromValue(EngineController::instance()));
@@ -5597,7 +5600,7 @@ private slots:
         controller.shutdownSession();
     }
     void piano_roll_names_the_drum_kit_parts_on_a_drums_track() {
-        TrackListWrapper tracks;
+        TrackListModelWrap tracks;
         const int drums=tracks.addInstrumentTrackOfType("Drums"), piano=tracks.addInstrumentTrackOfType("Piano");
         const int drumClip=tracks.addClipAtBeat(drums,0,4), pianoClip=tracks.addClipAtBeat(piano,0,4);
         QVERIFY(drumClip>0 && pianoClip>0);
@@ -5605,7 +5608,7 @@ private slots:
         auto* backend=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(backend);
         const auto restore=qScopeGuard([&] {
             roll->setVisible(false); roll->setProperty("clipId",-1); roll->setProperty("trackId",-1);
-            roll->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            roll->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListModelWrap*>(nullptr)));
         });
         roll->setProperty("trackModel",QVariant::fromValue(&tracks));
         roll->setProperty("trackId",drums); roll->setProperty("clipId",drumClip);
@@ -5639,7 +5642,7 @@ private slots:
         QVERIFY(!label(60)->isVisible());                           // no part names on other instruments
     }
     void piano_roll_names_the_electronic_kit_parts() {
-        TrackListWrapper tracks;
+        TrackListModelWrap tracks;
         const int electro=tracks.addInstrumentTrackOfType("Electronic Drums"), drums=tracks.addInstrumentTrackOfType("Drums");
         const int electroClip=tracks.addClipAtBeat(electro,0,4), drumClip=tracks.addClipAtBeat(drums,0,4);
         QVERIFY(electroClip>0 && drumClip>0);
@@ -5647,7 +5650,7 @@ private slots:
         auto* backend=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(backend);
         const auto restore=qScopeGuard([&] {
             roll->setVisible(false); roll->setProperty("clipId",-1); roll->setProperty("trackId",-1);
-            roll->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            roll->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListModelWrap*>(nullptr)));
         });
         roll->setProperty("trackModel",QVariant::fromValue(&tracks));
         roll->setProperty("trackId",electro); roll->setProperty("clipId",electroClip);
@@ -5668,14 +5671,14 @@ private slots:
         QCOMPARE(label(64)->property("text").toString(),QString("Snare edge"));
     }
     void piano_roll_velocity_lane_paints_remembers_and_follows_the_clip() {
-        TrackListWrapper tracks;
+        TrackListModelWrap tracks;
         const int track=tracks.addInstrumentTrack();
         const int clip=tracks.addClipAtBeat(track,0,4); QVERIFY(clip>0);
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
         auto* backend=roll->findChild<QObject*>("pianoRollBackend"); QVERIFY(backend);
         const auto restore=qScopeGuard([&] {
             roll->setVisible(false); roll->setProperty("clipId",-1); roll->setProperty("trackId",-1);
-            roll->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListWrapper*>(nullptr)));
+            roll->setProperty("trackModel",QVariant::fromValue(static_cast<TrackListModelWrap*>(nullptr)));
         });
         roll->setProperty("trackModel",QVariant::fromValue(&tracks));
         roll->setProperty("trackId",track); roll->setProperty("clipId",clip);
@@ -5967,7 +5970,7 @@ private slots:
         QVERIFY(std::abs(drawAt(4.2)-4.0)<1e-6);                    // grid restarts at bar 2 (past the 3.75 note)
     }
     void piano_roll_colour_box_switches_between_velocity_and_track_colour() {
-        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        TrackListModelWrap tracks; const int track=tracks.addInstrumentTrack();
         const int clip=tracks.addClipAtBeat(track,0,4); QVERIFY(clip>0);
         QVERIFY(tracks.setTrackColour(track,"#d97c73"));
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
@@ -6010,7 +6013,7 @@ private slots:
         QVERIFY(near(roll->property("noteOutlineColour").value<QColor>(),QColor("#5bc0de")));
     }
     void removing_a_track_with_clips_asks_first() {
-        TrackListWrapper tracks;
+        TrackListModelWrap tracks;
         const int empty=tracks.addAudioTrack();
         const int full=tracks.addInstrumentTrack(); QVERIFY(tracks.addClipAtBeat(full,0,4)>0);
         auto* list=window->findChild<QQuickItem*>("testTrackList"); QVERIFY(list);
@@ -6043,7 +6046,7 @@ private slots:
         QCOMPARE(tracks.clips().size(),1);
     }
     void mixer_clip_gain_fader_follows_the_target_clip() {
-        TrackListWrapper tracks;
+        TrackListModelWrap tracks;
         const int empty=tracks.addAudioTrack();
         const int withClip=tracks.addInstrumentTrack(); const int clip=tracks.addClipAtBeat(withClip,0,4); QVERIFY(clip>0);
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
@@ -6069,7 +6072,7 @@ private slots:
         QTRY_COMPARE(gain->property("value").toDouble(),4.5);
     }
     void mixer_clip_gain_does_not_rebuild_the_timeline() {
-        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        TrackListModelWrap tracks; const int track=tracks.addInstrumentTrack();
         const int clip=tracks.addClipAtBeat(track,0,4); QVERIFY(clip>0);
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
         auto* timeline=window->findChild<QQuickItem*>("testTimeline"); QVERIFY(timeline);
@@ -6098,7 +6101,7 @@ private slots:
                          -fader->mapToScene(QPointF(fader->width()/2,0)).x())<3); // centred on it
     }
     void mixer_clip_gain_drag_is_one_undo_step() {
-        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        TrackListModelWrap tracks; const int track=tracks.addInstrumentTrack();
         const int clip=tracks.addClipAtBeat(track,0,4); QVERIFY(clip>0);
         auto* mixer=window->findChild<QQuickItem*>("testMixer"); QVERIFY(mixer);
         const auto restore=qScopeGuard([&] { mixer->setVisible(false); mixer->setProperty("trackModel",QVariant()); });
@@ -6136,7 +6139,7 @@ private slots:
         QVERIFY(!visualItem(mixer,"mixerMasterScale-90"));
     }
     void piano_roll_ruler_and_grid_follow_the_meter() {
-        TrackListWrapper tracks; const int track=tracks.addInstrumentTrack();
+        TrackListModelWrap tracks; const int track=tracks.addInstrumentTrack();
         const int clip=tracks.addClipAtBeat(track,0,4); QVERIFY(clip>0);
         auto* roll=window->findChild<QQuickItem*>("testPianoRoll"); QVERIFY(roll);
         const auto restore=qScopeGuard([&] {
@@ -6187,7 +6190,7 @@ private slots:
     void transport_clock_shows_the_position_from_the_backend() {
         auto device=std::make_unique<MultiInputUiDevice>(); auto* io=device.get();
         EngineController controller(std::move(device),false); controller.setRestoreSessionOnStartup(false);
-        TrackListWrapper tracks; controller.attachProject(&tracks); tracks.addAudioTrack();
+        TrackListModelWrap tracks; controller.attachProject(&tracks); tracks.addAudioTrack();
         const auto restore=qScopeGuard([&] { window->setProperty("transport",QVariant::fromValue(EngineController::instance())); });
         window->setProperty("transport",QVariant::fromValue(&controller));
         auto* clock=visualItem(window->contentItem(),"transportClock"); QVERIFY(clock);

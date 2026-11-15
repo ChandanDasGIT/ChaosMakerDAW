@@ -1,10 +1,10 @@
 #include "testkit.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/instruments/synth/synthwrap/synthwrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "audiodevice/audiodevice.h"
-#include "instruments/synth/synth.h"
-#include "instruments/synth/synthpresets.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/common/trackEffectsPanel/instruments/synth/synthWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/audiodevice/audiodevice.h"
+#include "common/trackEffectsPanel/instruments/synth/synth.h"
+#include "common/trackEffectsPanel/instruments/synth/synthpresets.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -91,13 +91,13 @@ struct Storage {
 TEST(qtsynth, wrapper_edits_the_track_by_key_and_follows_other_panels)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int id = tracks.addInstrumentTrackOfType("Synth");
     const int piano = tracks.addInstrumentTrackOfType("Piano");
     CHECK(tracks.synth(id) != nullptr);
     CHECK(tracks.synth(piano) == nullptr);
 
-    SynthWrapper a, b;
+    SynthWrap a, b;
     a.setFolder(storage.dir.path() + "/presets");
     a.setTrackModel(&tracks); a.setTrackId(id);
     b.setTrackModel(&tracks); b.setTrackId(id);
@@ -107,7 +107,7 @@ TEST(qtsynth, wrapper_edits_the_track_by_key_and_follows_other_panels)
     CHECK(a.values().value("lfo.sync").toBool() == false);
     CHECK(a.values().size() == int(synth::controls().size()));
     int changes = 0;
-    QObject::connect(&tracks, &TrackListWrapper::synthChanged, &tracks, [&changes] { ++changes; });
+    QObject::connect(&tracks, &TrackListModelWrap::synthChanged, &tracks, [&changes] { ++changes; });
 
     CHECK(a.set("osc1.wave", "pulse"));
     CHECK(a.set("filter.cutoff", 800.0));
@@ -139,7 +139,7 @@ TEST(qtsynth, wrapper_edits_the_track_by_key_and_follows_other_panels)
     CHECK(a.resetToDefaults());
     CHECK(*tracks.synth(id) == synth::Settings{});
 
-    SynthWrapper other;                                           // not a synth track
+    SynthWrap other;                                           // not a synth track
     other.setTrackModel(&tracks); other.setTrackId(piano);
     CHECK(!other.valid());
     CHECK(!other.set("filter.cutoff", 500.0));
@@ -150,9 +150,9 @@ TEST(qtsynth, wrapper_edits_the_track_by_key_and_follows_other_panels)
 TEST(qtsynth, presets_load_save_rename_and_delete_in_their_own_folder)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int id = tracks.addInstrumentTrackOfType("Synth");
-    SynthWrapper page;
+    SynthWrap page;
     const QString folder = storage.dir.path() + "/synth-presets";
     page.setFolder(folder);
     page.setTrackModel(&tracks); page.setTrackId(id);
@@ -188,7 +188,7 @@ TEST(qtsynth, presets_load_save_rename_and_delete_in_their_own_folder)
     CHECK(!page.loadPreset("Dub") && !page.lastError().isEmpty());
 
     // The default folder is the app data folder's "synth-presets" (here a throwaway one).
-    SynthWrapper fresh;
+    SynthWrap fresh;
     CHECK(fresh.folder().startsWith(storage.dir.path()) && fresh.folder().endsWith("/synth-presets"));
 }
 
@@ -196,7 +196,7 @@ TEST(qtsynth, synth_track_plays_the_synth_and_edits_reach_it)
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addInstrumentTrackOfType("Synth");
     const auto instrument = controller.trackInstrument(id);
@@ -204,7 +204,7 @@ TEST(qtsynth, synth_track_plays_the_synth_and_edits_reach_it)
     if (!instrument || instrument->typeId() != "synth") return;
     const auto& s = static_cast<const Synth&>(*instrument);
 
-    SynthWrapper page;
+    SynthWrap page;
     page.setFolder(storage.dir.path() + "/presets");
     page.setTrackModel(&tracks); page.setTrackId(id);
     page.set("filter.mode", "highpass");
@@ -228,7 +228,7 @@ TEST(qtsynth, mon_lets_a_midi_keyboard_play_the_synth)
     auto device = std::make_unique<KeyboardDevice>();
     auto* keyboard = device.get();
     EngineController controller(std::move(device), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int id = tracks.addInstrumentTrackOfType("Synth");
     tick(); keyboard->play(2);
@@ -250,11 +250,11 @@ TEST(qtsynth, a_chain_file_carries_the_synth_sound_to_another_synth_track)
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int lead = tracks.addInstrumentTrackOfType("Synth");
     const int second = tracks.addInstrumentTrackOfType("Synth");
-    SynthWrapper page;
+    SynthWrap page;
     page.setFolder(storage.dir.path() + "/presets");
     page.setTrackModel(&tracks); page.setTrackId(lead);
     CHECK(page.loadPreset("Solo Lead"));
@@ -275,9 +275,9 @@ TEST(qtsynth, a_chain_file_carries_the_synth_sound_to_another_synth_track)
 TEST(qtsynth, an_unchanged_copy_of_a_preset_shows_the_copy_s_name)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int id = tracks.addInstrumentTrackOfType("Synth");
-    SynthWrapper page;
+    SynthWrap page;
     page.setFolder(storage.dir.path() + "/synth-presets");
     page.setTrackModel(&tracks); page.setTrackId(id);
     CHECK(page.loadPreset("Fat Bass") && page.currentPreset() == "Fat Bass");

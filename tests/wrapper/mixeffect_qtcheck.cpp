@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/plugins/mixfx/mixfxwrap/mixeffectwrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "audiodevice/audiodevice.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/common/mixEffect/mixEffectWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/audiodevice/audiodevice.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -54,9 +54,9 @@ struct Storage {
 
 TEST(qtmixeffect, the_page_shows_the_specs_cards_and_edits_the_tracks_settings)
 {
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int vocal = tracks.addVocalTrack();
-    MixEffectWrapper page;
+    MixEffectWrap page;
     page.setTrackModel(&tracks);
     page.setTrackId(vocal);
     page.setEffectType("compressor");
@@ -77,7 +77,7 @@ TEST(qtmixeffect, the_page_shows_the_specs_cards_and_edits_the_tracks_settings)
     CHECK((style["choices"].toStringList() == QStringList{"Clean", "Smooth", "Punchy"}));
 
     int changes = 0;
-    QObject::connect(&page, &MixEffectWrapper::valuesChanged, [&] { ++changes; });
+    QObject::connect(&page, &MixEffectWrap::valuesChanged, [&] { ++changes; });
     CHECK(page.values()["ratio"].toDouble() == 4.0);
     CHECK(page.setValue("ratio", 8));
     CHECK(changes == 1);
@@ -108,7 +108,7 @@ TEST(qtmixeffect, the_engine_follows_edits_meters_and_chain_imports)
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int vocal = tracks.addVocalTrack();
     CHECK(tracks.addTrackEffect(vocal, "compressor") >= 0);
@@ -117,7 +117,7 @@ TEST(qtmixeffect, the_engine_follows_edits_meters_and_chain_imports)
     CHECK(monitor && playback && monitor != playback);
     if (!monitor || !playback) return;
 
-    MixEffectWrapper page;
+    MixEffectWrap page;
     page.setTrackModel(&tracks);
     page.setTrackId(vocal);
     page.setEffectType("compressor");
@@ -162,12 +162,12 @@ TEST(qtmixeffect, the_master_track_has_effects_the_engine_runs_and_chains_carry)
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     tracks.addVocalTrack();
     const int master = tracks.masterTrackId();
     int changed = 0;
-    QObject::connect(&tracks, &TrackListWrapper::masterChanged, [&] { ++changed; });
+    QObject::connect(&tracks, &TrackListModelWrap::masterChanged, [&] { ++changed; });
     CHECK(tracks.masterEffects().isEmpty());
     CHECK(tracks.addTrackEffect(master, "limiter") > 0);
     CHECK(changed == 1);
@@ -176,7 +176,7 @@ TEST(qtmixeffect, the_master_track_has_effects_the_engine_runs_and_chains_carry)
     auto limiter = controller.mixEffectProcessor(master, "limiter", true);
     CHECK(limiter != nullptr);
 
-    MixEffectWrapper page;
+    MixEffectWrap page;
     page.setTrackModel(&tracks);
     page.setTrackId(master);
     page.setEffectType("limiter");
@@ -199,7 +199,7 @@ TEST(qtmixeffect, a_clips_effects_get_processors_that_follow_its_settings)
 {
     Storage storage;
     EngineController controller(std::make_unique<SilentDevice>(), false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int vocal = tracks.addVocalTrack();
     auto audio = std::make_shared<AudioData>();
@@ -217,7 +217,7 @@ TEST(qtmixeffect, a_clips_effects_get_processors_that_follow_its_settings)
     CHECK(tracks.clipEffectsInfo(clip)["effects"].toList().size() == 1);
     auto compressor = controller.mixEffectProcessor(id, "compressor", true);
     CHECK(compressor != nullptr);
-    MixEffectWrapper page;
+    MixEffectWrap page;
     page.setTrackModel(&tracks);
     page.setTrackId(id);
     page.setEffectType("compressor");

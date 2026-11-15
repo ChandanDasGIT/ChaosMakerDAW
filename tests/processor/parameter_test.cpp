@@ -1,6 +1,6 @@
 #include "testkit.h"
 
-#include "processor/parameter.h"
+#include "common/processor/parameter.h"
 
 TEST(parameter, starts_at_its_default_and_stays_in_range)
 {

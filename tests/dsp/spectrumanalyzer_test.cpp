@@ -1,6 +1,6 @@
 #include "testkit.h"
 #include "testsignals.h"
-#include "dsp/spectrumanalyzer.h"
+#include "common/dsp/spectrumanalyzer.h"
 
 #include <cmath>
 #include <vector>

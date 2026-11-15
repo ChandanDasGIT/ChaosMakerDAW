@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "persistence/mixfxjson.h"
+#include "common/trackEffectsPanel/plugins/mixFx/mixfxjson.h"
 
 using nlohmann::json;
 

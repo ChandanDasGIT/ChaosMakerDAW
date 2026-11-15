@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "wrapper/plugins/denoise/denoisewrap/denoisewrapper.h"
-#include "wrapper/engineWrap/enginecontroller.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "audiodevice/audiodevice.h"
+#include "wrapper/common/trackEffectsPanel/plugins/denoise/denoiseWrap.h"
+#include "wrapper/common/engine/engineController.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/audiodevice/audiodevice.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -51,7 +51,7 @@ struct Storage {
 void tick(int ms = 30) { QEventLoop loop; QTimer::singleShot(ms, &loop, &QEventLoop::quit); loop.exec(); }
 
 // 1 s of hiss, then 1 s of a loud tone, as a dry take at 0.
-int vocalWithNoise(TrackListWrapper& tracks)
+int vocalWithNoise(TrackListModelWrap& tracks)
 {
     const int vocal = tracks.addVocalTrack();
     auto audio = std::make_shared<AudioData>();
@@ -71,11 +71,11 @@ int vocalWithNoise(TrackListWrapper& tracks)
 TEST(qtdenoise, learning_from_the_selection_draws_the_noise_and_says_why_it_cannot)
 {
     Storage storage;
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     const int vocal = vocalWithNoise(tracks);
-    DenoiseWrapper page;
+    DenoiseWrap page;
     int profileChanged = 0;
-    QObject::connect(&page, &DenoiseWrapper::profileChanged, [&] { ++profileChanged; });
+    QObject::connect(&page, &DenoiseWrap::profileChanged, [&] { ++profileChanged; });
     page.setTrackModel(&tracks);
     page.setEffectsId(vocal);
     CHECK(!page.hasProfile() && page.profile().isEmpty() && page.frequencies().size() == 160);
@@ -101,11 +101,11 @@ TEST(qtdenoise, the_page_shows_the_live_sound_before_and_after_the_effect)
     auto device = std::make_unique<SilentDevice>(); auto* io = device.get();
     EngineController controller(std::move(device), false);
     controller.setRestoreSessionOnStartup(false);
-    TrackListWrapper tracks;
+    TrackListModelWrap tracks;
     controller.attachProject(&tracks);
     const int vocal = vocalWithNoise(tracks);
     CHECK(tracks.addTrackEffect(vocal, "denoise") > 0);
-    DenoiseWrapper page;
+    DenoiseWrap page;
     page.setTrackModel(&tracks);
     page.setEffectsId(vocal);
     CHECK(page.learn(0.0, 1.5));

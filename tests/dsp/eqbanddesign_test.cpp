@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "dsp/eqbanddesign.h"
+#include "common/dsp/eqbanddesign.h"
 #include <algorithm>
 #include <array>
 #include <cmath>

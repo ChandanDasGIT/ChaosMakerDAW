@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "session/tracklist.h"
+#include "common/session/tracklist.h"
 
 // Clip effects (restMap R2): a clip's own effects, by its effects id.
 namespace {

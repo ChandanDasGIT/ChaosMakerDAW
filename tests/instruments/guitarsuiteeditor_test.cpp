@@ -1,6 +1,6 @@
 #include "testkit.h"
-#include "instruments/guitar/guitarsuiteeditor.h"
-#include "instruments/guitar/plugins/guitarsuite/guitarsuite.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/guitarsuiteeditor.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/guitarsuite.h"
 
 TEST(guitarsuiteeditor, add_move_remove_and_parameter_operations) {
     GuitarSuiteEditor editor;

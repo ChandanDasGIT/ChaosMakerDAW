@@ -1,6 +1,6 @@
 #include "testkit.h"
 
-#include "rt/snapshotslot.h"
+#include "common/rt/snapshotslot.h"
 
 #include <atomic>
 #include <thread>

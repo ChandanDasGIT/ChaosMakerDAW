@@ -1,8 +1,8 @@
 #include "testkit.h"
-#include "recording/takerecorder.h"
-#include "wrapper/instruments/guitar/guitarsuiteeditorwrap/guitarsuiteeditorwrapper.h"
-#include "wrapper/session/tracklistwrap/tracklistwrapper.h"
-#include "instruments/guitar/plugins/guitarsuite/guitarsuite.h"
+#include "common/recording/takerecorder.h"
+#include "wrapper/common/trackEffectsPanel/instruments/guitar/electric/electricWrap.h"
+#include "wrapper/common/trackList/trackListModelWrap.h"
+#include "common/trackEffectsPanel/instruments/guitar/electric/guitarsuite.h"
 #include <QCoreApplication>
 #include <QDataStream>
 #include <QEventLoop>
@@ -42,12 +42,12 @@ float parameter(GuitarSuiteModel& model,int row,const char* name){
         if(item.toMap()["id"].toString()==name)return item.toMap()["value"].toFloat();
     return -1000;
 }
-QVariantList bands(TrackListWrapper& model,int track){return model.data(model.index(model.indexOfTrack(track)),TrackListWrapper::EqBandsRole).toList();}
+QVariantList bands(TrackListModelWrap& model,int track){return model.data(model.index(model.indexOfTrack(track)),TrackListModelWrap::EqBandsRole).toList();}
 }
 TEST(qtpresets, eq_factory_and_custom_presets_restore_all_bands_on_only_the_selected_track) {
-    Fixture f;TrackListWrapper tracks;
+    Fixture f;TrackListModelWrap tracks;
     const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar"),other=tracks.addVocalTrack();
-    int updates=0;QObject::connect(&tracks,&TrackListWrapper::cleanMonitorEqChanged,[&]{++updates;});
+    int updates=0;QObject::connect(&tracks,&TrackListModelWrap::cleanMonitorEqChanged,[&]{++updates;});
     // The clean monitor follows the monitor button (record arm is separate), so monitor the track.
     CHECK(tracks.setMonitorEnabled(guitar,true));const int before=updates;
     CHECK(tracks.eqPresetNames().size()==7);CHECK(tracks.applyEqPreset(guitar,4));CHECK(updates==before+1);
@@ -58,7 +58,7 @@ TEST(qtpresets, eq_factory_and_custom_presets_restore_all_bands_on_only_the_sele
     CHECK(!tracks.applyEqPreset(guitar,100));CHECK(!tracks.saveEqPreset(-1,f.url("invalid.eqpreset")));
 }
 TEST(qtpresets, invalid_eq_files_leave_current_curve_unchanged) {
-    Fixture f;TrackListWrapper tracks;const int track=tracks.addVocalTrack();CHECK(tracks.applyEqPreset(track,2));const auto saved=bands(tracks,track);
+    Fixture f;TrackListModelWrap tracks;const int track=tracks.addVocalTrack();CHECK(tracks.applyEqPreset(track,2));const auto saved=bands(tracks,track);
     CHECK(!tracks.loadEqPreset(track,f.url("missing.eqpreset")));CHECK(!tracks.eqPresetError().isEmpty());
     f.write("bad.eqpreset","not json");CHECK(!tracks.loadEqPreset(track,f.url("bad.eqpreset")));
     CHECK(tracks.saveEqPreset(track,f.url("valid.eqpreset")));
@@ -242,7 +242,7 @@ TEST(qtpresets, the_board_says_which_preset_is_playing_and_whether_it_was_change
 }
 
 TEST(qtpresets, session_roundtrip_keeps_audio_controls_tempo_and_tremolo_sustain) {
-    Fixture f; TrackListWrapper tracks;
+    Fixture f; TrackListModelWrap tracks;
     const int guitar=tracks.addInstrumentTrackOfType("Electric Guitar");
     tracks.setTempo(97.5,7,8); tracks.setVolume(guitar,0.6); tracks.setMuted(guitar,true); tracks.setSolo(guitar,true);
     tracks.setEqBand(guitar,4,-3); tracks.setRecordArmed(guitar,true); tracks.setTrackInputPort(guitar,"test:input");
@@ -254,7 +254,7 @@ TEST(qtpresets, session_roundtrip_keeps_audio_controls_tempo_and_tremolo_sustain
         CHECK(recorder.error().empty());
     }
     CHECK(tracks.attachTake(guitar,24000,audio));
-    const auto state=tracks.sessionState(); TrackListWrapper restored; QString error;
+    const auto state=tracks.sessionState(); TrackListModelWrap restored; QString error;
     CHECK(restored.restoreSessionState(state,error)); CHECK(error.isEmpty()); CHECK(restored.count()==1);
     CHECK_NEAR(restored.project().tempo().bpm(),97.5,1e-9); CHECK(restored.project().tempo().numerator()==7);
     const auto& track=*restored.project().tracks().front(); CHECK(track.muted && track.solo); CHECK(!track.recordArmed);

@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "plugins/chordplayer/chordplayer.h"
+#include "common/chordPlayer/chordplayer.h"
 
 #include <algorithm>
 #include <cmath>

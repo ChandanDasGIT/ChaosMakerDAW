@@ -1,5 +1,5 @@
 #include "testkit.h"
-#include "mixer/mixerpanel.h"
+#include "common/mixer/mixerpanel.h"
 #include <limits>
 
 TEST(mixerpanel, volume_clamping_and_conversion)
